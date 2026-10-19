@@ -288,9 +288,11 @@ The shareware save has the same layout, with its own addresses and `BYTEVERSION`
 ## Comparison reports
 
 The per-module EXE-vs-source comparison reports behind the ledger's C and G13 rows are
-kept out of tree in `~/Projects/ref/notes/1.3d-<module>.md` (con-compiler,
-con-interpreter, game, actors, player, premap, sector). They hold the exact decompile
-and assembly line references. Each module's 1.3D (full EXE) address range:
+in `docs/v13d/notes/1.3d-<module>.md` (con-compiler, con-interpreter, game, actors,
+player, premap, sector). They hold the exact decompile and assembly line references.
+Paths starting `<scratch>/` point to session-only working files (decompiles and
+disassembly listings) that weren't kept; regenerate them with `~/Projects/ref/tools/gh` and the
+addresses given. Each module's 1.3D (full EXE) address range:
 
 | Module | Range |
 |---|---|
