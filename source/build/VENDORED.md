@@ -51,3 +51,28 @@ BUILDLIC.TXT LICENSE.md
     `SDL_WasInit(SDL_INIT_VIDEO)` is 0
 - `cache1d.c`: `suckcache` passes `copybuf` a count of 4-byte words (it
   passed a byte count, copying 4x too much); pre-existing upstream bug
+- All files: `long` → `int32_t` and `unsigned long` → `uint32_t` via
+  `tools/retype_long.py`, which also adds `#include <stdint.h>` to every file it
+  changes (64-bit port; restores the original 32-bit `long` semantics)
+- 64-bit addresses: values holding memory addresses are `intptr_t`/`uintptr_t`
+  or real pointers:
+  - `frameplace`, `frameoffset`, `bakframeplace[]`, `FP_OFF` (now
+    `((intptr_t)(x))`), `waloff[]`, `voxoff[][]`, `palookupoffse[]`,
+    `bufplce[]`, `globalbufplc`, `slopalookup[]`, `asm2`, `asm3`
+  - `cache1d.c` `cachestart` and the `allocache`/`initcache` handles
+  - the address parameters of the `a.c` routines
+  - prototypes in `a.h`, `engine_protos.h`, `display.h`, `engine.h`,
+    `cache1d.h`
+- `a.c`: the `vlineasm4`/`mvlineasm4`/`tvlineasm2` loops that relied on 32-bit
+  address wraparound use equivalent pointer arithmetic; `rhlineasm4`/
+  `rmhlineasm4` index the palookup with the pixel instead of the reverse;
+  `slopevlin` reads palookup addresses from `intptr_t slopalookup[]`;
+  `tspritevline` adds its step as signed
+- `engine.c`: `drawmasks` swaps sprite pointers directly (it swapped half of
+  each); `initengine` clears all of `waloff[]`; `loadpics` aligns `pic` with
+  `~(intptr_t)15`
+- `build.h`: `BUILD_STATIC_ASSERT` checks `sectortype`/`walltype`/`spritetype`
+  are 40/32/44 bytes
+- printf formats match their now-32-bit arguments; C-library narrowings
+  (`read`, `lseek`, `sendto`, `recvfrom`, `time`, `strtol`, `strlen`) are
+  explicit casts

@@ -38,10 +38,20 @@ Options (pass with `-D` when configuring):
 | `DUKE3D_CONTROLS_MENU` | `ON` | In-game controls configuration menu |
 | `DUKE3D_FETCH_SDL` | `AUTO` | `ON` always builds SDL2 from source, `OFF` never does |
 
-**Known issue:** the 64-bit builds don't run the game yet. The engine stores
-pointers and file data in `long`, which is 64 bits on macOS/Linux and too
-small for pointers on Windows. On macOS/Linux, loading the GRP fails with
-"Not enough memory for file grouping system". Fixing that is the next step.
+**64-bit:** the game runs as a native 64-bit binary. That's verified on macOS
+arm64; Linux and Windows are built and tested in CI. Saves from this build
+can't be loaded by the original DOS game, and original DOS saves can't be
+loaded yet. Demo recording, the editor's map saving and network play haven't
+been verified on 64-bit. Those are the next steps.
+
+Without a `duke3d.cfg`, the game starts with default settings and writes one:
+to `~/Library/Application Support/Duke Nukem 3D/` on macOS, `~/.duke3d/` on
+Linux, and the game's folder on Windows. If your game data is version 1.3D,
+set `UseOldVersion = 1` under `[Misc]` in that file.
+
+To run the boot test against your own game data, configure with
+`-DDUKE3D_GRP=/path/to/DUKE3D.GRP`. That registers `render_e1l1` and
+`game_boot`, which need the GRP and so never run in CI.
 
 The original DOS/Watcom makefiles (`source/makefile.dos`,
 `source/makefile.lnk`) are kept for reference only.
