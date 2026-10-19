@@ -194,12 +194,20 @@ int32_t hitawall(struct player_struct *p,short *hitw)
     int32_t sx,sy,sz;
     short sect,hs;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+    // 1.3D returns what hitscan returns (0, or -1 outside any sector), not the distance.
+    return hitscan(p->posx,p->posy,p->posz,p->cursectnum,
+        sintable[(p->ang+512)&2047],
+        sintable[p->ang&2047],
+        0,&sect,hitw,&hs,&sx,&sy,&sz,CLIPMASK0);
+#else
     hitscan(p->posx,p->posy,p->posz,p->cursectnum,
         sintable[(p->ang+512)&2047],
         sintable[p->ang&2047],
         0,&sect,hitw,&hs,&sx,&sy,&sz,CLIPMASK0);
 
     return ( FindDistance2D(sx-p->posx,sy-p->posy) );
+#endif
 }
 
 short aim(spritetype *s,short aang)
@@ -238,12 +246,14 @@ short aim(spritetype *s,short aang)
             {
                 if(badguy(&sprite[i]) || PN == APLAYER || PN == SHARK)
                 {
+#if DUKE3D_GAMEVER >= GAMEVER_14
                     if( PN == APLAYER &&
 //                        ud.ffire == 0 &&
                         ud.coop == 1 &&
                         s->picnum == APLAYER &&
                         s != &sprite[i])
                             continue;
+#endif
 
                     if(gotshrinker && sprite[i].xrepeat < 30 )
                     {
@@ -251,7 +261,11 @@ short aim(spritetype *s,short aang)
                         {
                             case SHARK:
                                 if(sprite[i].xrepeat < 20) continue;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                                break;
+#else
                                     continue;
+#endif
                             case GREENSLIME:
                             case GREENSLIME+1:
                             case GREENSLIME+2:
@@ -384,7 +398,11 @@ void shoot(short i,short atwith)
             {
                 if( FindDistance2D(sx-hitx,sy-hity) < 1024 )
                     if( hitwall >= 0 && wall[hitwall].overpicnum != BIGFORCE )
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        if( ( wall[hitwall].nextsector >= 0 &&
+#else
                         if( ( wall[hitwall].nextsector >= 0 && hitsect >= 0 &&
+#endif
                             sector[wall[hitwall].nextsector].lotag == 0 &&
                                 sector[hitsect].lotag == 0 &&
                                     sector[wall[hitwall].nextsector].lotag == 0 &&
@@ -419,7 +437,11 @@ void shoot(short i,short atwith)
                         sprite[k].cstat |= (TRAND&4);
                         ssp(k,CLIPMASK0);
                         setsprite(k,sprite[k].x,sprite[k].y,sprite[k].z);
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        if( PN == OOZFILTER )
+#else
                         if( PN == OOZFILTER || PN == NEWBEAST )
+#endif
                             sprite[k].pal = 6;
                     }
                 }
@@ -464,6 +486,7 @@ void shoot(short i,short atwith)
                         }
                     }
                 }
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 else if(p >= 0 && zvel > 0 && sector[hitsect].lotag == 1)
                 {
                     j = spawn(ps[p].i,WATERSPLASH2);
@@ -475,6 +498,7 @@ void shoot(short i,short atwith)
                     sprite[j].xvel = 0;
 
                 }
+#endif
             }
 
             break;
@@ -530,7 +554,11 @@ void shoot(short i,short atwith)
             {
                 j = findplayer(s,&x);
                 sz -= (4<<8);
+#if DUKE3D_GAMEVER < GAMEVER_14
+                zvel = ( (ps[j].posz-sz) <<8 ) / (ldist(&sprite[ps[j].i], s ) + 1);
+#else
                 zvel = ( (ps[j].posz-sz) <<8 ) / (ldist(&sprite[ps[j].i], s ) );
+#endif
                 if(s->picnum != BOSS1)
                 {
                     zvel += 128-(TRAND&255);
@@ -580,7 +608,11 @@ void shoot(short i,short atwith)
                 if(hitspr >= 0)
                 {
                     checkhitsprite(hitspr,k);
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if( sprite[hitspr].picnum == APLAYER )
+#else
                     if( sprite[hitspr].picnum == APLAYER && (ud.coop != 1 || ud.ffire == 1) )
+#endif
                     {
                         l = spawn(k,JIBS6);
                         sprite[k].xrepeat = sprite[k].yrepeat = 0;
@@ -884,7 +916,11 @@ void shoot(short i,short atwith)
                     sprite[j].xrepeat = 24;
                     sprite[j].yrepeat = 24;
                 }
+#if DUKE3D_GAMEVER < GAMEVER_14
+                else
+#else
                 else if(atwith != FREEZEBLAST)
+#endif
                 {
                     sprite[j].xrepeat = 30;
                     sprite[j].yrepeat = 30;
@@ -912,10 +948,14 @@ void shoot(short i,short atwith)
             }
 
             sprite[j].cstat = 128;
+#if DUKE3D_GAMEVER < GAMEVER_14
+            sprite[j].clipdist = 4;
+#else
             if(atwith == RPG)
                 sprite[j].clipdist = 4;
             else
                 sprite[j].clipdist = 40;
+#endif
 
             break;
 
@@ -934,7 +974,9 @@ void shoot(short i,short atwith)
             if(hitspr >= 0) break;
 
             if(hitwall >= 0 && hitsect >= 0)
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 if( ((hitx-sx)*(hitx-sx)+(hity-sy)*(hity-sy)) < (290*290) )
+#endif
             {
                 if( wall[hitwall].nextsector >= 0)
                 {
@@ -956,8 +998,10 @@ void shoot(short i,short atwith)
                 sprite[k].cstat = 16;
                 hittype[k].temp_data[5] = sprite[k].ang = getangle(wall[hitwall].x-wall[wall[hitwall].point2].x,wall[hitwall].y-wall[wall[hitwall].point2].y)-512;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 if(p >= 0)
                     ps[p].ammo_amount[TRIPBOMB_WEAPON]--;
+#endif
 
             }
             return;
@@ -982,6 +1026,7 @@ void shoot(short i,short atwith)
                 sz+(6<<8),atwith,-64,32,32,sa,vel,zvel,i,1);
             break;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
         case GROWSPARK:
 
             if(p >= 0)
@@ -1073,6 +1118,7 @@ void shoot(short i,short atwith)
             }
 
             break;
+#endif
         case SHRINKER:
             if( s->extra >= 0 ) s->shade = -96;
             if(p >= 0)
@@ -2263,12 +2309,20 @@ void checkweapons(struct player_struct *p)
 
     cw = p->curr_weapon;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+    // 1.3D drops a freezer as a FREEZEBLAST, and has no range check.
+    if(cw)
+    {
+        if(TRAND&1)
+            spawn(p->i,cw == FREEZE_WEAPON ? FREEZEBLAST : weapon_sprites[cw]);
+#else
     if(cw < 1 || cw >= MAX_WEAPONS) return;
 
     if(cw)
     {
         if(TRAND&1)
             spawn(p->i,weapon_sprites[cw]);
+#endif
         else switch(cw)
         {
             case RPG_WEAPON:
@@ -2300,11 +2354,16 @@ void processinput(short snum)
     psect = p->cursectnum;
     if(psect == -1)
     {
+#if DUKE3D_GAMEVER < GAMEVER_14
+        if(s->extra > 0) // 1.3D kills even with clipping off
+#else
         if(s->extra > 0 && ud.clipping == 0)
+#endif
         {
             quickkill(p);
             spritesound(SQUISHED,pi);
         }
+        // 1.3D went on to read sector[-1]; sector 0 stands in for it.
         psect = 0;
     }
 
@@ -2371,8 +2430,13 @@ void processinput(short snum)
         else if(badguy(&sprite[j]) && sprite[j].xrepeat > 24 && klabs(s->z-sprite[j].z) < (84<<8) )
         {
             j = getangle(sprite[j].x-p->posx,sprite[j].y-p->posy);
+#if DUKE3D_GAMEVER < GAMEVER_14
+            p->posxv -= sintable[(j+512)&2047]<<6;
+            p->posyv -= sintable[j&2047]<<6;
+#else
             p->posxv -= sintable[(j+512)&2047]<<4;
             p->posyv -= sintable[j&2047]<<4;
+#endif
         }
     }
 
@@ -2432,7 +2496,9 @@ void processinput(short snum)
                 ps[i].gm = MODE_EOL;
             p->fist_incs = 0;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
             return;
+#endif
         }
     }
 
@@ -2506,6 +2572,10 @@ void processinput(short snum)
     {
         if(p->dead_flag == 0)
         {
+#if DUKE3D_GAMEVER < GAMEVER_14
+            if(s->pal != 1)
+                checkweapons(p);
+#endif
             if(s->pal != 1)
             {
                 p->pals[0] = 63;
@@ -2908,7 +2978,11 @@ void processinput(short snum)
             else
             {
                 p->on_ground = 0;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                p->poszv += 256; // 1.3D: fixed, not from the CON gravity
+#else
                 p->poszv += (gc+80); // (TICSPERFRAME<<6);
+#endif
                 if(p->poszv >= (4096+2048)) p->poszv = (4096+2048);
                 if(p->poszv > 2400 && p->falling_counter < 255)
                 {
@@ -3040,8 +3114,10 @@ void processinput(short snum)
         if(p->posz < (cz+(4<<8)))
         {
             p->jumping_counter = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_14
             if(p->poszv < 0)
                 p->posxv = p->posyv = 0;
+#endif
             p->poszv = 128;
             p->posz = cz+(4<<8);
         }
@@ -3080,6 +3156,7 @@ void processinput(short snum)
     {
         j = sector[s->sectnum].floorpicnum;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
         if( j == PURPLELAVA || sector[s->sectnum].ceilingpicnum == PURPLELAVA )
         {
             if(p->boot_amount > 0)
@@ -3098,10 +3175,15 @@ void processinput(short snum)
                 s->extra--;
             }
         }
+#endif
 
         k = 0;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+        if(p->on_ground && truefdist <= PHEIGHT+(16<<8) && p->posz >= hittype[pi].floorz-(40<<8))
+#else
         if(p->on_ground && truefdist <= PHEIGHT+(16<<8))
+#endif
         {
             switch(j)
             {
@@ -3291,7 +3373,11 @@ void processinput(short snum)
         if( psectlotag < 3 )
         {
             psect = s->sectnum;
+#if DUKE3D_GAMEVER < GAMEVER_14
+            if( sector[psect].lotag == 31 )
+#else
             if( ud.clipping == 0 && sector[psect].lotag == 31)
+#endif
             {
                 if( sprite[sector[psect].hitag].xvel && hittype[sector[psect].hitag].temp_data[0] == 0)
                 {
@@ -3312,7 +3398,9 @@ void processinput(short snum)
             j = ( pushmove(&p->posx,&p->posy,&p->posz,&p->cursectnum,164L,(4L<<8),(4L<<8),CLIPMASK0) < 0 && furthestangle(pi,8) < 512 );
         else j = 0;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
         if(ud.clipping == 0)
+#endif
         {
             if( klabs(hittype[pi].floorz-hittype[pi].ceilingz) < (48<<8) || j )
             {
@@ -3383,6 +3471,16 @@ void processinput(short snum)
 
     //Shooting code/changes
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+    // 1.3D switches one tic earlier, and has no expander.
+    if( p->show_empty_weapon > 0)
+        p->show_empty_weapon--;
+    if(p->show_empty_weapon == 1)
+    {
+        addweapon( p, p->last_full_weapon );
+        return;
+    }
+#else
     if( p->show_empty_weapon > 0)
     {
         p->show_empty_weapon--;
@@ -3396,6 +3494,7 @@ void processinput(short snum)
             return;
         }
     }
+#endif
 
     if(p->knee_incs > 0)
     {
@@ -3424,7 +3523,9 @@ void processinput(short snum)
                     case FEM7:
                     case FEM8:
                     case FEM9:
+#if DUKE3D_GAMEVER >= GAMEVER_14
                     case FEM10:
+#endif
                     case PODFEM1:
                     case NAKED1:
                     case STATUE:
@@ -3473,7 +3574,11 @@ void processinput(short snum)
 
     SHOOTINCODE:
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+    if( p->curr_weapon == SHRINKER_WEAPON )
+#else
     if( p->curr_weapon == SHRINKER_WEAPON || p->curr_weapon == GROW_WEAPON )
+#endif
         p->random_club_frame += 64; // Glowing
 
     if(p->rapid_fire_hold == 1)
@@ -3482,13 +3587,21 @@ void processinput(short snum)
         p->rapid_fire_hold = 0;
     }
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+    // 1.3D doesn't run the weapon at all while shrunk, tipping or using a card.
+    if(shrunk || p->tipincs || p->access_incs)
+        return;
+#else
     if(shrunk || p->tipincs || p->access_incs)
         sb_snum &= ~(1<<2);
+#endif
     else if ( shrunk == 0 && (sb_snum&(1<<2)) && (*kb) == 0 && p->fist_incs == 0 &&
          p->last_weapon == -1 && ( p->weapon_pos == 0 || p->holster_weapon == 1 ) )
     {
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
         p->crack_time = 777;
+#endif
 
         if(p->holster_weapon == 1)
         {
@@ -3566,6 +3679,9 @@ void processinput(short snum)
                     {
                         p->posz = p->oposz;
                         p->poszv = 0;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        p->ammo_amount[TRIPBOMB_WEAPON]--; // 1.3D takes the bomb here, not in shoot()
+#endif
                         (*kb) = 1;
                     }
                 }
@@ -3811,7 +3927,15 @@ void processinput(short snum)
                         shoot(pi,CHAINGUN);
                         lastvisinc = totalclock+32;
                         p->visibility = 0;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        if(p->ammo_amount[CHAINGUN_WEAPON] == 0)
+                        {
+                            checkavailweapon(p);
+                            return;
+                        }
+#else
                         checkavailweapon(p);
+#endif
 
                         if( ( sb_snum&(1<<2) ) == 0 )
                         {
@@ -3933,8 +4057,10 @@ void processinput(short snum)
                     else *kb = 0;
                 }
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 if(p->wantweaponfire >= 0)
                     checkavailweapon(p);
+#endif
                 break;
 
             case RPG_WEAPON:
