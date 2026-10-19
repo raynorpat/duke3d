@@ -7662,6 +7662,13 @@ int main(int argc,char **argv)
     FX_StopAllSounds();
     clearsoundlocks();
 
+    i = CheckParm("LOADVERIFY");
+    if(i && i+1 < _argc)
+    {
+        j = CheckParm("SAVEVERIFY");
+        exit(loadverify(_argv[i+1],(j && j+1 < _argc) ? _argv[j+1] : NULL));
+    }
+
     if(ud.warp_on > 1 && ud.multimode < 2)
     {
         clearview(0L);

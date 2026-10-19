@@ -195,13 +195,9 @@ static int loadpheader(char spot,int32 *vn,int32 *ln,int32 *psk,int32 *nump)
 
 int loadplayer(signed char spot)
 {
-     short k,music_changed;
      char fn[] = "game0.sav";
      char mpfn[] = "gameA_00.sav";
      char fullname[128];
-     char *fnptr, scriptptrs[MAXSCRIPTSIZE];
-     int32_t fil, bv, i, j, x, animoffs[MAXANIMATES];
-     int32 nump;
 
      if(spot < 0)
      {
@@ -223,15 +219,23 @@ int loadplayer(signed char spot)
          else mpfn[7] = multiwho + '0';
 
          GetPathFromEnvironment(fullname, 128, mpfn);
-         fnptr = fullname;
      }
      else
      {
         fn[4] = spot + '0';
 
         GetPathFromEnvironment(fullname, 128, fn);
-        fnptr = fullname;
      }
+
+     return loadplayerfile(fullname,spot);
+}
+
+int loadplayerfile(char *fnptr, signed char spot)
+{
+     short k,music_changed;
+     char scriptptrs[MAXSCRIPTSIZE];
+     int32_t fil, bv, i, j, x, animoffs[MAXANIMATES];
+     int32 nump;
 
      if ((fil = kopen4load(fnptr,0)) == -1) return(-1);
 
@@ -240,6 +244,7 @@ int loadplayer(signed char spot)
      kdfread(&bv,4,1,fil);
      if(bv != BYTEVERSION)
      {
+        printf("%s is a version %d save, not %d.\n",fnptr,bv,BYTEVERSION);
         FTA(114,&ps[myconnectindex]);
         kclose(fil);
         ototalclock = totalclock;
@@ -497,13 +502,9 @@ int loadplayer(signed char spot)
 
 int saveplayer(signed char spot)
 {
-     int32_t i, j, animoffs[MAXANIMATES];
      char fn[] = "game0.sav";
      char mpfn[] = "gameA_00.sav";
      char fullname[128];
-     char *fnptr,scriptptrs[MAXSCRIPTSIZE];
-     FILE *fil;
-     int32_t bv = BYTEVERSION;
 
      if(spot < 0)
      {
@@ -527,15 +528,23 @@ int saveplayer(signed char spot)
          else mpfn[7] = multiwho + '0';
 
          GetPathFromEnvironment(fullname, 128, mpfn);
-         fnptr = fullname;
      }
      else
      {
         fn[4] = spot + '0';
 
         GetPathFromEnvironment(fullname, 128, fn);
-        fnptr = fullname;
      }
+
+     return saveplayerfile(fullname,spot);
+}
+
+int saveplayerfile(char *fnptr, signed char spot)
+{
+     int32_t i, j, animoffs[MAXANIMATES];
+     char scriptptrs[MAXSCRIPTSIZE];
+     FILE *fil;
+     int32_t bv = BYTEVERSION;
 
      if ((fil = fopen(fnptr,"wb")) == 0) return(-1);
 
@@ -646,6 +655,44 @@ int saveplayer(signed char spot)
      ototalclock = totalclock;
 
      return(0);
+}
+
+/*
+ * -loadverify: load a save headless and print what the status bar shows.
+ * With -saveverify, save it again straight away. Returns the exit code:
+ * 0 loaded, 1 couldn't open or write a file, 2 refused.
+ */
+int loadverify(char *loadname, char *savename)
+{
+     struct player_struct *p = &ps[0];
+     int r = loadplayerfile(loadname,0);
+
+     if(r == -1)
+     {
+         printf("Can't open %s.\n",loadname);
+         return 1;
+     }
+     if(r != 0) return 2;
+
+     printf("SAVESTATE %d %d %d %d %d %d %d %d\n",
+         sprite[p->i].extra,p->shield_amount,p->curr_weapon,
+         p->ammo_amount[p->curr_weapon],ud.volume_number,ud.level_number,
+         p->posx,p->posy);
+
+     if(savename != NULL)
+     {
+         /* saveplayer writes the menu's screenshot tile; use the loaded one */
+         walock[MAXTILES-1] = 255;
+         if (waloff[MAXTILES-1] == 0) allocache(&waloff[MAXTILES-1],160*100,&walock[MAXTILES-1]);
+         copybufbyte((void *)waloff[MAXTILES-3],(void *)waloff[MAXTILES-1],160*100);
+         if(saveplayerfile(savename,0) != 0)
+         {
+             printf("Can't write %s.\n",savename);
+             return 1;
+         }
+     }
+     fflush(stdout);
+     return 0;
 }
 
 #define LMB (buttonstat&1)
