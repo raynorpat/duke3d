@@ -1,6 +1,6 @@
-# Jim Dose's audio library, played through SDL audio. usrhooks.c is left out on
-# purpose: sounds.c defines the same USRHOOKS_* functions. No include
-# directory is exported: audiolib/assert.h would shadow <assert.h>.
+# Jim Dose's audio library, played through SDL audio. Only the parts the
+# game uses are kept; the DOS sound card drivers are gone. sounds.c supplies
+# the USRHOOKS_* functions. Includes are written as "audiolib/...".
 
 add_library(audiolib STATIC
   al_midi.c
