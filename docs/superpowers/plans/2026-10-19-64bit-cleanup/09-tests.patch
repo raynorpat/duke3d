@@ -1,0 +1,334 @@
+diff --git a/source/CMakeLists.txt b/source/CMakeLists.txt
+index d272ea10a4f23602a46a865d861dad6b0714ef2c..19e2995c105c7d8c82a875c4d487dd2d86fcdcf6 100644
+--- a/source/CMakeLists.txt
++++ b/source/CMakeLists.txt
+@@ -1,10 +1,11 @@
+-add_executable(duke3d
++# Everything but game.c, which holds main(). The con_compile test links
++# these objects with its own main().
++add_library(duke3d_game OBJECT
+   actors.c
+   animlib.c
+   config.c
+   control.c
+   dukemusc.c
+-  game.c
+   gamedef.c
+   global.c
+   keyboard.c
+@@ -17,9 +18,12 @@ add_executable(duke3d
+   sounds.c)
+ 
+ # "build/engine.h" etc. resolve against this directory.
+-target_include_directories(duke3d PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+-target_link_libraries(duke3d PRIVATE
+-  duke3d_game_options buildengine audiolib duke3d::SDL2_mixer duke3d::SDL2main)
++target_include_directories(duke3d_game PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
++target_link_libraries(duke3d_game PUBLIC
++  duke3d_game_options buildengine audiolib duke3d::SDL2_mixer)
++
++add_executable(duke3d game.c)
++target_link_libraries(duke3d PRIVATE duke3d_game duke3d::SDL2main)
+ 
+ # Animation playback used to crash from an optimizer bug on Mac OS X.
+ if(APPLE)
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index cedfed3700f933c7f8fb616106ae02b56e0f289e..bd30aa05da7f0f5b4e0436df9d7bb698d0e1f81b 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -3,15 +3,10 @@
+ add_executable(sdl_driver_smoke sdl_driver_smoke.c)
+ target_link_libraries(sdl_driver_smoke PRIVATE buildengine duke3d::SDL2main)
+ 
+-# Not registered on Windows: the engine keeps pointers in 32-bit "long"
+-# there (LLP64), so it builds but crashes at runtime until the 64-bit
+-# cleanup spec lands. Building it still catches compile/link breakage.
+-if(NOT WIN32)
+-  add_test(NAME sdl_driver_smoke COMMAND sdl_driver_smoke)
+-  set_tests_properties(sdl_driver_smoke PROPERTIES
+-    ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+-    TIMEOUT 30)
+-endif()
++add_test(NAME sdl_driver_smoke COMMAND sdl_driver_smoke)
++set_tests_properties(sdl_driver_smoke PROPERTIES
++  ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
++  TIMEOUT 30)
+ 
+ # Renders E1L1's start view from a real GRP and compares the frame
+ # checksum. Needs game data, so it is only registered when DUKE3D_GRP
+@@ -30,4 +25,46 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
+   set_tests_properties(render_e1l1 PROPERTIES
+     ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+     TIMEOUT 30)
++
++  # Boots the real game to its title loop and into E1L1, headless.
++  if(WIN32)
++    set(_cfg_dir ".")
++  elseif(APPLE)
++    set(_cfg_dir "Library/Application Support/Duke Nukem 3D")
++  else()
++    set(_cfg_dir ".duke3d")
++  endif()
++  add_test(NAME game_boot
++    COMMAND "${CMAKE_COMMAND}"
++            "-DDUKE3D=$<TARGET_FILE:duke3d>"
++            "-DGRP=${DUKE3D_GRP}"
++            "-DCON_DIR=${PROJECT_SOURCE_DIR}/testdata"
++            "-DWORK=${CMAKE_BINARY_DIR}/gb"
++            "-DCFG_DIR=${_cfg_dir}"
++            -P "${CMAKE_CURRENT_SOURCE_DIR}/game_boot.cmake")
++  set_tests_properties(game_boot PROPERTIES TIMEOUT 60)
+ endif()
++
++# Compiles the in-repo CON scripts with the game's own compiler and checks
++# the script addresses it stores. Needs no game data. game.c is built again
++# here with its main() renamed, since the test brings its own.
++set(_game_c "${PROJECT_SOURCE_DIR}/source/game.c")
++add_executable(con_compile con_compile.c "${_game_c}")
++set_source_files_properties("${_game_c}" PROPERTIES
++  COMPILE_DEFINITIONS "SDL_MAIN_HANDLED;main=duke3d_main")
++target_link_libraries(con_compile PRIVATE duke3d_game)
++
++set(_con_dir "${CMAKE_CURRENT_BINARY_DIR}/con_compile")
++foreach(_con game.con DEFS.CON USER.CON)
++  string(TOLOWER "${_con}" _src)
++  configure_file("${PROJECT_SOURCE_DIR}/testdata/${_src}" "${_con_dir}/${_con}"
++                 COPYONLY)
++endforeach()
++# game.con with one action in front. The compiler can't nest includes, so
++# this is a copy rather than an "include game.con".
++file(READ "${PROJECT_SOURCE_DIR}/testdata/game.con" _game_con)
++file(WRITE "${_con_dir}/prefix.con"
++  "action CONCOMPILE_PREFIX 0 1 1 1 1\r\n${_game_con}")
++
++add_test(NAME con_compile COMMAND con_compile WORKING_DIRECTORY "${_con_dir}")
++set_tests_properties(con_compile PROPERTIES TIMEOUT 30)
+diff --git a/tests/con_compile.c b/tests/con_compile.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..9dbd821578e135d524f7eca9be5d3f58f1036053
+--- /dev/null
++++ b/tests/con_compile.c
+@@ -0,0 +1,151 @@
++/*
++ * Compiles the in-repo CON scripts with the game's real compiler and checks
++ *  that every script address it stores is a byte offset into script[].
++ *
++ * Address slots are found by compiling twice: once from game.con, and once
++ *  from prefix.con, which is game.con with one action (5 slots) defined in
++ *  front. Everything game.con emits moves up by 5 slots. A slot holding
++ *  a value compiles the same both times; a slot holding a script address
++ *  (jump target, label, actor or ai entry) grows by exactly 20 bytes. Every
++ *  such slot, every non-define label and every actor entry must then lie in
++ *  [0, scriptsize * 4). An absolute address doesn't.
++ *
++ * Run it from a directory holding game.con, DEFS.CON, USER.CON and
++ *  prefix.con.
++ */
++#define SDL_MAIN_HANDLED  /* game.c's main() is renamed; this one is ours. */
++#include "duke3d.h"
++
++#define PREFIX_SLOTS 5  /* one action: five values, its keyword dropped */
++#define SHIFT (PREFIX_SLOTS * 4)
++
++static int32_t a_script[MAXSCRIPTSIZE];
++static int32_t a_labelcode[MAXSCRIPTSIZE];
++static int32_t a_actorscrptr[MAXTILES];
++static int32_t a_size, a_labelcnt;
++
++static int failures = 0;
++
++static void fail(const char *what, int32_t index, int32_t value)
++{
++    if (failures++ < 20)
++        printf("FAIL: %s [%d] = %d (0x%x)\n", what, index, value, value);
++}
++
++/* A stored script address must be a 4-aligned byte offset in the script. */
++static int is_offset(int32_t v)
++{
++    return v >= 0 && v < a_size * 4 && (v & 3) == 0;
++}
++
++static int compile(char *filename)
++{
++    /* The compiler skips some slots (unset actor header fields), which the
++       game only ever compiles into a zeroed script[]. */
++    memset(script, 0, sizeof(script));
++
++    /* The buffers compilecons() hands the compiler. */
++    mymembuf = (char *)&hittype[0];
++    labelcode = (int32_t *)&sector[0];
++    label = (char *)&sprite[0];
++
++    loadefs(filename, mymembuf);
++    if (error || loadfromgrouponly)
++    {
++        printf("FAIL: compiling %s (errors: %d)\n", filename, error);
++        return 0;
++    }
++    if (script[0] != SCRIPT_OFF(scriptptr))
++    {
++        printf("FAIL: script[0] = %d, not the script size in bytes\n", script[0]);
++        return 0;
++    }
++    return 1;
++}
++
++int main(void)
++{
++    int32_t i, a, b, addrslots = 0, addrlabels = 0, actors = 0;
++
++    groupfile = -1;          /* no GRP: never offer the internal defaults */
++    loadfromgrouponly = 0;
++
++    if (!compile("game.con"))
++        return 1;
++    a_size = script[0] / 4;
++    a_labelcnt = labelcnt;
++    memcpy(a_script, script, sizeof(script));
++    memcpy(a_labelcode, labelcode, labelcnt * sizeof(int32_t));
++    memcpy(a_actorscrptr, actorscrptr, sizeof(actorscrptr));
++
++    if (!compile("prefix.con"))
++        return 1;
++    if (script[0] != a_script[0] + SHIFT || labelcnt != a_labelcnt + 1)
++    {
++        printf("FAIL: prefix.con compiled to %d bytes and %d labels, "
++               "expected %d and %d\n",
++               script[0], labelcnt, a_script[0] + SHIFT, a_labelcnt + 1);
++        return 1;
++    }
++
++    /* script[]: jump targets and label operands. Slot 0 is the size. */
++    for (i = 1; i < a_size; i++)
++    {
++        a = a_script[i];
++        b = script[i + PREFIX_SLOTS];
++        if (a == b)
++            continue;
++        addrslots++;
++        if (b - a != SHIFT)
++            fail("script slot moved by an odd amount", i, b - a);
++        else if (!is_offset(a))
++            fail("script slot address", i, a);
++    }
++
++    /* labelcode[]: defines hold values; actions, moves, ais and states
++       hold addresses. prefix.con's action is label 0. */
++    for (i = 0; i < a_labelcnt; i++)
++    {
++        a = a_labelcode[i];
++        b = labelcode[i + 1];
++        if (a == b)
++            continue;
++        addrlabels++;
++        if (b - a != SHIFT)
++            fail("label moved by an odd amount", i, b - a);
++        else if (!is_offset(a))
++            fail("labelcode", i, a);
++    }
++
++    /* actorscrptr[]: 0 means no script. */
++    for (i = 0; i < MAXTILES; i++)
++    {
++        a = a_actorscrptr[i];
++        if (a == 0)
++            continue;
++        actors++;
++        if (!is_offset(a))
++            fail("actorscrptr", i, a);
++        else if (actorscrptr[i] != a + SHIFT)
++            fail("actorscrptr didn't move with the script", i, actorscrptr[i]);
++    }
++
++    printf("script: %d bytes, %d address slots, %d address labels "
++           "of %d, %d actors\n",
++           a_size * 4, addrslots, addrlabels, a_labelcnt, actors);
++
++    /* Guard against a vacuous pass. */
++    if (actors == 0 || addrslots < 100 || addrlabels < 100)
++    {
++        printf("FAIL: too few script addresses found\n");
++        failures++;
++    }
++
++    if (failures)
++    {
++        printf("FAIL: %d problem(s)\n", failures);
++        return 1;
++    }
++    printf("PASS\n");
++    return 0;
++}
+diff --git a/tests/game_boot.cmake b/tests/game_boot.cmake
+new file mode 100644
+index 0000000000000000000000000000000000000000..0a19ca4bd6d55725deee59ed3c5338a8bb8717df
+--- /dev/null
++++ b/tests/game_boot.cmake
+@@ -0,0 +1,66 @@
++# Boots the real game headless twice: once to the title/demo loop and once
++# straight into E1L1. Each run must still be alive when the 15 s timeout
++# kills it. Afterwards duke3d.cfg must exist in the scratch config dir.
++#
++#   cmake -DDUKE3D=<exe> -DGRP=<DUKE3D.GRP> -DCON_DIR=<dir with game.con,
++#         defs.con, user.con> -DWORK=<scratch dir> -DCFG_DIR=<config dir,
++#         relative to the scratch HOME; "." means the run dir> -P game_boot.cmake
++
++foreach(_var DUKE3D GRP CON_DIR WORK CFG_DIR)
++  if(NOT DEFINED ${_var})
++    message(FATAL_ERROR "game_boot: ${_var} is not set")
++  endif()
++endforeach()
++
++# Keep WORK short: the game's config and save paths live in small buffers.
++set(_run "${WORK}/run")
++set(_home "${WORK}/home")
++file(REMOVE_RECURSE "${WORK}")
++file(MAKE_DIRECTORY "${_run}" "${_home}")
++
++# The game opens duke3d.grp and GAME.CON from its working directory. The
++# CON files are needed there: without them it stops at a keyboard prompt.
++file(CREATE_LINK "${GRP}" "${_run}/duke3d.grp" SYMBOLIC COPY_ON_ERROR)
++foreach(_con GAME.CON DEFS.CON USER.CON)
++  string(TOLOWER "${_con}" _src)
++  file(COPY_FILE "${CON_DIR}/${_src}" "${_run}/${_con}")
++endforeach()
++
++set(ENV{SDL_VIDEODRIVER} dummy)
++set(ENV{BUILD_WINDOWED} 1)
++set(ENV{HOME} "${_home}")
++set(ENV{USERPROFILE} "${_home}")
++
++set(_failed 0)
++foreach(_run_args "" "/v1;/l1;/s2")
++  execute_process(COMMAND "${DUKE3D}" ${_run_args}
++    WORKING_DIRECTORY "${_run}"
++    TIMEOUT 15
++    RESULT_VARIABLE _result
++    OUTPUT_VARIABLE _out
++    ERROR_VARIABLE _out)
++  message(STATUS "duke3d ${_run_args}: ${_result}\n${_out}")
++  if(NOT _result MATCHES "timeout")
++    message(SEND_ERROR "duke3d ${_run_args} didn't run until the timeout: ${_result}")
++    set(_failed 1)
++  endif()
++  if(_out MATCHES "Not enough memory")
++    message(SEND_ERROR "duke3d ${_run_args} ran out of memory")
++    set(_failed 1)
++  endif()
++endforeach()
++
++if(CFG_DIR STREQUAL ".")
++  set(_cfg "${_run}/duke3d.cfg")
++else()
++  set(_cfg "${_home}/${CFG_DIR}/duke3d.cfg")
++endif()
++if(NOT EXISTS "${_cfg}")
++  message(SEND_ERROR "no config was written: ${_cfg}")
++  set(_failed 1)
++endif()
++
++if(_failed)
++  message(FATAL_ERROR "game_boot failed")
++endif()
++message(STATUS "game_boot passed")

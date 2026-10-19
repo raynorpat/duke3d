@@ -1,0 +1,934 @@
+diff --git a/source/actors.c b/source/actors.c
+index 8cd4ac353807b3c152742ad2caa01a8bfaa2f603..6bec781fabdeb3d27560215c7f79de953ae3e0e1 100644
+--- a/source/actors.c
++++ b/source/actors.c
+@@ -4912,7 +4912,7 @@ void moveexplosions(void)  // STATNUM 5
+ 
+ void moveeffectors(void)   //STATNUM 3
+ {
+-    int32_t q=0l, l=0l, m=0l, x=0l, st=0l, j=0l, *t=NULL;
++    int32_t q=0l, l=0l, m=0l, x=0l, st=0l, j=0l, *t=NULL, *zp=NULL;
+     short i=0, k=0, nexti=0, nextk=0, p=0, sh=0, nextj=0;
+     spritetype *s=NULL;
+     sectortype *sc=NULL;
+@@ -5156,7 +5156,7 @@ void moveeffectors(void)   //STATNUM 3
+ 
+                 if(s->owner == -1)
+                 {
+-                    sprintf(tempbuf,"Could not find any locators for SE# 6 and 14 with a hitag of %ld.\n",t[3]);
++                    sprintf(tempbuf,"Could not find any locators for SE# 6 and 14 with a hitag of %d.\n",t[3]);
+                     gameexit(tempbuf);
+                 }
+ 
+@@ -6471,23 +6471,23 @@ void moveeffectors(void)   //STATNUM 3
+                 if( t[0] == 0 ) break;
+ 
+                 if( s->ang == 1536 )
+-                    l = (int32_t) &sc->ceilingz;
++                    zp = &sc->ceilingz;
+                 else
+-                    l = (int32_t) &sc->floorz;
++                    zp = &sc->floorz;
+ 
+                 if( t[0] == 1 ) //Decide if the s->sectnum should go up or down
+                 {
+-                    s->zvel = ksgn(s->z-*(int32_t *)l) * (SP<<4);
++                    s->zvel = ksgn(s->z-*zp) * (SP<<4);
+                     t[0]++;
+                 }
+ 
+                 if( sc->extra == 0 )
+                 {
+-                    *(int32_t *)l += s->zvel;
++                    *zp += s->zvel;
+ 
+-                    if(klabs(*(int32_t *)l-s->z) < 1024)
++                    if(klabs(*zp-s->z) < 1024)
+                     {
+-                        *(int32_t *)l = s->z;
++                        *zp = s->z;
+                         KILLIT(i); //All done
+                     }
+                 }
+diff --git a/source/audiolib/dpmi.h b/source/audiolib/dpmi.h
+index c54beb374c28594861d091f1abe5311a0b06b44b..228825c21c07d2dd10e2640f8fa81f0f7d32e26b 100644
+--- a/source/audiolib/dpmi.h
++++ b/source/audiolib/dpmi.h
+@@ -63,8 +63,8 @@ typedef struct
+ uint32_t DPMI_GetRealModeVector( int num );
+ void DPMI_SetRealModeVector( int num, uint32_t vector );
+ int  DPMI_CallRealModeFunction( dpmi_regs *callregs );
+-int  DPMI_GetDOSMemory( void **ptr, int *descriptor, unsigned length );
+-int  DPMI_FreeDOSMemory( int descriptor );
++int  DPMI_GetDOSMemory( void **ptr, intptr_t *descriptor, unsigned length );
++int  DPMI_FreeDOSMemory( intptr_t descriptor );
+ int  DPMI_LockMemory( void *address, unsigned length );
+ int  DPMI_LockMemoryRegion( void *start, void *end );
+ int  DPMI_UnlockMemory( void *address, unsigned length );
+diff --git a/source/audiolib/multivoc.c b/source/audiolib/multivoc.c
+index 5b760cc32ab6cec61f1abfaedcd5979e63fad99e..7d044a42f7618a9543e20228959eb0606052479f 100644
+--- a/source/audiolib/multivoc.c
++++ b/source/audiolib/multivoc.c
+@@ -108,7 +108,7 @@ static int MV_BuffShift;
+ 
+ static int MV_TotalMemory;
+ 
+-static int   MV_BufferDescriptor;
++static intptr_t MV_BufferDescriptor;
+ static int   MV_BufferEmpty[ NumberOfBuffers ];
+ char *MV_MixBuffer[ NumberOfBuffers + 1 ];
+ 
+@@ -477,7 +477,7 @@ void MV_ServiceVoc
+          count = length;
+          if ( source + count > end )
+             {
+-            count = end - source;
++            count = ( int )( end - source );
+             }
+ 
+          if ( MV_Bits == 16 )
+@@ -693,7 +693,7 @@ playbackstatus MV_GetNextVOCBlock
+                }
+             else
+                {
+-               voice->BlockLength  = ( ptr - 4 ) - (unsigned char *)voice->LoopStart;
++               voice->BlockLength  = ( uint32_t )( ( ptr - 4 ) - (unsigned char *)voice->LoopStart );
+                voice->sound        = voice->LoopStart;
+                voice->position     = 0;
+                voice->length       = min( voice->BlockLength, 0x8000 );
+@@ -849,18 +849,18 @@ playbackstatus MV_GetNextVOCBlock
+ 
+       if ( voice->LoopEnd != NULL )
+          {
+-         if ( blocklength > ( uint32_t )voice->LoopEnd )
++         if ( blocklength > ( uintptr_t )voice->LoopEnd )
+             {
+-            blocklength = ( uint32_t )voice->LoopEnd;
++            blocklength = ( uint32_t )( uintptr_t )voice->LoopEnd;
+             }
+          else
+             {
+-            voice->LoopEnd = ( char * )blocklength;
++            voice->LoopEnd = ( char * )( uintptr_t )blocklength;
+             }
+ 
+-         voice->LoopStart = voice->sound + ( uint32_t )voice->LoopStart;
+-         voice->LoopEnd   = voice->sound + ( uint32_t )voice->LoopEnd;
+-         voice->LoopSize  = voice->LoopEnd - voice->LoopStart;
++         voice->LoopStart = voice->sound + ( uintptr_t )voice->LoopStart;
++         voice->LoopEnd   = voice->sound + ( uintptr_t )voice->LoopEnd;
++         voice->LoopSize  = ( uint32_t )( voice->LoopEnd - voice->LoopStart );
+          }
+ 
+       if ( voice->bits == 16 )
+@@ -2395,7 +2395,7 @@ int MV_PlayLoopedRaw
+    voice->callbackval = callbackval;
+    voice->LoopStart   = loopstart;
+    voice->LoopEnd     = loopend;
+-   voice->LoopSize    = ( voice->LoopEnd - voice->LoopStart ) + 1;
++   voice->LoopSize    = ( uint32_t )( voice->LoopEnd - voice->LoopStart ) + 1;
+ 
+    MV_SetVoicePitch( voice, rate, pitchoffset );
+    MV_SetVoiceVolume( voice, vol, left, right );
+@@ -2760,8 +2760,8 @@ int MV_PlayLoopedVOC
+    voice->prev        = NULL;
+    voice->priority    = priority;
+    voice->callbackval = callbackval;
+-   voice->LoopStart   = ( char * )loopstart;
+-   voice->LoopEnd     = ( char * )loopend;
++   voice->LoopStart   = ( char * )( intptr_t )loopstart;
++   voice->LoopEnd     = ( char * )( intptr_t )loopend;
+    voice->LoopSize    = loopend - loopstart + 1;
+ 
+    if ( loopstart < 0 )
+diff --git a/source/audiolib/nodpmi.c b/source/audiolib/nodpmi.c
+index 8eaf9d3f354fb0333fbffd924db8d7fe6ab6dc87..16df2f82dceacf94f19dc70918fec0396cf254c3 100644
+--- a/source/audiolib/nodpmi.c
++++ b/source/audiolib/nodpmi.c
+@@ -118,7 +118,7 @@ int DPMI_LockMemoryRegion
+    {
+    int status;
+ 
+-   status = DPMI_LockMemory( start, ( char * )end - ( char * )start );
++   status = DPMI_LockMemory( start, ( unsigned )( ( char * )end - ( char * )start ) );
+ 
+    return( status );
+    }
+@@ -156,23 +156,23 @@ int DPMI_UnlockMemoryRegion
+    {
+    int status;
+ 
+-   status = DPMI_UnlockMemory( start, ( char * )end - ( char * )start );
++   status = DPMI_UnlockMemory( start, ( unsigned )( ( char * )end - ( char * )start ) );
+ 
+    return( status );
+    }
+ 
+-int DPMI_GetDOSMemory( void **ptr, int *descriptor, unsigned length )
++int DPMI_GetDOSMemory( void **ptr, intptr_t *descriptor, unsigned length )
+ {
+ 	/* Lovely... */
+ 	
+ 	*ptr = (void *)malloc(length);
+ 	
+-	*descriptor = (int) *ptr;
++	*descriptor = (intptr_t) *ptr;
+ 	
+ 	return (descriptor == 0) ? DPMI_Error : DPMI_Ok;
+ }
+ 
+-int DPMI_FreeDOSMemory( int descriptor )
++int DPMI_FreeDOSMemory( intptr_t descriptor )
+ {
+ 	free((void *)descriptor);
+ 	
+diff --git a/source/config.c b/source/config.c
+index 0407eabb32855cca9ca8f6dd5c83af5345c7f6ba..b119d139d17807273c5ccaaa316ed66d76c86b28 100644
+--- a/source/config.c
++++ b/source/config.c
+@@ -372,13 +372,13 @@ void CONFIG_SetupMouse( int32 scripthandle )
+ 
+    for (i=0;i<MAXMOUSEBUTTONS;i++)
+       {
+-      sprintf(str,"MouseButton%ld",i);
++      sprintf(str,"MouseButton%d",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString( scripthandle,"Controls", str,temp);
+       function = CONFIG_FunctionNameToNum(temp);
+       if (function != -1)
+          CONTROL_MapButton( function, i, false );
+-      sprintf(str,"MouseButtonClicked%ld",i);
++      sprintf(str,"MouseButtonClicked%d",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString( scripthandle,"Controls", str,temp);
+       function = CONFIG_FunctionNameToNum(temp);
+@@ -388,7 +388,7 @@ void CONFIG_SetupMouse( int32 scripthandle )
+    // map over the axes
+    for (i=0;i<MAXMOUSEAXES;i++)
+       {
+-      sprintf(str,"MouseAnalogAxes%ld",i);
++      sprintf(str,"MouseAnalogAxes%d",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString(scripthandle, "Controls", str,temp);
+       function = CONFIG_AnalogNameToNum(temp);
+@@ -398,19 +398,19 @@ void CONFIG_SetupMouse( int32 scripthandle )
+          CONTROL_MapAnalogAxis(i,function);
+          }
+ 	 */
+-      sprintf(str,"MouseDigitalAxes%ld_0",i);
++      sprintf(str,"MouseDigitalAxes%d_0",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString(scripthandle, "Controls", str,temp);
+       function = CONFIG_FunctionNameToNum(temp);
+       if (function != -1)
+          CONTROL_MapDigitalAxis( i, function, 0 );
+-      sprintf(str,"MouseDigitalAxes%ld_1",i);
++      sprintf(str,"MouseDigitalAxes%d_1",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString(scripthandle, "Controls", str,temp);
+       function = CONFIG_FunctionNameToNum(temp);
+       if (function != -1)
+          CONTROL_MapDigitalAxis( i, function, 1 );
+-      sprintf(str,"MouseAnalogScale%ld",i);
++      sprintf(str,"MouseAnalogScale%d",i);
+       SCRIPT_GetNumber(scripthandle, "Controls", str,&scale);
+       /*
+       CONTROL_SetAnalogAxisScale( i, scale );
+@@ -439,13 +439,13 @@ void CONFIG_SetupGamePad( int32 scripthandle )
+ 
+    for (i=0;i<MAXJOYBUTTONS;i++)
+       {
+-      sprintf(str,"JoystickButton%ld",i);
++      sprintf(str,"JoystickButton%d",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString( scripthandle,"Controls", str,temp);
+       function = CONFIG_FunctionNameToNum(temp);
+       if (function != -1)
+          CONTROL_MapButton( function, i, false );
+-      sprintf(str,"JoystickButtonClicked%ld",i);
++      sprintf(str,"JoystickButtonClicked%d",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString( scripthandle,"Controls", str,temp);
+       function = CONFIG_FunctionNameToNum(temp);
+@@ -455,13 +455,13 @@ void CONFIG_SetupGamePad( int32 scripthandle )
+    // map over the axes
+    for (i=0;i<MAXGAMEPADAXES;i++)
+       {
+-      sprintf(str,"GamePadDigitalAxes%ld_0",i);
++      sprintf(str,"GamePadDigitalAxes%d_0",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString(scripthandle, "Controls", str,temp);
+       function = CONFIG_FunctionNameToNum(temp);
+       if (function != -1)
+          CONTROL_MapDigitalAxis( i, function, 0 );
+-      sprintf(str,"GamePadDigitalAxes%ld_1",i);
++      sprintf(str,"GamePadDigitalAxes%d_1",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString(scripthandle, "Controls", str,temp);
+       function = CONFIG_FunctionNameToNum(temp);
+@@ -490,13 +490,13 @@ void CONFIG_SetupJoystick( int32 scripthandle )
+ 
+    for (i=0;i<MAXJOYBUTTONS;i++)
+       {
+-      sprintf(str,"JoystickButton%ld",i);
++      sprintf(str,"JoystickButton%d",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString( scripthandle,"Controls", str,temp);
+       function = CONFIG_FunctionNameToNum(temp);
+       if (function != -1)
+          CONTROL_MapJoyButton( function, i, false );
+-      sprintf(str,"JoystickButtonClicked%ld",i);
++      sprintf(str,"JoystickButtonClicked%d",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString( scripthandle,"Controls", str,temp);
+       function = CONFIG_FunctionNameToNum(temp);
+@@ -506,7 +506,7 @@ void CONFIG_SetupJoystick( int32 scripthandle )
+    // map over the axes
+    for (i=0;i<MAXJOYAXES;i++)
+       {
+-      sprintf(str,"JoystickAnalogAxes%ld",i);
++      sprintf(str,"JoystickAnalogAxes%d",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString(scripthandle, "Controls", str,temp);
+       function = CONFIG_AnalogNameToNum(temp);
+@@ -514,23 +514,23 @@ void CONFIG_SetupJoystick( int32 scripthandle )
+          //{
+          CONTROL_MapAnalogAxis(i,function);
+          //}
+-      sprintf(str,"JoystickDigitalAxes%ld_0",i);
++      sprintf(str,"JoystickDigitalAxes%d_0",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString(scripthandle, "Controls", str,temp);
+       function = CONFIG_FunctionNameToNum(temp);
+       if (function != -1)
+          CONTROL_MapDigitalAxis( i, function, 0 );
+-      sprintf(str,"JoystickDigitalAxes%ld_1",i);
++      sprintf(str,"JoystickDigitalAxes%d_1",i);
+       memset(temp,0,sizeof(temp));
+       SCRIPT_GetString(scripthandle, "Controls", str,temp);
+       function = CONFIG_FunctionNameToNum(temp);
+       if (function != -1)
+          CONTROL_MapDigitalAxis( i, function, 1 );
+-      sprintf(str,"JoystickAnalogScale%ld",i);
++      sprintf(str,"JoystickAnalogScale%d",i);
+       SCRIPT_GetFloat(scripthandle, "Controls", str,&scale);
+       CONTROL_SetAnalogAxisScale( i, scale );
+         deadzone = 0;
+-        sprintf(str,"JoystickAnalogDeadzone%ld",i);
++        sprintf(str,"JoystickAnalogDeadzone%d",i);
+         SCRIPT_GetNumber(scripthandle, "Controls", str, &deadzone);
+         CONTROL_SetAnalogAxisDeadzone( i, deadzone);
+       }
+@@ -540,7 +540,7 @@ void CONFIG_SetupJoystick( int32 scripthandle )
+    {
+          for(j=0; j < 8; j++) // 8? because hats can have 8 different values
+          { 
+-                 sprintf(str,"JoystickHat%ld_%ld",i, j);
++                 sprintf(str,"JoystickHat%d_%d",i, j);
+                  memset(temp,0,sizeof(temp));
+                  SCRIPT_GetString( scripthandle,"Controls", str,temp);
+                  function = CONFIG_FunctionNameToNum(temp);
+@@ -668,7 +668,7 @@ void CONFIG_ReadSetup( void )
+ 
+        for(dummy=0;dummy<10;dummy++)
+        {
+-           sprintf(buf,"WeaponChoice%ld",dummy);
++           sprintf(buf,"WeaponChoice%d",dummy);
+            SCRIPT_GetNumber( scripthandle, "Misc", buf, &ud.wchoice[0][dummy]);
+        }
+     }
+@@ -787,7 +787,7 @@ void CONFIG_WriteSetup( void )
+ 
+    for(dummy=0;dummy<10;dummy++)
+    {
+-       sprintf(buf,"WeaponChoice%ld",dummy);
++       sprintf(buf,"WeaponChoice%d",dummy);
+        SCRIPT_PutNumber( scripthandle, "Misc",buf,ud.wchoice[myconnectindex][dummy],false,false);
+    }
+ 
+diff --git a/source/dukeunix.h b/source/dukeunix.h
+index d42b353df431721ebcefee1ce1bf24fff62850ab..664176a4989ac1c3968fc7a938717b2a3126ee30 100644
+--- a/source/dukeunix.h
++++ b/source/dukeunix.h
+@@ -60,7 +60,7 @@ void _dos_getdate(struct dosdate_t *date);
+ #define max(x, y) ((x) > (y) ? (x) : (y))
+ #endif
+ 
+-#define FP_OFF(x) ((int32_t) (x))
++#define FP_OFF(x) ((intptr_t)(x))
+ 
+ #ifndef strcmpi
+ #define strcmpi(x, y) strcasecmp(x, y)
+diff --git a/source/dukewin.h b/source/dukewin.h
+index fc737adc495312c0692d87ee860680db3cec050b..9ea2eef85c2e59fa630494bac052fa925627bcb6 100644
+--- a/source/dukewin.h
++++ b/source/dukewin.h
+@@ -54,7 +54,7 @@ void _dos_getdate(struct dosdate_t *date);
+ #ifdef FP_OFF
+ #undef FP_OFF
+ #endif
+-#define FP_OFF(x) ((int32_t) (x))
++#define FP_OFF(x) ((intptr_t)(x))
+ 
+ // 64 megs should be enough for anybody.  :)  --ryan.
+ #define Z_AvailHeap() ((64 * 1024) * 1024)
+diff --git a/source/funct.h b/source/funct.h
+index 2c54babefb6d01b1807b7fc9e295da52b80994d3..07b53e47735029230f6f845bdc198fea8e1d58a4 100644
+--- a/source/funct.h
++++ b/source/funct.h
+@@ -141,7 +141,7 @@ extern void computergetinput(int32_t snum, input *syn);
+ extern void dummyfunc(void);
+ extern void dummymess(int i, char *c);
+ extern void cmenu(short cm);
+-extern void savetemp(char *fn, int32_t daptr, int32_t dasiz);
++extern void savetemp(char *fn, intptr_t daptr, int32_t dasiz);
+ extern void getangplayers(short snum);
+ extern int loadplayer(signed char spot);
+ extern int saveplayer(signed char spot);
+diff --git a/source/game.c b/source/game.c
+index f049782b91a1b32ba84ead9d5267feb3d7d83fe4..731eb9007e9a029a28d4458c5cae402638bb9b97 100644
+--- a/source/game.c
++++ b/source/game.c
+@@ -631,7 +631,7 @@ void getpackets(void)
+                 }
+ 
+                 if (j > packbufleng)
+-                    printf("INVALID GAME PACKET!!! (%ld too many bytes)\n",j-packbufleng);
++                    printf("INVALID GAME PACKET!!! (%d too many bytes)\n",j-packbufleng);
+ 
+                 while (j != packbufleng)
+                 {
+@@ -956,7 +956,7 @@ void caches(void)
+      for(i=0;i<cacnum;i++)
+           if ((*cac[i].lock) >= 200)
+           {
+-                sprintf(tempbuf,"Locked- %d: Leng:%ld, Lock:%d",i,cac[i].leng,*cac[i].lock);
++                sprintf(tempbuf,"Locked- %d: Leng:%d, Lock:%d",i,cac[i].leng,*cac[i].lock);
+                 printext256(0L,k,31,-1,tempbuf,1); k += 6;
+           }
+ 
+@@ -1262,7 +1262,7 @@ void weaponnum(short ind,int32_t x,int32_t y,int32_t num1, int32_t num2,char ha)
+     if(num1 > 99) num1 = 99;
+     if(num2 > 99) num2 = 99;
+ 
+-    sprintf(dabuf,"%ld",num1);
++    sprintf(dabuf,"%d",num1);
+     if(num1 > 9)
+     {
+         rotatesprite((x)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+@@ -1270,7 +1270,7 @@ void weaponnum(short ind,int32_t x,int32_t y,int32_t num1, int32_t num2,char ha)
+     }
+     else rotatesprite((x+4)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+ 
+-    sprintf(dabuf,"%ld",num2);
++    sprintf(dabuf,"%d",num2);
+     if(num2 > 9)
+     {
+         rotatesprite((x+13)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+@@ -1287,7 +1287,7 @@ void weaponnum999(char ind,int32_t x,int32_t y,int32_t num1, int32_t num2,char h
+     rotatesprite((x-4)<<16,y<<16,65536L,0,THREEBYFIVE+10,ha,0,10+128,0,0,xdim-1,ydim-1);
+     rotatesprite((x+13)<<16,y<<16,65536L,0,THREEBYFIVE+11,ha,0,10+128,0,0,xdim-1,ydim-1);
+ 
+-    sprintf(dabuf,"%ld",num1);
++    sprintf(dabuf,"%d",num1);
+     if(num1 > 99)
+     {
+         rotatesprite((x)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+@@ -1301,7 +1301,7 @@ void weaponnum999(char ind,int32_t x,int32_t y,int32_t num1, int32_t num2,char h
+     }
+     else rotatesprite((x+8)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+ 
+-    sprintf(dabuf,"%ld",num2);
++    sprintf(dabuf,"%d",num2);
+     if(num2 > 99)
+     {
+         rotatesprite((x+17)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+@@ -1809,7 +1809,7 @@ void tics(void)
+     i = totalclock;
+     if (i != frameval[framecnt])
+     {
+-        sprintf(b,"%ld",(TICRATE*AVERAGEFRAMES)/(i-frameval[framecnt]));
++        sprintf(b,"%d",(TICRATE*AVERAGEFRAMES)/(i-frameval[framecnt]));
+         printext256(windowx1,windowy1,31,-21,b,1);
+         frameval[framecnt] = i;
+     }
+@@ -1829,15 +1829,15 @@ void coords(short snum)
+             y = 16;
+     }
+ 
+-    sprintf(tempbuf,"X= %ld",ps[snum].posx);
++    sprintf(tempbuf,"X= %d",ps[snum].posx);
+     printext256(250L,y,31,-1,tempbuf,1);
+-    sprintf(tempbuf,"Y= %ld",ps[snum].posy);
++    sprintf(tempbuf,"Y= %d",ps[snum].posy);
+     printext256(250L,y+7L,31,-1,tempbuf,1);
+-    sprintf(tempbuf,"Z= %ld",ps[snum].posz);
++    sprintf(tempbuf,"Z= %d",ps[snum].posz);
+     printext256(250L,y+14L,31,-1,tempbuf,1);
+     sprintf(tempbuf,"A= %d",ps[snum].ang);
+     printext256(250L,y+21L,31,-1,tempbuf,1);
+-    sprintf(tempbuf,"ZV= %ld",ps[snum].poszv);
++    sprintf(tempbuf,"ZV= %d",ps[snum].poszv);
+     printext256(250L,y+28L,31,-1,tempbuf,1);
+     sprintf(tempbuf,"OG= %d",ps[snum].on_ground);
+     printext256(250L,y+35L,31,-1,tempbuf,1);
+@@ -1847,7 +1847,7 @@ void coords(short snum)
+     printext256(250L,y+50L,31,-1,tempbuf,1);
+     sprintf(tempbuf,"SECTL= %d",sector[ps[snum].cursectnum].lotag);
+     printext256(250L,y+57L,31,-1,tempbuf,1);
+-    sprintf(tempbuf,"SEED= %ld",randomseed);
++    sprintf(tempbuf,"SEED= %d",randomseed);
+     printext256(250L,y+64L,31,-1,tempbuf,1);
+     sprintf(tempbuf,"THOLD= %d",ps[snum].transporter_hold);
+     printext256(250L,y+64L+7,31,-1,tempbuf,1);
+@@ -2474,7 +2474,7 @@ void displayrest(int32_t smoothratio)
+     }
+ 
+     if(ps[myconnectindex].newowner == -1 && ud.overhead_on == 0 && ud.crosshair && ud.camerasprite == -1)
+-        rotatesprite((160L-(ps[myconnectindex].look_ang>>1))<<16,100L<<16,65536L,0,CROSSHAIR,0,0,2+1,windowx1,windowy1,windowx2,windowy2);
++        rotatesprite((160-(ps[myconnectindex].look_ang>>1))<<16,100L<<16,65536L,0,CROSSHAIR,0,0,2+1,windowx1,windowy1,windowx2,windowy2);
+ 
+     if(ps[myconnectindex].gm&MODE_TYPE)
+         typemode();
+@@ -2878,7 +2878,7 @@ void displayrooms(short snum,int32_t smoothratio)
+         {
+             walock[MAXTILES-1] = 254;
+             if (waloff[MAXTILES-1] == 0)
+-                allocache((int32_t *)&waloff[MAXTILES-1],100*160,&walock[MAXTILES-1]);
++                allocache(&waloff[MAXTILES-1],100*160,&walock[MAXTILES-1]);
+             setviewtotile(MAXTILES-1,100L,160L);
+         }
+         else if( ( ud.screen_tilting && p->rotscrnang ) || ud.detail==0 )
+@@ -4764,7 +4764,7 @@ short spawn( short j, short pn )
+                             }
+                             if(j == MAXSPRITES)
+                             {
+-                                sprintf(tempbuf,"Found lonely Sector Effector (lotag 0) at (%ld,%ld)\n",sp->x,sp->y);
++                                sprintf(tempbuf,"Found lonely Sector Effector (lotag 0) at (%d,%d)\n",sp->x,sp->y);
+                                 gameexit(tempbuf);
+                             }
+                             sp->owner = j;
+@@ -4781,7 +4781,7 @@ short spawn( short j, short pn )
+                             tempwallptr++;
+                             if(tempwallptr > 2047)
+                             {
+-                                sprintf(tempbuf,"Too many moving sectors at (%ld,%ld).\n",wall[s].x,wall[s].y);
++                                sprintf(tempbuf,"Too many moving sectors at (%d,%d).\n",wall[s].x,wall[s].y);
+                                 gameexit(tempbuf);
+                             }
+                         }
+@@ -4813,7 +4813,7 @@ short spawn( short j, short pn )
+ 
+                             if(j == 0)
+                             {
+-                                sprintf(tempbuf,"Subway found no zero'd sectors with locators\nat (%ld,%ld).\n",sp->x,sp->y);
++                                sprintf(tempbuf,"Subway found no zero'd sectors with locators\nat (%d,%d).\n",sp->x,sp->y);
+                                 gameexit(tempbuf);
+                             }
+ 
+@@ -6898,7 +6898,7 @@ void checkcommandline(int argc,char **argv)
+                     case 'V':
+                         c++;
+                         ud.warp_on = 1;
+-                        ud.m_volume_number = ud.volume_number = atol(c)-1;
++                        ud.m_volume_number = ud.volume_number = (int32_t)atol(c)-1;
+                         break;
+                     case 's':
+                     case 'S':
+@@ -7272,7 +7272,7 @@ void Startup(void)
+ void sendscore(char *s)
+ {
+     if(numplayers > 1)
+-      genericmultifunction(-1,s,strlen(s)+1,5);
++      genericmultifunction(-1,s,(int32_t)strlen(s)+1,5);
+ }
+ 
+ 
+@@ -7351,7 +7351,7 @@ void writestring(int32_t a1,int32_t a2,int32_t a3,short a4,int32_t vx,int32_t vy
+ 
+     fp = (FILE *)fopen("debug.txt","rt+");
+ 
+-    fprintf(fp,"%ld %ld %ld %d %ld %ld %ld\n",a1,a2,a3,a4,vx,vy,vz);
++    fprintf(fp,"%d %d %d %d %d %d %d\n",a1,a2,a3,a4,vx,vy,vz);
+ 
+     fclose(fp);
+ 
+@@ -7538,12 +7538,12 @@ int main(int argc,char **argv)
+             puts("You don't have enough free memory to run Duke Nukem 3D.");
+             puts("The DOS \"mem\" command should report 6,800K (or 6.8 megs)");
+             puts("of \"total memory free\".\n");
+-            printf("Duke Nukem 3D requires %ld more bytes to run.\n",3162000-350000-totalmemory);
++            printf("Duke Nukem 3D requires %d more bytes to run.\n",3162000-350000-totalmemory);
+             exit(0);
+         }
+     }
+     else
+-        printf("Using %ld bytes for heap.\n",totalmemory);
++        printf("Using %d bytes for heap.\n",totalmemory);
+ 
+ #ifndef ONELEVELDEMO
+ // CTW - REMOVED
+@@ -7638,7 +7638,7 @@ int main(int argc,char **argv)
+     }*/
+     if( setgamemode(ScreenMode,ScreenWidth,ScreenHeight) < 0 )
+     {
+-        printf("\nVESA driver for ( %ld * %ld ) not found/supported!\n",xdim,ydim);
++        printf("\nVESA driver for ( %d * %d ) not found/supported!\n",xdim,ydim);
+         ScreenMode = 2;
+         ScreenWidth = 320;
+         ScreenHeight = 200;
+@@ -9163,14 +9163,14 @@ void dobonus(char bonusonly)
+         minitext(23,80,"   NAME                                           KILLS",8,2+8+16+128);
+         for(i=0;i<playerswhenstarted;i++)
+         {
+-            sprintf(tempbuf,"%-4ld",i+1);
++            sprintf(tempbuf,"%-4d",i+1);
+             minitext(92+(i*23),80,tempbuf,3,2+8+16+128);
+         }
+ 
+         for(i=0;i<playerswhenstarted;i++)
+         {
+             xfragtotal = 0;
+-            sprintf(tempbuf,"%ld",i+1);
++            sprintf(tempbuf,"%d",i+1);
+ 
+             minitext(30,90+t,tempbuf,0,2+8+16+128);
+             minitext(38,90+t,ud.user_name[i],ps[i].palookup,2+8+16+128);
+@@ -9192,12 +9192,12 @@ void dobonus(char bonusonly)
+ 
+                 if(myconnectindex == connecthead)
+                 {
+-                    sprintf(tempbuf,"stats %ld killed %ld %d\n",i+1,y+1,frags[i][y]);
++                    sprintf(tempbuf,"stats %d killed %d %d\n",i+1,y+1,frags[i][y]);
+                     sendscore(tempbuf);
+                 }
+             }
+ 
+-            sprintf(tempbuf,"%-4ld",xfragtotal);
++            sprintf(tempbuf,"%-4d",xfragtotal);
+             minitext(101+(8*23),90+t,tempbuf,2,2+8+16+128);
+ 
+             t += 7;
+@@ -9212,7 +9212,7 @@ void dobonus(char bonusonly)
+                     yfragtotal += ps[i].fraggedself;
+                 yfragtotal += frags[i][y];
+             }
+-            sprintf(tempbuf,"%-4ld",yfragtotal);
++            sprintf(tempbuf,"%-4d",yfragtotal);
+             minitext(92+(y*23),96+(8*7),tempbuf,2,2+8+16+128);
+         }
+ 
+@@ -9341,17 +9341,17 @@ void dobonus(char bonusonly)
+                         bonuscnt++;
+                         sound(PIPEBOMB_EXPLODE);
+                     }
+-                    sprintf(tempbuf,"%02ld:%02ld",
++                    sprintf(tempbuf,"%02d:%02d",
+                         (ps[myconnectindex].player_par/(26*60))%60,
+                         (ps[myconnectindex].player_par/26)%60);
+                     gametext((320>>2)+71,60+9,tempbuf,0,2+8+16);
+ 
+-                    sprintf(tempbuf,"%02ld:%02ld",
++                    sprintf(tempbuf,"%02d:%02d",
+                         (partime[ud.volume_number*11+ud.last_level-1]/(26*60))%60,
+                         (partime[ud.volume_number*11+ud.last_level-1]/26)%60);
+                     gametext((320>>2)+71,69+9,tempbuf,0,2+8+16);
+ 
+-                    sprintf(tempbuf,"%02ld:%02ld",
++                    sprintf(tempbuf,"%02d:%02d",
+                         (designertime[ud.volume_number*11+ud.last_level-1]/(26*60))%60,
+                         (designertime[ud.volume_number*11+ud.last_level-1]/26)%60);
+                     gametext((320>>2)+71,78+9,tempbuf,0,2+8+16);
+diff --git a/source/gamedef.c b/source/gamedef.c
+index 7f87bd50f6afa849c7261f27c1c0e570a472f155..a4ab035940a4a7cda8a09fd947584c0430583955 100644
+--- a/source/gamedef.c
++++ b/source/gamedef.c
+@@ -428,7 +428,7 @@ void transnum(void)
+         return;
+     }
+ 
+-    *scriptptr = atol(textptr);
++    *scriptptr = (int32_t)atol(textptr);
+     scriptptr++;
+ 
+     textptr += l;
+@@ -461,7 +461,7 @@ char parsecommand(void)
+                 if( *textptr == 0 )
+                 {
+ //                    printf("  * ERROR!(L%d) Found '/*' with no '*/'.\n",j,label+(labelcnt<<6));
+-                    printf("  * ERROR!(L%ld) Found '/*' with no '*/'.\n",j);
++                    printf("  * ERROR!(L%d) Found '/*' with no '*/'.\n",j);
+                     error++;
+                     return 0;
+                 }
+@@ -1620,7 +1620,7 @@ void loadefs(char *filenam,char *mptr)
+     else
+     {
+         total_lines += line_number;
+-        printf("Code Size:%ld bytes(%ld labels).\n",(int32_t)((scriptptr-script)<<2)-4,labelcnt);
++        printf("Code Size:%d bytes(%d labels).\n",(int32_t)((scriptptr-script)<<2)-4,labelcnt);
+     }
+ }
+ 
+@@ -2450,7 +2450,7 @@ char parse(void)
+             break;
+         case 68:
+             insptr++;
+-            printf("%ld\n",*insptr);
++            printf("%d\n",*insptr);
+             insptr++;
+             break;
+         case 69:
+diff --git a/source/global.c b/source/global.c
+index 02405f8c928d333d964cdf0e20697b5543bbb77f..67c8b9d038eae556d407a08372282812a8b441f6 100644
+--- a/source/global.c
++++ b/source/global.c
+@@ -590,7 +590,7 @@ void SafeWriteString (int handle, char * buffer)
+ {
+ 	unsigned	iocount;
+ 
+-   iocount=strlen(buffer);
++   iocount=(unsigned)strlen(buffer);
+ 	if (write (handle,buffer,iocount) != (int)iocount)
+ 			Error ("File write string failure writing %s\n",buffer);
+ }
+@@ -820,10 +820,10 @@ char *ltoa(int32_t value, char *string, int radix)
+ {
+ 	switch (radix) {
+ 		case 10:
+-			sprintf(string, "%ld", value);
++			sprintf(string, "%d", value);
+ 			break;
+ 		case 16:
+-			sprintf(string, "%lx", value);
++			sprintf(string, "%x", value);
+ 			break;
+ 		default:
+ 			STUBBED("unknown radix");
+@@ -837,10 +837,10 @@ char *ultoa(uint32_t value, char *string, int radix)
+ {
+ 	switch (radix) {
+ 		case 10:
+-			sprintf(string, "%lu", value);
++			sprintf(string, "%u", value);
+ 			break;
+ 		case 16:
+-			sprintf(string, "%lux", value);
++			sprintf(string, "%ux", value);
+ 			break;
+ 		default:
+ 			STUBBED("unknown radix");
+diff --git a/source/menues.c b/source/menues.c
+index cea6e40c758cc79f60fd43d1be623b5ffc5a1f6c..6c01d8c350425b3970bc5316c6adc23059f39531 100644
+--- a/source/menues.c
++++ b/source/menues.c
+@@ -121,7 +121,7 @@ void cmenu(short cm)
+ }
+ 
+ 
+-void savetemp(char *fn,int32_t daptr,int32_t dasiz)
++void savetemp(char *fn,intptr_t daptr,int32_t dasiz)
+ {
+     int fp;
+ 
+@@ -198,7 +198,7 @@ int loadplayer(signed char spot)
+      char mpfn[] = "gameA_00.sav";
+      char fullname[128];
+      char *fnptr, scriptptrs[MAXSCRIPTSIZE];
+-     int32_t fil, bv, i, j, x;
++     int32_t fil, bv, i, j, x, animoffs[MAXANIMATES];
+      int32 nump;
+ 
+      if(spot < 0)
+@@ -360,8 +360,8 @@ int loadplayer(signed char spot)
+ 
+          kdfread(&animatecnt,sizeof(animatecnt),1,fil);
+          kdfread(&animatesect[0],2,MAXANIMATES,fil);
+-         kdfread(&animateptr[0],4,MAXANIMATES,fil);
+-     for(i = animatecnt-1;i>=0;i--) animateptr[i] = (int32_t *)((int32_t)animateptr[i]+(int32_t)(&sector[0]));
++         kdfread(&animoffs[0],4,MAXANIMATES,fil);
++     for(i = animatecnt-1;i>=0;i--) animateptr[i] = (int32_t *)((char *)&sector[0]+animoffs[i]);
+          kdfread(&animategoal[0],4,MAXANIMATES,fil);
+          kdfread(&animatevel[0],4,MAXANIMATES,fil);
+ 
+@@ -515,7 +515,7 @@ int loadplayer(signed char spot)
+ 
+ int saveplayer(signed char spot)
+ {
+-     int32_t i, j;
++     int32_t i, j, animoffs[MAXANIMATES];
+      char fn[] = "game0.sav";
+      char mpfn[] = "gameA_00.sav";
+      char fullname[128];
+@@ -683,9 +683,9 @@ int saveplayer(signed char spot)
+      dfwrite(&pskyoff[0],sizeof(pskyoff[0]),MAXPSKYTILES,fil);
+          dfwrite(&animatecnt,sizeof(animatecnt),1,fil);
+          dfwrite(&animatesect[0],2,MAXANIMATES,fil);
+-         for(i = animatecnt-1;i>=0;i--) animateptr[i] = (int32_t *)((int32_t)animateptr[i]-(int32_t)(&sector[0]));
+-         dfwrite(&animateptr[0],4,MAXANIMATES,fil);
+-         for(i = animatecnt-1;i>=0;i--) animateptr[i] = (int32_t *)((int32_t)animateptr[i]+(int32_t)(&sector[0]));
++         clearbuf(animoffs,MAXANIMATES,0L);
++         for(i = animatecnt-1;i>=0;i--) animoffs[i] = (int32_t)((char *)animateptr[i]-(char *)&sector[0]);
++         dfwrite(&animoffs[0],4,MAXANIMATES,fil);
+          dfwrite(&animategoal[0],4,MAXANIMATES,fil);
+          dfwrite(&animatevel[0],4,MAXANIMATES,fil);
+ 
+@@ -1282,7 +1282,7 @@ int getfilenames(char kind[6])
+                 {
+                     /* need to expand support if this assertion ever fails. */
+                     assert(stricmp(kind, "*.MAP") == 0);
+-                    len = strlen(dent->d_name);
++                    len = (int)strlen(dent->d_name);
+                     if (len >= 5)
+                     {
+                         ptr = ((char *) dent->d_name) + len;
+@@ -1962,10 +1962,10 @@ void menus(void)
+ 
+             dispnames();
+ 
+-            sprintf(tempbuf,"PLAYERS: %-2ld                      ",numplr); // int32 = long
++            sprintf(tempbuf,"PLAYERS: %-2d                      ",numplr); // int32 = long
+             gametext(160,158,tempbuf,0,2+8+16);
+ 
+-            sprintf(tempbuf,"EPISODE: %-2ld / LEVEL: %-2ld / SKILL: %-2ld",1+volnum,1+levnum,plrskl);
++            sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+volnum,1+levnum,plrskl);
+             gametext(160,170,tempbuf,0,2+8+16);
+ 
+             gametext(160,90,"LOAD game:",0,2+8+16);
+@@ -2078,10 +2078,10 @@ void menus(void)
+             menutext(160,24,0,0,"SAVE GAME");
+ 
+             rotatesprite(101<<16,97<<16,65536L,512,MAXTILES-3,-32,0,4+10+64,0,0,xdim-1,ydim-1);
+-            sprintf(tempbuf,"PLAYERS: %-2ld                      ",ud.multimode);
++            sprintf(tempbuf,"PLAYERS: %-2d                      ",ud.multimode);
+             gametext(160,158,tempbuf,0,2+8+16);
+ 
+-            sprintf(tempbuf,"EPISODE: %-2ld / LEVEL: %-2ld / SKILL: %-2ld",1+ud.volume_number,1+ud.level_number,ud.player_skill);
++            sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill);
+             gametext(160,170,tempbuf,0,2+8+16);
+ 
+             dispnames();
+@@ -2840,9 +2840,9 @@ void menus(void)
+ 
+             if(current_menu >= 360 && current_menu <= 369 )
+             {
+-                sprintf(tempbuf,"PLAYERS: %-2ld                      ",ud.multimode);
++                sprintf(tempbuf,"PLAYERS: %-2d                      ",ud.multimode);
+                 gametext(160,158,tempbuf,0,2+8+16);
+-                sprintf(tempbuf,"EPISODE: %-2ld / LEVEL: %-2ld / SKILL: %-2ld",1+ud.volume_number,1+ud.level_number,ud.player_skill);
++                sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill);
+                 gametext(160,170,tempbuf,0,2+8+16);
+ 
+                 x = strget((320>>1),184,&ud.savegame[current_menu-360][0],19, 999 );
+@@ -2886,7 +2886,7 @@ void menus(void)
+ 
+                 rotatesprite(101<<16,97<<16,65536,512,MAXTILES-1,-32,0,2+4+8+64,0,0,xdim-1,ydim-1);
+                 dispnames();
+-                rotatesprite((c+67+strlen(&ud.savegame[current_menu-360][0])*4)<<16,(50+12*probey)<<16,32768L-10240,0,SPINNINGNUKEICON+(((totalclock)>>3)%7),0,0,10,0,0,xdim-1,ydim-1);
++                rotatesprite((c+67+(int32_t)strlen(&ud.savegame[current_menu-360][0])*4)<<16,(50+12*probey)<<16,32768L-10240,0,SPINNINGNUKEICON+(((totalclock)>>3)%7),0,0,10,0,0,xdim-1,ydim-1);
+                 break;
+             }
+ 
+@@ -2905,9 +2905,9 @@ void menus(void)
+                   }
+ 
+                   rotatesprite(101<<16,97<<16,65536L,512,MAXTILES-3,-32,0,4+10+64,0,0,xdim-1,ydim-1);
+-                  sprintf(tempbuf,"PLAYERS: %-2ld                      ",numplr);
++                  sprintf(tempbuf,"PLAYERS: %-2d                      ",numplr);
+                   gametext(160,158,tempbuf,0,2+8+16);
+-                  sprintf(tempbuf,"EPISODE: %-2ld / LEVEL: %-2ld / SKILL: %-2ld",1+volnum,1+levnum,plrskl);
++                  sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+volnum,1+levnum,plrskl);
+                   gametext(160,170,tempbuf,0,2+8+16);
+               }
+               else menutext(69,70,0,0,"EMPTY");
+@@ -2922,9 +2922,9 @@ void menus(void)
+                   rotatesprite(101<<16,97<<16,65536L,512,MAXTILES-3,-32,0,4+10+64,0,0,xdim-1,ydim-1);
+               }
+               else menutext(69,70,0,0,"EMPTY");
+-              sprintf(tempbuf,"PLAYERS: %-2ld                      ",ud.multimode);
++              sprintf(tempbuf,"PLAYERS: %-2d                      ",ud.multimode);
+               gametext(160,158,tempbuf,0,2+8+16);
+-              sprintf(tempbuf,"EPISODE: %-2ld / LEVEL: %-2ld / SKILL: %-2ld",1+ud.volume_number,1+ud.level_number,ud.player_skill);
++              sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill);
+               gametext(160,170,tempbuf,0,2+8+16);
+           }
+ 
+@@ -3481,7 +3481,7 @@ void menus(void)
+             menutext(c,57-9,SHX(-2),PHX(-2),"GAME TYPE");
+ 
+ #ifdef VOLUMEONE
+-            sprintf(tempbuf,"EPISODE %ld",ud.m_volume_number+1);
++            sprintf(tempbuf,"EPISODE %d",ud.m_volume_number+1);
+             menutext(c,57+16-9,SHX(-3),1,tempbuf);
+ #else
+             sprintf(tempbuf,"EPISODE %ld",ud.m_volume_number+1);
+@@ -3489,7 +3489,7 @@ void menus(void)
+ #endif
+ 
+ #ifndef ONELEVELDEMO
+-            sprintf(tempbuf,"LEVEL %ld",ud.m_level_number+1);
++            sprintf(tempbuf,"LEVEL %d",ud.m_level_number+1);
+             menutext(c,57+16+16-9,SHX(-4),PHX(-4),tempbuf);
+ #else
+             sprintf(tempbuf,"LEVEL %ld",ud.m_level_number+1);
+@@ -4005,7 +4005,7 @@ void playanm(char *fn,char t)
+     walock[MAXTILES-3-t] = 219+t;
+ 
+     if(anim == 0 || lastanimhack != (MAXTILES-3-t))
+-        allocache((int32_t *)&anim,length+sizeof(anim_t),&walock[MAXTILES-3-t]);
++        allocache((intptr_t *)&anim,length+sizeof(anim_t),&walock[MAXTILES-3-t]);
+ 
+     animbuf = (char *)(FP_OFF(anim)+sizeof(anim_t));
+ 
+diff --git a/source/premap.c b/source/premap.c
+index e7611157d122a1800aa0d8ec7aa11afdaa37dd42..e51e1f215c9ca7904614b4ab15fae29796ce8e2e 100644
+--- a/source/premap.c
++++ b/source/premap.c
+@@ -248,7 +248,7 @@ char getsound(unsigned short num)
+         ( l < 12288 ) )
+     {
+         Sound[num].lock = 2;
+-        allocache((int32_t *)&Sound[num].ptr,l,(unsigned char *)&Sound[num].lock);
++        allocache((intptr_t *)&Sound[num].ptr,l,(unsigned char *)&Sound[num].lock);
+         if(Sound[num].ptr != NULL)
+             kread( fp, Sound[num].ptr , l);
+     }
+diff --git a/source/rts.c b/source/rts.c
+index 6af068d9ade53cf5ad38dd5f428dcf9445c2f4d1..6bcc7fb6bcf44b48a69238654563a28c41e6fa4b 100644
+--- a/source/rts.c
++++ b/source/rts.c
+@@ -225,7 +225,7 @@ void *RTS_GetSound (int32 lump)
+    if (lumpcache[lump] == NULL)
+    {
+       lumplockbyte[lump] = 200;
+-      allocache((int32_t *)&lumpcache[lump],(int32_t)RTS_SoundLength(lump-1),&lumplockbyte[lump]);
++      allocache((intptr_t *)&lumpcache[lump],(int32_t)RTS_SoundLength(lump-1),&lumplockbyte[lump]);
+       RTS_ReadLump(lump, lumpcache[lump]);
+    }
+    else
+diff --git a/source/scriplib.c b/source/scriplib.c
+index 259cd6584a56e784d5ea1c74f4e2504ea038a9b9..e5bdbffe82613146784ae5ecd26a8fcb85341173 100644
+--- a/source/scriplib.c
++++ b/source/scriplib.c
+@@ -259,7 +259,7 @@ static void SCRIPT_parseline (char *curline, scriptnode_t *node)
+ 	if (!strncmp (token, "0x", 2)) {
+ 		/* Found a hex digit! */
+ 		node->type = SCRIPTFLAG_HEX;
+-		node->data.number = strtol (token, NULL, 16);
++		node->data.number = (int)strtol (token, NULL, 16);
+ 	} else if (isdigit (token[0]) || token[0] == '-') {
+ 		/* Found a number! */
+ 		node->type = SCRIPTFLAG_DECIMAL;
+diff --git a/source/sounds.c b/source/sounds.c
+index ba192631aa9064f20ebddcd377ba64f5904feb3d..ab594e27f25bfb4ddfb513263abb681707192d0b 100644
+--- a/source/sounds.c
++++ b/source/sounds.c
+@@ -314,7 +314,7 @@ char loadsound(unsigned short num)
+ 
+     Sound[num].lock = 200;
+ 
+-    allocache((int32_t *)&Sound[num].ptr,l,(unsigned char *)&Sound[num].lock);
++    allocache((intptr_t *)&Sound[num].ptr,l,(unsigned char *)&Sound[num].lock);
+     kread( fp, Sound[num].ptr , l);
+     kclose( fp );
+     return 1;

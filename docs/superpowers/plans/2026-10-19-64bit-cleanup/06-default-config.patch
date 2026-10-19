@@ -1,0 +1,158 @@
+diff --git a/source/config.c b/source/config.c
+index b119d139d17807273c5ccaaa316ed66d76c86b28..21ca60f823feac1c5f77af1ddc85b0b19b985812 100644
+--- a/source/config.c
++++ b/source/config.c
+@@ -45,6 +45,7 @@ extern int stricmp(const char *x, const char *y);
+ // we load this in to get default button and key assignments
+ // as well as setting up function mappings
+ 
++#define __SETUP__
+ #include "_functio.h"
+ 
+ //
+@@ -77,7 +78,7 @@ int32 ScreenMode;
+ int32 ScreenWidth;
+ int32 ScreenHeight;
+ 
+-static char setupfilename[128];
++static char setupfilename[MAX_PATH];
+ static int32 scripthandle;
+ static int32 setupread=0;
+ /*
+@@ -92,7 +93,7 @@ void CONFIG_GetSetupFilename( void )
+    {
+  // this isn't hooked up to read from stdin, so skip it on Unix for now. --ryan.
+ #if PLATFORM_UNIX
+-   GetPathFromEnvironment(setupfilename, 128, SETUPFILENAME);
++   GetPathFromEnvironment(setupfilename, sizeof(setupfilename), SETUPFILENAME);
+ #else
+    struct find_t fblock;
+    char extension[10];
+@@ -102,7 +103,7 @@ void CONFIG_GetSetupFilename( void )
+    int32 numfiles;
+    int32 i;
+ 
+-   GetPathFromEnvironment(setupfilename, 128, SETUPFILENAME);
++   GetPathFromEnvironment(setupfilename, sizeof(setupfilename), SETUPFILENAME);
+ 
+    // determine extension
+ 
+@@ -304,6 +305,13 @@ void CONFIG_SetDefaults( void )
+    ud.crosshair = 0;
+    ud.m_marker = 1;
+    ud.m_ffire = 1;
++   ScreenMode = 2;
++   ScreenWidth = 320;
++   ScreenHeight = 200;
++   NumVoices = 8;
++   NumChannels = 2;
++   NumBits = 16;
++   MixRate = 22050;
+ }
+ /*
+ ===================
+@@ -596,15 +604,30 @@ void CONFIG_ReadSetup( void )
+    int32 dummy;
+    char commmacro[] = "CommbatMacro# ";
+ 
+-   if (!SafeFileExists(setupfilename))
++   CONFIG_SetDefaults();
++   if (SafeFileExists(setupfilename))
++      scripthandle = SCRIPT_Load( setupfilename );
++   else
+       {
+-      Error("ReadSetup: %s does not exist\n"
+-            "           Please run SETUP.EXE\n",setupfilename);
++      // No setup file: start an empty one holding the default bindings,
++      // which are then read back below like entries loaded from a file.
++      scripthandle = SCRIPT_Init( setupfilename );
++      for (dummy=0;dummy<NUMKEYENTRIES;dummy++)
++         SCRIPT_PutDoubleString( scripthandle, "KeyDefinitions",
++            keydefaults[dummy*3], keydefaults[dummy*3+1], keydefaults[dummy*3+2] );
++      for (dummy=0;dummy<(int32)(sizeof(mousedefaults)/sizeof(mousedefaults[0]));dummy++)
++         {
++         sprintf(buf,"MouseButton%d",dummy);
++         SCRIPT_PutString( scripthandle, "Controls", buf, mousedefaults[dummy] );
++         }
++      for (dummy=0;dummy<(int32)(sizeof(joystickdefaults)/sizeof(joystickdefaults[0]));dummy++)
++         {
++         sprintf(buf,"JoystickButton%d",dummy);
++         SCRIPT_PutString( scripthandle, "Controls", buf, joystickdefaults[dummy] );
++         }
++      SCRIPT_Save( scripthandle, setupfilename );
+       }
+ 
+-   CONFIG_SetDefaults();
+-   scripthandle = SCRIPT_Load( setupfilename );
+-
+    for(dummy = 0;dummy < 10;dummy++)
+    {
+        commmacro[13] = dummy+'0';
+diff --git a/source/scriplib.c b/source/scriplib.c
+index e5bdbffe82613146784ae5ecd26a8fcb85341173..587cd5d035a67b85d9bd9e011ac4f5040898c915 100644
+--- a/source/scriplib.c
++++ b/source/scriplib.c
+@@ -337,9 +337,13 @@ static scriptnode_t *SCRIPT_findinchildren (scriptnode_t *parent, char *s)
+ */
+ int32 SCRIPT_Init( char * name )
+ {
+-	STUBBED("Init");
+-	
+-	return -1;
++	if (script_numscriptsopen == MAX_SCRIPTS) return -1;
++
++	/* An empty script, as SCRIPT_Load starts one before parsing */
++	script_numscriptsopen++;
++	script_headnode[script_nexthandle] = SCRIPT_constructnode ();
++
++	return script_nexthandle++;	/* postincrement is important here */
+ }
+ 
+ 
+@@ -919,7 +923,45 @@ void SCRIPT_PutDoubleString
+    char * string2
+    )
+ {
+-	STUBBED("PutDoubleString");
++	scriptnode_t *head;
++	scriptnode_t *section;
++	scriptnode_t *node;
++
++	if(scripthandle >= MAX_SCRIPTS || scripthandle < 0)
++		return;
++
++	head = script_headnode[scripthandle];
++
++	/* We're screwed if there's no head */
++	if (head == NULL) return;
++
++	section = SCRIPT_findinchildren (head, sectionname);
++	if (section == NULL)
++	{
++		/* Add the section if it does not exist */
++		section = SCRIPT_constructnode ();
++		section->type = SCRIPTFLAG_CATEGORY;
++		section->key = SCRIPT_copystring (sectionname);
++		SCRIPT_addchild (head, section);
++	}
++
++	node = SCRIPT_findinchildren (section, entryname);
++	if (node == NULL)
++	{
++		/* Add the entry if it does not exist */
++		node = SCRIPT_constructnode ();
++		node->key = SCRIPT_copystring (entryname);
++		SCRIPT_addchild (section, node);
++	} else if (node->type == SCRIPTFLAG_ONESTRING) {
++		free (node->data.string[0]);
++	} else if (node->type == SCRIPTFLAG_TWOSTRING) {
++		free (node->data.string[0]);
++		free (node->data.string[1]);
++	}
++
++	node->type = SCRIPTFLAG_TWOSTRING;
++	node->data.string[0] = SCRIPT_copystring (string1);
++	node->data.string[1] = SCRIPT_copystring (string2);
+ }
+ 
+ /*

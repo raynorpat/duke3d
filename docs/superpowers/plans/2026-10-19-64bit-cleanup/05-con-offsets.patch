@@ -1,0 +1,431 @@
+diff --git a/source/duke3d.h b/source/duke3d.h
+index c13947bb3da67eca615320abe8b10ee987c5cb5d..376b5da92915def4f28f1a1db87ea7d4ee3fab8a 100644
+--- a/source/duke3d.h
++++ b/source/duke3d.h
+@@ -471,7 +471,11 @@ extern char sounds[NUM_SOUNDS][14];
+ 
+ extern int32_t script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;
+ extern char *label,*textptr,error,warning,killit_flag;
+-extern int32_t *actorscrptr[MAXTILES],*parsing_actor;
++extern int32_t actorscrptr[MAXTILES],*parsing_actor;
++
++// Script addresses are stored as byte offsets from script[].
++#define SCRIPT_PTR(off) ((int32_t *)((char *)script + (off)))
++#define SCRIPT_OFF(ptr) ((int32_t)((char *)(ptr) - (char *)script))
+ extern char actortype[MAXTILES];
+ extern char *music_pointer;
+ 
+diff --git a/source/game.c b/source/game.c
+index 731eb9007e9a029a28d4458c5cae402638bb9b97..629725370e6b8d5bcebadd69ccb9169f29727a5b 100644
+--- a/source/game.c
++++ b/source/game.c
+@@ -3109,10 +3109,10 @@ short EGS(short whatsect,int32_t s_x,int32_t s_y,int32_t s_z,short s_pn,signed c
+     T1=T3=T4=T6=0;
+     if( actorscrptr[s_pn] )
+     {
+-        s->extra = *actorscrptr[s_pn];
+-        T5 = *(actorscrptr[s_pn]+1);
+-        T2 = *(actorscrptr[s_pn]+2);
+-        s->hitag = *(actorscrptr[s_pn]+3);
++        s->extra = SCRIPT_PTR(actorscrptr[s_pn])[0];
++        T5 = SCRIPT_PTR(actorscrptr[s_pn])[1];
++        T2 = SCRIPT_PTR(actorscrptr[s_pn])[2];
++        s->hitag = SCRIPT_PTR(actorscrptr[s_pn])[3];
+     }
+     else
+     {
+@@ -3258,11 +3258,11 @@ short spawn( short j, short pn )
+ 
+         if( actorscrptr[s] )
+         {
+-            SH = *(actorscrptr[s]);
+-            T5 = *(actorscrptr[s]+1);
+-            T2 = *(actorscrptr[s]+2);
+-            if( *(actorscrptr[s]+3) && SHT == 0 )
+-                SHT = *(actorscrptr[s]+3);
++            SH = SCRIPT_PTR(actorscrptr[s])[0];
++            T5 = SCRIPT_PTR(actorscrptr[s])[1];
++            T2 = SCRIPT_PTR(actorscrptr[s])[2];
++            if( SCRIPT_PTR(actorscrptr[s])[3] && SHT == 0 )
++                SHT = SCRIPT_PTR(actorscrptr[s])[3];
+         }
+         else T2 = T5 = 0;
+     }
+@@ -5382,9 +5382,9 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
+ 
+                 if(ps[p].newowner > -1)
+                 {
+-                    t4 = *(actorscrptr[APLAYER]+1);
++                    t4 = SCRIPT_PTR(actorscrptr[APLAYER])[1];
+                     t3 = 0;
+-                    t1 = *(actorscrptr[APLAYER]+2);
++                    t1 = SCRIPT_PTR(actorscrptr[APLAYER])[2];
+                 }
+ 
+                 if(ud.camerasprite == -1 && ps[p].newowner == -1)
+@@ -5470,7 +5470,7 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
+         {
+             if(t4)
+             {
+-                l = *(int32_t *)(t4+8);
++                l = *SCRIPT_PTR(t4+8);
+ 
+                 switch( l )
+                 {
+@@ -5518,7 +5518,7 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
+                         break;
+                 }
+ 
+-                t->picnum += k + ( *(int32_t *)t4 ) + l * t3;
++                t->picnum += k + ( *SCRIPT_PTR(t4) ) + l * t3;
+ 
+                 if(l > 0) while(tilesizx[t->picnum] == 0 && t->picnum > 0 )
+                     t->picnum -= l;       //Hack, for actors
+diff --git a/source/gamedef.c b/source/gamedef.c
+index a4ab035940a4a7cda8a09fd947584c0430583955..7d5769bc5b377857b1b81071762503c10e560e7f 100644
+--- a/source/gamedef.c
++++ b/source/gamedef.c
+@@ -474,7 +474,7 @@ char parsecommand(void)
+             {
+                 getlabel();
+                 scriptptr--;
+-                labelcode[labelcnt] = (int32_t) scriptptr;
++                labelcode[labelcnt] = SCRIPT_OFF(scriptptr);
+                 labelcnt++;
+ 
+                 parsing_state = 1;
+@@ -619,7 +619,7 @@ char parsecommand(void)
+                         break;
+                     }
+                 if(i == labelcnt)
+-                    labelcode[labelcnt++] = (int32_t) scriptptr;
++                    labelcode[labelcnt++] = SCRIPT_OFF(scriptptr);
+                 for(j=0;j<2;j++)
+                 {
+                     if(keyword() >= 0) break;
+@@ -766,7 +766,7 @@ char parsecommand(void)
+                     }
+ 
+                 if(i == labelcnt)
+-                    labelcode[labelcnt++] = (int32_t) scriptptr;
++                    labelcode[labelcnt++] = SCRIPT_OFF(scriptptr);
+ 
+                 for(j=0;j<3;j++)
+                 {
+@@ -820,7 +820,7 @@ char parsecommand(void)
+                     }
+ 
+                 if(i == labelcnt)
+-                    labelcode[labelcnt++] = (int32_t) scriptptr;
++                    labelcode[labelcnt++] = SCRIPT_OFF(scriptptr);
+ 
+                 for(j=0;j<5;j++)
+                 {
+@@ -854,7 +854,7 @@ char parsecommand(void)
+ 
+             transnum();
+             scriptptr--;
+-            actorscrptr[*scriptptr] = parsing_actor;
++            actorscrptr[*scriptptr] = SCRIPT_OFF(parsing_actor);
+ 
+             for(j=0;j<4;j++)
+             {
+@@ -913,7 +913,7 @@ char parsecommand(void)
+ 
+             transnum();
+             scriptptr--;
+-            actorscrptr[*scriptptr] = parsing_actor;
++            actorscrptr[*scriptptr] = SCRIPT_OFF(parsing_actor);
+             actortype[*scriptptr] = j;
+ 
+             for(j=0;j<4;j++)
+@@ -997,7 +997,7 @@ char parsecommand(void)
+                 tempscrptr = scriptptr;
+                 scriptptr++; //Leave a spot for the fail location
+                 parsecommand();
+-                *tempscrptr = (int32_t) scriptptr;
++                *tempscrptr = SCRIPT_OFF(scriptptr);
+             }
+             else
+             {
+@@ -1078,7 +1078,7 @@ char parsecommand(void)
+ 
+             parsecommand();
+ 
+-            *tempscrptr = (int32_t) scriptptr;
++            *tempscrptr = SCRIPT_OFF(scriptptr);
+ 
+             checking_ifelse++;
+             return 0;
+@@ -1563,7 +1563,7 @@ void loadefs(char *filenam,char *mptr)
+     total_lines = 0;
+ 
+     passone(); //Tokenize
+-    *script = (int32_t) scriptptr;
++    *script = SCRIPT_OFF(scriptptr);
+ 
+     if(warning|error)
+         printf("Found %d warning(s), %d error(s).\n",warning,error);
+@@ -1727,7 +1727,7 @@ void alterang(short a)
+     short aang, angdif, goalang,j;
+     int32_t ticselapsed, *moveptr;
+ 
+-    moveptr = (int32_t *)g_t[1];
++    moveptr = SCRIPT_PTR(g_t[1]);
+ 
+     ticselapsed = (g_t[0])&31;
+ 
+@@ -1859,7 +1859,7 @@ void move()
+         return;
+     }
+ 
+-    moveptr = (int32_t *)g_t[1];
++    moveptr = SCRIPT_PTR(g_t[1]);
+ 
+     if(a&geth) g_sp->xvel += (*moveptr-g_sp->xvel)>>1;
+     if(a&getv) g_sp->zvel += ((*(moveptr+1)<<4)-g_sp->zvel)>>1;
+@@ -1998,7 +1998,7 @@ void parseifelse(int32_t condition)
+     }
+     else
+     {
+-        insptr = (int32_t *) *(insptr+1);
++        insptr = SCRIPT_PTR(*(insptr+1));
+         if(*insptr == 10)
+         {
+             insptr+=2;
+@@ -2149,9 +2149,9 @@ char parse(void)
+         case 24:
+             insptr++;
+             g_t[5] = *insptr;
+-            g_t[4] = *(int32_t *)(g_t[5]);       // Action
+-            g_t[1] = *(int32_t *)(g_t[5]+4);       // move
+-            g_sp->hitag = *(int32_t *)(g_t[5]+8);    // Ai
++            g_t[4] = *SCRIPT_PTR(g_t[5]);       // Action
++            g_t[1] = *SCRIPT_PTR(g_t[5]+4);       // move
++            g_sp->hitag = *SCRIPT_PTR(g_t[5]+8);    // Ai
+             g_t[0] = g_t[2] = g_t[3] = 0;
+             if(g_sp->hitag&random_angle)
+                 g_sp->ang = TRAND&2047;
+@@ -2178,7 +2178,7 @@ char parse(void)
+                 hittype[g_i].timetosleep = SLEEPTIME;
+             break;
+         case 10:
+-            insptr = (int32_t *) *(insptr+1);
++            insptr = SCRIPT_PTR(*(insptr+1));
+             break;
+         case 100:
+             insptr++;
+@@ -2531,7 +2531,7 @@ char parse(void)
+ 
+                 tempscrptr = insptr+2;
+ 
+-                insptr = (int32_t *) *(insptr+1);
++                insptr = SCRIPT_PTR(*(insptr+1));
+                 while(1) if(parse()) break;
+                 insptr = tempscrptr;
+             }
+@@ -3091,7 +3091,7 @@ void execute(short i,short p,int32_t x)
+ 
+     if( actorscrptr[g_sp->picnum] == 0 ) return;
+ 
+-    insptr = 4 + (actorscrptr[g_sp->picnum]);
++    insptr = 4 + SCRIPT_PTR(actorscrptr[g_sp->picnum]);
+ 
+     killit_flag = 0;
+ 
+@@ -3106,13 +3106,13 @@ void execute(short i,short p,int32_t x)
+     if(g_t[4])
+     {
+         g_sp->lotag += TICSPERFRAME;
+-        if(g_sp->lotag > *(int32_t *)(g_t[4]+16) )
++        if(g_sp->lotag > *SCRIPT_PTR(g_t[4]+16) )
+         {
+             g_t[2]++;
+             g_sp->lotag = 0;
+-            g_t[3] +=  *(int32_t *)( g_t[4]+12 );
++            g_t[3] +=  *SCRIPT_PTR( g_t[4]+12 );
+         }
+-        if( klabs(g_t[3]) >= klabs( *(int32_t *)(g_t[4]+4) * *(int32_t *)(g_t[4]+12) ) )
++        if( klabs(g_t[3]) >= klabs( *SCRIPT_PTR(g_t[4]+4) * *SCRIPT_PTR(g_t[4]+12) ) )
+             g_t[3] = 0;
+     }
+ 
+diff --git a/source/global.c b/source/global.c
+index 67c8b9d038eae556d407a08372282812a8b441f6..45e31312fbd37f6e7744f25039865d21f2cb74b2 100644
+--- a/source/global.c
++++ b/source/global.c
+@@ -127,7 +127,7 @@ char playerquitflag[MAXPLAYERS];
+ int32_t vel, svel, angvel, horiz, ototalclock, respawnactortime=768, respawnitemtime=768, groupfile;
+ 
+ int32_t script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;
+-int32_t *actorscrptr[MAXTILES],*parsing_actor;
++int32_t actorscrptr[MAXTILES],*parsing_actor;
+ char *label,*textptr,error,warning,killit_flag;
+ char *music_pointer;
+ char actortype[MAXTILES];
+diff --git a/source/menues.c b/source/menues.c
+index 6c01d8c350425b3970bc5316c6adc23059f39531..b012131fde9c52afc644d1c92758adf0cc2c482a 100644
+--- a/source/menues.c
++++ b/source/menues.c
+@@ -328,32 +328,12 @@ int loadplayer(signed char spot)
+ 
+      kdfread(&scriptptrs[0],1,MAXSCRIPTSIZE,fil);
+      kdfread(&script[0],4,MAXSCRIPTSIZE,fil);
+-     for(i=0;i<MAXSCRIPTSIZE;i++)
+-        if( scriptptrs[i] )
+-     {
+-         j = (int32_t)script[i]+(int32_t)&script[0];
+-         script[i] = j;
+-     }
+ 
+      kdfread(&actorscrptr[0],4,MAXTILES,fil);
+-     for(i=0;i<MAXTILES;i++)
+-         if(actorscrptr[i])
+-     {
+-        j = (int32_t)actorscrptr[i]+(int32_t)&script[0];
+-        actorscrptr[i] = (int32_t *)j;
+-     }
+ 
+      kdfread(&scriptptrs[0],1,MAXSPRITES,fil);
+      kdfread(&hittype[0],sizeof(struct weaponhit),MAXSPRITES,fil);
+ 
+-     for(i=0;i<MAXSPRITES;i++)
+-     {
+-        j = (int32_t)(&script[0]);
+-        if( scriptptrs[i]&1 ) T2 += j;
+-        if( scriptptrs[i]&2 ) T5 += j;
+-        if( scriptptrs[i]&4 ) T6 += j;
+-     }
+-
+          kdfread(&lockclock,sizeof(lockclock),1,fil);
+      kdfread(&pskybits,sizeof(pskybits),1,fil);
+      kdfread(&pskyoff[0],sizeof(pskyoff[0]),MAXPSKYTILES,fil);
+@@ -602,82 +582,17 @@ int saveplayer(signed char spot)
+      dfwrite(&cloudx[0],sizeof(short)<<7,1,fil);
+      dfwrite(&cloudy[0],sizeof(short)<<7,1,fil);
+ 
+-     for(i=0;i<MAXSCRIPTSIZE;i++)
+-     {
+-          if( (int32_t)script[i] >= (int32_t)(&script[0]) && (int32_t)script[i] < (int32_t)(&script[MAXSCRIPTSIZE]) )
+-          {
+-                scriptptrs[i] = 1;
+-                j = (int32_t)script[i] - (int32_t)&script[0];
+-                script[i] = j;
+-          }
+-          else scriptptrs[i] = 0;
+-     }
++     // Script values are already offsets; the pointer flag blocks are kept zeroed.
++     clearbufbyte(scriptptrs,MAXSCRIPTSIZE,0L);
+ 
+      dfwrite(&scriptptrs[0],1,MAXSCRIPTSIZE,fil);
+      dfwrite(&script[0],4,MAXSCRIPTSIZE,fil);
+ 
+-     for(i=0;i<MAXSCRIPTSIZE;i++)
+-        if( scriptptrs[i] )
+-     {
+-        j = script[i]+(int32_t)&script[0];
+-        script[i] = j;
+-     }
+-
+-     for(i=0;i<MAXTILES;i++)
+-         if(actorscrptr[i])
+-     {
+-        j = (int32_t)actorscrptr[i]-(int32_t)&script[0];
+-        actorscrptr[i] = (int32_t *)j;
+-     }
+      dfwrite(&actorscrptr[0],4,MAXTILES,fil);
+-     for(i=0;i<MAXTILES;i++)
+-         if(actorscrptr[i])
+-     {
+-         j = (int32_t)actorscrptr[i]+(int32_t)&script[0];
+-         actorscrptr[i] = (int32_t *)j;
+-     }
+-
+-     for(i=0;i<MAXSPRITES;i++)
+-     {
+-        scriptptrs[i] = 0;
+-
+-        if(actorscrptr[PN] == 0) continue;
+-
+-        j = (int32_t)&script[0];
+-
+-        if(T2 >= j && T2 < (int32_t)(&script[MAXSCRIPTSIZE]) )
+-        {
+-            scriptptrs[i] |= 1;
+-            T2 -= j;
+-        }
+-        if(T5 >= j && T5 < (int32_t)(&script[MAXSCRIPTSIZE]) )
+-        {
+-            scriptptrs[i] |= 2;
+-            T5 -= j;
+-        }
+-        if(T6 >= j && T6 < (int32_t)(&script[MAXSCRIPTSIZE]) )
+-        {
+-            scriptptrs[i] |= 4;
+-            T6 -= j;
+-        }
+-    }
+ 
+     dfwrite(&scriptptrs[0],1,MAXSPRITES,fil);
+     dfwrite(&hittype[0],sizeof(struct weaponhit),MAXSPRITES,fil);
+ 
+-    for(i=0;i<MAXSPRITES;i++)
+-    {
+-        if(actorscrptr[PN] == 0) continue;
+-        j = (int32_t)&script[0];
+-
+-        if(scriptptrs[i]&1)
+-            T2 += j;
+-        if(scriptptrs[i]&2)
+-            T5 += j;
+-        if(scriptptrs[i]&4)
+-            T6 += j;
+-    }
+-
+          dfwrite(&lockclock,sizeof(lockclock),1,fil);
+      dfwrite(&pskybits,sizeof(pskybits),1,fil);
+      dfwrite(&pskyoff[0],sizeof(pskyoff[0]),MAXPSKYTILES,fil);
+@@ -3484,7 +3399,7 @@ void menus(void)
+             sprintf(tempbuf,"EPISODE %d",ud.m_volume_number+1);
+             menutext(c,57+16-9,SHX(-3),1,tempbuf);
+ #else
+-            sprintf(tempbuf,"EPISODE %ld",ud.m_volume_number+1);
++            sprintf(tempbuf,"EPISODE %d",ud.m_volume_number+1);
+             menutext(c,57+16-9,SHX(-3),PHX(-3),tempbuf);
+ #endif
+ 
+diff --git a/source/player.c b/source/player.c
+index 0dc20ca6813f9d51d29ff0dc5f8c3ba203581a61..045aefe2fe157dc67cf3ffe1ead93251563c1d31 100644
+--- a/source/player.c
++++ b/source/player.c
+@@ -558,7 +558,7 @@ void shoot(short i,short atwith)
+             if(p >= 0)
+             {
+                 k = EGS(hitsect,hitx,hity,hitz,SHOTSPARK1,-15,10,10,sa,0,0,i,4);
+-                sprite[k].extra = *actorscrptr[atwith];
++                sprite[k].extra = *SCRIPT_PTR(actorscrptr[atwith]);
+                 sprite[k].extra += (TRAND%6);
+ 
+                 if( hitwall == -1 && hitspr == -1)
+@@ -673,7 +673,7 @@ void shoot(short i,short atwith)
+             else
+             {
+                 k = EGS(hitsect,hitx,hity,hitz,SHOTSPARK1,-15,24,24,sa,0,0,i,4);
+-                sprite[k].extra = *actorscrptr[atwith];
++                sprite[k].extra = *SCRIPT_PTR(actorscrptr[atwith]);
+ 
+                 if( hitspr >= 0 )
+                 {
+diff --git a/source/sector.c b/source/sector.c
+index 706e28886a044917e89e89d2493c34b97e5db5ba..7e683bd34113d7b7b144b7d0e79f0d30180169cb 100644
+--- a/source/sector.c
++++ b/source/sector.c
+@@ -2054,7 +2054,7 @@ void checkhitsprite(short i,short sn)
+         case FUELPOD:
+         case SOLARPANNEL:
+         case ANTENNA:
+-            if(sprite[sn].extra != *actorscrptr[SHOTSPARK1] )
++            if(sprite[sn].extra != *SCRIPT_PTR(actorscrptr[SHOTSPARK1]) )
+             {
+                 for(j=0;j<15;j++)
+                     EGS(SECT,SX,SY,sector[SECT].floorz-(12<<8)-(j<<9),SCRAP1+(TRAND&15),-8,64,64,

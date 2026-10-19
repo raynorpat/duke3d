@@ -1,0 +1,112 @@
+diff --git a/source/build/VENDORED.md b/source/build/VENDORED.md
+index 9bcea6fa2f8f67e921f5f5d46b8d481aa65cec5b..79c29b9716f26f554b9a4f55ae62ca2a08f539b1 100644
+--- a/source/build/VENDORED.md
++++ b/source/build/VENDORED.md
+@@ -41,3 +41,13 @@ BUILDLIC.TXT LICENSE.md
+   - `VBE_setPalette`: pass `&fmt_swap[start]` to `SDL_SetPaletteColors`
+     (upstream passed `fmt_swap`, handing uninitialized colors to SDL when
+     `start != 0`); deliberate upstream bug fix
++  - `cleanup_vesa_modelist`: drop modes whose width isn't a multiple of 4
++    (SDL pads 8-bit surface rows to 4 bytes, but the engine assumes
++    `bytesperline == width`)
++  - `sdl_mouse_wheel_filter`: negate `y` for `SDL_MOUSEWHEEL_FLIPPED`
++  - `go_to_new_vid_mode`: set the window size even while fullscreen, so
++    leaving fullscreen restores the new mode's size
++  - `go_to_new_vid_mode`: call `SDL_InitSubSystem(SDL_INIT_VIDEO)` only when
++    `SDL_WasInit(SDL_INIT_VIDEO)` is 0
++- `cache1d.c`: `suckcache` passes `copybuf` a count of 4-byte words (it
++  passed a byte count, copying 4x too much); pre-existing upstream bug
+diff --git a/source/build/cache1d.c b/source/build/cache1d.c
+index 8152222e0e9f205a23a3b9731f50176f008f1b1e..a7b96fd15a9e32967d78ca307d88f54e9e7e8afa 100644
+--- a/source/build/cache1d.c
++++ b/source/build/cache1d.c
+@@ -175,12 +175,12 @@ void suckcache (int32_t *suckptr)
+ 			if ((i > 0) && (*cac[i-1].lock == 0))
+ 			{
+ 				cac[i-1].leng += cac[i].leng;
+-				cacnum--; copybuf(&cac[i+1],&cac[i],(cacnum-i)*sizeof(cactype));
++				cacnum--; copybuf(&cac[i+1],&cac[i],(cacnum-i)*(int32_t)(sizeof(cactype)>>2));
+ 			}
+ 			else if ((i < cacnum-1) && (*cac[i+1].lock == 0))
+ 			{
+ 				cac[i+1].leng += cac[i].leng;
+-				cacnum--; copybuf(&cac[i+1],&cac[i],(cacnum-i)*sizeof(cactype));
++				cacnum--; copybuf(&cac[i+1],&cac[i],(cacnum-i)*(int32_t)(sizeof(cactype)>>2));
+ 			}
+ 		}
+ }
+diff --git a/source/build/sdl_driver.c b/source/build/sdl_driver.c
+index 35cc5e6bf65fccefaaea14a6ff833478d5bd2b8d..f74c5983798759bc7b4468b04201bdfe6934b657 100644
+--- a/source/build/sdl_driver.c
++++ b/source/build/sdl_driver.c
+@@ -474,7 +474,7 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
+     getvalidvesamodes();
+     SDL_ClearError();
+ 
+-    if ((sdl_window == NULL) && (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0))
++    if ((SDL_WasInit(SDL_INIT_VIDEO) == 0) && (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0))
+         goto vidmode_failed;
+ 
+     free_video_surfaces();
+@@ -499,12 +499,14 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
+         if (sdl_renderer == NULL)
+             goto vidmode_failed;
+     } /* if */
+-    else if (!sdl_fullscreen)
++    else
+     {
++        /* set the size even when fullscreen, so going windowed restores it. */
+         SDL_SetWindowSize(sdl_window, w * scale, h * scale);
+-        SDL_SetWindowPosition(sdl_window, SDL_WINDOWPOS_CENTERED,
+-                              SDL_WINDOWPOS_CENTERED);
+-    } /* else if */
++        if (!sdl_fullscreen)
++            SDL_SetWindowPosition(sdl_window, SDL_WINDOWPOS_CENTERED,
++                                  SDL_WINDOWPOS_CENTERED);
++    } /* else */
+ 
+     SDL_RenderSetLogicalSize(sdl_renderer, w, h);
+ 
+@@ -575,9 +577,14 @@ static __inline int sdl_mouse_button_filter(SDL_MouseButtonEvent const *event)
+ static int sdl_mouse_wheel_filter(SDL_MouseWheelEvent const *event)
+ {
+     /* bits 3 and 4 are wheel up/down; readmousebstatus() clears them. */
+-    if (event->y > 0)
++    Sint32 y = event->y;
++
++    if (event->direction == SDL_MOUSEWHEEL_FLIPPED)
++        y = -y;
++
++    if (y > 0)
+         mouse_buttons |= 8;
+-    else if (event->y < 0)
++    else if (y < 0)
+         mouse_buttons |= 16;
+     return(0);
+ } /* sdl_mouse_wheel_filter */
+@@ -1796,8 +1803,25 @@ static __inline void sort_vesa_modelist(void)
+ } /* sort_vesa_modelist */
+ 
+ 
++/* the engine assumes bytesperline == width, but SDL pads surface rows to 4. */
++static __inline void cull_unaligned_vesa_modes(void)
++{
++    int i;
++
++    for (i = 0; i < validmodecnt; i++)
++    {
++        if (validmodexdim[i] & 3)
++        {
++            remove_vesa_mode(i, "width not a multiple of 4");
++            i--;  /* list shrinks. */
++        } /* if */
++    } /* for */
++} /* cull_unaligned_vesa_modes */
++
++
+ static __inline void cleanup_vesa_modelist(void)
+ {
++    cull_unaligned_vesa_modes();
+     cull_large_vesa_modes();
+     cull_duplicate_vesa_modes();
+     sort_vesa_modelist();

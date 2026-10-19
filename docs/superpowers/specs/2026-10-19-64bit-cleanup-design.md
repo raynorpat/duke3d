@@ -1,7 +1,52 @@
 # 64-bit Cleanup (Core) — Design
 
 Date: 2026-10-19
-Status: Approved (brainstorming)
+Status: Approved (brainstorming). Revised after two validation spikes; see "Changes since
+approval".
+
+## Changes since approval
+
+Two spikes, run in a scratch clone, implemented this design end to end on macOS arm64.
+
+- **Spike 1 (engine):** a headless render of E1L1 that was checked by eye and recorded as
+  checksum `8e9d8814`.
+- **Spike 2 (game):** the game boots to the title loop and into E1L1. A window-only
+  screenshot showed E1L1 with the HUD, status bar and weapon drawn correctly.
+
+They showed these differences from the text below:
+
+1. **Warp switches use `/`.** The game parses `/v1 /l1 /s2`, not `-v1 -l1 -s2`, and
+   `game_boot` uses the slash form.
+2. **The default config is saved immediately.** When `duke3d.cfg` is missing, the defaults
+   are written into a new script and saved right away, so a run that is killed (as
+   `game_boot` kills it) still leaves a config. A clean exit still rewrites the full file.
+3. **Defaults needed to boot.** `CONFIG_SetDefaults` now also sets screen mode 2 at
+   320×200, which avoids a 0×0 video mode, and sound defaults (8 voices, 2 channels, 16
+   bits, 22050 Hz). `SCRIPT_Init` and `SCRIPT_PutDoubleString` were `STUBBED()` and are
+   now implemented in the style of their neighbours.
+4. **`game_boot` copies the in-repo `testdata/*.con`** into its run directory. A fresh
+   config defaults to 1.5 CONs. The user's data is v1.3D, whose CONs need
+   `UseOldVersion = 1`. Without external CONs, the game waits at a keyboard prompt.
+5. **Static asserts use a C99 typedef macro (`BUILD_STATIC_ASSERT`)** instead of
+   `_Static_assert`, because MSVC may reject the latter under this project's C99 setting.
+6. **`con_compile` links the game sources** through a new object library that `duke3d`
+   also uses. Every source except `game.c` is in it.
+7. **Extra fixes found while making the game run:**
+   - `suckcache` copied 4× too much memory: it passed a byte count to a word copier. This
+     bug predates the port.
+   - The `drawmasks` sprite sort swapped only half of each pointer.
+   - `initengine` cleared only half of `waloff[]`.
+   - `loadpics` masked off the upper address bits.
+   - The `a.c` loops that relied on 32-bit address wraparound are rewritten with
+     equivalent pointer arithmetic.
+   - `animateptr` save handling is corrected.
+   - Printf format strings match their 32-bit arguments.
+8. **Savegames:** the 4-byte `scriptptrs` flag blocks are still written, now as zeros. A
+   DOS or 32-bit build therefore can't load a 64-bit save. Loading the other direction
+   (sub-project 3) is unaffected. `player_struct` contains a `char *palette`, so `ps[]`
+   is not DOS-sized. Sub-project 3 must read it field by field.
+9. **The manual playtest with the user's 1.3D data needs `UseOldVersion = 1`** under
+   `[Misc]` in `duke3d.cfg`. The README documents this.
 
 This is sub-project 1 of 3 for running duke3d on 64-bit targets. It follows the CMake +
 SDL2 work (`2026-10-18-cmake-sdl2-design.md`).
@@ -129,7 +174,7 @@ Rules:
 
 ### 4. Format invariants
 
-These `_Static_assert` checks live next to the type definitions (`build.h` and
+These `BUILD_STATIC_ASSERT` checks (a C99 typedef-based macro) live next to the type definitions (`build.h` and
 `duke3d.h`):
 
 - `sizeof(sectortype) == 40`, `sizeof(walltype) == 32`, `sizeof(spritetype) == 44`
@@ -178,7 +223,7 @@ guard is removed.
 
 ## Testing
 
-1. **Compile-time:** the `-Werror` flags and `_Static_assert` checks from section 4.
+1. **Compile-time:** the `-Werror` flags and `BUILD_STATIC_ASSERT` checks from section 4.
 2. **`sdl_driver_smoke`** (existing): passes on all three OSes.
 3. **`con_compile`** (new CTest, no game data needed, runs in CI):
    - compiles the in-repo `testdata/game.con`, `defs.con` and `user.con` with the game's
@@ -194,7 +239,7 @@ guard is removed.
      and a scratch `HOME`/`USERPROFILE`.
    - Runs `duke3d` twice with `SDL_VIDEODRIVER=dummy`, `BUILD_WINDOWED=1` and
      `execute_process(... TIMEOUT 15)`: once with no arguments (title/demo loop), and
-     once with `-v1 -l1 -s2` (Episode 1 Level 1, skill 2).
+     once with `/v1 /l1 /s2` (Episode 1 Level 1, skill 2).
    - Passes when each run is still alive at the timeout, meaning `execute_process`
      reports a timeout rather than an exit code. Fails on any exit, crash, or output
      containing `Not enough memory`.

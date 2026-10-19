@@ -1,0 +1,87 @@
+diff --git a/cmake/CompileOptions.cmake b/cmake/CompileOptions.cmake
+index b11692be39346a1f48aeae4edc58e8165ede2159..fbc4fee74cf9824e46c36987c895ead65425db8f 100644
+--- a/cmake/CompileOptions.cmake
++++ b/cmake/CompileOptions.cmake
+@@ -25,8 +25,10 @@ endif()
+ if(MSVC)
+   target_compile_definitions(duke3d_compile_options INTERFACE
+     _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE)
+-  # /J: char is unsigned, which the game logic assumes.
+-  target_compile_options(duke3d_compile_options INTERFACE /J /W3 /wd4996)
++  # /J: char is unsigned, which the game logic assumes. /we4311 /we4312
++  # /we4302: pointer truncation and widening casts are errors.
++  target_compile_options(duke3d_compile_options INTERFACE
++    /J /W3 /wd4996 /we4311 /we4312 /we4302)
+ else()
+   # The game logic assumes unsigned char, and the code relies on
+   # type-punning that breaks under strict aliasing.
+@@ -48,6 +50,18 @@ else()
+         "-Wno-error=${_flag}")
+     endif()
+   endforeach()
++
++  # Casts that truncate or widen an address are errors on 64-bit targets.
++  foreach(_flag
++      pointer-to-int-cast
++      int-to-pointer-cast)
++    string(MAKE_C_IDENTIFIER "DUKE3D_HAS_WERROR_${_flag}" _var)
++    check_c_compiler_flag("-Werror=${_flag}" ${_var})
++    if(${_var})
++      target_compile_options(duke3d_compile_options INTERFACE
++        "-Werror=${_flag}")
++    endif()
++  endforeach()
+ endif()
+ 
+ target_compile_features(duke3d_compile_options INTERFACE c_std_99)
+diff --git a/source/build/build.h b/source/build/build.h
+index 053d328e278d35264523f1e27b13f720fc11c33c..631a59d2dcadce06bd1df17845419d6b9c8f4cc3 100644
+--- a/source/build/build.h
++++ b/source/build/build.h
+@@ -141,9 +141,13 @@ typedef struct
+ #pragma pack()
+ #endif
+ 
+-_Static_assert(sizeof(sectortype) == 40, "sectortype must match the on-disk size");
+-_Static_assert(sizeof(walltype) == 32, "walltype must match the on-disk size");
+-_Static_assert(sizeof(spritetype) == 44, "spritetype must match the on-disk size");
++/* A C99 compile-time check: the array size is negative when c is false. */
++#define BUILD_STATIC_ASSERT(c, name) typedef char build_static_assert_##name[(c) ? 1 : -1]
++
++/* These must match the on-disk sizes. */
++BUILD_STATIC_ASSERT(sizeof(sectortype) == 40, sectortype_size);
++BUILD_STATIC_ASSERT(sizeof(walltype) == 32, walltype_size);
++BUILD_STATIC_ASSERT(sizeof(spritetype) == 44, spritetype_size);
+ 
+ EXTERN sectortype sector[MAXSECTORS];
+ EXTERN walltype wall[MAXWALLS];
+diff --git a/source/duke3d.h b/source/duke3d.h
+index 376b5da92915def4f28f1a1db87ea7d4ee3fab8a..7fde6d93d5d950a400a44fa8c2a9d36d47ce0f5c 100644
+--- a/source/duke3d.h
++++ b/source/duke3d.h
+@@ -330,6 +330,8 @@ struct animwalltype
+         short wallnum;
+         int32_t tag;
+ };
++/* Saved to disk: keep the 32-bit sizes. */
++BUILD_STATIC_ASSERT(sizeof(struct animwalltype) == 8, animwalltype_size);
+ extern struct animwalltype animwall[MAXANIMWALLS];
+ extern short numanimwalls,probey,lastprobey;
+ 
+@@ -470,6 +472,7 @@ extern char playerreadyflag[MAXPLAYERS],playerquitflag[MAXPLAYERS];
+ extern char sounds[NUM_SOUNDS][14];
+ 
+ extern int32_t script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;
++BUILD_STATIC_ASSERT(sizeof(script[0]) == 4, script_element_size);
+ extern char *label,*textptr,error,warning,killit_flag;
+ extern int32_t actorscrptr[MAXTILES],*parsing_actor;
+ 
+@@ -498,6 +501,8 @@ struct weaponhit
+     int32_t floorz,ceilingz,lastvx,lastvy,bposx,bposy,bposz;
+     int32_t temp_data[6];
+ };
++/* Saved to disk: keep the 32-bit sizes. */
++BUILD_STATIC_ASSERT(sizeof(struct weaponhit) == 72, weaponhit_size);
+ 
+ extern struct weaponhit hittype[MAXSPRITES];
+ 
