@@ -67,7 +67,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define TIMERUPDATESIZ 32
 
 /* this should be a proper prototype included from a header file */
+#if PLATFORM_UNIX
 extern int stricmp(const char *x, const char *y);
+#endif
 
 int32_t cameradist = 0, cameraclock = 0;
 char eightytwofifty = 0;
@@ -7219,7 +7221,7 @@ void Startup(void)
 
 #ifdef VOLUMEONE
 
-   printf("\n*** You have run Duke Nukem 3D %ld times. ***\n\n",ud.executions);
+   printf("\n*** You have run Duke Nukem 3D %d times. ***\n\n",ud.executions);
    if(ud.executions >= 50) puts("IT IS NOW TIME TO UPGRADE TO THE COMPLETE VERSION!!!\n");
 
 #endif

@@ -339,8 +339,10 @@ extern int setup_homedir(void);
 extern char CheckParm(char *check);
 extern void RegisterShutdownFunction(void (*shutdown)(void));
 extern void Shutdown(void);
+#if PLATFORM_UNIX
 extern char *ltoa(int32_t value, char *string, int radix);
 extern char *ultoa(uint32_t value, char *string, int radix);
+#endif
 extern int dukescreencapture(char *str, char inverseit);
 
 /* actors.c */

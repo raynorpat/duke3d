@@ -26,7 +26,7 @@ typedef long long __int64;
 
 struct find_t
 {
-	int32_t handle;
+	intptr_t handle;
     struct _finddata_t data;
 	char name[MAX_PATH];
 };

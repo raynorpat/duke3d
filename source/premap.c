@@ -1398,7 +1398,7 @@ void enterlevel(char g)
 
 #else
 
-    l = strlen(level_file_names[ (ud.volume_number*11)+ud.level_number]);
+    l = (int32_t)strlen(level_file_names[ (ud.volume_number*11)+ud.level_number]);
     copybufbyte( level_file_names[ (ud.volume_number*11)+ud.level_number],&levname[0],l);
     levname[l] = 255;
     levname[l+1] = 0;

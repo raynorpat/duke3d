@@ -702,7 +702,7 @@ boolean SCRIPT_GetNumber
 	{
 		*number = cur->data.number;
 #ifdef DEBUG_SCRIPLIB
-		printf ("GetNumber: value for %s:%s is %ld\n", sectionname, entryname, *number);
+		printf ("GetNumber: value for %s:%s is %d\n", sectionname, entryname, *number);
 #endif
 	}
 

@@ -31,7 +31,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #endif
 
 /* this should be a proper prototype included from a header file */
+#if PLATFORM_UNIX
 extern int stricmp(const char *x, const char *y);
+#endif
 
 #include <stdio.h>
 #include <string.h>
@@ -494,7 +496,7 @@ void CONFIG_SetupJoystick( int32 scripthandle )
    char str[80];
    char temp[80];
    int32 function, deadzone;
-   float scale;
+   float scale = 1.0f;
 
    for (i=0;i<MAXJOYBUTTONS;i++)
       {
@@ -620,10 +622,25 @@ void CONFIG_ReadSetup( void )
          sprintf(buf,"MouseButton%d",dummy);
          SCRIPT_PutString( scripthandle, "Controls", buf, mousedefaults[dummy] );
          }
+      for (dummy=0;dummy<(int32)(sizeof(mouseclickeddefaults)/sizeof(mouseclickeddefaults[0]));dummy++)
+         {
+         sprintf(buf,"MouseButtonClicked%d",dummy);
+         SCRIPT_PutString( scripthandle, "Controls", buf, mouseclickeddefaults[dummy] );
+         }
       for (dummy=0;dummy<(int32)(sizeof(joystickdefaults)/sizeof(joystickdefaults[0]));dummy++)
          {
          sprintf(buf,"JoystickButton%d",dummy);
          SCRIPT_PutString( scripthandle, "Controls", buf, joystickdefaults[dummy] );
+         }
+      for (dummy=0;dummy<(int32)(sizeof(joystickclickeddefaults)/sizeof(joystickclickeddefaults[0]));dummy++)
+         {
+         sprintf(buf,"JoystickButtonClicked%d",dummy);
+         SCRIPT_PutString( scripthandle, "Controls", buf, joystickclickeddefaults[dummy] );
+         }
+      for (dummy=0;dummy<(int32)(sizeof(joystickanalogdefaults)/sizeof(joystickanalogdefaults[0]));dummy++)
+         {
+         sprintf(buf,"JoystickAnalogAxes%d",dummy);
+         SCRIPT_PutString( scripthandle, "Controls", buf, joystickanalogdefaults[dummy] );
          }
       SCRIPT_Save( scripthandle, setupfilename );
       }

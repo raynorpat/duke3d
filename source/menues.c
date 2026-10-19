@@ -30,7 +30,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "animlib.h"
 
 /* this should be a proper prototype included from a header file */
+#if PLATFORM_UNIX
 extern int stricmp(const char *x, const char *y);
+#endif
 
 extern short inputloc;
 extern int recfilep;
@@ -1877,7 +1879,7 @@ void menus(void)
 
             dispnames();
 
-            sprintf(tempbuf,"PLAYERS: %-2d                      ",numplr); // int32 = long
+            sprintf(tempbuf,"PLAYERS: %-2d                      ",numplr);
             gametext(160,158,tempbuf,0,2+8+16);
 
             sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+volnum,1+levnum,plrskl);
@@ -3407,7 +3409,7 @@ void menus(void)
             sprintf(tempbuf,"LEVEL %d",ud.m_level_number+1);
             menutext(c,57+16+16-9,SHX(-4),PHX(-4),tempbuf);
 #else
-            sprintf(tempbuf,"LEVEL %ld",ud.m_level_number+1);
+            sprintf(tempbuf,"LEVEL %d",ud.m_level_number+1);
             menutext(c,57+16+16-9,SHX(-4),1,tempbuf);
 #endif
             menutext(c,57+16+16+16-9,SHX(-5),PHX(-5),"MONSTERS");

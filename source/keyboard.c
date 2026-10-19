@@ -28,7 +28,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "keyboard.h"
 
 /* this should be a proper prototype included from a header file */
+#if PLATFORM_UNIX
 extern int stricmp(const char *x, const char *y);
+#endif
 
 /*
 =============================================================================

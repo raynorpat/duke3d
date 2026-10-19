@@ -276,7 +276,7 @@ void FixFilePath(char *filename)
 #elif PLATFORM_WIN32
 int _dos_findfirst(char *filename, int x, struct find_t *f)
 {
-    int32_t rc = _findfirst(filename, &f->data);
+    intptr_t rc = _findfirst(filename, &f->data);
     f->handle = rc;
     if (rc != -1)
     {
@@ -840,7 +840,7 @@ char *ultoa(uint32_t value, char *string, int radix)
 			sprintf(string, "%u", value);
 			break;
 		case 16:
-			sprintf(string, "%ux", value);
+			sprintf(string, "%x", value);
 			break;
 		default:
 			STUBBED("unknown radix");
@@ -917,7 +917,11 @@ int dukescreencapture(char *str, char inverseit)
     char *path = alloca(slen);
     strcpy(path, ApogeePath);
     strcat(path, SCREENSHOTDIR);
+#if PLATFORM_WIN32
+	_mkdir(path);
+#else
 	mkdir(path, S_IRWXU);
+#endif
     strcat(path, PATH_SEP_STR);
     strcat(path, str);
     str = path;
