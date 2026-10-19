@@ -49,6 +49,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifndef _CTAWEAPI
 #define _CTAWEAPI
+#include <stdint.h>
 
 
 #define MAXBANKS            64      /* maximum number of banks */
@@ -98,11 +99,11 @@ typedef int                     BOOL;
 
 typedef unsigned char		BYTE;
 typedef unsigned short		WORD;
-typedef unsigned long		DWORD;
+typedef uint32_t		DWORD;
 
 typedef short int               SHORT;
 typedef unsigned int		UINT;
-typedef signed long 		LONG;
+typedef int32_t 		LONG;
 
 #ifndef FAR
 #define FAR                     __far

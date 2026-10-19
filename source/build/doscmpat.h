@@ -30,10 +30,11 @@
 #endif
 
 // need these for something where we abstracted with SDL...
-typedef unsigned long Uint32;
+typedef uint32_t Uint32;
 typedef unsigned short Uint16;
 typedef unsigned char Uint8;
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,14 +48,14 @@ typedef unsigned char Uint8;
 #pragma intrinsic(min);
 #pragma intrinsic(max);
 
-void printext16(long xpos, long ypos, short col, short backcol, char name[82], char fontsize);
+void printext16(int32_t xpos, int32_t ypos, short col, short backcol, char name[82], char fontsize);
 
 void *kkmalloc(size_t size);
 void *kmalloc(size_t i1);
 void kkfree(void *i1);
 void kfree(void *i1);
 
-void setstereo(long dastereomode);
+void setstereo(int32_t dastereomode);
 void printscreeninterrupt(void);
 
 void setvmode(int i1);

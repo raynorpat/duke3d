@@ -25,6 +25,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //-------------------------------------------------------------------------
 
 #if PLATFORM_DOS
+#include <stdint.h>
 #include <conio.h>
 #include <dos.h>
 #endif
@@ -559,7 +560,7 @@ void CONFIG_SetupJoystick( int32 scripthandle )
 
 void readsavenames(void)
 {
-    long dummy;
+    int32_t dummy;
     short i;
     char filename[] = "game_.sav";
     char fullname[128];
@@ -782,7 +783,7 @@ void CONFIG_WriteSetup( void )
    SCRIPT_PutNumber( scripthandle, "Controls", "MouseAimingFlipped",ud.mouseflip,false,false);
    SCRIPT_PutNumber( scripthandle, "Controls","MouseAiming",MouseAiming,false,false);
    SCRIPT_PutNumber( scripthandle, "Controls","GameMouseAiming",(int32) ps[myconnectindex].aim_mode,false,false);
-   SCRIPT_PutNumber( scripthandle, "Controls","AimingFlag",(long) myaimmode,false,false);
+   SCRIPT_PutNumber( scripthandle, "Controls","AimingFlag",(int32_t) myaimmode,false,false);
 
    for(dummy=0;dummy<10;dummy++)
    {

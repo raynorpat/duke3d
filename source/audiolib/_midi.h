@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifndef ___MIDI_H
 #define ___MIDI_H
+#include <stdint.h>
 
 #define RELATIVE_BEAT( measure, beat, tick ) \
    ( ( tick ) + ( ( beat ) << 9 ) + ( ( measure ) << 16 ) )
@@ -121,14 +122,14 @@ typedef struct
    short          loopcount;
    short          RunningStatus;
    unsigned       time;
-   long           FPSecondsPerTick;
+   int32_t           FPSecondsPerTick;
    short          tick;
    short          beat;
    short          measure;
    short          BeatsPerMeasure;
    short          TicksPerBeat;
    short          TimeBase;
-   long           delay;
+   int32_t           delay;
    short          active;
    } songcontext;
 
@@ -137,7 +138,7 @@ typedef struct
    unsigned char *start;
    unsigned char *pos;
 
-   long           delay;
+   int32_t           delay;
    short          active;
    short          RunningStatus;
 
@@ -149,8 +150,8 @@ typedef struct
    char           EMIDI_VolumeChange;
    } track;
 
-static long _MIDI_ReadNumber( void *from, size_t size );
-static long _MIDI_ReadDelta( track *ptr );
+static int32_t _MIDI_ReadNumber( void *from, size_t size );
+static int32_t _MIDI_ReadDelta( track *ptr );
 static void _MIDI_ResetTracks( void );
 static void _MIDI_AdvanceTick( void );
 static void _MIDI_MetaEvent( track *Track );

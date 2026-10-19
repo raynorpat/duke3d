@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1994 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <conio.h>
 #include <dos.h>
 #include <stdio.h>
@@ -56,7 +57,7 @@ static int GUS_Installed = 0;
 extern VoiceNode   GUSWAVE_Voices[ VOICES ];
 extern int GUSWAVE_Installed;
 
-unsigned long GUS_TotalMemory;
+uint32_t GUS_TotalMemory;
 int           GUS_MemConfig;
 
 int GUS_AuxError  = 0;
@@ -203,7 +204,7 @@ int GUS_Init
          GUS_SetErrorCode( GUS_OutOfDosMemory );
          return( GUS_Error );
          }
-      GUS_HoldBuffer.paddr = ( unsigned long )GUS_HoldBuffer.vptr;
+      GUS_HoldBuffer.paddr = ( uint32_t )GUS_HoldBuffer.vptr;
 
       HoldBufferAllocated = TRUE;
       }

@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifndef __ADLIBFX_H
 #define __ADLIBFX_H
+#include <stdint.h>
 
 enum ADLIBFX_Errors
    {
@@ -43,7 +44,7 @@ enum ADLIBFX_Errors
 
 typedef	struct
    {
-   unsigned long  length;
+   uint32_t  length;
    short int      priority;
    char           mChar, cChar;
    char           mScale, cScale;
@@ -67,9 +68,9 @@ int   ADLIBFX_SetVolume( int handle, int volume );
 int   ADLIBFX_SetTotalVolume( int volume );
 int   ADLIBFX_GetTotalVolume( void );
 int   ADLIBFX_VoiceAvailable( int priority );
-int   ADLIBFX_Play( ALSound *sound, int volume, int priority, unsigned long callbackval );
+int   ADLIBFX_Play( ALSound *sound, int volume, int priority, uint32_t callbackval );
 int   ADLIBFX_SoundPlaying( int handle );
-void  ADLIBFX_SetCallBack( void ( *function )( unsigned long ) );
+void  ADLIBFX_SetCallBack( void ( *function )( uint32_t ) );
 int   ADLIBFX_Init( void );
 int   ADLIBFX_Shutdown( void );
    #pragma aux ADLIBFX_Shutdown frame;

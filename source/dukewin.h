@@ -8,6 +8,7 @@ typedef long long __int64;
 #pragma warning(disable:4761)
 
 #if USE_SDL
+#include <stdint.h>
 #include "SDL.h"
 #endif
 
@@ -25,7 +26,7 @@ typedef long long __int64;
 
 struct find_t
 {
-	long handle;
+	int32_t handle;
     struct _finddata_t data;
 	char name[MAX_PATH];
 };
@@ -53,7 +54,7 @@ void _dos_getdate(struct dosdate_t *date);
 #ifdef FP_OFF
 #undef FP_OFF
 #endif
-#define FP_OFF(x) ((long) (x))
+#define FP_OFF(x) ((int32_t) (x))
 
 // 64 megs should be enough for anybody.  :)  --ryan.
 #define Z_AvailHeap() ((64 * 1024) * 1024)

@@ -6,6 +6,7 @@
  * Written by Ryan C. Gordon. (icculus@clutteredmind.org)
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -57,7 +58,7 @@ typedef struct __DUKECHANINFO
     int in_use;                 // 1 or 0.
     int priority;               // priority, defined by application.
     Uint32 birthday;            // ticks when channel was grabbed.
-    unsigned long callbackval;  // callback value from application.
+    uint32_t callbackval;  // callback value from application.
 } duke_channel_info;
 
 
@@ -67,7 +68,7 @@ static char warningMessage[80];
 static char errorMessage[80];
 static int fx_initialized = 0;
 static int numChannels = MIX_CHANNELS;
-static void (*callback)(unsigned long);
+static void (*callback)(uint32_t);
 static int reverseStereo = 0;
 static int reverbDelay = 256;
 static int reverbLevel = 0;
@@ -541,7 +542,7 @@ int FX_Shutdown( void )
 } // FX_Shutdown
 
 
-int FX_SetCallBack(void (*func)(unsigned long))
+int FX_SetCallBack(void (*func)(uint32_t))
 {
     callback = func;
     return(FX_Ok);
@@ -749,7 +750,7 @@ static void addChunkToCache(Mix_Chunk *chunk, void *ptr)
 //  If the value is not FX_Ok, then the warning or error message is set,
 //  and you should bail.
 // size added by SBF for ROTT
-static int setupVocPlayback(char *ptr, int size, int priority, unsigned long callbackval,
+static int setupVocPlayback(char *ptr, int size, int priority, uint32_t callbackval,
                             int *chan, Mix_Chunk **chunk)
 {
     SDL_RWops *rw;
@@ -825,7 +826,7 @@ static int _FX_SetPosition(int chan, int angle, int distance)
 
 int FX_PlayVOC(char *ptr, int pitchoffset,
                int vol, int left, int right,
-               int priority, unsigned long callbackval)
+               int priority, uint32_t callbackval)
 {
     int rc;
     int chan;
@@ -863,9 +864,9 @@ static int getSampleSize(void)
 } // getSampleSize
 
 
-int FX_PlayLoopedVOC(char *ptr, long loopstart, long loopend,
+int FX_PlayLoopedVOC(char *ptr, int32_t loopstart, int32_t loopend,
        int pitchoffset, int vol, int left, int right, int priority,
-       unsigned long callbackval)
+       uint32_t callbackval)
 {
     int rc;
     int chan;
@@ -914,7 +915,7 @@ int FX_PlayLoopedVOC(char *ptr, long loopstart, long loopend,
 } // FX_PlayLoopedVOC
 
 int FX_PlayVOC3D(char *ptr, int pitchoffset, int angle, int distance,
-       int priority, unsigned long callbackval)
+       int priority, uint32_t callbackval)
 {
     int rc;
     int chan;
@@ -937,7 +938,7 @@ int FX_PlayVOC3D(char *ptr, int pitchoffset, int angle, int distance,
 
 // ROTT Special - SBF
 int FX_PlayVOC3D_ROTT(char *ptr, int size, int pitchoffset, int angle, int distance,
-       int priority, unsigned long callbackval)
+       int priority, uint32_t callbackval)
 {
     int rc;
     int chan;
@@ -962,15 +963,15 @@ int FX_PlayVOC3D_ROTT(char *ptr, int size, int pitchoffset, int angle, int dista
 
     // it's all the same to SDL_mixer.  :)
 int FX_PlayWAV( char *ptr, int pitchoffset, int vol, int left, int right,
-       int priority, unsigned long callbackval )
+       int priority, uint32_t callbackval )
 {
     return(FX_PlayVOC(ptr, pitchoffset, vol, left, right, priority, callbackval));
 } // FX_PlayWAV
 
 
-int FX_PlayLoopedWAV( char *ptr, long loopstart, long loopend,
+int FX_PlayLoopedWAV( char *ptr, int32_t loopstart, int32_t loopend,
        int pitchoffset, int vol, int left, int right, int priority,
-       unsigned long callbackval )
+       uint32_t callbackval )
 {
     return(FX_PlayLoopedVOC(ptr, loopstart, loopend, pitchoffset, vol, left,
                              right, priority, callbackval));
@@ -978,31 +979,31 @@ int FX_PlayLoopedWAV( char *ptr, long loopstart, long loopend,
 
 
 int FX_PlayWAV3D( char *ptr, int pitchoffset, int angle, int distance,
-       int priority, unsigned long callbackval )
+       int priority, uint32_t callbackval )
 {
     return(FX_PlayVOC3D(ptr, pitchoffset, angle, distance, priority, callbackval));
 } // FX_PlayWAV3D
 
 // ROTT Special - SBF
 int FX_PlayWAV3D_ROTT( char *ptr, int size, int pitchoffset, int angle, int distance,
-       int priority, unsigned long callbackval )
+       int priority, uint32_t callbackval )
 {
     return(FX_PlayVOC3D_ROTT(ptr, size, pitchoffset, angle, distance, priority, callbackval));
 } // FX_PlayWAV3D_ROTT
 
 
-int FX_PlayRaw( char *ptr, unsigned long length, unsigned rate,
+int FX_PlayRaw( char *ptr, uint32_t length, unsigned rate,
        int pitchoffset, int vol, int left, int right, int priority,
-       unsigned long callbackval )
+       uint32_t callbackval )
 {
     setErrorMessage("FX_PlayRaw() ... NOT IMPLEMENTED!");
     return(FX_Error);
 } // FX_PlayRaw
 
 
-int FX_PlayLoopedRaw( char *ptr, unsigned long length, char *loopstart,
+int FX_PlayLoopedRaw( char *ptr, uint32_t length, char *loopstart,
        char *loopend, unsigned rate, int pitchoffset, int vol, int left,
-       int right, int priority, unsigned long callbackval )
+       int right, int priority, uint32_t callbackval )
 {
     setErrorMessage("FX_PlayLoopedRaw() ... NOT IMPLEMENTED!");
     return(FX_Error);
@@ -1085,9 +1086,9 @@ int FX_StopAllSounds(void)
 } // FX_StopAllSounds
 
 
-int FX_StartDemandFeedPlayback( void ( *function )( char **ptr, unsigned long *length ),
+int FX_StartDemandFeedPlayback( void ( *function )( char **ptr, uint32_t *length ),
        int rate, int pitchoffset, int vol, int left, int right,
-       int priority, unsigned long callbackval )
+       int priority, uint32_t callbackval )
 {
     setErrorMessage("FX_StartDemandFeedPlayback() ... NOT IMPLEMENTED!");
     return(FX_Error);
@@ -1321,10 +1322,10 @@ void PlayMusic(char *_filename)
     //FixFilePath(filename);
 
     char filename[MAX_PATH];
-    long handle;
-    long size;
+    int32_t handle;
+    int32_t size;
     void *song;
-    long rc;
+    int32_t rc;
 
     MUSIC_StopSong();
 
@@ -1420,13 +1421,13 @@ int MUSIC_GetContext(void)
 } // MUSIC_GetContext
 
 
-void MUSIC_SetSongTick(unsigned long PositionInTicks)
+void MUSIC_SetSongTick(uint32_t PositionInTicks)
 {
     musdebug("STUB ... MUSIC_SetSongTick().\n");
 } // MUSIC_SetSongTick
 
 
-void MUSIC_SetSongTime(unsigned long milliseconds)
+void MUSIC_SetSongTime(uint32_t milliseconds)
 {
     musdebug("STUB ... MUSIC_SetSongTime().\n");
 }// MUSIC_SetSongTime

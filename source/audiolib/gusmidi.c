@@ -31,6 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 // Module MUST be compiled with structure allignment set to a maximum
 // of 1 byte ( zp1 ).
 
+#include <stdint.h>
 #include <conio.h>
 #include <dos.h>
 #include <stdio.h>
@@ -74,7 +75,7 @@ static char  InstrumentDirectory[ 80 ];
 
 extern struct gf1_dma_buff GUS_HoldBuffer;
 
-extern unsigned long GUS_TotalMemory;
+extern uint32_t GUS_TotalMemory;
 extern int           GUS_MemConfig;
 
 static int GUSMIDI_Volume = 255;

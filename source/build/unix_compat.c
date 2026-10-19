@@ -18,6 +18,7 @@
 #error Please define PLATFORM_UNIX to use this code.
 #endif
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -73,12 +74,12 @@ int stricmp(const char *x, const char *y)
 } /* stricmp */
 #endif /* DC */
 
-long filelength(int fhandle)
+int32_t filelength(int fhandle)
 {
-    long retval = -1;
+    int32_t retval = -1;
     struct stat stat_buf;
     if (fstat(fhandle, &stat_buf) == 0)
-        retval = (long) stat_buf.st_size;
+        retval = (int32_t) stat_buf.st_size;
     return(retval);
 } /* filelength */
 

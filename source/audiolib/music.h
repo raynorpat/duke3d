@@ -31,6 +31,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #ifndef __MUSIC_H
 #define __MUSIC_H
 
+#include <stdint.h>
 #include "sndcards.h"
 
 #ifndef PLAT_DOS
@@ -56,8 +57,8 @@ enum MUSIC_ERRORS
 
 typedef struct
    {
-   unsigned long tickposition;
-   unsigned long milliseconds;
+   uint32_t tickposition;
+   uint32_t milliseconds;
    unsigned int  measure;
    unsigned int  beat;
    unsigned int  tick;
@@ -82,8 +83,8 @@ int   MUSIC_StopSong( void );
 int   MUSIC_PlaySong( unsigned char *song, int loopflag );
 void  MUSIC_SetContext( int context );
 int   MUSIC_GetContext( void );
-void  MUSIC_SetSongTick( unsigned long PositionInTicks );
-void  MUSIC_SetSongTime( unsigned long milliseconds );
+void  MUSIC_SetSongTick( uint32_t PositionInTicks );
+void  MUSIC_SetSongTime( uint32_t milliseconds );
 void  MUSIC_SetSongPosition( int measure, int beat, int tick );
 void  MUSIC_GetSongPosition( songposition *pos );
 void  MUSIC_GetSongLength( songposition *pos );

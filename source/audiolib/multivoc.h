@@ -32,6 +32,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define __MULTIVOC_H
 
 // platform.h is in buildengine, but I need the byteswapping macros... --ryan.
+#include <stdint.h>
 #include "../build/platform.h"
 
 #define MV_MinVoiceHandle  1
@@ -84,34 +85,34 @@ int   MV_StartPlayback( void );
 void  MV_StopPlayback( void );
 int   MV_StartRecording( int MixRate, void ( *function )( char *ptr, int length ) );
 void  MV_StopRecord( void );
-int   MV_StartDemandFeedPlayback( void ( *function )( char **ptr, unsigned long *length ),
+int   MV_StartDemandFeedPlayback( void ( *function )( char **ptr, uint32_t *length ),
          int rate, int pitchoffset, int vol, int left, int right,
-         int priority, unsigned long callbackval );
-int   MV_PlayRaw( char *ptr, unsigned long length,
+         int priority, uint32_t callbackval );
+int   MV_PlayRaw( char *ptr, uint32_t length,
          unsigned rate, int pitchoffset, int vol, int left,
-         int right, int priority, unsigned long callbackval );
-int   MV_PlayLoopedRaw( char *ptr, unsigned long length,
+         int right, int priority, uint32_t callbackval );
+int   MV_PlayLoopedRaw( char *ptr, uint32_t length,
          char *loopstart, char *loopend, unsigned rate, int pitchoffset,
          int vol, int left, int right, int priority,
-         unsigned long callbackval );
+         uint32_t callbackval );
 int   MV_PlayWAV( char *ptr, int pitchoffset, int vol, int left,
-         int right, int priority, unsigned long callbackval );
+         int right, int priority, uint32_t callbackval );
 int   MV_PlayWAV3D( char *ptr, int pitchoffset, int angle, int distance,
-         int priority, unsigned long callbackval );
-int   MV_PlayLoopedWAV( char *ptr, long loopstart, long loopend,
+         int priority, uint32_t callbackval );
+int   MV_PlayLoopedWAV( char *ptr, int32_t loopstart, int32_t loopend,
          int pitchoffset, int vol, int left, int right, int priority,
-         unsigned long callbackval );
+         uint32_t callbackval );
 int   MV_PlayVOC3D( char *ptr, int pitchoffset, int angle, int distance,
-         int priority, unsigned long callbackval );
+         int priority, uint32_t callbackval );
 int   MV_PlayVOC( char *ptr, int pitchoffset, int vol, int left, int right,
-         int priority, unsigned long callbackval );
-int   MV_PlayLoopedVOC( char *ptr, long loopstart, long loopend,
+         int priority, uint32_t callbackval );
+int   MV_PlayLoopedVOC( char *ptr, int32_t loopstart, int32_t loopend,
          int pitchoffset, int vol, int left, int right, int priority,
-         unsigned long callbackval );
+         uint32_t callbackval );
 void  MV_CreateVolumeTable( int index, int volume, int MaxVolume );
 void  MV_SetVolume( int volume );
 int   MV_GetVolume( void );
-void  MV_SetCallBack( void ( *function )( unsigned long ) );
+void  MV_SetCallBack( void ( *function )( uint32_t ) );
 void  MV_SetReverseStereo( int setting );
 int   MV_GetReverseStereo( void );
 int   MV_Init( int soundcard, int MixRate, int Voices, int numchannels,

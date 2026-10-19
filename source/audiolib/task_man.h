@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifndef __TASK_MAN_H
 #define __TASK_MAN_H
+#include <stdint.h>
 
 enum TASK_ERRORS
    {
@@ -44,8 +45,8 @@ typedef struct task
     struct   task *prev;
     void          ( *TaskService )( struct task * );
     void          *data;
-    long          rate;
-    volatile long count;
+    int32_t          rate;
+    volatile int32_t count;
     int           priority;
     int           active;
 } task;

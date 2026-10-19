@@ -26,6 +26,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #ifndef __TASK_MAN_H
 #define __TASK_MAN_H
+#include <stdint.h>
 
 enum TASK_ERRORS
    {
@@ -40,8 +41,8 @@ typedef struct task
     struct   task *prev;
     void          ( *TaskService )( struct task * );
     void          *data;
-    long          rate;
-    volatile long count;
+    int32_t          rate;
+    volatile int32_t count;
     int           priority;
     int           active;
 } task;

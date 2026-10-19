@@ -25,6 +25,7 @@ typedef long long __int64;
 #define O_BINARY 0
 #endif
 
+#include <stdint.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -59,7 +60,7 @@ void _dos_getdate(struct dosdate_t *date);
 #define max(x, y) ((x) > (y) ? (x) : (y))
 #endif
 
-#define FP_OFF(x) ((long) (x))
+#define FP_OFF(x) ((int32_t) (x))
 
 #ifndef strcmpi
 #define strcmpi(x, y) strcasecmp(x, y)

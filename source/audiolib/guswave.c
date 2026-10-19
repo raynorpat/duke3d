@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1994 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <conio.h>
 #include <dos.h>
@@ -75,7 +76,7 @@ static int GUSWAVE_MaxVoices = VOICES;
 //static
 int GUSWAVE_Installed = FALSE;
 
-static void ( *GUSWAVE_CallBackFunc )( unsigned long ) = NULL;
+static void ( *GUSWAVE_CallBackFunc )( uint32_t ) = NULL;
 
 // current volume for dig audio - from 0 to 4095
 static int GUSWAVE_Volume = MAX_VOLUME;
@@ -282,7 +283,7 @@ static int LOADDS GUSWAVE_CallBack
    int reason,
    int voice,
    unsigned char **buf,
-   unsigned long *size
+   uint32_t *size
    )
 
    {
@@ -385,7 +386,7 @@ static int LOADDS GUSWAVE_DebugCallBack
    int reason,
    int voice,
    unsigned char **buf,
-   unsigned long *size
+   uint32_t *size
    )
 
    {
@@ -993,8 +994,8 @@ playbackstatus GUSWAVE_GetNextVOCBlock
    unsigned char *ptr;
    int            blocktype;
    int            lastblocktype;
-   unsigned long  blocklength;
-   unsigned long  samplespeed;
+   uint32_t  blocklength;
+   uint32_t  samplespeed;
    unsigned int   tc;
    int            packtype;
    int            voicemode;
@@ -1031,7 +1032,7 @@ playbackstatus GUSWAVE_GetNextVOCBlock
          }
 
       blocktype = ( int )*ptr;
-      blocklength = ( *( unsigned long * )( ptr + 1 ) ) & 0x00ffffff;
+      blocklength = ( *( uint32_t * )( ptr + 1 ) ) & 0x00ffffff;
       ptr += 4;
 
       switch( blocktype )
@@ -1134,7 +1135,7 @@ playbackstatus GUSWAVE_GetNextVOCBlock
 
          case 9 :
             // New sound data block
-            samplespeed = *( unsigned long * )ptr;
+            samplespeed = *( uint32_t * )ptr;
             BitsPerSample = ( unsigned )*( ptr + 4 );
             Channels = ( unsigned )*( ptr + 5 );
             Format = ( unsigned )*( unsigned short * )( ptr + 6 );
@@ -1283,7 +1284,7 @@ int GUSWAVE_Play
    int      type;
    int      pan;
    unsigned flags;
-   int ( *servicefunction )( int reason, int voice, unsigned char **buf, unsigned long *size );
+   int ( *servicefunction )( int reason, int voice, unsigned char **buf, uint32_t *size );
 
    type = 0;
    if ( channels != 1 )
@@ -1371,7 +1372,7 @@ int GUSWAVE_PlayVOC
    int   angle,
    int   volume,
    int   priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -1455,7 +1456,7 @@ int GUSWAVE_PlayWAV
    int   angle,
    int   volume,
    int   priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -1558,7 +1559,7 @@ int GUSWAVE_PlayWAV
 
 int GUSWAVE_StartDemandFeedPlayback
    (
-   void ( *function )( char **ptr, unsigned long *length ),
+   void ( *function )( char **ptr, uint32_t *length ),
    int   channels,
    int   bits,
    int   rate,
@@ -1566,7 +1567,7 @@ int GUSWAVE_StartDemandFeedPlayback
    int   angle,
    int   volume,
    int   priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -1716,7 +1717,7 @@ static int GUSWAVE_InitVoices
 
 void GUSWAVE_SetCallBack
    (
-   void ( *function )( unsigned long )
+   void ( *function )( uint32_t )
    )
 
    {

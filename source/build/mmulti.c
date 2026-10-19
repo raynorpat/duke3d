@@ -5,6 +5,7 @@
  * This file has been modified from Ken Silverman's original release
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +25,7 @@
 
 #define updatecrc16(crc,dat) crc = (((crc<<8)&65535)^crctable[((((unsigned short)crc)>>8)&65535)^dat])
 
-static long incnt[MAXPLAYERS], outcntplc[MAXPLAYERS], outcntend[MAXPLAYERS];
+static int32_t incnt[MAXPLAYERS], outcntplc[MAXPLAYERS], outcntend[MAXPLAYERS];
 static char errorgotnum[MAXPLAYERS];
 static char errorfixnum[MAXPLAYERS];
 static char errorresendnum[MAXPLAYERS];
@@ -32,17 +33,17 @@ static char errorresendnum[MAXPLAYERS];
 	static char lasterrorgotnum[MAXPLAYERS];
 #endif
 
-long crctable[256];
+int32_t crctable[256];
 
 static char lastpacket[576], inlastpacket = 0;
 static short lastpacketfrom, lastpacketleng;
 
-extern long totalclock;  /* MUST EXTERN 1 ANNOYING VARIABLE FROM GAME */
-static long timeoutcount = 60, resendagaincount = 4, lastsendtime[MAXPLAYERS];
+extern int32_t totalclock;  /* MUST EXTERN 1 ANNOYING VARIABLE FROM GAME */
+static int32_t timeoutcount = 60, resendagaincount = 4, lastsendtime[MAXPLAYERS];
 
 static short bakpacketptr[MAXPLAYERS][256], bakpacketlen[MAXPLAYERS][256];
 static char bakpacketbuf[BAKSIZ];
-static long bakpacketplc = 0;
+static int32_t bakpacketplc = 0;
 
 short myconnectindex, numplayers;
 short connecthead, connectpoint2[MAXPLAYERS];
@@ -63,7 +64,7 @@ typedef struct
 	short gametype;              /* gametype: 1-serial,2-modem,3-net */
 	short filler;
 	char buffer[MAXPACKETSIZE];
-	long longcalladdress;
+	int32_t longcalladdress;
 } gcomtype;
 static gcomtype *gcom;
 
@@ -81,7 +82,7 @@ void callcommit(void);
 
 void initcrc(void)
 {
-	long i, j, k, a;
+	int32_t i, j, k, a;
 
 	for(j=0;j<256;j++)      /* Calculate CRC table */
 	{
@@ -99,9 +100,9 @@ void initcrc(void)
 }
 
 
-long getcrc(char *buffer, short bufleng)
+int32_t getcrc(char *buffer, short bufleng)
 {
-	long i, j;
+	int32_t i, j;
 
 	j = 0;
 	for(i=bufleng-1;i>=0;i--) updatecrc16(j,buffer[i]);
@@ -110,7 +111,7 @@ long getcrc(char *buffer, short bufleng)
 
 void initmultiplayers(char damultioption, char dacomrateoption, char dapriority)
 {
-	long i;
+	int32_t i;
 
 	initcrc();
 	for(i=0;i<MAXPLAYERS;i++)
@@ -159,9 +160,9 @@ void initmultiplayers(char damultioption, char dacomrateoption, char dapriority)
 }
 
 
-static void dosendpackets(long other)
+static void dosendpackets(int32_t other)
 {
-	long i, j, k, messleng;
+	int32_t i, j, k, messleng;
 	unsigned short dacrc;
 
 	if (outcntplc[other] == outcntend[other]) return;
@@ -233,10 +234,10 @@ static void dosendpackets(long other)
 }
 
 
-void sendpacket(long other, char *bufptr, long messleng)
+void sendpacket(int32_t other, char *bufptr, int32_t messleng)
 {
-	long i = 0;
-    long j = 0;
+	int32_t i = 0;
+    int32_t j = 0;
 
 	if (numplayers < 2) return;
 
@@ -265,9 +266,9 @@ void sendpacket(long other, char *bufptr, long messleng)
 }
 
 
-void setpackettimeout(long datimeoutcount, long daresendagaincount)
+void setpackettimeout(int32_t datimeoutcount, int32_t daresendagaincount)
 {
-	long i;
+	int32_t i;
 
 	timeoutcount = datimeoutcount;
 	resendagaincount = daresendagaincount;
@@ -287,7 +288,7 @@ void sendlogon(void)
 
 void sendlogoff(void)
 {
-	long i;
+	int32_t i;
 	char tempbuf[2];
 
 	tempbuf[0] = 255;
@@ -309,7 +310,7 @@ void setsocket(short newsocket)
 
 short getpacket (short *other, char *bufptr)
 {
-	long i, messleng;
+	int32_t i, messleng;
 	unsigned short dacrc;
 
 	if (numplayers < 2) return(0);
@@ -403,7 +404,7 @@ short getpacket (short *other, char *bufptr)
 #if (PRINTERRORS)
 					printf("\n%ld-%ld .û ",gcom->buffer[0],(gcom->buffer[0]+1)&255);
 #endif
-					messleng = ((long)gcom->buffer[3]) + (((long)gcom->buffer[4])<<8);
+					messleng = ((int32_t)gcom->buffer[3]) + (((int32_t)gcom->buffer[4])<<8);
 					lastpacketleng = gcom->numbytes-7-messleng;
 					memcpy(bufptr,&gcom->buffer[messleng+5],lastpacketleng);
 					incnt[*other]++;
@@ -437,7 +438,7 @@ short getpacket (short *other, char *bufptr)
 	printf("\n%ld-%ld ûû ",gcom->buffer[0],(gcom->buffer[0]+1)&255);
 #endif
 
-	messleng = ((long)gcom->buffer[3]) + (((long)gcom->buffer[4])<<8);
+	messleng = ((int32_t)gcom->buffer[3]) + (((int32_t)gcom->buffer[4])<<8);
 	lastpacketleng = gcom->numbytes-7-messleng;
 	inlastpacket = 1; lastpacketfrom = *other;
 
@@ -451,7 +452,7 @@ short getpacket (short *other, char *bufptr)
 void flushpackets()
 {
 #if 0
-	long i;
+	int32_t i;
 
 	if (numplayers < 2) return;
 
@@ -474,7 +475,7 @@ void flushpackets()
 #endif
 }
 
-void genericmultifunction(long other, char *bufptr, long messleng, long command)
+void genericmultifunction(int32_t other, char *bufptr, int32_t messleng, int32_t command)
 {
 	if (numplayers < 2) return;
 
@@ -793,8 +794,8 @@ static int get_udp_packet(int *ip, short *_port, void *pkt, size_t pktsize)
 static char *read_whole_file(const char *cfgfile)
 {
     char *buf;
-    long len, rc;
-    long handle;
+    int32_t len, rc;
+    int32_t handle;
 
     if (cfgfile == NULL)
         return(NULL);
@@ -982,7 +983,7 @@ static int connect_to_everyone(gcomtype *gcom, int myip, int bcast)
     short port;
     int first_send = 1;
     unsigned short heard_from[MAX_PLAYERS];
-    unsigned long resendat;
+    uint32_t resendat;
     int max;
     int remaining;
 

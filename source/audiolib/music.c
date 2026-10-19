@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1994 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "task_man.h"
@@ -586,7 +587,7 @@ int MUSIC_GetContext
 
 void MUSIC_SetSongTick
    (
-   unsigned long PositionInTicks
+   uint32_t PositionInTicks
    )
 
    {
@@ -602,7 +603,7 @@ void MUSIC_SetSongTick
 
 void MUSIC_SetSongTime
    (
-   unsigned long milliseconds
+   uint32_t milliseconds
    )
 
    {

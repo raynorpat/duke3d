@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1994 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <dos.h>
 #include <conio.h>
 #include <stdlib.h>
@@ -97,15 +98,15 @@ static struct
 #define kStackSize 2048
 
 static unsigned short StackSelector = NULL;
-static unsigned long  StackPointer;
+static uint32_t  StackPointer;
 
 static unsigned short oldStackSelector;
-static unsigned long  oldStackPointer;
+static uint32_t  oldStackPointer;
 
 // These declarations are necessary to use the inline assembly pragmas.
 
-extern void GetStack(unsigned short *selptr,unsigned long *stackptr);
-extern void SetStack(unsigned short selector,unsigned long stackptr);
+extern void GetStack(unsigned short *selptr,uint32_t *stackptr);
+extern void SetStack(unsigned short selector,uint32_t stackptr);
 
 // This function will get the current stack selector and pointer and save
 // them off.
@@ -457,7 +458,7 @@ static void tdelay
    )
 
    {
-	long time;
+	int32_t time;
    unsigned flags;
 
    flags = DisableInterrupts();
@@ -693,8 +694,8 @@ int SOUNDSCAPE_GetCurrentPos
 
    CurrentAddr = DMA_GetCurrentPos( SOUNDSCAPE_Config.DMAChan );
 
-   offset = ( int )( ( ( unsigned long )CurrentAddr ) -
-      ( ( unsigned long )SOUNDSCAPE_CurrentDMABuffer ) );
+   offset = ( int )( ( ( uint32_t )CurrentAddr ) -
+      ( ( uint32_t )SOUNDSCAPE_CurrentDMABuffer ) );
 
    if ( SOUNDSCAPE_MixMode & SIXTEEN_BIT )
       {
@@ -1562,7 +1563,7 @@ int SOUNDSCAPE_Init
       }
 
    // Leave a little room at top of stack just for the hell of it...
-   StackPointer = kStackSize - sizeof( long );
+   StackPointer = kStackSize - sizeof( int32_t );
 
    SOUNDSCAPE_Installed = TRUE;
 

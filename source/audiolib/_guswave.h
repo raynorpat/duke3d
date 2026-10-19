@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifndef ___GUSWAVE_H
 #define ___GUSWAVE_H
+#include <stdint.h>
 
 #define TRUE  ( 1 == 1 )
 #define FALSE ( !TRUE )
@@ -83,7 +84,7 @@ typedef volatile struct VoiceNode
 
    int num;
 
-   unsigned long  mem;           /* location in ultrasound memory */
+   uint32_t  mem;           /* location in ultrasound memory */
    int            Active;        /* this instance in use */
    int            GF1voice;      /* handle to active voice */
 
@@ -91,23 +92,23 @@ typedef volatile struct VoiceNode
    char          *LoopStart;
    char          *LoopEnd;
    unsigned       LoopCount;
-   unsigned long  LoopSize;
-   unsigned long  BlockLength;
+   uint32_t  LoopSize;
+   uint32_t  BlockLength;
 
-   unsigned long  PitchScale;
+   uint32_t  PitchScale;
 
    unsigned char *sound;
-   unsigned long  length;
-   unsigned long  SamplingRate;
-   unsigned long  RateScale;
+   uint32_t  length;
+   uint32_t  SamplingRate;
+   uint32_t  RateScale;
    int            Playing;
 
    int    handle;
    int    priority;
 
-   void          ( *DemandFeed )( char **ptr, unsigned long *length );
+   void          ( *DemandFeed )( char **ptr, uint32_t *length );
 
-   unsigned long callbackval;
+   uint32_t callbackval;
 
    int    Volume;
    int    Pan;
@@ -131,18 +132,18 @@ voicestatus;
 typedef struct
    {
    char          RIFF[ 4 ];
-   unsigned long file_size;
+   uint32_t file_size;
    char          WAVE[ 4 ];
    char          fmt[ 4 ];
-   unsigned long format_size;
+   uint32_t format_size;
    } riff_header;
 
 typedef struct
    {
    unsigned short wFormatTag;
    unsigned short nChannels;
-   unsigned long  nSamplesPerSec;
-   unsigned long  nAvgBytesPerSec;
+   uint32_t  nSamplesPerSec;
+   uint32_t  nAvgBytesPerSec;
    unsigned short nBlockAlign;
    unsigned short nBitsPerSample;
    } format_header;
@@ -150,7 +151,7 @@ typedef struct
 typedef struct
    {
    unsigned char DATA[ 4 ];
-   unsigned long size;
+   uint32_t size;
    } data_header;
 
 playbackstatus GUSWAVE_GetNextVOCBlock( VoiceNode *voice );

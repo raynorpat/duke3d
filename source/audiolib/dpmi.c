@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1994 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <dos.h>
 #include <string.h>
 #include "dpmi.h"
@@ -45,13 +46,13 @@ static struct SREGS SegRegs;
    Returns the vector of a real mode interrupt.
 ---------------------------------------------------------------------*/
 
-unsigned long DPMI_GetRealModeVector
+uint32_t DPMI_GetRealModeVector
    (
    int num
    )
 
    {
-   unsigned long vector;
+   uint32_t vector;
 
    Regs.x.eax = 0x0200;
    Regs.h.bl  = num;
@@ -74,7 +75,7 @@ unsigned long DPMI_GetRealModeVector
 void DPMI_SetRealModeVector
    (
    int num,
-   unsigned long vector
+   uint32_t vector
    )
 
    {

@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1994 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <conio.h>
 #include <dos.h>
 #include <stddef.h>
@@ -334,9 +335,9 @@ static void AL_SetVoiceVolume
    int slot;
    int port;
    int voc;
-   unsigned long t1;
-   unsigned long t2;
-   unsigned long volume;
+   uint32_t t1;
+   uint32_t t2;
+   uint32_t volume;
    TIMBRE *timbre;
 
    channel = Voice[ voice ].channel;
@@ -1205,7 +1206,7 @@ void AL_SetPitchBend
 
    {
    int            pitchbend;
-   unsigned long  TotalBend;
+   uint32_t  TotalBend;
    VOICE         *voice;
 
    // We only play channels 1 through 10

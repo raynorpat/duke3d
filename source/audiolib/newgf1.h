@@ -1,3 +1,4 @@
+#include <stdint.h>
 /*
 Copyright (C) 1994-1995 Apogee Software, Ltd.
 
@@ -159,7 +160,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 /* log table used for vibrato and pitch bend.  log table made public for
 ** developers use */
 #define LOG_TAB_SIZE 12
-extern long gf1_log_table[LOG_TAB_SIZE];
+extern int32_t gf1_log_table[LOG_TAB_SIZE];
 
 #if defined(__BORLANDC__)
 #undef RFAR
@@ -194,7 +195,7 @@ struct	patchheader
 	char		channels;
 	unsigned short	wave_forms;
 	unsigned short	master_volume;
-	unsigned long	data_size;
+	uint32_t	data_size;
 	char		reserved[ PATCH_HEADER_RESERVED_SIZE ];
 };
 
@@ -202,7 +203,7 @@ struct	instrumentdata
 {
 	unsigned short	instrument;
 	char		instrument_name[ INST_NAME_SIZE ];
-	long		instrument_size;
+	int32_t		instrument_size;
 	char		layers;
 	char		reserved[ RESERVED_SIZE ];	
 };
@@ -211,7 +212,7 @@ struct	layerdata
 {
 	char		layer_duplicate;
 	char		layer;
-	long		layer_size;
+	int32_t		layer_size;
 	char		samples;
 	char		reserved[ LAYER_RESERVED_SIZE ];	
 };
@@ -220,13 +221,13 @@ struct	patchdata
 {
 	char		wave_name[7];
 	unsigned char	fractions;
-	long		wave_size;
-	long		start_loop;
-	long		end_loop;
+	int32_t		wave_size;
+	int32_t		start_loop;
+	int32_t		end_loop;
 	unsigned short	sample_rate;
-	long		low_frequency;
-	long		high_frequency;
-	long		root_frequency;
+	int32_t		low_frequency;
+	int32_t		high_frequency;
+	int32_t		root_frequency;
 	short		tune;
 	unsigned char	balance;
 	unsigned char	envelope_rate[ ENVELOPES ];
@@ -245,12 +246,12 @@ struct	patchdata
 
 struct wave_struct
 {
-	unsigned long		start_loop;
-	unsigned long		end_loop;
-	long		low_frequency;
-	long		high_frequency;
-	long		root_frequency;
-	unsigned long	mem;
+	uint32_t		start_loop;
+	uint32_t		end_loop;
+	int32_t		low_frequency;
+	int32_t		high_frequency;
+	int32_t		root_frequency;
+	uint32_t	mem;
 	unsigned short	scale_frequency;
 	unsigned short	sample_rate;
 	unsigned short	scale_factor;
@@ -263,7 +264,7 @@ struct wave_struct
 	unsigned short	end_acc_low;
 	unsigned short	end_acc_high;
 	unsigned short	sample_ratio;
-	unsigned long	wave_size;
+	uint32_t	wave_size;
 	unsigned char	fractions;
 	unsigned char	balance;
 	unsigned char	envelope_rate[ ENVELOPES ];
@@ -291,13 +292,13 @@ struct patch {
 
 struct gf1_dma_buff {
 	unsigned char RFAR *vptr;
-	unsigned long paddr;
+	uint32_t paddr;
 };
 
 struct gf1_sound {
-	unsigned long mem_pos;
-	unsigned long start_loop;
-	unsigned long end_loop;
+	uint32_t mem_pos;
+	uint32_t start_loop;
+	uint32_t end_loop;
 	unsigned char type;
 };
 
@@ -313,38 +314,38 @@ int	gf1_unload_os(void);
 void	gf1_set_appname(char RFAR *);
 void	reset_ultra(int);
 int	gf1_asm_init(void);
-unsigned char gf1_peek(unsigned long address);
-void gf1_poke(unsigned long address, unsigned char data);
-void gf1_poke_block(unsigned char RFAR *data, unsigned long address, unsigned long len, unsigned char dma_control);
-char gf1_good_dram(unsigned long address);
+unsigned char gf1_peek(uint32_t address);
+void gf1_poke(uint32_t address, unsigned char data);
+void gf1_poke_block(unsigned char RFAR *data, uint32_t address, uint32_t len, unsigned char dma_control);
+char gf1_good_dram(uint32_t address);
 int GetUltraCfg(struct load_os RFAR *os);
-unsigned long gf1_malloc(unsigned long);
-void gf1_free(unsigned long);
-unsigned long gf1_mem_avail(void);
-unsigned long gf1_mem_largest_avail(void);
+uint32_t gf1_malloc(uint32_t);
+void gf1_free(uint32_t);
+uint32_t gf1_mem_avail(void);
+uint32_t gf1_mem_largest_avail(void);
 void gf1_delay(void);
 int gf1_allocate_voice(int priority, void (RFAR *steal_notify)(int));
 void gf1_free_voice(unsigned int i);
 void gf1_adjust_priority(int voice, int priority);
-int gf1_dram_xfer(struct gf1_dma_buff RFAR *dptr, unsigned long size, unsigned long dram_address, unsigned char dma_control, unsigned short flags);
+int gf1_dram_xfer(struct gf1_dma_buff RFAR *dptr, uint32_t size, uint32_t dram_address, unsigned char dma_control, unsigned short flags);
 void gf1_stop_dma(void);
-long convert_to_16bit(long address);
+int32_t convert_to_16bit(int32_t address);
 int gf1_wait_dma(void);
 int gf1_dma_ready(void);
-unsigned long gf1_amount_xferred(void);
+uint32_t gf1_amount_xferred(void);
 int gf1_detect_card(unsigned short port);
 char *gf1_error_str(int);
 int gf1_play_digital(unsigned short priority, unsigned char RFAR *buffer,
-	unsigned long size, unsigned long gf1_addr, unsigned short volume,
+	uint32_t size, uint32_t gf1_addr, unsigned short volume,
 	unsigned short pan, unsigned short frequency, unsigned char type,
 	struct gf1_dma_buff RFAR *dptr,
-	int (RFAR *callback)(int, int, unsigned char RFAR * RFAR *, unsigned long RFAR *));
+	int (RFAR *callback)(int, int, unsigned char RFAR * RFAR *, uint32_t RFAR *));
 void gf1_restart_digital(int voice);
 void gf1_start_digital(int voice);
 void gf1_pause_digital(int voice);
 void RFAR gf1_stop_digital(int voice);
 void gf1_dig_set_dma_rate(unsigned short rate);
-unsigned long gf1_digital_position(int voice);
+uint32_t gf1_digital_position(int voice);
 int gf1_myatoi(void);
 int gf1_update_waveform(struct wave_struct RFAR *wave_info);
 int gf1_get_patch_info(char RFAR *patch_file, struct patchinfo RFAR *patch);
@@ -354,7 +355,7 @@ int gf1_load_patch(char RFAR *patch_file, struct patchinfo RFAR *patchinfo,
 	unsigned char RFAR *wavemem, int flags);
 void gf1_unload_patch(struct patch RFAR *patch);
 void gf1_detune_patch(struct patch RFAR *patch, unsigned short detune);
-unsigned short gf1_calc_fc(unsigned int sample_ratio,long root,long frequency);
+unsigned short gf1_calc_fc(unsigned int sample_ratio,int32_t root,int32_t frequency);
 void gf1_midi_stop_voice(int voice);
 void gf1_midi_wait_voice(int voice);
 unsigned short gf1_midi_status_note(int voice);
@@ -384,7 +385,7 @@ int gf1_midi_get_master_volume(void);
 int gf1_midi_get_volume(int voice);
 unsigned short gf1_read(int handle, void RFAR *io_buffer, unsigned short size);
 unsigned short gf1_close_file(int handle);
-unsigned int gf1_seek(int handle, unsigned long offset, int method);
+unsigned int gf1_seek(int handle, uint32_t offset, int method);
 int gf1_open(char RFAR *name);
 #ifdef __FLAT__
 int gf1_atoi(char RFAR **str, int base);
@@ -394,7 +395,7 @@ int gf1_atoi(void);
 void gf1_leave(void);
 short gf1_enter(void);
 void gf1_enter1(void);
-int gf1_play_next_buffer(int voice, unsigned char RFAR *buff, unsigned long size);
+int gf1_play_next_buffer(int voice, unsigned char RFAR *buff, uint32_t size);
 void gf1_dig_set_vol(unsigned short voice, unsigned short vol);
 void gf1_dig_set_pan(unsigned short voice, unsigned short pan);
 int gf1_set_external_semaphore(void RFAR *addr);
@@ -405,7 +406,7 @@ int gf1_add_dma_handler(int (*handler)());
 int gf1_add_voice_handler(int (*handler)(int));
 int gf1_add_volume_handler(int (*handler)(int));
 int gf1_add_timer_handler(int timer, int (RFAR *handler)(void));
-void gf1_set_record_rate(unsigned long rate);
+void gf1_set_record_rate(uint32_t rate);
 void gf1_create_patch(struct patch RFAR *patch);
 int gf1_add_layer(struct patch RFAR *patch, int layer, char RFAR *wavemem);
 void gf1_get_waveform_info(struct patch RFAR *patch, int layer, int waven,
@@ -419,13 +420,13 @@ void gf1_disable_mic_in(void);
 void gf1_enable_output(void);
 void gf1_disable_output(void);
 void gf1_sound_volume(unsigned short voice, int volume,
-	unsigned long period /* us*10 */);
+	uint32_t period /* us*10 */);
 void gf1_sound_pan(unsigned short voice, unsigned short pan);
-void gf1_sound_frequency(unsigned short voice, unsigned long freq);
+void gf1_sound_frequency(unsigned short voice, uint32_t freq);
 void RFAR gf1_sound_stop(int voice);
 void gf1_sound_mode(int voice, struct gf1_sound RFAR *sound,
 	unsigned char type);
 int gf1_sound_start(unsigned short priority, struct gf1_sound RFAR *sound,
-	short volume, unsigned long period, short pan, unsigned long freq);
+	short volume, uint32_t period, short pan, uint32_t freq);
 int gf1_sound_playing(int voice);
 #endif

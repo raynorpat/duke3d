@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifndef __MIDI_H
 #define __MIDI_H
+#include <stdint.h>
 
 enum MIDI_Errors
    {
@@ -86,8 +87,8 @@ void MIDI_StopSong( void );
 int  MIDI_PlaySong( unsigned char *song, int loopflag );
 void MIDI_SetTempo( int tempo );
 int  MIDI_GetTempo( void );
-void MIDI_SetSongTick( unsigned long PositionInTicks );
-void MIDI_SetSongTime( unsigned long milliseconds );
+void MIDI_SetSongTick( uint32_t PositionInTicks );
+void MIDI_SetSongTime( uint32_t milliseconds );
 void MIDI_SetSongPosition( int measure, int beat, int tick );
 void MIDI_GetSongPosition( songposition *pos );
 void MIDI_GetSongLength( songposition *pos );

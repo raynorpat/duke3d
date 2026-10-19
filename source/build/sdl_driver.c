@@ -13,6 +13,7 @@
  * See the included license file "BUILDLIC.TXT" for license info.
  * This file IS NOT A PART OF Ken Silverman's original release
  */
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -64,7 +65,7 @@ static sdl_renderer_type renderer = RENDERER_SOFTWARE;
 #if (!defined __WATCOMC__)
 #include "a.h"
 #else
-extern long setvlinebpl(long);
+extern int32_t setvlinebpl(int32_t);
 #pragma aux setvlinebpl parm [eax];
 #endif  /* __WATCOMC__ */
 
@@ -145,9 +146,9 @@ int _argc = 0;
 char **_argv = NULL;
 
     /* !!! move these elsewhere? */
-long xres, yres, bytesperline, frameplace, imageSize, maxpages;
+int32_t xres, yres, bytesperline, frameplace, imageSize, maxpages;
 char *screen, vesachecked;
-long buffermode, origbuffermode, linearmode;
+int32_t buffermode, origbuffermode, linearmode;
 char permanentupdate = 0, vgacompatible;
 
 SDL_Surface *surface = NULL; /* This isn't static so that we can use it elsewhere AH */
@@ -157,10 +158,10 @@ static SDL_Texture *sdl_texture = NULL;
 static SDL_Surface *sdl_rgbsurface = NULL;  /* 32-bit staging copy of surface */
 static int debug_hall_of_mirrors = 0;
 static int sdl_fullscreen = 0;
-static long mouse_x = 0;
-static long mouse_y = 0;
-static long mouse_relative_x = 0;
-static long mouse_relative_y = 0;
+static int32_t mouse_x = 0;
+static int32_t mouse_y = 0;
+static int32_t mouse_relative_x = 0;
+static int32_t mouse_relative_y = 0;
 static short mouse_buttons = 0;
 static int mouse_grabbed = 0;
 static unsigned int lastkey = 0;
@@ -191,9 +192,9 @@ static char egapalette[] = { 0, 0, 0,
 
 static unsigned int scancodes[SDL_NUM_SCANCODES];
 
-static long last_render_ticks = 0;
-long total_render_time = 1;
-long total_rendered_frames = 0;
+static int32_t last_render_ticks = 0;
+int32_t total_render_time = 1;
+int32_t total_rendered_frames = 0;
 
 static char *titlelong = NULL;
 static char *titleshort = NULL;
@@ -398,14 +399,14 @@ static void init_new_res_vars(int davidoption)
     horizlookup = horizlookup2 = NULL;
 
     if (renderer == RENDERER_OPENGL3D)
-        frameplace = (long) NULL;
+        frameplace = (int32_t) NULL;
     else
-        frameplace = (long) ( ((Uint8 *) surface->pixels) );
+        frameplace = (int32_t) ( ((Uint8 *) surface->pixels) );
 
   	if (screen != NULL)
    	{
        	if (screenalloctype == 0) kkfree((void *)screen);
-   	    if (screenalloctype == 1) suckcache((long *)screen);
+   	    if (screenalloctype == 1) suckcache((int32_t *)screen);
    		screen = NULL;
    	} /* if */
 
@@ -418,24 +419,24 @@ static void init_new_res_vars(int davidoption)
     		case 6: xdim = 320; ydim = 200; i = 131072; break;
     		default: assert(0);
     	}
-    	j = ydim*4*sizeof(long);  /* Leave room for horizlookup&horizlookup2 */
+    	j = ydim*4*sizeof(int32_t);  /* Leave room for horizlookup&horizlookup2 */
 
     	screenalloctype = 0;
 	    if ((screen = (char *)kkmalloc(i+(j<<1))) == NULL)
     	{
-	    	 allocache((long *)&screen,i+(j<<1),&permanentlock);
+	    	 allocache((int32_t *)&screen,i+(j<<1),&permanentlock);
     		 screenalloctype = 1;
     	}
 
         /* !!! FIXME: Should screen get allocated above if in opengl3d mode? */
 
         if (renderer == RENDERER_OPENGL3D)
-            frameplace = (long) NULL;
+            frameplace = (int32_t) NULL;
         else
         {
             frameplace = FP_OFF(screen);
-          	horizlookup = (long *)(frameplace+i);
-           	horizlookup2 = (long *)(frameplace+i+j);
+          	horizlookup = (int32_t *)(frameplace+i);
+           	horizlookup2 = (int32_t *)(frameplace+i+j);
         } /* else */
     } /* if */
 
@@ -942,7 +943,7 @@ unsigned char _readlastkeyhit(void)
 int mprotect_align(const void *addr, size_t len, int prot)
 {
     int retval;
-    unsigned long l = (unsigned long) addr;
+    uint32_t l = (uint32_t) addr;
     l -= (l % PAGESIZE);
     retval = mprotect((void *) l, len * 2, prot);
     assert(retval == 0);
@@ -1345,7 +1346,7 @@ void _platform_init(int argc, char **argv, const char *title, const char *icon)
 } /* _platform_init */
 
 
-int setvesa(long x, long y)
+int setvesa(int32_t x, int32_t y)
 {
     fprintf(stderr, "setvesa() called in SDL driver!\n");
     exit(23);
@@ -1356,7 +1357,7 @@ int screencapture(char *_filename, char inverseit)
 {
 	char *ptr = NULL;
 	int fil = -1;
-    long i, bufplc, p, col, ncol, leng, numbytes, xres;
+    int32_t i, bufplc, p, col, ncol, leng, numbytes, xres;
     int captcnt;
     size_t flen = strlen(_filename);
     char *filename = alloca(flen + 1);
@@ -1519,7 +1520,7 @@ void setvmode(int mode)
 } /* setvmode */
 
 
-int _setgamemode(char davidoption, long daxdim, long daydim)
+int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim)
 {
 #ifdef USE_OPENGL
     static int shown_gl_strings = 0;
@@ -1601,12 +1602,12 @@ void qsetmode640480(void)
 } /* qsetmode640480 */
 
 
-static int get_dimensions_from_str(const char *str, long *_w, long *_h)
+static int get_dimensions_from_str(const char *str, int32_t *_w, int32_t *_h)
 {
     char *xptr = NULL;
     char *ptr = NULL;
-    long w = -1;
-    long h = -1;
+    int32_t w = -1;
+    int32_t h = -1;
 
     if (str == NULL)
         return(0);
@@ -1637,10 +1638,10 @@ static int get_dimensions_from_str(const char *str, long *_w, long *_h)
 } /* get_dimensions_from_str */
 
 
-static __inline void get_max_screen_res(long *max_w, long *max_h)
+static __inline void get_max_screen_res(int32_t *max_w, int32_t *max_h)
 {
-    long w = DEFAULT_MAXRESWIDTH;
-    long h = DEFAULT_MAXRESHEIGHT;
+    int32_t w = DEFAULT_MAXRESWIDTH;
+    int32_t h = DEFAULT_MAXRESHEIGHT;
     const char *envr = getenv(BUILD_MAXSCREENRES);
 
     if (envr != NULL)
@@ -1674,8 +1675,8 @@ static void add_vesa_mode(const char *typestr, int w, int h)
 /* Let the user specify a specific mode via environment variable. */
 static __inline void add_user_defined_resolution(void)
 {
-    long w;
-    long h;
+    int32_t w;
+    int32_t h;
     const char *envr = getenv(BUILD_USERSCREENRES);
 
     if (envr == NULL)
@@ -1729,8 +1730,8 @@ static void remove_vesa_mode(int index, const char *reason)
 
 static __inline void cull_large_vesa_modes(void)
 {
-    long max_w;
-    long max_h;
+    int32_t max_w;
+    int32_t max_h;
     int i;
 
     get_max_screen_res(&max_w, &max_h);
@@ -1774,7 +1775,7 @@ static __inline void sort_vesa_modelist(void)
 {
     int i;
     int sorted;
-    long tmp;
+    int32_t tmp;
 
     do
     {
@@ -1816,7 +1817,7 @@ static __inline void output_vesa_modelist(void)
     for (i = 0; i < validmodecnt; i++)
     {
         sprintf(numbuf, " (%ldx%ld)",
-                  (long) validmodexdim[i], (long) validmodeydim[i]);
+                  (int32_t) validmodexdim[i], (int32_t) validmodeydim[i]);
 
         if ( (strlen(buffer) + strlen(numbuf)) >= (sizeof (buffer) - 1) )
             strcpy(buffer + (sizeof (buffer) - 5), " ...");
@@ -1862,7 +1863,7 @@ void getvalidvesamodes(void)
 } /* getvalidvesamodes */
 
 
-int VBE_setPalette(long start, long num, char *palettebuffer)
+int VBE_setPalette(int32_t start, int32_t num, char *palettebuffer)
 /*
  * (From Ken's docs:)
  *   Set (num) palette palette entries starting at (start)
@@ -1945,7 +1946,7 @@ int VBE_setPalette(long start, long num, char *palettebuffer)
 } /* VBE_setPalette */
 
 
-int VBE_getPalette(long start, long num, char *palettebuffer)
+int VBE_getPalette(int32_t start, int32_t num, char *palettebuffer)
 {
     SDL_Color *sdlp = surface->format->palette->colors + start;
     char *p = palettebuffer + (start * 4);
@@ -2021,7 +2022,7 @@ void readmousebstatus(short *bstatus)
 
 static unsigned char mirrorcolor = 0;
 
-void _updateScreenRect(long x, long y, long w, long h)
+void _updateScreenRect(int32_t x, int32_t y, int32_t w, int32_t h)
 {
     if (renderer == RENDERER_SOFTWARE)
         present_surface();  /* the whole frame is cheap to push nowadays. */
@@ -2066,19 +2067,19 @@ void _nextpage(void)
 } /* _nextpage */
 
 
-unsigned char readpixel(long offset)
+unsigned char readpixel(int32_t offset)
 {
     return( *((unsigned char *) offset) );
 } /* readpixel */
 
-void drawpixel(long offset, unsigned char pixel)
+void drawpixel(int32_t offset, unsigned char pixel)
 {
     *((unsigned char *) offset) = pixel;
 } /* drawpixel */
 
 
 /* !!! These are incorrect. */
-void drawpixels(long offset, unsigned short pixels)
+void drawpixels(int32_t offset, unsigned short pixels)
 {
     Uint8 *surface_end;
     Uint16 *pos;
@@ -2099,7 +2100,7 @@ void drawpixels(long offset, unsigned short pixels)
 } /* drawpixels */
 
 
-void drawpixelses(long offset, unsigned int pixelses)
+void drawpixelses(int32_t offset, unsigned int pixelses)
 {
     Uint8 *surface_end;
     Uint32 *pos;
@@ -2126,13 +2127,13 @@ void setcolor16(int col)
 	drawpixel_color = col;
 }
 
-void drawpixel16(long offset)
+void drawpixel16(int32_t offset)
 {
-    drawpixel(((long) surface->pixels + offset), drawpixel_color);
+    drawpixel(((int32_t) surface->pixels + offset), drawpixel_color);
 } /* drawpixel16 */
 
 
-void fillscreen16(long offset, long color, long blocksize)
+void fillscreen16(int32_t offset, int32_t color, int32_t blocksize)
 {
     Uint8 *surface_end;
     Uint8 *wanted_end;
@@ -2164,7 +2165,7 @@ void fillscreen16(long offset, long color, long blocksize)
         offset = 0;
 
     if (wanted_end > surface_end)
-        blocksize = ((unsigned long) surface_end) - ((unsigned long) pixels + offset);
+        blocksize = ((uint32_t) surface_end) - ((uint32_t) pixels + offset);
 
     memset(pixels + offset, (int) color, blocksize);
 
@@ -2205,12 +2206,12 @@ static __inline void DrawVerticalRun (char **ScreenPtr, int XAdvance, int RunLen
     *ScreenPtr = WorkingScreenPtr;
 }
 
-void drawline16(long XStart, long YStart, long XEnd, long YEnd, char Color)
+void drawline16(int32_t XStart, int32_t YStart, int32_t XEnd, int32_t YEnd, char Color)
 {
     int Temp, AdjUp, AdjDown, ErrorTerm, XAdvance, XDelta, YDelta;
     int WholeStep, InitialPixelCount, FinalPixelCount, i, RunLength;
     char *ScreenPtr;
-    long dx, dy;
+    int32_t dx, dy;
 
     if (SDL_MUSTLOCK(surface))
         SDL_LockSurface(surface);
@@ -2394,7 +2395,7 @@ void *_getVideoBase(void)
     return((void *) surface->pixels);
 }
 
-void setactivepage(long dapagenum)
+void setactivepage(int32_t dapagenum)
 {
 	/* !!! Is this really still needed? - DDOI */
     /*fprintf(stderr, "%s, line %d; setactivepage(): STUB.\n", __FILE__, __LINE__);*/
@@ -2467,7 +2468,7 @@ void restore256_palette(void)
 	in_egapalette = 0;
 } /* restore256_palette */
 
-unsigned long getticks(void)
+uint32_t getticks(void)
 {
     return(SDL_GetTicks());
 } /* getticks */

@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1994 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <dos.h>
 #include <conio.h>
 #include <stdlib.h>
@@ -92,10 +93,10 @@ void ( *PAS_CallBack )( void );
 #define kStackSize 2048
 
 static unsigned short StackSelector = NULL;
-static unsigned long  StackPointer;
+static uint32_t  StackPointer;
 
 static unsigned short oldStackSelector;
-static unsigned long  oldStackPointer;
+static uint32_t  oldStackPointer;
 
 // This is defined because we can't create local variables in a
 // function that switches stacks.
@@ -103,8 +104,8 @@ static int irqstatus;
 
 // These declarations are necessary to use the inline assembly pragmas.
 
-extern void GetStack(unsigned short *selptr,unsigned long *stackptr);
-extern void SetStack(unsigned short selector,unsigned long stackptr);
+extern void GetStack(unsigned short *selptr,uint32_t *stackptr);
+extern void SetStack(unsigned short selector,uint32_t stackptr);
 
 // This function will get the current stack selector and pointer and save
 // them off.
@@ -871,8 +872,8 @@ int PAS_GetCurrentPos
       return( PAS_Error );
       }
 
-   offset = ( int )( ( ( unsigned long )CurrentAddr ) -
-      ( ( unsigned long )PAS_CurrentDMABuffer ) );
+   offset = ( int )( ( ( uint32_t )CurrentAddr ) -
+      ( ( uint32_t )PAS_CurrentDMABuffer ) );
 
    if ( PAS_MixMode & SIXTEEN_BIT )
       {
@@ -901,35 +902,35 @@ int PAS_GetFilterSetting
 
    {
    /* CD Quality 17897hz */
-   if ( ( unsigned long )rate > ( unsigned long )17897L * 2 )
+   if ( ( uint32_t )rate > ( uint32_t )17897L * 2 )
       {
       /* 00001b 20hz to 17.8khz */
       return( 0x01 );
       }
 
    /* Cassette Quality 15090hz */
-   if ( ( unsigned long )rate > ( unsigned long )15909L * 2 )
+   if ( ( uint32_t )rate > ( uint32_t )15909L * 2 )
       {
       /* 00010b 20hz to 15.9khz */
       return( 0x02 );
       }
 
    /* FM Radio Quality 11931hz */
-   if ( ( unsigned long )rate > ( unsigned long )11931L * 2 )
+   if ( ( uint32_t )rate > ( uint32_t )11931L * 2 )
       {
       /* 01001b 20hz to 11.9khz */
       return( 0x09 );
       }
 
    /* AM Radio Quality  8948hz */
-   if ( ( unsigned long )rate > ( unsigned long )8948L * 2 )
+   if ( ( uint32_t )rate > ( uint32_t )8948L * 2 )
       {
       /* 10001b 20hz to 8.9khz */
       return( 0x11 );
       }
 
    /* Telphone Quality  5965hz */
-   if ( ( unsigned long )rate > ( unsigned long )5965L * 2 )
+   if ( ( uint32_t )rate > ( uint32_t )5965L * 2 )
       {
       /* 00100b 20hz to 5.9khz */
       return( 0x19 );
@@ -1121,7 +1122,7 @@ int PAS_CallInt( int ebx, int ecx, int edx );
 
 int PAS_CallMVFunction
    (
-   unsigned long function,
+   uint32_t function,
    int ebx,
    int ecx,
    int edx
@@ -1734,7 +1735,7 @@ int PAS_Init
       }
 
    // Leave a little room at top of stack just for the hell of it...
-   StackPointer = kStackSize - sizeof( long );
+   StackPointer = kStackSize - sizeof( int32_t );
 
    // Install our interrupt handler
    Interrupt = PAS_Interrupts[ PAS_Irq ];

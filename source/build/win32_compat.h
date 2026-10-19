@@ -24,6 +24,7 @@
 
 #define PLATFORM_SUPPORTS_SDL
 
+#include <stdint.h>
 #include <stdio.h>
 
 #if (!defined _MSC_VER)
@@ -93,7 +94,7 @@ int _kinp_handler(int port, char *source_file, int source_line);
 #undef FP_OFF
 #endif
 
-#define FP_OFF(x) ((long) (x))
+#define FP_OFF(x) ((int32_t) (x))
 
 /* !!! This might be temporary. */
 #define printext16 printext256

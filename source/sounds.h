@@ -32,6 +32,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #ifndef _sounds_public_
 #define _sounds_public_
+#include <stdint.h>
 
 extern int32 FXDevice;
 extern int32 MusicDevice;
@@ -54,6 +55,6 @@ void MusicShutdown( void );
 void clearsoundlocks(void);
 
 /* dunno where this came from; I added it. --ryan. */
-void testcallback(unsigned long num);
+void testcallback(uint32_t num);
 
 #endif

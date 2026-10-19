@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    is left public for you to modify.
 **********************************************************************/
 
+#include <stdint.h>
 #include <stdlib.h>
 #include "usrhooks.h"
 
@@ -43,7 +44,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 int USRHOOKS_GetMem
    (
    void **ptr,
-   unsigned long size
+   uint32_t size
    )
 
    {

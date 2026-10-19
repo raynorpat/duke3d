@@ -36,6 +36,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define NOINTS
 #define USE_USRHOOKS
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <dos.h>
 #include <conio.h>
@@ -75,10 +76,10 @@ typedef struct
 #define kStackSize 2048
 
 static unsigned short StackSelector = NULL;
-static unsigned long  StackPointer;
+static uint32_t  StackPointer;
 
 static unsigned short oldStackSelector;
-static unsigned long  oldStackPointer;
+static uint32_t  oldStackPointer;
 
 #endif
 
@@ -87,8 +88,8 @@ static task *TaskList = &HeadTask;
 
 static void ( __interrupt __far *OldInt8 )( void );
 
-static volatile long TaskServiceRate  = 0x10000L;
-static volatile long TaskServiceCount = 0;
+static volatile int32_t TaskServiceRate  = 0x10000L;
+static volatile int32_t TaskServiceCount = 0;
 
 #ifndef NOINTS
 static volatile int  TS_TimesInInterrupt;
@@ -103,8 +104,8 @@ volatile int TS_InInterrupt = FALSE;
 ---------------------------------------------------------------------*/
 
 static void TS_FreeTaskList( void );
-static void TS_SetClockSpeed( long speed );
-static long TS_SetTimer( long TickBase );
+static void TS_SetClockSpeed( int32_t speed );
+static int32_t TS_SetTimer( int32_t TickBase );
 static void TS_SetTimerToMaxTaskRate( void );
 static void __interrupt __far TS_ServiceSchedule( void );
 static void __interrupt __far TS_ServiceScheduleIntEnabled( void );
@@ -114,8 +115,8 @@ static void RestoreRealTimeClock( void );
 
 // These declarations are necessary to use the inline assembly pragmas.
 
-extern void GetStack(unsigned short *selptr,unsigned long *stackptr);
-extern void SetStack(unsigned short selector,unsigned long stackptr);
+extern void GetStack(unsigned short *selptr,uint32_t *stackptr);
+extern void SetStack(unsigned short selector,uint32_t stackptr);
 
 // This function will get the current stack selector and pointer and save
 // them off.
@@ -187,7 +188,7 @@ static void TS_FreeTaskList
 
 static void TS_SetClockSpeed
    (
-   long speed
+   int32_t speed
    )
 
    {
@@ -219,13 +220,13 @@ static void TS_SetClockSpeed
    speed if necessary.
 ---------------------------------------------------------------------*/
 
-static long TS_SetTimer
+static int32_t TS_SetTimer
    (
-   long TickBase
+   int32_t TickBase
    )
 
    {
-   long speed;
+   int32_t speed;
 
    speed = 1192030L / TickBase;
    if ( speed < TaskServiceRate )
@@ -251,7 +252,7 @@ static void TS_SetTimerToMaxTaskRate
 
    {
    task     *ptr;
-   long      MaxServiceRate;
+   int32_t      MaxServiceRate;
    unsigned  flags;
 
    flags = DisableInterrupts();
@@ -529,7 +530,7 @@ static int TS_Startup
          }
 
       // Leave a little room at top of stack just for the hell of it...
-      StackPointer = kStackSize - sizeof( long );
+      StackPointer = kStackSize - sizeof( int32_t );
 
 #endif
 

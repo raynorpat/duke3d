@@ -22,6 +22,7 @@
 
 #ifndef _INCLUDE_ENGINE_H_
 #define _INCLUDE_ENGINE_H_
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,7 +62,7 @@ int initmouse(void);
  * @param daxdim The x resolution. (must be 320 if param 1 != 1.)
  * @param daydim The y resolution. (must be 200 if param 1 != 1.)
  */
-int setgamemode(char davidoption, long daxdim, long daydim);
+int setgamemode(char davidoption, int32_t daxdim, int32_t daydim);
 
 /**@brief Get the ceiling z value for a point in a sector.
  *
@@ -71,7 +72,7 @@ int setgamemode(char davidoption, long daxdim, long daydim);
  * @param day The y coordinate to look in.
  * @return The z coordinate at that point.
  */
-int getceilzofslope(short sectnum, long dax, long day);
+int getceilzofslope(short sectnum, int32_t dax, int32_t day);
 
 /**@brief Get the floor z value for a point in a sector.
  *
@@ -81,7 +82,7 @@ int getceilzofslope(short sectnum, long dax, long day);
  * @param day The y coordinate to look in.
  * @return The z coordinate.
  */
-int getflorzofslope(short sectnum, long dax, long day);
+int getflorzofslope(short sectnum, int32_t dax, int32_t day);
 
 /**@brief Get the floor and ceiling z values for a point.
  *
@@ -93,7 +94,7 @@ int getflorzofslope(short sectnum, long dax, long day);
  * @param *ceilz A pointer to write the ceiling z value to.
  * @param *florz A pointer to write the floor z value to.
  */
-void getzsofslope(short sectnum, long dax, long day, long *ceilz, long *florz);
+void getzsofslope(short sectnum, int32_t dax, int32_t day, int32_t *ceilz, int32_t *florz);
 
 /**@brief Set aspect ratio and viewing range angle.
  *
@@ -126,7 +127,7 @@ void getzsofslope(short sectnum, long dax, long day, long *ceilz, long *florz);
  * drawoverheadmap function into your GAME.C if you use it.
  *
  */
-void setaspect(long daxrange, long daaspect);
+void setaspect(int32_t daxrange, int32_t daaspect);
 
 /**@brief Insert a sprite into a sector.
  *
@@ -152,7 +153,7 @@ int insertsprite(short sectnum, short statnum);
  * function.
  *
  */
-void updatesector(long x, long y, short *sectnum);
+void updatesector(int32_t x, int32_t y, short *sectnum);
 
 /**@brief Find the wall to the left of another wall.
  *
@@ -214,8 +215,8 @@ void nextpage(void);
  * @param dahoriz ??? fixme
  * @param dacursectnum Sector camera is currently in.
  */
-void drawrooms(long daposx, long daposy, long daposz,
-               short daang, long dahoriz, short dacursectnum);
+void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
+               short daang, int32_t dahoriz, short dacursectnum);
 
 /**@brief Loads a map from disk.
  *
@@ -230,8 +231,8 @@ void drawrooms(long daposx, long daposy, long daposz,
  * @param *dacursectnum A pointer for the starting sector.
  * @return -1 if the map is not found.
  */
-int loadboard(char *filename, long *daposx, long *daposy,
-			  long *daposz, short *daang, short *dacursectnum);
+int loadboard(char *filename, int32_t *daposx, int32_t *daposy,
+			  int32_t *daposz, short *daang, short *dacursectnum);
 
 /**@brief Draw the sprites and maskwalls to the current drawing page.
  *
@@ -263,7 +264,7 @@ void drawmasks(void);
  * @param name The text to draw.
  * @param fontsize The font size. Legal values: 0 -- 8x8 font. 1 -- 4x6 font.
  */
-void printext256(long xpos, long ypos, short col, short backcol,
+void printext256(int32_t xpos, int32_t ypos, short col, short backcol,
 			char name[82], char fontsize);
 
 /**@brief Draws a text message to the screen without refreshing.
@@ -287,7 +288,7 @@ void printext256(long xpos, long ypos, short col, short backcol,
  * other cause flicker, so I have this function here so the shadow can
  * be drawn with _noupdate, and the actual string is draw with an update.
  */
-void printext256_noupdate(long xpos, long ypos, short col, short backcol,
+void printext256_noupdate(int32_t xpos, int32_t ypos, short col, short backcol,
 			char name[82], char fontsize);
 
 /**@brief Initialize the Build Engine.
@@ -327,7 +328,7 @@ int loadpics(char *filename);
  * @param *daang  A pointer containing the starting angle.
  * @param *dacursectnum A pointer containing the starting sector.
  */
-int saveboard(char *filename, long *daposx, long *daposy, long *daposz,
+int saveboard(char *filename, int32_t *daposx, int32_t *daposy, int32_t *daposz,
                          short *daang, short *dacursectnum);
 
 /**@brief Plots a pixel to the screen.
@@ -340,7 +341,7 @@ int saveboard(char *filename, long *daposx, long *daposy, long *daposz,
  * @param y The y coordinate of the pixel.
  * @param col The color of the pixel.
  */
-void plotpixel(long x, long y, char col);
+void plotpixel(int32_t x, int32_t y, char col);
 
 /**@brief Returns the color of a pixel on screen.
  *
@@ -352,7 +353,7 @@ void plotpixel(long x, long y, char col);
  * @param y The y coordinate of the pixel.
  * @return The color of the pixel.
  */
-unsigned char getpixel(long x, long y);
+unsigned char getpixel(int32_t x, int32_t y);
 
 /**@brief Adjust the gamma of a VGA palette.
  *
@@ -421,9 +422,9 @@ void getmousevalues(short *mousx, short *mousy, short *bstatus);
  * to or not. \n The lower 16 bits are anded with wall[].cstat and the higher
  * 16 bits are anded with sprite[].cstat.
  */
-int clipmove (long *x, long *y, long *z, short *sectnum, long xvect,
-			long yvect, long walldist, long ceildist,
-			long flordist, unsigned long cliptype);
+int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum, int32_t xvect,
+			int32_t yvect, int32_t walldist, int32_t ceildist,
+			int32_t flordist, uint32_t cliptype);
 
 /**@brief Find the highest and lowest z coordinates your clipping box can get to.
  *
@@ -444,9 +445,9 @@ int clipmove (long *x, long *y, long *z, short *sectnum, long xvect,
  * 16384+sector (sector first touched) or \n
  * 49152+spritenum (sprite first touched)
  */
-void getzrange(long x, long y, long z, short sectnum,
-			long *ceilz, long *ceilhit, long *florz, long *florhit,
-			long walldist, unsigned long cliptype);
+void getzrange(int32_t x, int32_t y, int32_t z, short sectnum,
+			int32_t *ceilz, int32_t *ceilhit, int32_t *florz, int32_t *florhit,
+			int32_t walldist, uint32_t cliptype);
 
 /**@brief Gets the angle of a vector.
  *
@@ -456,7 +457,7 @@ void getzrange(long x, long y, long z, short sectnum,
  * @param xvect The x component.
  * @param yvect The y component.
  */
-int getangle(long xvect, long yvect);
+int getangle(int32_t xvect, int32_t yvect);
 
 /**@brief Adjust the slope of a sector's ceiling to pass through a point
  *
@@ -470,7 +471,7 @@ int getangle(long xvect, long yvect);
  * is the pivot wall of the slope,
  * this function makes the slope pass through the x,y,z point.
  */
-void alignceilslope(short dasect, long x, long y, long z);
+void alignceilslope(short dasect, int32_t x, int32_t y, int32_t z);
 
 /**@brief Adjust the slope of a sector's floor to pass through a point
  *
@@ -485,7 +486,7 @@ void alignceilslope(short dasect, long x, long y, long z);
  * this function makes the slope pass through the x,y,z point. \n
  * One use of this function is sine-wave floors.
  */
-void alignflorslope(short dasect, long x, long y, long z);
+void alignflorslope(short dasect, int32_t x, int32_t y, int32_t z);
 
 /**@brief Project a ray and report what it hit.
  *
@@ -527,10 +528,10 @@ void alignflorslope(short dasect, long x, long y, long z);
  * @arg (If vectorz > 0 then you're shooting downard which means
  * that you couldn't have hit a ceiling)
  */
-int hitscan(long xs, long ys, long zs, short sectnum,
-            long vx, long vy, long vz,
+int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
+            int32_t vx, int32_t vy, int32_t vz,
 	        short *hitsect, short *hitwall, short *hitsprite,
-	        long *hitx, long *hity, long *hitz, unsigned long cliptype);
+	        int32_t *hitx, int32_t *hity, int32_t *hitz, uint32_t cliptype);
 
 /**@brief Tests to see if a 2d point is in a sector.
  *
@@ -539,7 +540,7 @@ int hitscan(long xs, long ys, long zs, short sectnum,
  * @param y Y coordinate of point.
  * @param sectnum The sector to test against.
  */
-int inside (long x, long y, short sectnum);
+int inside (int32_t x, int32_t y, short sectnum);
 
 /**@brief Sets the first wall of a sector.
  *
@@ -564,8 +565,8 @@ void setfirstwall(short sectnum, short newfirstwall);
  * @param *x2 X coordinate of the translated point.
  * @param *y2 Y coordinate of the translated point.
  */
-void rotatepoint(long xpivot, long ypivot, long x, long y, short daang,
-			long *x2, long *y2);
+void rotatepoint(int32_t xpivot, int32_t ypivot, int32_t x, int32_t y, short daang,
+			int32_t *x2, int32_t *y2);
 
 /**@brief Draw the tile screen.
  *
@@ -574,21 +575,21 @@ void rotatepoint(long xpivot, long ypivot, long x, long y, short daang,
  * @param pictopleft The first tile to show.
  * @param picbox The tile to highlight.
  */
-int drawtilescreen(long pictopleft, long picbox);
+int drawtilescreen(int32_t pictopleft, int32_t picbox);
 
 /**@brief Clear the current video page to a given color.
  *
  * This function clears the current video page to the color \a dacol.
  * @param dacol The color to clear to.
  */
-void clearview(long dacol);
+void clearview(int32_t dacol);
 
 /**@brief Clear all video pages to a given color.
  *
  * This function clears all the video pages to the color \a dacol.
  * @param dacol The color to clear to.
  */
-void clearallviews(long dacol);
+void clearallviews(int32_t dacol);
 
 /**@brief Draw a 2D grid.
  *
@@ -603,7 +604,7 @@ void clearallviews(long dacol);
  * @remark Please do not use this function. It is only public
  * because the build editor needs it.
  */
-void draw2dgrid(long posxe, long posye, short ange, long zoome,
+void draw2dgrid(int32_t posxe, int32_t posye, short ange, int32_t zoome,
 			short gride);
 
 /**@brief Draw the 2D screen.
@@ -613,7 +614,7 @@ void draw2dgrid(long posxe, long posye, short ange, long zoome,
  * @remark Please do not use this function. It is only public
  * because the build editor needs it.
  */
-void draw2dscreen(long posxe, long posye, short ange, long zoome,
+void draw2dscreen(int32_t posxe, int32_t posye, short ange, int32_t zoome,
 			short gride);
 
 /**@brief A fast routine to find the sector that owns a certain wall.
@@ -633,7 +634,7 @@ int sectorofwall(short theline);
  * @param newy The Y coordinate to move to.
  * @param newz The Z coordinate to move to.
  */
-int setsprite(short spritenum, long newx, long newy, long newz);
+int setsprite(short spritenum, int32_t newx, int32_t newy, int32_t newz);
 
 /**@brief Drag a wall to a new point.
  *
@@ -648,7 +649,7 @@ int setsprite(short spritenum, long newx, long newy, long newz);
  * the left side of the wall (given that you are in the sector of that wall)
  * Got it?
  */
-void dragpoint(short pointhighlight, long dax, long day);
+void dragpoint(short pointhighlight, int32_t dax, int32_t day);
 
 /**@brief Integer Square Root Function
  *
@@ -657,7 +658,7 @@ void dragpoint(short pointhighlight, long dax, long day);
  * @param num The number to work on.
  * @return The square root of \a num.
  */
-int ksqrt(long num);
+int ksqrt(int32_t num);
 
 /**@brief Find number of walls in sector, up to a known wall.
  *
@@ -683,14 +684,14 @@ int loopnumofsector(short sectnum, short wallnum);
  * @param z2 Z coordinate of point 2.
  * @param sect2 Point 2's sector.
  */
-int cansee(long x1, long y1, long z1, short sect1,
-            long x2, long y2, long z2, short sect2);
-int lintersect(long x1, long y1, long z1, long x2, long y2, long z2,
-               long x3, long y3, long x4, long y4, long *intx,
-               long *inty, long *intz);
-int rintersect(long x1, long y1, long z1, long vx, long vy, long vz,
-               long x3, long y3, long x4, long y4, long *intx,
-               long *inty, long *intz);
+int cansee(int32_t x1, int32_t y1, int32_t z1, short sect1,
+            int32_t x2, int32_t y2, int32_t z2, short sect2);
+int lintersect(int32_t x1, int32_t y1, int32_t z1, int32_t x2, int32_t y2, int32_t z2,
+               int32_t x3, int32_t y3, int32_t x4, int32_t y4, int32_t *intx,
+               int32_t *inty, int32_t *intz);
+int rintersect(int32_t x1, int32_t y1, int32_t z1, int32_t vx, int32_t vy, int32_t vz,
+               int32_t x3, int32_t y3, int32_t x4, int32_t y4, int32_t *intx,
+               int32_t *inty, int32_t *intz);
 
 /**@brief Allocate a tile permanently.
  *
@@ -703,7 +704,7 @@ int rintersect(long x1, long y1, long z1, long vx, long vy, long vz,
  * function so I would recommend calling this function
  * right after loadpics.
  */
-int allocatepermanenttile(short tilenume, long xsiz, long ysiz);
+int allocatepermanenttile(short tilenume, int32_t xsiz, int32_t ysiz);
 
 /**@brief Draw a line.
  *
@@ -714,7 +715,7 @@ int allocatepermanenttile(short tilenume, long xsiz, long ysiz);
  * @param y2 Y coordinate of ending point.
  * @param col Color to use.
  */
-void drawline256 (long x1, long y1, long x2, long y2, unsigned char col);
+void drawline256 (int32_t x1, int32_t y1, int32_t x2, int32_t y2, unsigned char col);
 
 /**@brief Copy a piece of a tile to another tile, skipping transparent pixels.
  *
@@ -734,8 +735,8 @@ void drawline256 (long x1, long y1, long x2, long y2, unsigned char col);
  * @param sx2 The X coordinate to paste at.
  * @param sy2 The Y coordinate to paste at.
  */
-void copytilepiece(long tilenume1, long sx1, long sy1, long xsiz, long ysiz,
-                   long tilenume2, long sx2, long sy2);
+void copytilepiece(int32_t tilenume1, int32_t sx1, int32_t sy1, int32_t xsiz, int32_t ysiz,
+                   int32_t tilenume2, int32_t sx2, int32_t sy2);
 
 /**@brief Find the next closest ceiling or floor in surrounding sectors.
  *
@@ -750,7 +751,7 @@ void copytilepiece(long tilenume1, long sx1, long sy1, long xsiz, long ysiz,
  * \a topbottom: pass -1 to search ceilings, 1 to search floors. \n
  * \a direction: pass -1 to search upwards, 1 to search downwards.
  */
-int nextsectorneighborz(short sectnum, long thez,
+int nextsectorneighborz(short sectnum, int32_t thez,
                         short topbottom, short direction);
 
 /**@brief Find the closest objects with tags the player is pointing at.
@@ -774,9 +775,9 @@ int nextsectorneighborz(short sectnum, long thez,
  * @arg 2 = search hitag only.
  * @arg 3 = search both lotag and hitag.
  */
-int neartag(long xs, long ys, long zs, short sectnum, short ange,
+int neartag(int32_t xs, int32_t ys, int32_t zs, short sectnum, short ange,
             short *neartagsector, short *neartagwall, short *neartagsprite,
-            long *neartaghitdist, long neartagrange, char tagsearch);
+            int32_t *neartaghitdist, int32_t neartagrange, char tagsearch);
 
 /**@brief Try to keep object away from wall.
  *
@@ -797,9 +798,9 @@ int neartag(long xs, long ys, long zs, short sectnum, short ange,
  * to or not. The lower 16 bits are anded with wall[].cstat and the higher
  * 16 bits are anded with sprite[].cstat.
  */
-int pushmove(long *x, long *y, long *z, short *sectnum,
-             long walldist, long ceildist, long flordist,
-             unsigned long cliptype);
+int pushmove(int32_t *x, int32_t *y, int32_t *z, short *sectnum,
+             int32_t walldist, int32_t ceildist, int32_t flordist,
+             uint32_t cliptype);
 
 /**@brief Returns a random number.
  *
@@ -860,9 +861,9 @@ void flushperms(void);
  * screen and rotate about once per second.
  * The sprite will only get drawn inside the rectangle from (50,50) to (270,150).
  */
-void rotatesprite(long sx, long sy, long z, short a, short picnum,
+void rotatesprite(int32_t sx, int32_t sy, int32_t z, short a, short picnum,
                   signed char dashade, char dapalnum, char dastat,
-                  long cx1, long cy1, long cx2, long cy2);
+                  int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2);
 /**@brief Make a lookup table for remapping.
  *
  * Ken's description of this function:
@@ -884,7 +885,7 @@ void rotatesprite(long sx, long sy, long z, short a, short picnum,
  * the memory block for use but will not waste the time creating a palookup
  * table (it assumes you will create one yourself).
  */
-void makepalookup(long palnum, char *remapbuf, signed char r,
+void makepalookup(int32_t palnum, char *remapbuf, signed char r,
                   signed char g, signed char b, char dastat);
 
 /**@brief Draw the overhead textured map view.
@@ -895,7 +896,7 @@ void makepalookup(long palnum, char *remapbuf, signed char r,
  * @param zoome The zoom to apply to the map.
  * @param ang The angle to rotate the map by.
  */
-void drawmapview(long dax, long day, long zoome, short ang);
+void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang);
 
 /**@brief Sets the viewing window for 3D mode.
  *
@@ -907,7 +908,7 @@ void drawmapview(long dax, long day, long zoome, short ang);
  * @param y2 lower right Y coordinate.
  * @remark Example: For full screen 320*200, call like this: setview(0L,0L,319L,199L);
  */
-void setview(long x1, long y1, long x2, long y2);
+void setview(int32_t x1, int32_t y1, int32_t x2, int32_t y2);
 
 /**@brief Shows a tile on screen, saving the previous view.
  *
@@ -920,7 +921,7 @@ void setview(long x1, long y1, long x2, long y2);
  * @param xsiz X size to draw.
  * @param ysiz Y size to draw.
  */
-void setviewtotile(short tilenume, long xsiz, long ysiz);
+void setviewtotile(short tilenume, int32_t xsiz, int32_t ysiz);
 
 /**@brief Shows the screen as it was previous to the last \a setviewtotile.
  *
@@ -935,9 +936,9 @@ void setviewback(void);
  * @param tilenume The tile to perform the rotation on.
  */
 void squarerotatetile(short tilenume);
-void preparemirror(long dax, long day, long daz,
-                   short daang, long dahoriz, short dawall,
-                   short dasector, long *tposx, long *tposy,
+void preparemirror(int32_t dax, int32_t day, int32_t daz,
+                   short daang, int32_t dahoriz, short dawall,
+                   short dasector, int32_t *tposx, int32_t *tposy,
                    short *tang);
 void completemirror(void);
 
@@ -951,7 +952,7 @@ void completemirror(void);
  * @param walldist Radius of clipping box.
  * @return TRUE if an intersection ocurred. 
  */
-int clipinsidebox(long x, long y, short wallnum, long walldist);
+int clipinsidebox(int32_t x, int32_t y, short wallnum, int32_t walldist);
 
 #ifdef SUPERBUILD
 
@@ -983,7 +984,7 @@ int clipinsidebox(long x, long y, short wallnum, long walldist);
  * you add detail. \n This is why you don't see any large
  * voxels in SW and Blood.
  */
-void qloadkvx(long voxindex, char *filename);
+void qloadkvx(int32_t voxindex, char *filename);
 #endif
 
 #ifdef __cplusplus

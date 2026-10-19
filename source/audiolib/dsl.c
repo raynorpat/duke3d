@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -226,13 +227,13 @@ unsigned DSL_GetPlaybackRate( void )
 	return _SampleRate;
 }
 
-unsigned long DisableInterrupts( void )
+uint32_t DisableInterrupts( void )
 {
     SDL_LockAudio();
 	return 0;
 }
 
-void RestoreInterrupts( unsigned long flags )
+void RestoreInterrupts( uint32_t flags )
 {
     SDL_UnlockAudio();
 }

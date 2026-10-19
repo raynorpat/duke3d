@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1994 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
 #include <dos.h>
@@ -77,13 +78,13 @@ static unsigned _MIDI_Time;
 static int  _MIDI_BeatsPerMeasure;
 static int  _MIDI_TicksPerBeat;
 static int  _MIDI_TimeBase;
-static long _MIDI_FPSecondsPerTick;
+static int32_t _MIDI_FPSecondsPerTick;
 static unsigned _MIDI_TotalTime;
 static int  _MIDI_TotalTicks;
 static int  _MIDI_TotalBeats;
 static int  _MIDI_TotalMeasures;
 
-static unsigned long _MIDI_PositionInTicks;
+static uint32_t _MIDI_PositionInTicks;
 
 static int  _MIDI_Context;
 
@@ -122,7 +123,7 @@ char MIDI_PatchMap[ 128 ];
    Reads a variable length number from a MIDI track.
 ---------------------------------------------------------------------*/
 
-static long _MIDI_ReadNumber
+static int32_t _MIDI_ReadNumber
    (
    void *from,
    size_t size
@@ -130,7 +131,7 @@ static long _MIDI_ReadNumber
 
    {
    unsigned char *FromPtr;
-   long          value;
+   int32_t          value;
 
    if ( size > 4 )
       {
@@ -156,13 +157,13 @@ static long _MIDI_ReadNumber
    Reads a variable length encoded delta delay time from the MIDI data.
 ---------------------------------------------------------------------*/
 
-static long _MIDI_ReadDelta
+static int32_t _MIDI_ReadDelta
    (
    track *ptr
    )
 
    {
-   long          value;
+   int32_t          value;
    unsigned char c;
 
    GET_NEXT_EVENT( ptr, value );
@@ -293,7 +294,7 @@ static void _MIDI_MetaEvent
    int   command;
    int   length;
    int   denominator;
-   long  tempo;
+   int32_t  tempo;
 
    GET_NEXT_EVENT( Track, command );
    GET_NEXT_EVENT( Track, length );
@@ -947,7 +948,7 @@ int MIDI_Reset
 
    {
    int channel;
-   long time;
+   int32_t time;
    unsigned flags;
 
    MIDI_AllNotesOff();
@@ -1235,8 +1236,8 @@ int MIDI_PlaySong
    {
    int    numtracks;
    int    format;
-   long   headersize;
-   long   tracklength;
+   int32_t   headersize;
+   int32_t   tracklength;
    track *CurrentTrack;
    unsigned char *ptr;
    int    status;
@@ -1253,7 +1254,7 @@ int MIDI_PlaySong
       return( MIDI_NullMidiModule );
       }
 
-   if ( *( unsigned long * )song != MIDI_HEADER_SIGNATURE )
+   if ( *( uint32_t * )song != MIDI_HEADER_SIGNATURE )
       {
       return( MIDI_InvalidMidiFile );
       }
@@ -1306,7 +1307,7 @@ int MIDI_PlaySong
    numtracks    = _MIDI_NumTracks;
    while( numtracks-- )
       {
-      if ( *( unsigned long * )ptr != MIDI_TRACK_SIGNATURE )
+      if ( *( uint32_t * )ptr != MIDI_TRACK_SIGNATURE )
          {
          DPMI_UnlockMemory( _MIDI_TrackPtr, _MIDI_TrackMemSize );
 
@@ -1370,7 +1371,7 @@ void MIDI_SetTempo
    )
 
    {
-   long tickspersecond;
+   int32_t tickspersecond;
 
    MIDI_Tempo = tempo;
    tickspersecond = ( tempo * _MIDI_Division ) / 60;
@@ -1557,7 +1558,7 @@ static int _MIDI_ProcessNextTick
 
 void MIDI_SetSongTick
    (
-   unsigned long PositionInTicks
+   uint32_t PositionInTicks
    )
 
    {
@@ -1604,13 +1605,13 @@ void MIDI_SetSongTick
 
 void MIDI_SetSongTime
    (
-   unsigned long milliseconds
+   uint32_t milliseconds
    )
 
    {
-   unsigned long mil;
-   unsigned long sec;
-   unsigned long newtime;
+   uint32_t mil;
+   uint32_t sec;
+   uint32_t newtime;
 
    if ( !_MIDI_SongLoaded )
       {
@@ -1665,7 +1666,7 @@ void MIDI_SetSongPosition
    )
 
    {
-   unsigned long pos;
+   uint32_t pos;
 
    if ( !_MIDI_SongLoaded )
       {
@@ -1716,8 +1717,8 @@ void MIDI_GetSongPosition
    )
 
    {
-   unsigned long mil;
-   unsigned long sec;
+   uint32_t mil;
+   uint32_t sec;
 
    mil = ( _MIDI_Time & ( ( 1 << TIME_PRECISION ) - 1 ) ) * 1000;
    sec = _MIDI_Time >> TIME_PRECISION;
@@ -1741,8 +1742,8 @@ void MIDI_GetSongLength
    )
 
    {
-   unsigned long mil;
-   unsigned long sec;
+   uint32_t mil;
+   uint32_t sec;
 
    mil = ( _MIDI_TotalTime & ( ( 1 << TIME_PRECISION ) - 1 ) ) * 1000;
    sec = _MIDI_TotalTime >> TIME_PRECISION;

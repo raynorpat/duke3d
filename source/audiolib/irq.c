@@ -28,23 +28,24 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1994 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <dos.h>
 #include <stdlib.h>
 #include "irq.h"
 
-#define D32RealSeg(P) ( ( ( ( unsigned long )( P ) ) >> 4 ) & 0xFFFF )
-#define D32RealOff(P) ( ( ( unsigned long )( P ) ) & 0xF )
+#define D32RealSeg(P) ( ( ( ( uint32_t )( P ) ) >> 4 ) & 0xFFFF )
+#define D32RealOff(P) ( ( ( uint32_t )( P ) ) & 0xF )
 
 typedef struct
    {
-   unsigned long  drdi;
-   unsigned long  drsi;
-   unsigned long  drbp;
-   unsigned long  drxx;
-   unsigned long  drbx;
-   unsigned long  drdx;
-   unsigned long  drcx;
-   unsigned long  drax;
+   uint32_t  drdi;
+   uint32_t  drsi;
+   uint32_t  drbp;
+   uint32_t  drxx;
+   uint32_t  drbx;
+   uint32_t  drdx;
+   uint32_t  drcx;
+   uint32_t  drax;
 
    unsigned short drflags;
    unsigned short dres;
@@ -66,7 +67,7 @@ static unsigned short IRQ_CallBackSegment;
 static unsigned short IRQ_CallBackOffset;
 static unsigned short IRQ_RealModeSegment;
 static unsigned short IRQ_RealModeOffset;
-static unsigned long  IRQ_ProtectedModeOffset;
+static uint32_t  IRQ_ProtectedModeOffset;
 static unsigned short IRQ_ProtectedModeSelector;
 
 static union  REGS  Regs;
@@ -74,7 +75,7 @@ static struct SREGS SegRegs;
 
 static void *D32DosMemAlloc
    (
-   unsigned long size
+   uint32_t size
    )
 
    {
@@ -89,7 +90,7 @@ static void *D32DosMemAlloc
    if ( Regs.x.cflag != 0 )
       {
       // Failed
-      return ( ( unsigned long )0 );
+      return ( ( uint32_t )0 );
       }
 
    return( ( void * )( ( Regs.x.eax & 0xFFFF ) << 4  ) );

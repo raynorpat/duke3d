@@ -24,6 +24,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
+#include <stdint.h>
 #include "duke3d.h"
 
 // PRIMITIVE
@@ -199,27 +200,27 @@ short checkcursectnums(short sect)
     return -1;
 }
 
-long ldist(spritetype *s1,spritetype *s2)
+int32_t ldist(spritetype *s1,spritetype *s2)
 {
-    long vx,vy;
+    int32_t vx,vy;
     vx = s1->x - s2->x;
     vy = s1->y - s2->y;
     return(FindDistance2D(vx,vy) + 1);
 }
 
-long dist(spritetype *s1,spritetype *s2)
+int32_t dist(spritetype *s1,spritetype *s2)
 {
-    long vx,vy,vz;
+    int32_t vx,vy,vz;
     vx = s1->x - s2->x;
     vy = s1->y - s2->y;
     vz = s1->z - s2->z;
     return(FindDistance3D(vx,vy,vz>>4));
 }
 
-short findplayer(spritetype *s,long *d)
+short findplayer(spritetype *s,int32_t *d)
 {
     short j, closest_player;
-    long x, closest;
+    int32_t x, closest;
 
     if(ud.multimode < 2)
     {
@@ -244,10 +245,10 @@ short findplayer(spritetype *s,long *d)
     return closest_player;
 }
 
-short findotherplayer(short p,long *d)
+short findotherplayer(short p,int32_t *d)
 {
     short j, closest_player;
-    long x, closest;
+    int32_t x, closest;
 
     closest = 0x7fffffff;
     closest_player = p;
@@ -272,7 +273,7 @@ short findotherplayer(short p,long *d)
 
 void doanimations(void)
 {
-	long i, j, a, p, v, dasect;
+	int32_t i, j, a, p, v, dasect;
 
 	for(i=animatecnt-1;i>=0;i--)
 	{
@@ -332,13 +333,13 @@ void doanimations(void)
 	}
 }
 
-long getanimationgoal(long *animptr)
+int32_t getanimationgoal(int32_t *animptr)
 {
-	long i, j;
+	int32_t i, j;
 
 	j = -1;
     for(i=animatecnt-1;i>=0;i--)
-        if (animptr == (long *)animateptr[i])
+        if (animptr == (int32_t *)animateptr[i])
 		{
 			j = i;
 			break;
@@ -346,9 +347,9 @@ long getanimationgoal(long *animptr)
 	return(j);
 }
 
-static long setanimation(short animsect,long *animptr, long thegoal, long thevel)
+static int32_t setanimation(short animsect,int32_t *animptr, int32_t thegoal, int32_t thevel)
 {
-	long i, j;
+	int32_t i, j;
 
 	if (animatecnt >= MAXANIMATES-1)
 		return(-1);
@@ -402,7 +403,7 @@ void animatecamsprite(void)
 
 void animatewalls(void)
 {
-    long i, j, p, t;
+    int32_t i, j, p, t;
 
     for(p=0;p < numanimwalls ;p++)
 //    for(p=numanimwalls-1;p>=0;p--)
@@ -545,7 +546,7 @@ char activatewarpelevators(short s,short d) //Parm = sectoreffectornum
 
 void operatesectors(short sn,short ii)
 {
-    long j=0l, l=0l, q=0l, startwall=0l, endwall=0l;
+    int32_t j=0l, l=0l, q=0l, startwall=0l, endwall=0l;
     short i=0;
     char sect_error;
     sectortype *sptr;
@@ -593,8 +594,8 @@ void operatesectors(short sn,short ii)
 
         case 9:
         {
-            long dax,day,dax2,day2,sp;
-            long wallfind[2];
+            int32_t dax,day,dax2,day2,sp;
+            int32_t wallfind[2];
 
             startwall = sptr->wallptr;
             endwall = startwall+sptr->wallnum-1;
@@ -1149,11 +1150,11 @@ void operateforcefields(short s, short low)
 }
 
 
-char checkhitswitch(short snum,long w,char switchtype)
+char checkhitswitch(short snum,int32_t w,char switchtype)
 {
     char switchpal;
     short i, x, lotag,hitag,picnum,correctdips,numdips;
-    long sx,sy;
+    int32_t sx,sy;
 
     if(w < 0) return 0;
     correctdips = 1;
@@ -1555,7 +1556,7 @@ void breakwall(short newpn,short spr,short dawallnum)
     lotsofglass(spr,dawallnum,10);
 }
 
-void checkhitwall(short spr,short dawallnum,long x,long y,long z,short atwith)
+void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short atwith)
 {
     short j, i, sn = -1, darkestwall;
     signed char nfloors,nceilings;
@@ -2408,8 +2409,8 @@ void cheatkeys(short snum)
 {
     short i, k;
     char dainv;
-    unsigned long sb_snum;
-    long j;
+    uint32_t sb_snum;
+    int32_t j;
     struct player_struct *p;
 
     sb_snum = sync[snum].bits;
@@ -2884,7 +2885,7 @@ void cheatkeys(short snum)
 
 void checksectors(short snum)
 {
-    long i = -1,oldz;
+    int32_t i = -1,oldz;
     struct player_struct *p;
     short j,hitscanwall;
 

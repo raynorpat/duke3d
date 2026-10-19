@@ -25,6 +25,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //-------------------------------------------------------------------------
 
 #if PLATFORM_DOS
+#include <stdint.h>
 #include <conio.h>
 #endif
 
@@ -40,7 +41,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #define LOUDESTVOLUME 150
 
-long backflag,numenvsnds;
+int32_t backflag,numenvsnds;
 
 /*
 ===================
@@ -212,7 +213,7 @@ void MusicShutdown( void )
       }
    }
 
-int USRHOOKS_GetMem(char **ptr, unsigned long size )
+int USRHOOKS_GetMem(char **ptr, uint32_t size )
 {
    *ptr = malloc(size);
 
@@ -262,7 +263,7 @@ void playmusic(char *fn)
 {
 #if PLATFORM_DOS
     short      fp;
-    long        l;
+    int32_t        l;
 
     if(MusicToggle == 0) return;
     if(MusicDevice == NumSoundCards) return;
@@ -293,7 +294,7 @@ void playmusic(char *fn)
 
 char loadsound(unsigned short num)
 {
-    long   fp, l;
+    int32_t   fp, l;
 
     if(num >= NUM_SOUNDS || SoundToggle == 0) return 0;
     if (FXDevice == NumSoundCards) return 0;
@@ -313,15 +314,15 @@ char loadsound(unsigned short num)
 
     Sound[num].lock = 200;
 
-    allocache((long *)&Sound[num].ptr,l,(unsigned char *)&Sound[num].lock);
+    allocache((int32_t *)&Sound[num].ptr,l,(unsigned char *)&Sound[num].lock);
     kread( fp, Sound[num].ptr , l);
     kclose( fp );
     return 1;
 }
 
-int xyzsound(short num,short i,long x,long y,long z)
+int xyzsound(short num,short i,int32_t x,int32_t y,int32_t z)
 {
-    long sndist, cx, cy, cz, j,k;
+    int32_t sndist, cx, cy, cz, j,k;
     short pitche,pitchs,cs;
     int voice, sndang, ca, pitch;
 
@@ -467,7 +468,7 @@ void sound(short num)
 {
     short pitch,pitche,pitchs,cx;
     int voice;
-    long start;
+    int32_t start;
 
     if (FXDevice == NumSoundCards) return;
     if(SoundToggle==0) return;
@@ -499,13 +500,13 @@ void sound(short num)
     {
         if(*Sound[num].ptr == 'C')
         {
-            start = (long)*(unsigned short *)(Sound[num].ptr + 0x14);
+            start = (int32_t)*(unsigned short *)(Sound[num].ptr + 0x14);
             voice = FX_PlayLoopedVOC( Sound[num].ptr, start, start + soundsiz[num],
                     pitch,LOUDESTVOLUME,LOUDESTVOLUME,LOUDESTVOLUME,soundpr[num],num);
         }
         else
         {
-            start = (long)*(unsigned short *)(Sound[num].ptr + 0x14);
+            start = (int32_t)*(unsigned short *)(Sound[num].ptr + 0x14);
             voice = FX_PlayLoopedWAV( Sound[num].ptr, start, start + soundsiz[num],
                     pitch,LOUDESTVOLUME,LOUDESTVOLUME,LOUDESTVOLUME,soundpr[num],num);
         }
@@ -555,7 +556,7 @@ void stopenvsound(short num,short i)
 
 void pan3dsound(void)
 {
-    long sndist, sx, sy, sz, cx, cy, cz;
+    int32_t sndist, sx, sy, sz, cx, cy, cz;
     short sndang,ca,j,k,i,cs;
 
     numenvsnds = 0;
@@ -633,9 +634,9 @@ void pan3dsound(void)
     }
 }
 
-void testcallback(unsigned long _num)
+void testcallback(uint32_t _num)
 {
-    long num = (long) _num;
+    int32_t num = (int32_t) _num;
     
     short tempi,tempj,tempk;
 
@@ -675,7 +676,7 @@ void testcallback(unsigned long _num)
 
 void clearsoundlocks(void)
 {
-    long i;
+    int32_t i;
 
     for(i=0;i<NUM_SOUNDS;i++)
         if(Sound[i].lock >= 200)

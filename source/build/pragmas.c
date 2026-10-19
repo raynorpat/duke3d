@@ -15,6 +15,7 @@
  * This file has been modified from Ken Silverman's original release
  */
 
+#include <stdint.h>
 #include <string.h>	// memcpy
 #include <stdio.h>
 #include "platform.h"
@@ -22,11 +23,11 @@
 
 #define low32(a) ((a&0xffffffff))
 
-unsigned long getkensmessagecrc(long param) {
+uint32_t getkensmessagecrc(int32_t param) {
     return(0x56c764d4);
 }
 
-long msqrtasm(int i1)
+int32_t msqrtasm(int i1)
 {
     int retval = 0x40000000;
     int temp = 0x20000000;
@@ -49,12 +50,12 @@ long msqrtasm(int i1)
 }
 
 
-void clearbuf(void *buffer, int size, long fill_value) {
+void clearbuf(void *buffer, int size, int32_t fill_value) {
   int i;
-  for (i = 0; i < size; i++) ((long*)buffer)[i] = fill_value;
+  for (i = 0; i < size; i++) ((int32_t*)buffer)[i] = fill_value;
 }
 
-void clearbufbyte(void *vpbuffer, int size, long fill_value) {
+void clearbufbyte(void *vpbuffer, int size, int32_t fill_value) {
   unsigned char *buffer = (unsigned char *) vpbuffer;
   int lsize;
   switch(size){
@@ -90,7 +91,7 @@ void clearbufbyte(void *vpbuffer, int size, long fill_value) {
 
 void copybuf(void *source, void *dest, int size) {
   int i;
-  for (i = 0; i < size; i++) ((long*)dest)[i] = ((long*)source)[i];
+  for (i = 0; i < size; i++) ((int32_t*)dest)[i] = ((int32_t*)source)[i];
 }
 
 void copybufbyte(void *source, void *dest, int size) {
@@ -104,7 +105,7 @@ void copybufreverse(void *source, void *dest, int size) {
   } while(--size);
 }
 
-void qinterpolatedown16 (long *source, int size, int linum, int linum_inc) {
+void qinterpolatedown16 (int32_t *source, int size, int linum, int linum_inc) {
 	if (size == 0)
 	{
 		*source = (linum>>16);
@@ -120,17 +121,17 @@ void qinterpolatedown16 (long *source, int size, int linum, int linum_inc) {
 	}
 }
 
-void qinterpolatedown16short (long *source, int size, int linum, int linum_inc)
+void qinterpolatedown16short (int32_t *source, int size, int linum, int linum_inc)
 {
 	if (size == 0) return;
 
-	if ((long)source & 0x2)
+	if ((int32_t)source & 0x2)
 	{
         unsigned short *src = (unsigned short *) source;
 		*src = ((linum>>16)&0xffff);
         src++;
 		linum += linum_inc;
-        source = (long *) src;
+        source = (int32_t *) src;
 
 		size--;
 		if (size == 0) return;

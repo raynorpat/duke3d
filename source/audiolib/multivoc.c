@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1993 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -119,7 +120,7 @@ static volatile VoiceNode VoicePool;
 /*static*/ int MV_MixPage      = 0;
 static int MV_VoiceHandle  = MV_MinVoiceHandle;
 
-static void ( *MV_CallBackFunc )( unsigned long ) = NULL;
+static void ( *MV_CallBackFunc )( uint32_t ) = NULL;
 static void ( *MV_RecordFunc )( char *ptr, int length ) = NULL;
 static void ( *MV_MixFunction )( VoiceNode *voice, int buffer );
 
@@ -132,7 +133,7 @@ short *MV_RightVolume;
 int    MV_SampleSize = 1;
 int    MV_RightChannelOffset;
 
-unsigned long MV_MixPosition;
+uint32_t MV_MixPosition;
 
 int MV_ErrorCode = MV_Ok;
 
@@ -277,10 +278,10 @@ static void MV_Mix
    {
    char          *start;
    int            length;
-   long           voclength;
-   unsigned long  position;
-   unsigned long  rate;
-   unsigned long  FixedPointBufferSize;
+   int32_t           voclength;
+   uint32_t  position;
+   uint32_t  rate;
+   uint32_t  FixedPointBufferSize;
 
    if ( ( voice->length == 0 ) &&
         ( voice->GetSound != NULL ) &&
@@ -562,7 +563,7 @@ void MV_ServiceVoc
 int leftpage  = -1;
 int rightpage = -1;
 
-void MV_ServiceGus( char **ptr, unsigned long *length )
+void MV_ServiceGus( char **ptr, uint32_t *length )
    {
    if ( leftpage == MV_MixPage )
       {
@@ -575,7 +576,7 @@ void MV_ServiceGus( char **ptr, unsigned long *length )
    *length = MV_BufferSize;
    }
 
-void MV_ServiceRightGus( char **ptr, unsigned long *length )
+void MV_ServiceRightGus( char **ptr, uint32_t *length )
    {
    if ( rightpage == MV_MixPage )
       {
@@ -618,8 +619,8 @@ playbackstatus MV_GetNextVOCBlock
    unsigned char *ptr;
    int            blocktype=0;
    int            lastblocktype=0;
-   unsigned long  blocklength=0l;
-   unsigned long  samplespeed=0l;
+   uint32_t  blocklength=0l;
+   uint32_t  samplespeed=0l;
    unsigned int   tc=0;
    int            packtype=0;
    int            voicemode=0;
@@ -848,17 +849,17 @@ playbackstatus MV_GetNextVOCBlock
 
       if ( voice->LoopEnd != NULL )
          {
-         if ( blocklength > ( unsigned long )voice->LoopEnd )
+         if ( blocklength > ( uint32_t )voice->LoopEnd )
             {
-            blocklength = ( unsigned long )voice->LoopEnd;
+            blocklength = ( uint32_t )voice->LoopEnd;
             }
          else
             {
             voice->LoopEnd = ( char * )blocklength;
             }
 
-         voice->LoopStart = voice->sound + ( unsigned long )voice->LoopStart;
-         voice->LoopEnd   = voice->sound + ( unsigned long )voice->LoopEnd;
+         voice->LoopStart = voice->sound + ( uint32_t )voice->LoopStart;
+         voice->LoopEnd   = voice->sound + ( uint32_t )voice->LoopEnd;
          voice->LoopSize  = voice->LoopEnd - voice->LoopStart;
          }
 
@@ -1145,7 +1146,7 @@ int MV_Kill
    {
    VoiceNode *voice;
    unsigned  flags;
-   unsigned  long callbackval;
+   uint32_t callbackval;
 
    if ( !MV_Installed )
       {
@@ -1339,7 +1340,7 @@ int MV_VoiceAvailable
 void MV_SetVoicePitch
    (
    VoiceNode *voice,
-   unsigned long rate,
+   uint32_t rate,
    int pitchoffset
    )
 
@@ -2258,14 +2259,14 @@ void MV_StopRecord
 
 int MV_StartDemandFeedPlayback
    (
-   void ( *function )( char **ptr, unsigned long *length ),
+   void ( *function )( char **ptr, uint32_t *length ),
    int rate,
    int pitchoffset,
    int vol,
    int left,
    int right,
    int priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -2321,14 +2322,14 @@ int MV_StartDemandFeedPlayback
 int MV_PlayRaw
    (
    char *ptr,
-   unsigned long length,
+   uint32_t length,
    unsigned rate,
    int   pitchoffset,
    int   vol,
    int   left,
    int   right,
    int   priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -2351,7 +2352,7 @@ int MV_PlayRaw
 int MV_PlayLoopedRaw
    (
    char *ptr,
-   unsigned long length,
+   uint32_t length,
    char *loopstart,
    char *loopend,
    unsigned rate,
@@ -2360,7 +2361,7 @@ int MV_PlayLoopedRaw
    int   left,
    int   right,
    int   priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -2419,7 +2420,7 @@ int MV_PlayWAV
    int   left,
    int   right,
    int   priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -2446,7 +2447,7 @@ int MV_PlayWAV3D
    int  angle,
    int  distance,
    int  priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -2494,14 +2495,14 @@ int MV_PlayWAV3D
 int MV_PlayLoopedWAV
    (
    char *ptr,
-   long  loopstart,
-   long  loopend,
+   int32_t  loopstart,
+   int32_t  loopend,
    int   pitchoffset,
    int   vol,
    int   left,
    int   right,
    int   priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -2581,7 +2582,7 @@ int MV_PlayLoopedWAV
       length     /= 2;
       }
 
-   loopend    = min( loopend, (long)data->size );
+   loopend    = min( loopend, (int32_t)data->size );
    absloopend = min( absloopend, length );
 
    voice->Playing     = TRUE;
@@ -2600,7 +2601,7 @@ int MV_PlayLoopedWAV
    voice->LoopEnd     = voice->NextBlock + loopend;
    voice->LoopSize    = absloopend - absloopstart;
 
-   if ( ( loopstart >= (long)data->size ) || ( loopstart < 0 ) )
+   if ( ( loopstart >= (int32_t)data->size ) || ( loopstart < 0 ) )
       {
       voice->LoopStart = NULL;
       voice->LoopEnd   = NULL;
@@ -2629,7 +2630,7 @@ int MV_PlayVOC3D
    int  angle,
    int  distance,
    int  priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -2682,7 +2683,7 @@ int MV_PlayVOC
    int   left,
    int   right,
    int   priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -2705,14 +2706,14 @@ int MV_PlayVOC
 int MV_PlayLoopedVOC
    (
    char *ptr,
-   long  loopstart,
-   long  loopend,
+   int32_t  loopstart,
+   int32_t  loopend,
    int   pitchoffset,
    int   vol,
    int   left,
    int   right,
    int   priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -2957,7 +2958,7 @@ int MV_GetVolume
 
 void MV_SetCallBack
    (
-   void ( *function )( unsigned long )
+   void ( *function )( uint32_t )
    )
 
    {
@@ -3011,7 +3012,7 @@ int MV_TestPlayback
    {
 #ifdef PLAT_DOS
    unsigned flags;
-   long time;
+   int32_t time;
    int  start;
    int  status;
    int  pos;
@@ -3283,9 +3284,9 @@ int MV_Init
 
 #ifdef PLAT_DOS
    // Make sure we don't cross a physical page
-   if ( ( ( unsigned long )ptr & 0xffff ) + TotalBufferSize > 0x10000 )
+   if ( ( ( uint32_t )ptr & 0xffff ) + TotalBufferSize > 0x10000 )
       {
-      ptr = ( char * )( ( ( unsigned long )ptr & 0xff0000 ) + 0x10000 );
+      ptr = ( char * )( ( ( uint32_t )ptr & 0xff0000 ) + 0x10000 );
       }
 #endif
 

@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1994 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <dos.h>
 #include <conio.h>
 #include <stdlib.h>
@@ -114,10 +115,10 @@ static int BLASTER_WaveBlasterState = 0x0F;
 #define kStackSize 2048
 
 static unsigned short StackSelector = NULL;
-static unsigned long  StackPointer;
+static uint32_t  StackPointer;
 
 static unsigned short oldStackSelector;
-static unsigned long  oldStackPointer;
+static uint32_t  oldStackPointer;
 
 // This is defined because we can't create local variables in a
 // function that switches stacks.
@@ -125,8 +126,8 @@ static int GlobalStatus;
 
 // These declarations are necessary to use the inline assembly pragmas.
 
-extern void GetStack(unsigned short *selptr,unsigned long *stackptr);
-extern void SetStack(unsigned short selector,unsigned long stackptr);
+extern void GetStack(unsigned short *selptr,uint32_t *stackptr);
+extern void SetStack(unsigned short selector,uint32_t stackptr);
 
 // This function will get the current stack selector and pointer and save
 // them off.
@@ -695,7 +696,7 @@ void BLASTER_SetPlaybackRate
    if ( BLASTER_Version < DSP_Version4xx )
       {
       int  timeconstant;
-      long ActualRate;
+      int32_t ActualRate;
 
       // Send sampling rate as time constant for older Sound
       // Blaster compatible cards.
@@ -975,8 +976,8 @@ int BLASTER_GetCurrentPos
 
    CurrentAddr = DMA_GetCurrentPos( DmaChannel );
 
-   offset = ( int )( ( ( unsigned long )CurrentAddr ) -
-      ( ( unsigned long )BLASTER_CurrentDMABuffer ) );
+   offset = ( int )( ( ( uint32_t )CurrentAddr ) -
+      ( ( uint32_t )BLASTER_CurrentDMABuffer ) );
 
    if ( BLASTER_MixMode & SIXTEEN_BIT )
       {
@@ -2253,7 +2254,7 @@ int BLASTER_Init
          }
 
       // Leave a little room at top of stack just for the hell of it...
-      StackPointer = kStackSize - sizeof( long );
+      StackPointer = kStackSize - sizeof( int32_t );
 
       BLASTER_OldInt = _dos_getvect( Interrupt );
       if ( Irq < 8 )

@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifndef __PITCH_H
 #define __PITCH_H
+#include <stdint.h>
 
 enum PITCH_ERRORS
    {
@@ -39,7 +40,7 @@ enum PITCH_ERRORS
    };
 
 //void          PITCH_Init( void );
-unsigned long PITCH_GetScale( int pitchoffset );
+uint32_t PITCH_GetScale( int pitchoffset );
 void          PITCH_UnlockMemory( void );
 int           PITCH_LockMemory( void );
 #endif

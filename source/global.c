@@ -24,6 +24,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,7 +43,7 @@ char MusicPtr[72000];
 short global_random;
 short neartagsector, neartagwall, neartagsprite;
 
-long gc,neartaghitdist,lockclock,max_player_health,max_armour_amount,max_ammo_amount[MAX_WEAPONS];
+int32_t gc,neartaghitdist,lockclock,max_player_health,max_armour_amount,max_ammo_amount[MAX_WEAPONS];
 
 // long temp_data[MAXSPRITES][6];
 struct weaponhit hittype[MAXSPRITES];
@@ -55,10 +56,10 @@ short moustat = 0;
 
 struct animwalltype animwall[MAXANIMWALLS];
 short numanimwalls;
-long *animateptr[MAXANIMATES], animategoal[MAXANIMATES], animatevel[MAXANIMATES], animatecnt;
+int32_t *animateptr[MAXANIMATES], animategoal[MAXANIMATES], animatevel[MAXANIMATES], animatecnt;
 // long oanimateval[MAXANIMATES];
 short animatesect[MAXANIMATES];
-long msx[2048],msy[2048];
+int32_t msx[2048],msy[2048];
 short cyclers[MAXCYCLERS][6],numcyclers;
 
 char fta_quotes[NUMOFFIRSTTIMEACTIVE][64];
@@ -75,12 +76,12 @@ int current_menu;
 char betaname[80];
 
 char level_names[44][33],level_file_names[44][128];
-long partime[44],designertime[44];
+int32_t partime[44],designertime[44];
 char volume_names[4][33];
 char skill_names[5][33];
 
-volatile long checksume;
-long soundsiz[NUM_SOUNDS];
+volatile int32_t checksume;
+int32_t soundsiz[NUM_SOUNDS];
 
 short soundps[NUM_SOUNDS],soundpe[NUM_SOUNDS],soundvo[NUM_SOUNDS];
 char soundm[NUM_SOUNDS],soundpr[NUM_SOUNDS];
@@ -95,38 +96,38 @@ SOUNDOWNER SoundOwner[NUM_SOUNDS][4];
 
 char numplayersprites,loadfromgrouponly,earthquaketime;
 
-long fricxv,fricyv;
+int32_t fricxv,fricyv;
 struct player_orig po[MAXPLAYERS];
 struct player_struct ps[MAXPLAYERS];
 struct user_defs ud;
 
 char pus, pub;
 char syncstat, syncval[MAXPLAYERS][MOVEFIFOSIZ];
-long syncvalhead[MAXPLAYERS], syncvaltail, syncvaltottail;
+int32_t syncvalhead[MAXPLAYERS], syncvaltail, syncvaltottail;
 
 input sync[MAXPLAYERS], loc;
 input recsync[RECSYNCBUFSIZ];
-long avgfvel, avgsvel, avgavel, avghorz, avgbits;
+int32_t avgfvel, avgsvel, avgavel, avghorz, avgbits;
 
 
 input inputfifo[MOVEFIFOSIZ][MAXPLAYERS];
 input recsync[RECSYNCBUFSIZ];
 
-long movefifosendplc;
+int32_t movefifosendplc;
 
   //Multiplayer syncing variables
 short screenpeek;
-long movefifoend[MAXPLAYERS];
+int32_t movefifoend[MAXPLAYERS];
 
 
     //Game recording variables
 
 char playerreadyflag[MAXPLAYERS],ready2send;
 char playerquitflag[MAXPLAYERS];
-long vel, svel, angvel, horiz, ototalclock, respawnactortime=768, respawnitemtime=768, groupfile;
+int32_t vel, svel, angvel, horiz, ototalclock, respawnactortime=768, respawnitemtime=768, groupfile;
 
-long script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;
-long *actorscrptr[MAXTILES],*parsing_actor;
+int32_t script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;
+int32_t *actorscrptr[MAXTILES],*parsing_actor;
 char *label,*textptr,error,warning,killit_flag;
 char *music_pointer;
 char actortype[MAXTILES];
@@ -157,19 +158,19 @@ short weaponsandammosprites[15] = {
         FREEZEAMMO
     };
 
-long impact_damage;
+int32_t impact_damage;
 
         //GLOBAL.C - replace the end "my's" with this
-long myx, omyx, myxvel, myy, omyy, myyvel, myz, omyz, myzvel;
+int32_t myx, omyx, myxvel, myy, omyy, myyvel, myz, omyz, myzvel;
 short myhoriz, omyhoriz, myhorizoff, omyhorizoff;
 short myang, omyang, mycursectnum, myjumpingcounter,frags[MAXPLAYERS][MAXPLAYERS];
 
 char myjumpingtoggle, myonground, myhardlanding, myreturntocenter;
 signed char multiwho, multipos, multiwhat, multiflag;
 
-long fakemovefifoplc,movefifoplc;
-long myxbak[MOVEFIFOSIZ], myybak[MOVEFIFOSIZ], myzbak[MOVEFIFOSIZ];
-long myhorizbak[MOVEFIFOSIZ],dukefriction = 0xcc00, show_shareware;
+int32_t fakemovefifoplc,movefifoplc;
+int32_t myxbak[MOVEFIFOSIZ], myybak[MOVEFIFOSIZ], myzbak[MOVEFIFOSIZ];
+int32_t myhorizbak[MOVEFIFOSIZ],dukefriction = 0xcc00, show_shareware;
 
 short myangbak[MOVEFIFOSIZ];
 char myname[32],camerashitable,freezerhurtowner=0,lasermode;
@@ -177,16 +178,16 @@ char myname[32],camerashitable,freezerhurtowner=0,lasermode;
 // char networkmode = 255, movesperpacket = 1,gamequit = 0,playonten = 0,everyothertime;
 char networkmode = 255, movesperpacket = 1,gamequit = 0,everyothertime;
 // CTW END - MODIFICATION
-long numfreezebounces=3,rpgblastradius,pipebombblastradius,tripbombblastradius,shrinkerblastradius,morterblastradius,bouncemineblastradius,seenineblastradius;
+int32_t numfreezebounces=3,rpgblastradius,pipebombblastradius,tripbombblastradius,shrinkerblastradius,morterblastradius,bouncemineblastradius,seenineblastradius;
 STATUSBARTYPE sbar;
 
-long myminlag[MAXPLAYERS], mymaxlag, otherminlag, bufferjitter = 1;
+int32_t myminlag[MAXPLAYERS], mymaxlag, otherminlag, bufferjitter = 1;
 short numclouds,clouds[128],cloudx[128],cloudy[128];
-long cloudtotalclock = 0,totalmemory = 0;
-long numinterpolations = 0, startofdynamicinterpolations = 0;
-long oldipos[MAXINTERPOLATIONS];
-long bakipos[MAXINTERPOLATIONS];
-long *curipos[MAXINTERPOLATIONS];
+int32_t cloudtotalclock = 0,totalmemory = 0;
+int32_t numinterpolations = 0, startofdynamicinterpolations = 0;
+int32_t oldipos[MAXINTERPOLATIONS];
+int32_t bakipos[MAXINTERPOLATIONS];
+int32_t *curipos[MAXINTERPOLATIONS];
 
 static char ApogeePath[256];
 
@@ -275,7 +276,7 @@ void FixFilePath(char *filename)
 #elif PLATFORM_WIN32
 int _dos_findfirst(char *filename, int x, struct find_t *f)
 {
-    long rc = _findfirst(filename, &f->data);
+    int32_t rc = _findfirst(filename, &f->data);
     f->handle = rc;
     if (rc != -1)
     {
@@ -594,7 +595,7 @@ void SafeWriteString (int handle, char * buffer)
 			Error ("File write string failure writing %s\n",buffer);
 }
 
-void *SafeMalloc (long size)
+void *SafeMalloc (int32_t size)
 {
 	void *ptr;
 
@@ -630,7 +631,7 @@ void SafeRealloc (void **x, int32 size)
     *x = ptr;
 }
 
-void *SafeLevelMalloc (long size)
+void *SafeLevelMalloc (int32_t size)
 {
 	void *ptr;
 
@@ -717,7 +718,7 @@ short	KeepShort (short l)
 }
 
 
-long	SwapLong (long l)
+int32_t	SwapLong (int32_t l)
 {
 	byte	b1,b2,b3,b4;
 
@@ -726,10 +727,10 @@ long	SwapLong (long l)
 	b3 = (l>>16)&255;
 	b4 = (l>>24)&255;
 
-	return ((long)b1<<24) + ((long)b2<<16) + ((long)b3<<8) + b4;
+	return ((int32_t)b1<<24) + ((int32_t)b2<<16) + ((int32_t)b3<<8) + b4;
 }
 
-long	KeepLong (long l)
+int32_t	KeepLong (int32_t l)
 {
 	return l;
 }
@@ -740,7 +741,7 @@ long	KeepLong (long l)
 #undef SwapShort
 #undef SwapLong
 
-void SwapIntelLong(long *l)
+void SwapIntelLong(int32_t *l)
 {
     *l = IntelLong(*l);
 }
@@ -750,7 +751,7 @@ void SwapIntelShort(short *s)
     *s = IntelShort(*s);
 }
 
-void SwapIntelLongArray(long *l, int num)
+void SwapIntelLongArray(int32_t *l, int num)
 {
     while (num--) {
         SwapIntelLong(l);
@@ -815,7 +816,7 @@ char *itoa(int value, char *string, int radix)
 	return string;
 }
 
-char *ltoa(long value, char *string, int radix)
+char *ltoa(int32_t value, char *string, int radix)
 {
 	switch (radix) {
 		case 10:
@@ -832,7 +833,7 @@ char *ltoa(long value, char *string, int radix)
 	return string;
 }
 
-char *ultoa(unsigned long value, char *string, int radix)
+char *ultoa(uint32_t value, char *string, int radix)
 {
 	switch (radix) {
 		case 10:

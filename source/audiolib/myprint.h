@@ -19,6 +19,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 #ifndef __MYPRINT_H
 #define __MYPRINT_H
+#include <stdint.h>
 
 enum COLORS
    {
@@ -37,7 +38,7 @@ void mysetxy( int x, int y );
 void myputch( char ch );
 int  printstring( char *string );
 int  printnum( int number );
-int  printunsigned( unsigned long number, int radix );
+int  printunsigned( uint32_t number, int radix );
 int  myprintf( char *fmt, ... );
 
 #endif

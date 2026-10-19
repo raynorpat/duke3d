@@ -17,6 +17,7 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 */
+#include <stdint.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -182,7 +183,7 @@ int DB_PrintNum
 
 int DB_PrintUnsigned
    (
-   unsigned long number,
+   uint32_t number,
    int radix
    )
 

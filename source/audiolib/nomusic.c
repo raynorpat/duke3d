@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include "music.h"
 
 char *MUSIC_ErrorString(int ErrorNumber)
@@ -72,11 +73,11 @@ int MUSIC_GetContext(void)
 	return 0;
 }
 
-void MUSIC_SetSongTick(unsigned long PositionInTicks)
+void MUSIC_SetSongTick(uint32_t PositionInTicks)
 {
 }
 
-void MUSIC_SetSongTime(unsigned long milliseconds)
+void MUSIC_SetSongTime(uint32_t milliseconds)
 {
 }
 

@@ -26,6 +26,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #ifndef _types_public
 #define _types_public
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,8 +46,8 @@ typedef unsigned short int      uint16;
 typedef uint16                  word;
 typedef short int               int16;
 
-typedef unsigned long           uint32;
-typedef long                    int32;
+typedef uint32_t           uint32;
+typedef int32_t                    int32;
 typedef uint32                  dword;
 
 typedef int32                   fixed;

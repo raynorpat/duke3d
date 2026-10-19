@@ -64,6 +64,7 @@ Duke Lookup Table
 */
 
 #if PLATFORM_DOS
+#include <stdint.h>
 #include <io.h>
 #endif
 
@@ -86,7 +87,7 @@ Duke Lookup Table
 /* defined in build.c ... */
 void editinput(void);
 void clearmidstatbar16(void);
-short getnumber16(char namestart[80], short num, long maxnumber);
+short getnumber16(char namestart[80], short num, int32_t maxnumber);
 void printmessage16(char name[82]);
 
 #define TICSPERFRAME 3
@@ -98,29 +99,29 @@ char *Myname = "stryker@metronet.com";
 
 extern char keystatus[];
 extern short defaultspritecstat;
-extern long posx, posy, posz, horiz, qsetmode;
+extern int32_t posx, posy, posz, horiz, qsetmode;
 extern short ang, cursectnum;
 extern short ceilingheinum, floorheinum;
 extern char names[MAXTILES][17];
 
-extern long zmode, kensplayerheight, zlock;
+extern int32_t zmode, kensplayerheight, zlock;
 
 extern short editstatus, searchit;
-extern long searchx, searchy;                          //search input
+extern int32_t searchx, searchy;                          //search input
 extern short searchsector, searchwall, searchstat;     //search output
 
 static short temppicnum, tempcstat;
 static char tempshade, tempxrepeat, tempyrepeat, somethingintab = 255;
-static long temphitag,templotag;
+static int32_t temphitag,templotag;
 
-static long ototalclock = 0;
+static int32_t ototalclock = 0;
 
-static long clockval[16], clockcnt = 0;
+static int32_t clockval[16], clockcnt = 0;
 
 #define NUMOPTIONS 8
 #define NUMKEYS 19
 
-static long vesares[13][2] = { {320,200}, {360,200}, {320,240}, {360,240},
+static int32_t vesares[13][2] = { {320,200}, {360,200}, {320,240}, {360,240},
                                {320,400}, {360,400}, {640,350}, {640,400},
                                {640,480}, {800,600}, {1024,768},{1280,1024},
                                {1600,1200} };
@@ -141,7 +142,7 @@ extern char buildkeys[NUMKEYS];
 
 //extern void __interrupt __far timerhandler(void);
 
-long xoldtimerhandler;
+int32_t xoldtimerhandler;
 
 #define COKE 52
 
@@ -248,16 +249,16 @@ static char on2d3d=0;
 //static char onwater=0;
 static char onnames=4;
 static char usedcount=0;
-long mousxplc,mousyplc;
-long ppointhighlight;
+int32_t mousxplc,mousyplc;
+int32_t ppointhighlight;
 static int counter=0;
 char nosprites=0,purpleon=0,skill=4;
 char framerateon=1,tabgraphic=0;
 
 
 static char sidemode=0;
-extern long vel, svel, angvel;
-long xvel, yvel, hvel, timeoff;
+extern int32_t vel, svel, angvel;
+int32_t xvel, yvel, hvel, timeoff;
 
 static char once=0;
 
@@ -287,8 +288,8 @@ void ExtLoadMap(const char *mapname)
 {
 
 
- long i;
- long sky=0;
+ int32_t i;
+ int32_t sky=0;
  int j;
 
 
@@ -354,14 +355,14 @@ void ExtLoadMap(const char *mapname)
 
 }
 
-void overwritesprite (long thex, long they, short tilenum,signed char shade, char stat, char dapalnum)
+void overwritesprite (int32_t thex, int32_t they, short tilenum,signed char shade, char stat, char dapalnum)
 {
         rotatesprite(thex<<16,they<<16,65536L,(stat&8)<<7,tilenum,shade,dapalnum,
                 ((stat&1^1)<<4)+(stat&2)+((stat&4)>>2)+((stat&16)>>2)^((stat&8)>>1),
                 windowx1,windowy1,windowx2,windowy2);
 }
 
-void putsprite (long thex, long they, long zoom, short rot, short tilenum, signed char shade, char dapalnum)
+void putsprite (int32_t thex, int32_t they, int32_t zoom, short rot, short tilenum, signed char shade, char dapalnum)
 {char stat=0;
     rotatesprite(thex<<16,they<<16,65536L-zoom,(rot+(stat&8))<<7,tilenum,shade,dapalnum,
                 ((stat&1^1)<<4)+(stat&2)+((stat&4)>>2)+((stat&16)>>2)^((stat&8)>>1),
@@ -406,7 +407,7 @@ const char *ExtGetSectorCaption(short sectnum)
 
 const char *ExtGetWallCaption(short wallnum)
 {
-    long i=0;
+    int32_t i=0;
 
     if(!(onnames==2 || onnames==4))
     {
@@ -1336,7 +1337,7 @@ void ReadPaletteTable()
 
 void Keys3d(void)
 {
-    long i,count,rate,nexti;
+    int32_t i,count,rate,nexti;
     short statnum=0;
 
 
@@ -1853,7 +1854,7 @@ void Keys2d(void)
 
 void ExtInit(void)
 {
-    long fil;
+    int32_t fil;
     
     printf("------------------------------------------------------------------------------\n");
     printf("BUILD.EXE Copyright (c) 1993 - 1996 Ken Silverman, 3D Realms Entertainment.\n");
@@ -1936,7 +1937,7 @@ void ExtPreCheckKeys(void) // just before drawrooms
 
 void ExtAnalyzeSprites(void)
 {
-        long i, j, k;
+        int32_t i, j, k;
         spritetype *tspr;
     char frames=0;
 
@@ -2051,7 +2052,7 @@ int intro=0;
 
 void ExtCheckKeys(void)
 {
- long i,count,nexti;
+ int32_t i,count,nexti;
  short statnum=0;
         if (qsetmode == 200)    //In 3D mode
         {
@@ -2143,8 +2144,8 @@ void ExtCheckKeys(void)
 
 void faketimerhandler(void)
 {
-  long i, j, dax, day, dist;
-        long hiz, hihit, loz, lohit, oposx, oposy;
+  int32_t i, j, dax, day, dist;
+        int32_t hiz, hihit, loz, lohit, oposx, oposy;
         short hitwall, daang;
 
     counter++; if(counter>=5) counter=0;
@@ -2174,8 +2175,8 @@ void faketimerhandler(void)
                 if (yvel > 0) yvel--;
 
                 i = 4-keystatus[buildkeys[4]];
-                xvel += mulscale(vel,(long)sintable[(ang+512)&2047],i);
-                yvel += mulscale(vel,(long)sintable[ang&2047],i);
+                xvel += mulscale(vel,(int32_t)sintable[(ang+512)&2047],i);
+                yvel += mulscale(vel,(int32_t)sintable[ang&2047],i);
 
                 if (((daang-ang)&2047) < 1024)
                         ang = ((ang+((((daang-ang)&2047)+24)>>4))&2047);
@@ -2302,7 +2303,7 @@ SetGAMEPalette()
 
 kensetpalette(char *vgapal)
 {
-        long i;
+        int32_t i;
         char vesapal[1024];
 
         for(i=0;i<256;i++)
@@ -2317,7 +2318,7 @@ kensetpalette(char *vgapal)
 
 SearchSectorsForward()
 {
- long ii=0;
+ int32_t ii=0;
  if(cursector_lotag!=0)
  {
      if(cursectornum<MAXSECTORS) cursectornum++;
@@ -2340,7 +2341,7 @@ SearchSectorsForward()
 
 SearchSectorsBackward()
 {
- long ii=0;
+ int32_t ii=0;
  if(cursector_lotag!=0)
  {
      if(cursectornum>0) cursectornum--;

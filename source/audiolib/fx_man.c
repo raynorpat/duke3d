@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1994 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "sndcards.h"
@@ -499,7 +500,7 @@ int FX_Shutdown
 
 int FX_SetCallBack
    (
-   void ( *function )( unsigned long )
+   void ( *function )( uint32_t )
    )
 
    {
@@ -906,7 +907,7 @@ int FX_PlayVOC
    int left,
    int right,
    int priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -933,14 +934,14 @@ int FX_PlayVOC
 int FX_PlayLoopedVOC
    (
    char *ptr,
-   long loopstart,
-   long loopend,
+   int32_t loopstart,
+   int32_t loopend,
    int pitchoffset,
    int vol,
    int left,
    int right,
    int priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -972,7 +973,7 @@ int FX_PlayWAV
    int left,
    int right,
    int priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -999,14 +1000,14 @@ int FX_PlayWAV
 int FX_PlayLoopedWAV
    (
    char *ptr,
-   long loopstart,
-   long loopend,
+   int32_t loopstart,
+   int32_t loopend,
    int pitchoffset,
    int vol,
    int left,
    int right,
    int priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -1038,7 +1039,7 @@ int FX_PlayVOC3D
    int angle,
    int distance,
    int priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -1070,7 +1071,7 @@ int FX_PlayWAV3D
    int angle,
    int distance,
    int priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -1097,14 +1098,14 @@ int FX_PlayWAV3D
 int FX_PlayRaw
    (
    char *ptr,
-   unsigned long length,
+   uint32_t length,
    unsigned rate,
    int pitchoffset,
    int vol,
    int left,
    int right,
    int priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -1131,7 +1132,7 @@ int FX_PlayRaw
 int FX_PlayLoopedRaw
    (
    char *ptr,
-   unsigned long length,
+   uint32_t length,
    char *loopstart,
    char *loopend,
    unsigned rate,
@@ -1140,7 +1141,7 @@ int FX_PlayLoopedRaw
    int left,
    int right,
    int priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -1276,14 +1277,14 @@ int FX_StopAllSounds
 
 int FX_StartDemandFeedPlayback
    (
-   void ( *function )( char **ptr, unsigned long *length ),
+   void ( *function )( char **ptr, uint32_t *length ),
    int rate,
    int pitchoffset,
    int vol,
    int left,
    int right,
    int priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {

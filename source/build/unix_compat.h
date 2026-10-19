@@ -25,6 +25,7 @@
 
 #define PLATFORM_SUPPORTS_SDL
 
+#include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -84,7 +85,7 @@ int _kinp_handler(int port, char *source_file, int source_line);
 #define kkmalloc(x) malloc(x)
 #define kfree(x) free(x)
 #define kkfree(x) free(x)
-#define FP_OFF(x) ((long) (x))
+#define FP_OFF(x) ((int32_t) (x))
 
 #ifndef O_BINARY
 #define O_BINARY 0
@@ -101,7 +102,7 @@ int stricmp(const char *x, const char *y);
 #define printext16_noupdate printext256_noupdate
 
 /* Other DOSisms. See unix_compat.c for implementation. */
-long filelength(int fhandle);
+int32_t filelength(int fhandle);
 
 /* !!! need an implementation of findfirst()/findnext()! */
 /*     Look for references to _dos_findfirst() in build.c! */

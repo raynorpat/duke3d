@@ -29,6 +29,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1994 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <dos.h>
 #include <conio.h>
 #include <stdlib.h>
@@ -296,7 +297,7 @@ char *DMA_GetCurrentPos
 
    {
    DMA_PORT      *Port;
-   unsigned long addr;
+   uint32_t addr;
    int           status;
 
    addr   = NULL;

@@ -32,6 +32,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifndef __USRHOOKS_H
 #define __USRHOOKS_H
+#include <stdint.h>
 
 /*---------------------------------------------------------------------
    Error definitions
@@ -49,7 +50,7 @@ enum USRHOOKS_Errors
    Function Prototypes
 ---------------------------------------------------------------------*/
 
-int USRHOOKS_GetMem( void **ptr, unsigned long size );
+int USRHOOKS_GetMem( void **ptr, uint32_t size );
 int USRHOOKS_FreeMem( void *ptr );
 
 #endif

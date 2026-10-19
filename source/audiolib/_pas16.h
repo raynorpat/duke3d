@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifndef ___PAS16_H
 #define ___PAS16_H
+#include <stdint.h>
 
 #define TRUE    ( 1 == 1 )
 #define FALSE   ( !TRUE )
@@ -192,16 +193,16 @@ typedef struct
 
 typedef struct
    {
-   unsigned long SetMixer;
-   unsigned long SetVolume;
-   unsigned long SetFilter;
-   unsigned long SetCrossChannel;
-   unsigned long GetMixer;
-   unsigned long GetVolume;
-   unsigned long GetFilter;
-   unsigned long GetCrossChannel;
-   unsigned long ReadSound;
-   unsigned long FMSplit;
+   uint32_t SetMixer;
+   uint32_t SetVolume;
+   uint32_t SetFilter;
+   uint32_t SetCrossChannel;
+   uint32_t GetMixer;
+   uint32_t GetVolume;
+   uint32_t GetFilter;
+   uint32_t GetCrossChannel;
+   uint32_t ReadSound;
+   uint32_t FMSplit;
    } MVFunc;
 
 int     PAS_CheckForDriver( void );
@@ -221,7 +222,7 @@ int     PAS_GetFilterSetting( int rate );
 void    PAS_BeginTransfer( int mode );
 int     PAS_TestAddress( int address );
 int     PAS_FindCard( void );
-int     PAS_CallMVFunction( unsigned long function, int ebx, int ecx, int edx );
+int     PAS_CallMVFunction( uint32_t function, int ebx, int ecx, int edx );
 void    PAS_SaveState( void );
 void    PAS_RestoreState( void );
 

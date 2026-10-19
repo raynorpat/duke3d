@@ -28,6 +28,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
    (c) Copyright 1994 James R. Dose.  All Rights Reserved.
 **********************************************************************/
 
+#include <stdint.h>
 #include <dos.h>
 #include <stdlib.h>
 #include <conio.h>
@@ -43,13 +44,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 static void ADLIBFX_SendOutput( int reg, int data );
 static void ADLIBFX_Service( task *Task );
 
-static long     ADLIBFX_LengthLeft;
+static int32_t     ADLIBFX_LengthLeft;
 static int      ADLIBFX_Block;
 static ALSound *ADLIBFX_Sound = NULL;
 static char    *ADLIBFX_SoundPtr = NULL;
 static int      ADLIBFX_Priority;
-static unsigned long ADLIBFX_CallBackVal;
-static void     ( *ADLIBFX_CallBackFunc )( unsigned long ) = NULL;
+static uint32_t ADLIBFX_CallBackVal;
+static void     ( *ADLIBFX_CallBackFunc )( uint32_t ) = NULL;
 static int      ADLIBFX_SoundVolume;
 static int      ADLIBFX_TotalVolume = ADLIBFX_MaxVolume;
 static task    *ADLIBFX_ServiceTask = NULL;
@@ -347,7 +348,7 @@ int ADLIBFX_Play
    ALSound *sound,
    int volume,
    int priority,
-   unsigned long callbackval
+   uint32_t callbackval
    )
 
    {
@@ -459,7 +460,7 @@ static void ADLIBFX_LockEnd
 
 void ADLIBFX_SetCallBack
    (
-   void ( *function )( unsigned long )
+   void ( *function )( uint32_t )
    )
 
    {

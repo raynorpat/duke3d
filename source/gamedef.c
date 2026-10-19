@@ -24,6 +24,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
+#include <stdint.h>
 #include "duke3d.h"
 
 extern short otherp;
@@ -31,11 +32,11 @@ extern short otherp;
 static short total_lines,line_number;
 static char checking_ifelse,parsing_state,*last_used_text;
 static short num_squigilly_brackets;
-static long last_used_size;
+static int32_t last_used_size;
 
 static short g_i,g_p;
-static long g_x;
-static long *g_t;
+static int32_t g_x;
+static int32_t *g_t;
 static spritetype *g_sp;
 
 #define NUMKEYWORDS     112
@@ -196,7 +197,7 @@ char isaltok(char c)
 
 void getglobalz(short i)
 {
-    long hz,lz,zr;
+    int32_t hz,lz,zr;
 
     spritetype *s = &sprite[i];
 
@@ -245,7 +246,7 @@ void getglobalz(short i)
 void makeitfall(short i)
 {
     spritetype *s = &sprite[i];
-    long hz,lz,c;
+    int32_t hz,lz,c;
 
     if( floorspace(s->sectnum) )
         c = 0;
@@ -283,7 +284,7 @@ void makeitfall(short i)
 
 void getlabel(void)
 {
-    long i;
+    int32_t i;
 
     while( isalnum(*textptr) == 0 )
     {
@@ -300,9 +301,9 @@ void getlabel(void)
     label[(labelcnt<<6)+i] = 0;
 }
 
-long keyword(void)
+int32_t keyword(void)
 {
-    long i;
+    int32_t i;
     char *temptextptr;
 
     temptextptr = textptr;
@@ -329,9 +330,9 @@ long keyword(void)
     return -1;
 }
 
-long transword(void) //Returns its code #
+int32_t transword(void) //Returns its code #
 {
-    long i, l;
+    int32_t i, l;
 
     while( isaltok(*textptr) == 0 )
     {
@@ -380,7 +381,7 @@ long transword(void) //Returns its code #
 
 void transnum(void)
 {
-    long i, l;
+    int32_t i, l;
 
     while( isaltok(*textptr) == 0 )
     {
@@ -436,7 +437,7 @@ void transnum(void)
 
 char parsecommand(void)
 {
-    long i, j, k, *tempscrptr;
+    int32_t i, j, k, *tempscrptr;
     char done, *origtptr, temp_ifelse_check, tw;
     short temp_line_number;
     int fp;
@@ -473,7 +474,7 @@ char parsecommand(void)
             {
                 getlabel();
                 scriptptr--;
-                labelcode[labelcnt] = (long) scriptptr;
+                labelcode[labelcnt] = (int32_t) scriptptr;
                 labelcnt++;
 
                 parsing_state = 1;
@@ -618,7 +619,7 @@ char parsecommand(void)
                         break;
                     }
                 if(i == labelcnt)
-                    labelcode[labelcnt++] = (long) scriptptr;
+                    labelcode[labelcnt++] = (int32_t) scriptptr;
                 for(j=0;j<2;j++)
                 {
                     if(keyword() >= 0) break;
@@ -765,7 +766,7 @@ char parsecommand(void)
                     }
 
                 if(i == labelcnt)
-                    labelcode[labelcnt++] = (long) scriptptr;
+                    labelcode[labelcnt++] = (int32_t) scriptptr;
 
                 for(j=0;j<3;j++)
                 {
@@ -819,7 +820,7 @@ char parsecommand(void)
                     }
 
                 if(i == labelcnt)
-                    labelcode[labelcnt++] = (long) scriptptr;
+                    labelcode[labelcnt++] = (int32_t) scriptptr;
 
                 for(j=0;j<5;j++)
                 {
@@ -996,7 +997,7 @@ char parsecommand(void)
                 tempscrptr = scriptptr;
                 scriptptr++; //Leave a spot for the fail location
                 parsecommand();
-                *tempscrptr = (long) scriptptr;
+                *tempscrptr = (int32_t) scriptptr;
             }
             else
             {
@@ -1077,7 +1078,7 @@ char parsecommand(void)
 
             parsecommand();
 
-            *tempscrptr = (long) scriptptr;
+            *tempscrptr = (int32_t) scriptptr;
 
             checking_ifelse++;
             return 0;
@@ -1467,7 +1468,7 @@ char *defaultcons[3] =
 
 void copydefaultcons(void)
 {
-    long i, fs, fpi;
+    int32_t i, fs, fpi;
     FILE *fpo;
 
     for(i=0;i<3;i++)
@@ -1505,7 +1506,7 @@ void copydefaultcons(void)
 void loadefs(char *filenam,char *mptr)
 {
     int i;
-    long fs,fp;
+    int32_t fs,fp;
 
     if(!SafeFileExists(filenam) && loadfromgrouponly == 0)
     {
@@ -1562,7 +1563,7 @@ void loadefs(char *filenam,char *mptr)
     total_lines = 0;
 
     passone(); //Tokenize
-    *script = (long) scriptptr;
+    *script = (int32_t) scriptptr;
 
     if(warning|error)
         printf("Found %d warning(s), %d error(s).\n",warning,error);
@@ -1619,14 +1620,14 @@ void loadefs(char *filenam,char *mptr)
     else
     {
         total_lines += line_number;
-        printf("Code Size:%ld bytes(%ld labels).\n",(long)((scriptptr-script)<<2)-4,labelcnt);
+        printf("Code Size:%ld bytes(%ld labels).\n",(int32_t)((scriptptr-script)<<2)-4,labelcnt);
     }
 }
 
 char dodge(spritetype *s)
 {
     short i;
-    long bx,by,mx,my,bxvect,byvect,mxvect,myvect,d;
+    int32_t bx,by,mx,my,bxvect,byvect,mxvect,myvect,d;
 
     mx = s->x;
     my = s->y;
@@ -1658,7 +1659,7 @@ char dodge(spritetype *s)
 short furthestangle(short i,short angs)
 {
     short j=0, hitsect=0, hitwall=0,hitspr, furthest_angle=0, angincs=0;
-    long hx=0l, hy=0l, hz=0l, d=0l, greatestd=0l;
+    int32_t hx=0l, hy=0l, hz=0l, d=0l, greatestd=0l;
     spritetype *s = &sprite[i];
 
     greatestd = -(1<<30);
@@ -1685,10 +1686,10 @@ short furthestangle(short i,short angs)
     return (furthest_angle&2047);
 }
 
-short furthestcanseepoint(short i,spritetype *ts,long *dax,long *day)
+short furthestcanseepoint(short i,spritetype *ts,int32_t *dax,int32_t *day)
 {
     short j, hitsect,hitwall,hitspr, angincs, tempang;
-    long hx, hy, hz, d, da;//, d, cd, ca,tempx,tempy,cx,cy;
+    int32_t hx, hy, hz, d, da;//, d, cd, ca,tempx,tempy,cx,cy;
     spritetype *s = &sprite[i];
 
     if( (g_t[0]&63) ) return -1;
@@ -1724,9 +1725,9 @@ short furthestcanseepoint(short i,spritetype *ts,long *dax,long *day)
 void alterang(short a)
 {
     short aang, angdif, goalang,j;
-    long ticselapsed, *moveptr;
+    int32_t ticselapsed, *moveptr;
 
-    moveptr = (long *)g_t[1];
+    moveptr = (int32_t *)g_t[1];
 
     ticselapsed = (g_t[0])&31;
 
@@ -1791,9 +1792,9 @@ void alterang(short a)
 
 void move()
 {
-    long l, *moveptr;
+    int32_t l, *moveptr;
     short j, a, goalang, angdif;
-    long daxvel;
+    int32_t daxvel;
 
     a = g_sp->hitag;
 
@@ -1837,7 +1838,7 @@ void move()
 
     if(a&face_player_smart)
     {
-        long newx,newy;
+        int32_t newx,newy;
 
         newx = ps[g_p].posx+(ps[g_p].posxv/768);
         newy = ps[g_p].posy+(ps[g_p].posyv/768);
@@ -1858,7 +1859,7 @@ void move()
         return;
     }
 
-    moveptr = (long *)g_t[1];
+    moveptr = (int32_t *)g_t[1];
 
     if(a&geth) g_sp->xvel += (*moveptr-g_sp->xvel)>>1;
     if(a&getv) g_sp->zvel += ((*(moveptr+1)<<4)-g_sp->zvel)>>1;
@@ -1988,7 +1989,7 @@ void move()
 
 char parse(void);
 
-void parseifelse(long condition)
+void parseifelse(int32_t condition)
 {
     if( condition )
     {
@@ -1997,7 +1998,7 @@ void parseifelse(long condition)
     }
     else
     {
-        insptr = (long *) *(insptr+1);
+        insptr = (int32_t *) *(insptr+1);
         if(*insptr == 10)
         {
             insptr+=2;
@@ -2010,7 +2011,7 @@ void parseifelse(long condition)
 
 char parse(void)
 {
-    long j, l, s;
+    int32_t j, l, s;
 
     if(killit_flag) return 1;
 
@@ -2148,9 +2149,9 @@ char parse(void)
         case 24:
             insptr++;
             g_t[5] = *insptr;
-            g_t[4] = *(long *)(g_t[5]);       // Action
-            g_t[1] = *(long *)(g_t[5]+4);       // move
-            g_sp->hitag = *(long *)(g_t[5]+8);    // Ai
+            g_t[4] = *(int32_t *)(g_t[5]);       // Action
+            g_t[1] = *(int32_t *)(g_t[5]+4);       // move
+            g_sp->hitag = *(int32_t *)(g_t[5]+8);    // Ai
             g_t[0] = g_t[2] = g_t[3] = 0;
             if(g_sp->hitag&random_angle)
                 g_sp->ang = TRAND&2047;
@@ -2177,7 +2178,7 @@ char parse(void)
                 hittype[g_i].timetosleep = SLEEPTIME;
             break;
         case 10:
-            insptr = (long *) *(insptr+1);
+            insptr = (int32_t *) *(insptr+1);
             break;
         case 100:
             insptr++;
@@ -2302,7 +2303,7 @@ char parse(void)
             g_sp->yoffset = 0;
 //            if(!gotz)
             {
-                long c;
+                int32_t c;
 
                 if( floorspace(g_sp->sectnum) )
                     c = 0;
@@ -2526,11 +2527,11 @@ char parse(void)
             break;
         case 17:
             {
-                long *tempscrptr;
+                int32_t *tempscrptr;
 
                 tempscrptr = insptr+2;
 
-                insptr = (long *) *(insptr+1);
+                insptr = (int32_t *) *(insptr+1);
                 while(1) if(parse()) break;
                 insptr = tempscrptr;
             }
@@ -2823,7 +2824,7 @@ char parse(void)
                         j = 0;
                 }
 
-                parseifelse((long) j);
+                parseifelse((int32_t) j);
 
             }
             break;
@@ -3078,7 +3079,7 @@ char parse(void)
     return 0;
 }
 
-void execute(short i,short p,long x)
+void execute(short i,short p,int32_t x)
 {
     char done;
 
@@ -3105,13 +3106,13 @@ void execute(short i,short p,long x)
     if(g_t[4])
     {
         g_sp->lotag += TICSPERFRAME;
-        if(g_sp->lotag > *(long *)(g_t[4]+16) )
+        if(g_sp->lotag > *(int32_t *)(g_t[4]+16) )
         {
             g_t[2]++;
             g_sp->lotag = 0;
-            g_t[3] +=  *(long *)( g_t[4]+12 );
+            g_t[3] +=  *(int32_t *)( g_t[4]+12 );
         }
-        if( klabs(g_t[3]) >= klabs( *(long *)(g_t[4]+4) * *(long *)(g_t[4]+12) ) )
+        if( klabs(g_t[3]) >= klabs( *(int32_t *)(g_t[4]+4) * *(int32_t *)(g_t[4]+12) ) )
             g_t[3] = 0;
     }
 

@@ -6,6 +6,7 @@
  * Written by Ryan C. Gordon. (icculus@clutteredmind.org)
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -57,7 +58,7 @@ static char warningMessage[80];
 static char errorMessage[80];
 static int fx_initialized = 0;
 static int numChannels = MIX_CHANNELS;
-static void (*callback)(unsigned long);
+static void (*callback)(uint32_t);
 static int reverseStereo = 0;
 static int reverbDelay = 256;
 static int reverbLevel = 0;
@@ -340,10 +341,10 @@ void PlayMusic(char *_filename)
     //FixFilePath(filename);
 
     char filename[MAX_PATH];
-    long handle;
-    long size;
+    int32_t handle;
+    int32_t size;
     void *song;
-    long rc;
+    int32_t rc;
 
     MUSIC_StopSong();
 
@@ -438,13 +439,13 @@ int MUSIC_GetContext(void)
 } // MUSIC_GetContext
 
 
-void MUSIC_SetSongTick(unsigned long PositionInTicks)
+void MUSIC_SetSongTick(uint32_t PositionInTicks)
 {
     musdebug("STUB ... MUSIC_SetSongTick().\n");
 } // MUSIC_SetSongTick
 
 
-void MUSIC_SetSongTime(unsigned long milliseconds)
+void MUSIC_SetSongTime(uint32_t milliseconds)
 {
     musdebug("STUB ... MUSIC_SetSongTime().\n");
 }// MUSIC_SetSongTime

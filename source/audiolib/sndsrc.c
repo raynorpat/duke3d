@@ -36,6 +36,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define MONO_16BIT   ( SIXTEEN_BIT )
 #define STEREO_16BIT ( STEREO | SIXTEEN_BIT )
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <dos.h>
 #include <conio.h>
@@ -232,8 +233,8 @@ int SS_GetCurrentPos
       return( SS_Warning );
       }
 
-   offset = ( int )( ( ( unsigned long )SS_SoundPtr ) -
-      ( ( unsigned long )SS_CurrentBuffer ) );
+   offset = ( int )( ( ( uint32_t )SS_SoundPtr ) -
+      ( ( uint32_t )SS_CurrentBuffer ) );
 
    return( offset );
    }

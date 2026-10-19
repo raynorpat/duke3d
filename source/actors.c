@@ -24,6 +24,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
+#include <stdint.h>
 #include "duke3d.h"
 
 extern char numenvsnds,actor_tog;
@@ -32,15 +33,15 @@ extern char numenvsnds,actor_tog;
 
 void updateinterpolations()  //Stick at beginning of domovethings
 {
-	long i;
+	int32_t i;
 
 	for(i=numinterpolations-1;i>=0;i--) oldipos[i] = *curipos[i];
 }
 
 
-void setinterpolation(long *posptr)
+void setinterpolation(int32_t *posptr)
 {
-	long i;
+	int32_t i;
 
 	if (numinterpolations >= MAXINTERPOLATIONS) return;
 	for(i=numinterpolations-1;i>=0;i--)
@@ -50,9 +51,9 @@ void setinterpolation(long *posptr)
 	numinterpolations++;
 }
 
-void stopinterpolation(long *posptr)
+void stopinterpolation(int32_t *posptr)
 {
-	long i;
+	int32_t i;
 
 	for(i=numinterpolations-1;i>=startofdynamicinterpolations;i--)
 		if (curipos[i] == posptr)
@@ -64,9 +65,9 @@ void stopinterpolation(long *posptr)
 		}
 }
 
-void dointerpolations(long smoothratio)       //Stick at beginning of drawscreen
+void dointerpolations(int32_t smoothratio)       //Stick at beginning of drawscreen
 {
-	long i, j, odelta, ndelta;
+	int32_t i, j, odelta, ndelta;
 
 	ndelta = 0; j = 0;
 	for(i=numinterpolations-1;i>=0;i--)
@@ -80,12 +81,12 @@ void dointerpolations(long smoothratio)       //Stick at beginning of drawscreen
 
 void restoreinterpolations()  //Stick at end of drawscreen
 {
-	long i;
+	int32_t i;
 
 	for(i=numinterpolations-1;i>=0;i--) *curipos[i] = bakipos[i];
 }
 
-long ceilingspace(short sectnum)
+int32_t ceilingspace(short sectnum)
 {
     if( (sector[sectnum].ceilingstat&1) && sector[sectnum].ceilingpal == 0 )
     {
@@ -99,7 +100,7 @@ long ceilingspace(short sectnum)
     return 0;
 }
 
-long floorspace(short sectnum)
+int32_t floorspace(short sectnum)
 {
     if( (sector[sectnum].floorstat&1) && sector[sectnum].ceilingpal == 0 )
     {
@@ -386,11 +387,11 @@ void checkavailweapon( struct player_struct *p )
 }
    */
 
-long ifsquished(short i, short p)
+int32_t ifsquished(short i, short p)
 {
     sectortype *sc;
     char squishme;
-    long floorceildist;
+    int32_t floorceildist;
 
     if(PN == APLAYER && ud.clipping)
         return 0;
@@ -425,12 +426,12 @@ long ifsquished(short i, short p)
     return 0;
 }
 
-void hitradius( short i, long  r, long  hp1, long  hp2, long  hp3, long  hp4 )
+void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, int32_t  hp4 )
 {
     spritetype *s,*sj;
     walltype *wal;
-    long d, q, x1, y1;
-    long sectcnt, sectend, dasect, startwall, endwall, nextsect;
+    int32_t d, q, x1, y1;
+    int32_t sectcnt, sectend, dasect, startwall, endwall, nextsect;
     short j,k,p,x,nextj,sect;
     char statlist[] = {0,1,6,10,12,2,5};
     short *tempshort = (short *)tempbuf;
@@ -606,9 +607,9 @@ void hitradius( short i, long  r, long  hp1, long  hp2, long  hp3, long  hp4 )
 }
 
 
-short movesprite(short spritenum, long xchange, long ychange, long zchange, unsigned long cliptype)
+short movesprite(short spritenum, int32_t xchange, int32_t ychange, int32_t zchange, uint32_t cliptype)
 {
-    long daz,h, oldx, oldy;
+    int32_t daz,h, oldx, oldy;
     short retval, dasectnum, a, cd;
     char bg;
 
@@ -676,7 +677,7 @@ short movesprite(short spritenum, long xchange, long ychange, long zchange, unsi
                 clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),8L,(4<<8),(4<<8),cliptype);
         else
             retval =
-                clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),(long)(sprite[spritenum].clipdist<<2),(4<<8),(4<<8),cliptype);
+                clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),(int32_t)(sprite[spritenum].clipdist<<2),(4<<8),(4<<8),cliptype);
     }
 
     if( dasectnum >= 0)
@@ -693,10 +694,10 @@ short movesprite(short spritenum, long xchange, long ychange, long zchange, unsi
 }
 
 
-short ssp(short i,unsigned long cliptype) //The set sprite function
+short ssp(short i,uint32_t cliptype) //The set sprite function
 {
     spritetype *s;
-    long movetype;
+    int32_t movetype;
 
     s = &sprite[i];
 
@@ -754,7 +755,7 @@ void lotsofpaper(spritetype *s, short n)
      
 void guts(spritetype *s,short gtype, short n, short p)
 {
-    long gutz,floorz;
+    int32_t gutz,floorz;
     short i,a,j;
     char sx,sy;
     signed char pal;
@@ -792,7 +793,7 @@ void guts(spritetype *s,short gtype, short n, short p)
 
 void gutsdir(spritetype *s,short gtype, short n, short p)
 {
-    long gutz,floorz;
+    int32_t gutz,floorz;
     short i,a,j;
     char sx,sy;
 
@@ -818,7 +819,7 @@ void gutsdir(spritetype *s,short gtype, short n, short p)
 
 void setsectinterpolate(short i)
 {
-    long j, k, startwall,endwall;
+    int32_t j, k, startwall,endwall;
 
     startwall = sector[SECT].wallptr;
     endwall = startwall+sector[SECT].wallnum;
@@ -862,7 +863,7 @@ void ms(short i)
     //T1,T2 and T3 are used for all the sector moving stuff!!!
 
     short startwall,endwall,x;
-    long tx,ty,j,k;
+    int32_t tx,ty,j,k;
     spritetype *s;
 
     s = &sprite[i];
@@ -890,7 +891,7 @@ void ms(short i)
 
 void movefta(void)
 {
-    long x, px, py, sx, sy;
+    int32_t x, px, py, sx, sy;
     short i, j, p, psect, ssect, nexti;
     spritetype *s;
 
@@ -1162,7 +1163,7 @@ short otherp;
 void moveplayers(void) //Players
 {
     short i , nexti;
-    long otherx;
+    int32_t otherx;
     spritetype *s;
     struct player_struct *p;
 
@@ -1299,7 +1300,7 @@ void moveplayers(void) //Players
 void movefx(void)
 {
     short i, j, nexti, p;
-    long x, ht;
+    int32_t x, ht;
     spritetype *s;
 
     i = headspritestat[11];
@@ -1402,7 +1403,7 @@ void movefallers(void)
 {
     short i, nexti, sect, j;
     spritetype *s;
-    long x;
+    int32_t x;
 
     i = headspritestat[12];
     while(i >= 0)
@@ -1499,7 +1500,7 @@ void movefallers(void)
 void movestandables(void)
 {
     short i=0, j=0, k=0, m=0, nexti=0, nextj=0, nextk=0, p=0, q=0, sect=0;
-    long l=0l, x=0l, *t=NULL, x1=0l, y1=0l;
+    int32_t l=0l, x=0l, *t=NULL, x1=0l, y1=0l;
     spritetype *s=NULL;
 
     i = headspritestat[6];
@@ -2395,7 +2396,7 @@ void movestandables(void)
 
 void bounce(short i)
 {
-    long k, l, daang, dax, day, daz, xvect, yvect, zvect;
+    int32_t k, l, daang, dax, day, daz, xvect, yvect, zvect;
     short hitsect;
     spritetype *s = &sprite[i];
 
@@ -2435,8 +2436,8 @@ void bounce(short i)
 void moveweapons(void)
 {
     short i, j, k, nexti, p, q, tempsect;
-    long dax,day,daz, x, l, ll, x1, y1;
-    unsigned long qq;
+    int32_t dax,day,daz, x, l, ll, x1, y1;
+    uint32_t qq;
     spritetype *s;
 
     i = headspritestat[4];
@@ -2781,7 +2782,7 @@ void movetransports(void)
 {
     char warpspriteto;
     short i, j, k, l, p, sect, sectlotag, nexti, nextj, nextk;
-    long ll,onfloorz,q;
+    int32_t ll,onfloorz,q;
 
     i = headspritestat[9]; //Transporters
 
@@ -3121,7 +3122,7 @@ void movetransports(void)
 
 void moveactors(void)
 {
-    long x, m, l, *t;
+    int32_t x, m, l, *t;
     short a, i, j, nexti, nextj, sect, p;
     spritetype *s;
     unsigned short k;
@@ -4379,7 +4380,7 @@ void moveactors(void)
 void moveexplosions(void)  // STATNUM 5
 {
     short i, j, k, nexti, sect, p;
-    long l, x, *t;
+    int32_t l, x, *t;
     spritetype *s;
 
     i = headspritestat[5];
@@ -4911,7 +4912,7 @@ void moveexplosions(void)  // STATNUM 5
 
 void moveeffectors(void)   //STATNUM 3
 {
-    long q=0l, l=0l, m=0l, x=0l, st=0l, j=0l, *t=NULL;
+    int32_t q=0l, l=0l, m=0l, x=0l, st=0l, j=0l, *t=NULL;
     short i=0, k=0, nexti=0, nextk=0, p=0, sh=0, nextj=0;
     spritetype *s=NULL;
     sectortype *sc=NULL;
@@ -4935,7 +4936,7 @@ void moveeffectors(void)   //STATNUM 3
         {
             case 0:
             {
-                long zchange = 0;
+                int32_t zchange = 0;
 
                 zchange = 0;
 
@@ -6470,23 +6471,23 @@ void moveeffectors(void)   //STATNUM 3
                 if( t[0] == 0 ) break;
 
                 if( s->ang == 1536 )
-                    l = (long) &sc->ceilingz;
+                    l = (int32_t) &sc->ceilingz;
                 else
-                    l = (long) &sc->floorz;
+                    l = (int32_t) &sc->floorz;
 
                 if( t[0] == 1 ) //Decide if the s->sectnum should go up or down
                 {
-                    s->zvel = ksgn(s->z-*(long *)l) * (SP<<4);
+                    s->zvel = ksgn(s->z-*(int32_t *)l) * (SP<<4);
                     t[0]++;
                 }
 
                 if( sc->extra == 0 )
                 {
-                    *(long *)l += s->zvel;
+                    *(int32_t *)l += s->zvel;
 
-                    if(klabs(*(long *)l-s->z) < 1024)
+                    if(klabs(*(int32_t *)l-s->z) < 1024)
                     {
-                        *(long *)l = s->z;
+                        *(int32_t *)l = s->z;
                         KILLIT(i); //All done
                     }
                 }
@@ -6839,7 +6840,7 @@ void moveeffectors(void)   //STATNUM 3
                 break;
             case 29:
                 s->hitag += 64;
-                l = mulscale12((long)s->yvel,sintable[s->hitag&2047]);
+                l = mulscale12((int32_t)s->yvel,sintable[s->hitag&2047]);
                 sc->floorz = s->z + l;
                 break;
             case 31: // True Drop Floor
