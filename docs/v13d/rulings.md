@@ -88,10 +88,10 @@ Minor findings from the reviews, left for later.
 - save-file item 19 scalar names unverified
 - E-007 assumes 1.5's MACT386 FindDistance2D matches 1.3D's
 - reference.md points at ~/Projects/ref/tools instead of tools/v13d
-- cache1d.c relies on CMake for BUILD_ENGINEREV (no build.h include); savegame.h relies on duke3d.h for gamever.h
+- ~~cache1d.c relies on CMake for BUILD_ENGINEREV (no build.h include); savegame.h relies on duke3d.h for gamever.h~~ (fixed)
 - demoverify used before declaration (game.c:7987); add a prototype to funct.h
-- ~~garbled configure error for 1.4+shareware (CMakeLists.txt:20)~~ (fixed in b552652); shareware refusing a full E2/E3 demo says "isn't a 1.3D demo"; 1.4 builds say "not a DOS 1.5 save"
-- 1.3D CON cut at fs-2 on every platform (C-012, faithful) loses the last character of an LF-only CON
-- /v4, /v0 and /q16 give out-of-range volume and multimode 0 (divide by zero); clamp
+- ~~garbled configure error for 1.4+shareware (CMakeLists.txt:20)~~ (fixed in b552652); ~~shareware refusing a full E2/E3 demo says "isn't a 1.3D demo"; 1.4 builds say "not a DOS 1.5 save"~~ (fixed)
+- ~~1.3D CON cut at fs-2 on every platform (C-012, faithful) loses the last character of an LF-only CON~~ (fixed)
+- ~~/v4, /v0 and /q16 give out-of-range volume and multimode 0 (divide by zero); clamp~~ (fixed)
 - 1.5 banner "v1.4"→"v1.5" has no Fix: comment
-- 1.3D attract demos desync after the player used cheats (G13-G33, faithful to DOS)
+- ~~1.3D attract demos desync after the player used cheats (G13-G33, faithful to DOS)~~ (fixed)
