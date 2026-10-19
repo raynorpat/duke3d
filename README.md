@@ -45,6 +45,18 @@ same layout. The original DOS game can't load them back, though, and 1.3D saves
 aren't supported. Demo recording and playback and the editor's map saving are
 verified on 64-bit. Network play builds but hasn't been verified on 64-bit.
 
+Without a `duke3d.cfg`, the game starts with default settings and writes one:
+to `~/Library/Application Support/Duke Nukem 3D/` on macOS, `~/.duke3d/` on
+Linux, and the working directory on Windows. If your game data is version 1.3D,
+set `UseOldVersion = 1` under `[Misc]` in that file.
+
+To run the boot test against your own game data, configure with
+`-DDUKE3D_GRP=/path/to/DUKE3D.GRP`. That registers `render_e1l1` and
+`game_boot`, which need the GRP and so never run in CI.
+
+The original DOS/Watcom makefiles (`source/makefile.dos`,
+`source/makefile.lnk`) are kept for reference only.
+
 ### DOS save tests
 
 The DOS save tests need the Atomic Edition data and some DOS 1.5 saves. Copy
@@ -57,18 +69,6 @@ Then configure with `-DDUKE3D_ATOMIC_GRP=$HOME/duke3d-data/atomic15/DUKE3D.GRP`
 and `-DDUKE3D_DOS_SAVES_DIR=<folder of .sav files>`. Each save gets a
 `dos_save_load_*` test, which compares the game's headless `-loadverify` output
 with an independent decoder (`tests/dos_save_decode.py`, needs Python 3).
-
-Without a `duke3d.cfg`, the game starts with default settings and writes one:
-to `~/Library/Application Support/Duke Nukem 3D/` on macOS, `~/.duke3d/` on
-Linux, and the working directory on Windows. If your game data is version 1.3D,
-set `UseOldVersion = 1` under `[Misc]` in that file.
-
-To run the boot test against your own game data, configure with
-`-DDUKE3D_GRP=/path/to/DUKE3D.GRP`. That registers `render_e1l1` and
-`game_boot`, which need the GRP and so never run in CI.
-
-The original DOS/Watcom makefiles (`source/makefile.dos`,
-`source/makefile.lnk`) are kept for reference only.
 
 
 # Duke Nukem 3D (v1.5 CD Version) Source Code Release - April 1, 2003
