@@ -149,7 +149,7 @@ struct player_struct;
 
 
 #include "task_man.h"
-#include "music.h"
+#include "audiolib/music.h"
 #include "sndcards.h"
 
 #include "names.h"

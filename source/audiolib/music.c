@@ -11,61 +11,26 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
-#include <assert.h>
 
-#if PLATFORM_DOS
-// Use the original Apogee Sound System libs instead.  --ryan.
-#error you probably should not compile this.
-#endif
-
-#if (defined __WATCOMC__)
-// This is probably out of date.  --ryan.
-#include "dukesnd_watcom.h"
-#endif
-
-#if (!defined __WATCOMC__)
-#define cdecl
-#endif
-
-#include "SDL.h"
-#ifdef ROTT
-#include "rt_def.h"      // ROTT music hack
-#include "rt_cfg.h"      // ROTT music hack
-#include "rt_util.h"     // ROTT music hack
-#endif
 #include "music.h"
 #include "midi.h"
 #include "al_midi.h"
 #include "oplemu.h"
 #include "dsl.h"
 #include "interrup.h"
+#include "util.h"
 
-#define __FX_TRUE  (1 == 1)
-#define __FX_FALSE (!__FX_TRUE)
+#define TRUE  ( 1 == 1 )
+#define FALSE ( !TRUE )
 
 #define DUKESND_DEBUG       "DUKESND_DEBUG"
-
-#ifndef min
-#define min(a, b)  (((a) < (b)) ? (a) : (b))
-#endif
-
-#ifndef max
-#define max(a, b)  (((a) > (b)) ? (a) : (b))
-#endif
 
 int MUSIC_ErrorCode = MUSIC_Ok;
 
 static char warningMessage[80];
 static char errorMessage[80];
-static int fx_initialized = 0;
-static void (*callback)(uint32_t);
-static int reverseStereo = 0;
-static int reverbDelay = 256;
-static int reverbLevel = 0;
-static int fastReverb = 0;
 static FILE *debug_file = NULL;
 static int initialized_debugging = 0;
-static int mixerIsStereo = 1;
 
 // This gets called all over the place for information and debugging messages.
 //  If the user set the DUKESND_DEBUG environment variable, the messages
@@ -170,9 +135,6 @@ char *MUSIC_ErrorString(int ErrorNumber)
         default:
             return("Unknown error.");
     } // switch
-
-    assert(0);    // shouldn't hit this point.
-    return(NULL);
 } // MUSIC_ErrorString
 
 
@@ -216,7 +178,7 @@ static void music_mixer(unsigned char *stream, int len)
                     s = buf[i * 2 + c];
 
                 if (bytes == 1)
-                    *stream++ = (Uint8) ((s >> 8) + 128);
+                    *stream++ = (unsigned char) ((s >> 8) + 128);
                 else
                 {
                     *(int16_t *) stream = s;
@@ -510,7 +472,7 @@ int MUSIC_FadeVolume(int tovolume, int milliseconds)
 
 int MUSIC_FadeActive(void)
 {
-    return(__FX_FALSE);
+    return(FALSE);
 } // MUSIC_FadeActive
 
 

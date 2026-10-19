@@ -34,7 +34,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "types.h"
 #include "sndcards.h"
 #include "fx_man.h"
-#include "music.h"
+#include "audiolib/music.h"
 #include "util_lib.h"
 #include "duke3d.h"
 
