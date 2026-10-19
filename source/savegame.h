@@ -7,6 +7,8 @@
 #ifndef _INCL_SAVEGAME_H_
 #define _INCL_SAVEGAME_H_
 
+#include "gamever.h"
+
 #define SG_WALL_SIZE        32
 #define SG_SECTOR_SIZE      40
 #define SG_SPRITE_SIZE      44

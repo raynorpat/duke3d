@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 
 #include "platform.h"
+#include "build.h"  /* BUILD_ENGINEREV, which picks the LZW variant */
 #include "display.h"
 
 #include "pragmas.h"
