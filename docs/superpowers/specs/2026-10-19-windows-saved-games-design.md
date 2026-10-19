@@ -71,7 +71,7 @@ directory and not yet in the save folder:
 - `game0.sav` … `game9.sav`
 
 A small static helper in `global.c` does the copy, byte for byte, in binary mode. It
-closes both files and leaves a partial destination removed if the write fails. The
+closes both files, and deletes a partial copy if the write fails. The
 originals stay where they are, so an older build still finds them. Multiplayer
 `gameA_xx.sav` files aren't copied.
 
@@ -80,8 +80,8 @@ macOS and Linux behaviour is unchanged.
 ### 3. Build
 
 The Windows build links `shell32` (`SHGetKnownFolderPath`) and `ole32` (`CoTaskMemFree`).
-Add them where `buildengine` already adds `ws2_32 winmm` on WIN32, or to `duke3d_game`,
-whichever target owns `global.c`. `FOLDERID_SavedGames` comes from `<knownfolders.h>`
+Add them to `duke3d_game` (which builds `global.c`) under `if(WIN32)` in
+`source/CMakeLists.txt`, the same way `buildengine` adds `ws2_32 winmm`. `FOLDERID_SavedGames` comes from `<knownfolders.h>`
 with `<shlobj.h>`. With MinGW it may need `INITGUID`, or `<initguid.h>` before
 `<knownfolders.h>`.
 
