@@ -323,6 +323,6 @@ def main(argv):
 if __name__ == '__main__':
     try:
         sys.exit(main(sys.argv))
-    except ValueError as e:
+    except (ValueError, struct.error, IndexError) as e:
         print('error: %s' % e)
         sys.exit(1)
