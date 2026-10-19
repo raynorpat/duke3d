@@ -328,31 +328,11 @@ int loadplayer(signed char spot)
 
      kdfread(&scriptptrs[0],1,MAXSCRIPTSIZE,fil);
      kdfread(&script[0],4,MAXSCRIPTSIZE,fil);
-     for(i=0;i<MAXSCRIPTSIZE;i++)
-        if( scriptptrs[i] )
-     {
-         j = (int32_t)script[i]+(int32_t)&script[0];
-         script[i] = j;
-     }
 
      kdfread(&actorscrptr[0],4,MAXTILES,fil);
-     for(i=0;i<MAXTILES;i++)
-         if(actorscrptr[i])
-     {
-        j = (int32_t)actorscrptr[i]+(int32_t)&script[0];
-        actorscrptr[i] = (int32_t *)j;
-     }
 
      kdfread(&scriptptrs[0],1,MAXSPRITES,fil);
      kdfread(&hittype[0],sizeof(struct weaponhit),MAXSPRITES,fil);
-
-     for(i=0;i<MAXSPRITES;i++)
-     {
-        j = (int32_t)(&script[0]);
-        if( scriptptrs[i]&1 ) T2 += j;
-        if( scriptptrs[i]&2 ) T5 += j;
-        if( scriptptrs[i]&4 ) T6 += j;
-     }
 
          kdfread(&lockclock,sizeof(lockclock),1,fil);
      kdfread(&pskybits,sizeof(pskybits),1,fil);
@@ -602,81 +582,16 @@ int saveplayer(signed char spot)
      dfwrite(&cloudx[0],sizeof(short)<<7,1,fil);
      dfwrite(&cloudy[0],sizeof(short)<<7,1,fil);
 
-     for(i=0;i<MAXSCRIPTSIZE;i++)
-     {
-          if( (int32_t)script[i] >= (int32_t)(&script[0]) && (int32_t)script[i] < (int32_t)(&script[MAXSCRIPTSIZE]) )
-          {
-                scriptptrs[i] = 1;
-                j = (int32_t)script[i] - (int32_t)&script[0];
-                script[i] = j;
-          }
-          else scriptptrs[i] = 0;
-     }
+     // Script values are already offsets; the pointer flag blocks are kept zeroed.
+     clearbufbyte(scriptptrs,MAXSCRIPTSIZE,0L);
 
      dfwrite(&scriptptrs[0],1,MAXSCRIPTSIZE,fil);
      dfwrite(&script[0],4,MAXSCRIPTSIZE,fil);
 
-     for(i=0;i<MAXSCRIPTSIZE;i++)
-        if( scriptptrs[i] )
-     {
-        j = script[i]+(int32_t)&script[0];
-        script[i] = j;
-     }
-
-     for(i=0;i<MAXTILES;i++)
-         if(actorscrptr[i])
-     {
-        j = (int32_t)actorscrptr[i]-(int32_t)&script[0];
-        actorscrptr[i] = (int32_t *)j;
-     }
      dfwrite(&actorscrptr[0],4,MAXTILES,fil);
-     for(i=0;i<MAXTILES;i++)
-         if(actorscrptr[i])
-     {
-         j = (int32_t)actorscrptr[i]+(int32_t)&script[0];
-         actorscrptr[i] = (int32_t *)j;
-     }
-
-     for(i=0;i<MAXSPRITES;i++)
-     {
-        scriptptrs[i] = 0;
-
-        if(actorscrptr[PN] == 0) continue;
-
-        j = (int32_t)&script[0];
-
-        if(T2 >= j && T2 < (int32_t)(&script[MAXSCRIPTSIZE]) )
-        {
-            scriptptrs[i] |= 1;
-            T2 -= j;
-        }
-        if(T5 >= j && T5 < (int32_t)(&script[MAXSCRIPTSIZE]) )
-        {
-            scriptptrs[i] |= 2;
-            T5 -= j;
-        }
-        if(T6 >= j && T6 < (int32_t)(&script[MAXSCRIPTSIZE]) )
-        {
-            scriptptrs[i] |= 4;
-            T6 -= j;
-        }
-    }
 
     dfwrite(&scriptptrs[0],1,MAXSPRITES,fil);
     dfwrite(&hittype[0],sizeof(struct weaponhit),MAXSPRITES,fil);
-
-    for(i=0;i<MAXSPRITES;i++)
-    {
-        if(actorscrptr[PN] == 0) continue;
-        j = (int32_t)&script[0];
-
-        if(scriptptrs[i]&1)
-            T2 += j;
-        if(scriptptrs[i]&2)
-            T5 += j;
-        if(scriptptrs[i]&4)
-            T6 += j;
-    }
 
          dfwrite(&lockclock,sizeof(lockclock),1,fil);
      dfwrite(&pskybits,sizeof(pskybits),1,fil);
@@ -3484,7 +3399,7 @@ void menus(void)
             sprintf(tempbuf,"EPISODE %d",ud.m_volume_number+1);
             menutext(c,57+16-9,SHX(-3),1,tempbuf);
 #else
-            sprintf(tempbuf,"EPISODE %ld",ud.m_volume_number+1);
+            sprintf(tempbuf,"EPISODE %d",ud.m_volume_number+1);
             menutext(c,57+16-9,SHX(-3),PHX(-3),tempbuf);
 #endif
 

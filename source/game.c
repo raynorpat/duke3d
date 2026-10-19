@@ -3109,10 +3109,10 @@ short EGS(short whatsect,int32_t s_x,int32_t s_y,int32_t s_z,short s_pn,signed c
     T1=T3=T4=T6=0;
     if( actorscrptr[s_pn] )
     {
-        s->extra = *actorscrptr[s_pn];
-        T5 = *(actorscrptr[s_pn]+1);
-        T2 = *(actorscrptr[s_pn]+2);
-        s->hitag = *(actorscrptr[s_pn]+3);
+        s->extra = SCRIPT_PTR(actorscrptr[s_pn])[0];
+        T5 = SCRIPT_PTR(actorscrptr[s_pn])[1];
+        T2 = SCRIPT_PTR(actorscrptr[s_pn])[2];
+        s->hitag = SCRIPT_PTR(actorscrptr[s_pn])[3];
     }
     else
     {
@@ -3258,11 +3258,11 @@ short spawn( short j, short pn )
 
         if( actorscrptr[s] )
         {
-            SH = *(actorscrptr[s]);
-            T5 = *(actorscrptr[s]+1);
-            T2 = *(actorscrptr[s]+2);
-            if( *(actorscrptr[s]+3) && SHT == 0 )
-                SHT = *(actorscrptr[s]+3);
+            SH = SCRIPT_PTR(actorscrptr[s])[0];
+            T5 = SCRIPT_PTR(actorscrptr[s])[1];
+            T2 = SCRIPT_PTR(actorscrptr[s])[2];
+            if( SCRIPT_PTR(actorscrptr[s])[3] && SHT == 0 )
+                SHT = SCRIPT_PTR(actorscrptr[s])[3];
         }
         else T2 = T5 = 0;
     }
@@ -5382,9 +5382,9 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
 
                 if(ps[p].newowner > -1)
                 {
-                    t4 = *(actorscrptr[APLAYER]+1);
+                    t4 = SCRIPT_PTR(actorscrptr[APLAYER])[1];
                     t3 = 0;
-                    t1 = *(actorscrptr[APLAYER]+2);
+                    t1 = SCRIPT_PTR(actorscrptr[APLAYER])[2];
                 }
 
                 if(ud.camerasprite == -1 && ps[p].newowner == -1)
@@ -5470,7 +5470,7 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
         {
             if(t4)
             {
-                l = *(int32_t *)(t4+8);
+                l = *SCRIPT_PTR(t4+8);
 
                 switch( l )
                 {
@@ -5518,7 +5518,7 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
                         break;
                 }
 
-                t->picnum += k + ( *(int32_t *)t4 ) + l * t3;
+                t->picnum += k + ( *SCRIPT_PTR(t4) ) + l * t3;
 
                 if(l > 0) while(tilesizx[t->picnum] == 0 && t->picnum > 0 )
                     t->picnum -= l;       //Hack, for actors

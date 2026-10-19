@@ -2054,7 +2054,7 @@ void checkhitsprite(short i,short sn)
         case FUELPOD:
         case SOLARPANNEL:
         case ANTENNA:
-            if(sprite[sn].extra != *actorscrptr[SHOTSPARK1] )
+            if(sprite[sn].extra != *SCRIPT_PTR(actorscrptr[SHOTSPARK1]) )
             {
                 for(j=0;j<15;j++)
                     EGS(SECT,SX,SY,sector[SECT].floorz-(12<<8)-(j<<9),SCRAP1+(TRAND&15),-8,64,64,

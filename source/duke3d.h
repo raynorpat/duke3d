@@ -471,7 +471,11 @@ extern char sounds[NUM_SOUNDS][14];
 
 extern int32_t script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;
 extern char *label,*textptr,error,warning,killit_flag;
-extern int32_t *actorscrptr[MAXTILES],*parsing_actor;
+extern int32_t actorscrptr[MAXTILES],*parsing_actor;
+
+// Script addresses are stored as byte offsets from script[].
+#define SCRIPT_PTR(off) ((int32_t *)((char *)script + (off)))
+#define SCRIPT_OFF(ptr) ((int32_t)((char *)(ptr) - (char *)script))
 extern char actortype[MAXTILES];
 extern char *music_pointer;
 
