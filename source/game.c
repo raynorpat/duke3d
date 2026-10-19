@@ -8779,8 +8779,13 @@ void fakedomovethings(void)
                  if(badguy(&sprite[j]) && sprite[j].xrepeat > 24 && klabs(sprite[p->i].z-sprite[j].z) < (84<<8) )
                  {
                     j = getangle( sprite[j].x-myx,sprite[j].y-myy);
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    myxvel -= sintable[(j+512)&2047]<<6; // 1.3D's prediction pushes harder
+                    myyvel -= sintable[j&2047]<<6;
+#else
                     myxvel -= sintable[(j+512)&2047]<<4;
                     myyvel -= sintable[j&2047]<<4;
+#endif
                 }
         }
 
@@ -8899,7 +8904,11 @@ void fakedomovethings(void)
                             {
                                      myonground = 0;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                                     myzvel += 256; // 1.3D's prediction uses fixed gravity
+#else
                                      myzvel += (gc+80);
+#endif
 
                                      if(myzvel >= (4096+2048)) myzvel = (4096+2048);
                             }
@@ -8946,8 +8955,10 @@ void fakedomovethings(void)
                                                 myjumpingtoggle = 1;
                                              }
                             }
+#if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D's prediction doesn't cancel a jump on release
                             if( myjumpingcounter && (sb_snum&1) == 0 )
                                 myjumpingcounter = 0;
+#endif
                  }
 
                  if(myjumpingcounter)
@@ -8982,7 +8993,9 @@ void fakedomovethings(void)
                  if(myz < (cz+(4<<8)) )
                  {
                             myjumpingcounter = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D's prediction keeps moving after a ceiling bump
                             if(myzvel < 0) myxvel = myyvel = 0;
+#endif
                             myzvel = 128;
                             myz = cz+(4<<8);
                  }
