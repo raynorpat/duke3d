@@ -1350,14 +1350,14 @@ void Keys3d(void)
      rate=(120<<4)/(i-clockval[clockcnt]);
      if(framerateon)
      {
-                sprintf(tempbuf,"%ld",rate);
+                sprintf(tempbuf,"%d",rate);
 /*        if(rate<MinRate)
                 { sprintf(tempbuf,"%ld WARNING : %s",rate,Slow[rate/MinD]);
                   printext256(0*8,0*8,255,-1,tempbuf,1);
                 }
                 else
 */
-        {sprintf(tempbuf,"%ld",rate); printext256(0*8,0*8,15,-1,tempbuf,1);}
+        {sprintf(tempbuf,"%d",rate); printext256(0*8,0*8,15,-1,tempbuf,1);}
      }
         }
         clockval[clockcnt] = i; 
@@ -2118,20 +2118,20 @@ void ExtCheckKeys(void)
             printext256(70*8+1,0*8+1,0,-1,names[temppicnum],1);
             printext256(70*8+1,0*8,15,-1,names[temppicnum],1);
 
-            sprintf(tempbuf,"lo = %ld",templotag);
+            sprintf(tempbuf,"lo = %d",templotag);
             printext256(70*8+1,1*8+1,0,-1,tempbuf,1);
             printext256(70*8,1*8,15,-1,tempbuf,1);
 
-            sprintf(tempbuf,"hi = %ld",temphitag);
+            sprintf(tempbuf,"hi = %d",temphitag);
         printext256(70*8+1,2*8+1,0,-1,tempbuf,1);
         printext256(70*8,2*8,15,-1,tempbuf,1);
 
-                        sprintf(tempbuf,"USED = %ld",count);
+                        sprintf(tempbuf,"USED = %d",count);
         printext256(70*8+1,3*8+1,0,-1,tempbuf,1);
         printext256(70*8,3*8,15,-1,tempbuf,1);
 
         count=ActorMem(temppicnum);
-                        sprintf(tempbuf,"MEM  = %ld",count);
+                        sprintf(tempbuf,"MEM  = %d",count);
         printext256(70*8+1,4*8+1,0,-1,tempbuf,1);
         printext256(70*8,4*8,15,-1,tempbuf,1);
                 }// end if usedcount

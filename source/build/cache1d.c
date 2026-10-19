@@ -87,8 +87,8 @@ void allocache (intptr_t *newhandle, int32_t newbytes, unsigned char *newlockptr
 
 	if ((unsigned)newbytes > (unsigned)cachesize)
 	{
-		printf("Cachesize: %ld\n",cachesize);
-		printf("*Newhandle: 0x%x, Newbytes: %ld, *Newlock: %d\n",(unsigned int)(uintptr_t)newhandle,newbytes,*newlockptr);
+		printf("Cachesize: %d\n",cachesize);
+		printf("*Newhandle: 0x%x, Newbytes: %d, *Newlock: %d\n",(unsigned int)(uintptr_t)newhandle,newbytes,*newlockptr);
 		reportandexit("BUFFER TOO BIG TO FIT IN CACHE!\n");
 	}
 
@@ -211,15 +211,15 @@ void reportandexit(char *errormessage)
 	j = 0;
 	for(i=0;i<cacnum;i++)
 	{
-		printf("%ld- ",i);
-		printf("ptr: 0x%lx, ",*cac[i].hand);
-		printf("leng: %ld, ",cac[i].leng);
+		printf("%d- ",i);
+		printf("ptr: %p, ",(void *)*cac[i].hand);
+		printf("leng: %d, ",cac[i].leng);
 		printf("lock: %d\n",*cac[i].lock);
 		j += cac[i].leng;
 	}
-	printf("Cachesize = %ld\n",cachesize);
-	printf("Cacnum = %ld\n",cacnum);
-	printf("Cache length sum = %ld\n",j);
+	printf("Cachesize = %d\n",cachesize);
+	printf("Cacnum = %d\n",cacnum);
+	printf("Cache length sum = %d\n",j);
 	printf("ERROR: %s",errormessage);
 	exit(0);
 }

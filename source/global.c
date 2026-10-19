@@ -559,7 +559,7 @@ void SafeRead (int32 handle, void *buffer, int32 count)
 	{
 		iocount = count > 0x8000 ? 0x8000 : count;
 		if (read (handle,buffer,iocount) != (int)iocount)
-			Error ("File read failure reading %ld bytes",count);
+			Error ("File read failure reading %d bytes",count);
 		buffer = (void *)( (byte *)buffer + iocount );
 		count -= iocount;
 	}
@@ -574,7 +574,7 @@ void SafeWrite (int32 handle, void *buffer, int32 count)
 	{
 		iocount = count > 0x8000 ? 0x8000 : count;
 		if (write (handle,buffer,iocount) != (int)iocount)
-			Error ("File write failure writing %ld bytes",count);
+			Error ("File write failure writing %d bytes",count);
 		buffer = (void *)( (byte *)buffer + iocount );
 		count -= iocount;
 	}
@@ -608,7 +608,7 @@ void *SafeMalloc (int32_t size)
 #endif
 
 	if (!ptr)
-      Error ("SafeMalloc failure for %lu bytes",size);
+      Error ("SafeMalloc failure for %u bytes",size);
 
 	return ptr;
 }
@@ -626,7 +626,7 @@ void SafeRealloc (void **x, int32 size)
 #endif
 
 	if (!ptr)
-      Error ("SafeRealloc failure for %lu bytes",size);
+      Error ("SafeRealloc failure for %u bytes",size);
 
     *x = ptr;
 }
@@ -644,7 +644,7 @@ void *SafeLevelMalloc (int32_t size)
 #endif
 
 	if (!ptr)
-      Error ("SafeLevelMalloc failure for %lu bytes",size);
+      Error ("SafeLevelMalloc failure for %u bytes",size);
 
 	return ptr;
 }

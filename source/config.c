@@ -171,7 +171,7 @@ void CONFIG_GetSetupFilename( void )
          {
          if (clock()>oldtime)
             {
-            printf("%ld seconds left. \r",count);
+            printf("%d seconds left. \r",count);
             fflush(stdout);
             oldtime = clock()+CLOCKS_PER_SEC;
             count--;

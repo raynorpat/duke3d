@@ -586,7 +586,7 @@ int32_t gettile(int32_t tilenum)
 			{
 				drawtilescreen(topleft,tilenum);
 				if ((vidoption != 2) && ((vidoption != 1) || (vgacompatible == 1))) limitrate();
-				sprintf(snotbuf,"Goto tile: %ld_ ",j);
+				sprintf(snotbuf,"Goto tile: %d_ ",j);
 				printext256(0,0,whitecol,0,snotbuf,0);
 				nextpage();
 
@@ -857,7 +857,7 @@ short getnumber16(char namestart[80], short num, int32_t maxnumber)
 	oldnum = danum;
 	while ((keystatus[0x1c] != 2) && (keystatus[0x1] == 0))
 	{
-		sprintf(buffer, "%s%ld_ ", namestart, danum);
+		sprintf(buffer, "%s%d_ ", namestart, danum);
 		printmessage16(buffer);
 
         _idle(); /* rcg06232002 prevent hang while waiting for input. */
@@ -902,7 +902,7 @@ short getnumber256(char namestart[80], short num, int32_t maxnumber)
 		ExtAnalyzeSprites();
 		drawmasks();
 
-		sprintf(buffer,"%s%ld_ ",namestart,danum);
+		sprintf(buffer,"%s%d_ ",namestart,danum);
 		printmessage256(buffer);
 		nextpage();
 
@@ -1377,7 +1377,7 @@ void printcoords16(int32_t posxe, int32_t posye, short ange)
 	char snotbuf[80];
 	int32_t i;
 
-	sprintf(snotbuf,"x=%ld y=%ld ang=%d",posxe,posye,ange);
+	sprintf(snotbuf,"x=%d y=%d ang=%d",posxe,posye,ange);
 	i = 0;
 	while ((snotbuf[i] != 0) && (i < 30))
 		i++;
@@ -1522,7 +1522,7 @@ void showsectordata(short sectnum)
 	statusbar_printext16(8,88,11,-1,snotbuf,0);
 	sprintf(snotbuf,"Visibility: %d",sector[sectnum].visibility);
 	statusbar_printext16(8,96,11,-1,snotbuf,0);
-	sprintf(snotbuf,"Pixel height: %ld",(sector[sectnum].floorz-sector[sectnum].ceilingz)>>8);
+	sprintf(snotbuf,"Pixel height: %d",(sector[sectnum].floorz-sector[sectnum].ceilingz)>>8);
 	statusbar_printext16(8,104,11,-1,snotbuf,0);
 
 	statusbar_printext16(200,32,11,-1,"CEILINGS:",0);
@@ -1532,7 +1532,7 @@ void showsectordata(short sectnum)
 	statusbar_printext16(200,56,11,-1,snotbuf,0);
 	sprintf(snotbuf,"Shade byte: %d",sector[sectnum].ceilingshade);
 	statusbar_printext16(200,64,11,-1,snotbuf,0);
-	sprintf(snotbuf,"Z-coordinate: %ld",sector[sectnum].ceilingz);
+	sprintf(snotbuf,"Z-coordinate: %d",sector[sectnum].ceilingz);
 	statusbar_printext16(200,72,11,-1,snotbuf,0);
 	sprintf(snotbuf,"Tile number: %d",sector[sectnum].ceilingpicnum);
 	statusbar_printext16(200,80,11,-1,snotbuf,0);
@@ -1548,7 +1548,7 @@ void showsectordata(short sectnum)
 	statusbar_printext16(400,56,11,-1,snotbuf,0);
 	sprintf(snotbuf,"Shade byte: %d",sector[sectnum].floorshade);
 	statusbar_printext16(400,64,11,-1,snotbuf,0);
-	sprintf(snotbuf,"Z-coordinate: %ld",sector[sectnum].floorz);
+	sprintf(snotbuf,"Z-coordinate: %d",sector[sectnum].floorz);
 	statusbar_printext16(400,72,11,-1,snotbuf,0);
 	sprintf(snotbuf,"Tile number: %d",sector[sectnum].floorpicnum);
 	statusbar_printext16(400,80,11,-1,snotbuf,0);
@@ -1566,9 +1566,9 @@ void showwalldata(short wallnum)
 
 	sprintf(snotbuf,"Wall %d",wallnum);
 	statusbar_printext16(8,32,11,-1,snotbuf,0);
-	sprintf(snotbuf,"X-coordinate: %ld",wall[wallnum].x);
+	sprintf(snotbuf,"X-coordinate: %d",wall[wallnum].x);
 	statusbar_printext16(8,48,11,-1,snotbuf,0);
-	sprintf(snotbuf,"Y-coordinate: %ld",wall[wallnum].y);
+	sprintf(snotbuf,"Y-coordinate: %d",wall[wallnum].y);
 	statusbar_printext16(8,56,11,-1,snotbuf,0);
 	sprintf(snotbuf,"Point2: %d",wall[wallnum].point2);
 	statusbar_printext16(8,64,11,-1,snotbuf,0);
@@ -1607,11 +1607,11 @@ void showwalldata(short wallnum)
 	dax = wall[wallnum].x-wall[wall[wallnum].point2].x;
 	day = wall[wallnum].y-wall[wall[wallnum].point2].y;
 	dist = ksqrt(dax*dax+day*day);
-	sprintf(snotbuf,"Wall length: %ld",dist>>4);
+	sprintf(snotbuf,"Wall length: %d",dist>>4);
 	statusbar_printext16(400,96,11,-1,snotbuf,0);
 
 	dax = (int32_t)sectorofwall(wallnum);
-	sprintf(snotbuf,"Pixel height: %ld",(sector[dax].floorz-sector[dax].ceilingz)>>8);
+	sprintf(snotbuf,"Pixel height: %d",(sector[dax].floorz-sector[dax].ceilingz)>>8);
 	statusbar_printext16(400,104,11,-1,snotbuf,0);
 }
 
@@ -1622,11 +1622,11 @@ void showspritedata(short spritenum)
 
 	sprintf(snotbuf,"Sprite %d",spritenum);
 	statusbar_printext16(8,32,11,-1,snotbuf,0);
-	sprintf(snotbuf,"X-coordinate: %ld",sprite[spritenum].x);
+	sprintf(snotbuf,"X-coordinate: %d",sprite[spritenum].x);
 	statusbar_printext16(8,48,11,-1,snotbuf,0);
-	sprintf(snotbuf,"Y-coordinate: %ld",sprite[spritenum].y);
+	sprintf(snotbuf,"Y-coordinate: %d",sprite[spritenum].y);
 	statusbar_printext16(8,56,11,-1,snotbuf,0);
-	sprintf(snotbuf,"Z-coordinate: %ld",sprite[spritenum].z);
+	sprintf(snotbuf,"Z-coordinate: %d",sprite[spritenum].z);
 	statusbar_printext16(8,64,11,-1,snotbuf,0);
 
 	sprintf(snotbuf,"Sectnum: %d",sprite[spritenum].sectnum);
@@ -1773,7 +1773,7 @@ int drawtilescreen(int32_t pictopleft, int32_t picbox)
 	}
 
 	i = localartlookup[picbox];
-	sprintf(snotbuf,"%ld",i);
+	sprintf(snotbuf,"%d",i);
 	printext256(0L,ydim-8,whitecol,-1,snotbuf,0);
 	printext256(xdim-(int32_t)(strlen(names[i])<<3),ydim-8,whitecol,-1,names[i],0);
 
@@ -2845,7 +2845,7 @@ void overheadeditor(void)
 				if (pointhighlight >= 16384)
 				{
 					i = pointhighlight-16384;
-					sprintf(buffer,"Sprite (%ld) Lo-tag: ",i);
+					sprintf(buffer,"Sprite (%d) Lo-tag: ",i);
 					sprite[i].lotag = getnumber16(buffer,sprite[i].lotag,65536L);
 					clearmidstatbar16();
 					showspritedata((short)i);
@@ -2853,7 +2853,7 @@ void overheadeditor(void)
 				else if (linehighlight >= 0)
 				{
 					i = linehighlight;
-					sprintf(buffer,"Wall (%ld) Lo-tag: ",i);
+					sprintf(buffer,"Wall (%d) Lo-tag: ",i);
 					wall[i].lotag = getnumber16(buffer,wall[i].lotag,65536L);
 					clearmidstatbar16();
 					showwalldata((short)i);
@@ -2865,7 +2865,7 @@ void overheadeditor(void)
 				for (i=0;i<numsectors;i++)
 					if (inside(mousxplc,mousyplc,i) == 1)
 					{
-						sprintf(buffer,"Sector (%ld) Lo-tag: ",i);
+						sprintf(buffer,"Sector (%d) Lo-tag: ",i);
 						sector[i].lotag = getnumber16(buffer,sector[i].lotag,65536L);
 						clearmidstatbar16();
 						showsectordata((short)i);
@@ -2903,7 +2903,7 @@ void overheadeditor(void)
 				if (pointhighlight >= 16384)
 				{
 					i = pointhighlight-16384;
-					sprintf(buffer,"Sprite (%ld) Hi-tag: ",i);
+					sprintf(buffer,"Sprite (%d) Hi-tag: ",i);
 					sprite[i].hitag = getnumber16(buffer,sprite[i].hitag,65536L);
 					clearmidstatbar16();
 					showspritedata((short)i);
@@ -2911,7 +2911,7 @@ void overheadeditor(void)
 				else if (linehighlight >= 0)
 				{
 					i = linehighlight;
-					sprintf(buffer,"Wall (%ld) Hi-tag: ",i);
+					sprintf(buffer,"Wall (%d) Hi-tag: ",i);
 					wall[i].hitag = getnumber16(buffer,wall[i].hitag,65536L);
 					clearmidstatbar16();
 					showwalldata((short)i);
@@ -2922,7 +2922,7 @@ void overheadeditor(void)
 				for (i=0;i<numsectors;i++)
 					if (inside(mousxplc,mousyplc,i) == 1)
 					{
-						sprintf(buffer,"Sector (%ld) Hi-tag: ",i);
+						sprintf(buffer,"Sector (%d) Hi-tag: ",i);
 						sector[i].hitag = getnumber16(buffer,sector[i].hitag,65536L);
 						clearmidstatbar16();
 						showsectordata((short)i);
@@ -2938,12 +2938,12 @@ void overheadeditor(void)
 			for (i=0;i<numsectors;i++)
 				if (inside(mousxplc,mousyplc,i) == 1)
 				{
-					sprintf(buffer,"Sector (%ld) Ceilingpal: ",i);
+					sprintf(buffer,"Sector (%d) Ceilingpal: ",i);
 					sector[i].ceilingpal = getnumber16(buffer,sector[i].ceilingpal,256L);
 					clearmidstatbar16();
 					showsectordata((short)i);
 
-					sprintf(buffer,"Sector (%ld) Floorpal: ",i);
+					sprintf(buffer,"Sector (%d) Floorpal: ",i);
 					sector[i].floorpal = getnumber16(buffer,sector[i].floorpal,256L);
 					clearmidstatbar16();
 					showsectordata((short)i);
@@ -2957,7 +2957,7 @@ void overheadeditor(void)
 			if (pointhighlight >= 16384)
 			{
 				i = pointhighlight-16384;
-				sprintf(buffer,"Sprite (%ld) Status list: ",i);
+				sprintf(buffer,"Sprite (%d) Status list: ",i);
 				changespritestat(i,getnumber16(buffer,sprite[i].statnum,65536L));
 				clearmidstatbar16();
 				showspritedata((short)i);
@@ -4909,7 +4909,7 @@ void overheadeditor(void)
 							ExtUnInit();
 							uninitengine();
 							setvmode(0x3);
-							printf("Memory status: %ld(%ld) bytes\n", cachesize, artsize);
+							printf("Memory status: %d(%d) bytes\n", cachesize, artsize);
 							printf("%s\n", kensig);
                             printf("%s\n", PORTSIG);
 							exit(0);
@@ -4940,7 +4940,7 @@ void overheadeditor(void)
 		ExtUnInit();
 		uninitkeys();
 		uninittimer();
-		printf("%ld * %ld not supported in this graphics mode\n",xdim,ydim);
+		printf("%d * %d not supported in this graphics mode\n",xdim,ydim);
 		exit(0);
 	}
 
@@ -6804,7 +6804,7 @@ int main(int argc,char **argv)
 		ExtUnInit();
 		uninitkeys();
 		uninittimer();
-		printf("%ld * %ld not supported in this graphics mode\n",xdim,ydim);
+		printf("%d * %d not supported in this graphics mode\n",xdim,ydim);
 		exit(0);
 	}
 
@@ -6928,7 +6928,7 @@ int main(int argc,char **argv)
 			ExtSaveMap(boardfilename);
 		}
 	}
-	printf("Memory status: %ld(%ld) bytes\n",cachesize,artsize);
+	printf("Memory status: %d(%d) bytes\n",cachesize,artsize);
 	printf("%s\n",kensig);
     printf("%s\n",PORTSIG);
 	return(0);

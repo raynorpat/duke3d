@@ -1743,7 +1743,7 @@ static __inline void cull_large_vesa_modes(void)
     int i;
 
     get_max_screen_res(&max_w, &max_h);
-    sdldebug("Setting resolution ceiling to (%ldx%ld).", max_w, max_h);
+    sdldebug("Setting resolution ceiling to (%dx%d).", max_w, max_h);
 
     for (i = 0; i < validmodecnt; i++)
     {
@@ -1841,7 +1841,7 @@ static __inline void output_vesa_modelist(void)
 
     for (i = 0; i < validmodecnt; i++)
     {
-        sprintf(numbuf, " (%ldx%ld)",
+        sprintf(numbuf, " (%dx%d)",
                   (int32_t) validmodexdim[i], (int32_t) validmodeydim[i]);
 
         if ( (strlen(buffer) + strlen(numbuf)) >= (sizeof (buffer) - 1) )
