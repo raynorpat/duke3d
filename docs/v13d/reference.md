@@ -339,6 +339,9 @@ wanted. Save into these slots, then copy `GAME<n>.SAV` to `<data dir>/refsaves/`
 | full | 3 | `e2` | any E2 level |
 | full | 4 | `e3` | any E3 level |
 
-The expected values in `tests/data/v13d_save_refs.cmake` are read from the save files
-themselves with the "Save file" layout above. They need no debugger: player position
-and health from `sprite[ps[0].i]`, plus `curr_weapon` (ps `+0x2a8`) and level.
+The expected values in `tests/data/v13d_save_refs.cmake` must be observed
+**independently of the save layout**. Otherwise a layout mistake would be repeated in
+both the reference and the loader under test, and the test would still pass. When
+making each save, the user writes down from the screen: health, armor, current weapon,
+its ammo, and episode/level. Copy the file to `<data dir>/refsaves/<name>.SAV`. Values
+parsed from the file with the layout above (player sprite x/y) are only a supplement.
