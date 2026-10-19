@@ -9,13 +9,13 @@ Below is the original 3DRealms README, unchanged beyond some Markdown formatting
 
 ## Building
 
-The build uses CMake (3.24 or newer) and SDL2 + SDL2_mixer, and produces
+The build uses CMake (3.24 or newer) and SDL2, and produces
 64-bit binaries for Windows, macOS and Linux.
 
 Prerequisites:
 
-- **macOS:** `brew install cmake sdl2 sdl2_mixer`
-- **Linux (Debian/Ubuntu):** `sudo apt install cmake build-essential libsdl2-dev libsdl2-mixer-dev`
+- **macOS:** `brew install cmake sdl2`
+- **Linux (Debian/Ubuntu):** `sudo apt install cmake build-essential libsdl2-dev`
 - **Windows:** Visual Studio 2022 with "Desktop development with C++", and CMake. SDL2 is
   downloaded and built automatically if it isn't installed.
 

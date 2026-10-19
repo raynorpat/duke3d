@@ -21,7 +21,7 @@ add_library(duke3d_game OBJECT
 # "build/engine.h" etc. resolve against this directory.
 target_include_directories(duke3d_game PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(duke3d_game PUBLIC
-  duke3d_game_options buildengine audiolib duke3d::SDL2_mixer)
+  duke3d_game_options buildengine audiolib)
 
 # The Windows Saved Games folder (SHGetKnownFolderPath, CoTaskMemFree).
 if(WIN32)
@@ -47,7 +47,7 @@ target_link_libraries(buildeditor PRIVATE
 
 # Shared SDL DLLs (vcpkg etc.) must sit next to the executables. Fetched SDL
 # is static, and an empty DLL list would make copy_if_different fail.
-if(WIN32 AND NOT (DUKE3D_SDL2_FETCHED AND DUKE3D_SDL2_MIXER_FETCHED))
+if(WIN32 AND NOT DUKE3D_SDL2_FETCHED)
   foreach(_exe duke3d buildeditor)
     add_custom_command(TARGET ${_exe} POST_BUILD
       COMMAND "${CMAKE_COMMAND}" -E copy_if_different

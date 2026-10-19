@@ -22,7 +22,7 @@ if(DUKE3D_VERSION STREQUAL "1.4" AND DUKE3D_SHAREWARE)
 endif()
 option(DUKE3D_CONTROLS_MENU "Enable the in-game controls config menu" ON)
 set(DUKE3D_FETCH_SDL "AUTO" CACHE STRING
-    "Download and build SDL2/SDL2_mixer: AUTO (only if not found), ON, OFF")
+    "Download and build SDL2: AUTO (only if not found), ON, OFF")
 set_property(CACHE DUKE3D_FETCH_SDL PROPERTY STRINGS AUTO ON OFF)
 
 # Executables go to bin/, away from build/source/build (the engine's binary

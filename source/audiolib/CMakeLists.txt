@@ -1,4 +1,4 @@
-# Jim Dose's audio library, SDL_mixer-backed. usrhooks.c is left out on
+# Jim Dose's audio library, played through SDL audio. usrhooks.c is left out on
 # purpose: sounds.c defines the same USRHOOKS_* functions. No include
 # directory is exported: audiolib/assert.h would shadow <assert.h>.
 
@@ -18,4 +18,4 @@ add_library(audiolib STATIC
   pitch.c
   user.c)
 
-target_link_libraries(audiolib PUBLIC duke3d_compile_options duke3d::SDL2_mixer)
+target_link_libraries(audiolib PUBLIC duke3d_compile_options duke3d::SDL2)

@@ -34,7 +34,7 @@ add_executable(version_macros version_macros.c)
 # options rather than its objects.
 target_include_directories(version_macros PRIVATE "${PROJECT_SOURCE_DIR}/source")
 target_link_libraries(version_macros PRIVATE
-  duke3d_game_options buildengine audiolib duke3d::SDL2_mixer duke3d::SDL2main)
+  duke3d_game_options buildengine audiolib duke3d::SDL2main)
 target_compile_definitions(version_macros PRIVATE
   SDL_MAIN_HANDLED EXPECT_GAMEVER=${_vgame}L EXPECT_ENGINEREV=${_veng}L
   EXPECT_BYTEVERSION=${_vbyte} EXPECT_PLUTOPAK=${_vpluto}
@@ -62,6 +62,18 @@ target_include_directories(opl_music PRIVATE "${PROJECT_SOURCE_DIR}/source")
 target_link_libraries(opl_music PRIVATE audiolib)
 add_test(NAME opl_music COMMAND opl_music)
 set_tests_properties(opl_music PROPERTIES TIMEOUT 30)
+
+# Stops audio playback with "interrupts" disabled, as MV_Shutdown does,
+# which must not deadlock against the audio callback. Uses SDL's dummy
+# audio driver, so it needs no sound hardware.
+add_executable(dsl_shutdown dsl_shutdown.c)
+target_include_directories(dsl_shutdown PRIVATE "${PROJECT_SOURCE_DIR}/source")
+target_link_libraries(dsl_shutdown PRIVATE audiolib duke3d::SDL2main)
+target_compile_definitions(dsl_shutdown PRIVATE SDL_MAIN_HANDLED)
+add_test(NAME dsl_shutdown COMMAND dsl_shutdown)
+set_tests_properties(dsl_shutdown PROPERTIES
+  ENVIRONMENT "SDL_AUDIODRIVER=dummy"
+  TIMEOUT 10)
 
 # Bad DUKE3D_VERSION values must stop the configure step.
 add_test(NAME version_config_rejects

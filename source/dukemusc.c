@@ -1,5 +1,6 @@
 /*
- * A reimplementation of Jim Dose's FX_MAN routines, using  SDL_mixer 1.2.
+ * Jim Dose's MUSIC_* routines over his MIDI and AL_MIDI code and an
+ *   emulated OPL3, played through DSL (SDL audio).
  *   Whee. FX_MAN is also known as the "Apogee Sound System", or "ASS" for
  *   short. How strangely appropriate that seems.
  *
@@ -31,7 +32,6 @@
 #endif
 
 #include "SDL.h"
-#include "SDL_mixer.h"
 #ifdef ROTT
 #include "rt_def.h"      // ROTT music hack
 #include "rt_cfg.h"      // ROTT music hack
@@ -41,6 +41,8 @@
 #include "audiolib/midi.h"
 #include "audiolib/al_midi.h"
 #include "audiolib/oplemu.h"
+#include "audiolib/dsl.h"
+#include "audiolib/interrup.h"
 
 #define __FX_TRUE  (1 == 1)
 #define __FX_FALSE (!__FX_TRUE)
@@ -60,7 +62,6 @@ int MUSIC_ErrorCode = MUSIC_Ok;
 static char warningMessage[80];
 static char errorMessage[80];
 static int fx_initialized = 0;
-static int numChannels = MIX_CHANNELS;
 static void (*callback)(uint32_t);
 static int reverseStereo = 0;
 static int reverbDelay = 256;
@@ -182,30 +183,28 @@ char *MUSIC_ErrorString(int ErrorNumber)
 
 
 // The music is Jim Dose's MIDI and AL_MIDI (FM) code, as DOS played it on
-// a Sound Blaster 16, writing to an emulated OPL3 that SDL_mixer pulls
-// samples from through Mix_HookMusic. The hook runs on the audio thread,
-// so every call into MIDI and AL_MIDI holds music_lock.
+// a Sound Blaster 16, writing to an emulated OPL3 that DSL pulls samples
+// from on the audio thread. Every call into MIDI and AL_MIDI disables
+// "interrupts", which holds the audio callback off.
 
 // MIDI picks each song's EMIDI arrangement for this card.
 int MUSIC_SoundDevice = -1;
 
 static int music_initialized = 0;
 static int music_hooked = 0;
-static int music_format = AUDIO_S16SYS;
+static int music_bits = 16;
 static int music_channels = 2;
 static unsigned char *music_songdata = NULL;
-static SDL_mutex *music_lock = NULL;
 static midifuncs music_midifuncs;
 
-static void music_mixer(void *udata, Uint8 *stream, int len)
+static void music_mixer(unsigned char *stream, int len)
 {
     int16_t buf[1024 * 2];
     int frames, count, i, c;
-    int bytes = (music_format == AUDIO_U8) ? 1 : 2;
+    int bytes = music_bits / 8;
 
     frames = len / (bytes * music_channels);
 
-    SDL_LockMutex(music_lock);
     while (frames > 0)
     {
         count = min(frames, 1024);
@@ -233,15 +232,14 @@ static void music_mixer(void *udata, Uint8 *stream, int len)
 
         frames -= count;
     }
-    SDL_UnlockMutex(music_lock);
 } // music_mixer
 
 
 int MUSIC_Init(int SoundCard, int Address)
 {
     int i;
-    int freq = 44100;
-    Uint16 format = AUDIO_S16SYS;
+    unsigned freq = 44100;
+    int bits = 16;
     int channels = 2;
 
     init_debugging();
@@ -263,11 +261,9 @@ int MUSIC_Init(int SoundCard, int Address)
 
     // Without sound effects there is no mixer to play through; the song
     //  is still sequenced, just never heard.
-    music_hooked = Mix_QuerySpec(&freq, &format, &channels);
-    music_format = format;
+    music_hooked = (DSL_GetPlaybackFormat(&freq, &bits, &channels) == DSL_Ok);
+    music_bits = bits;
     music_channels = channels;
-
-    music_lock = SDL_CreateMutex();
 
     for (i = 0; i < 128; i++)
         MIDI_PatchMap[i] = i;
@@ -292,7 +288,7 @@ int MUSIC_Init(int SoundCard, int Address)
     MIDI_SetMidiFuncs(&music_midifuncs);
 
     if (music_hooked)
-        Mix_HookMusic(music_mixer, NULL);
+        DSL_SetMusicCallback(music_mixer);
 
     music_initialized = 1;
     return(MUSIC_Ok);
@@ -311,14 +307,12 @@ int MUSIC_Shutdown(void)
 
     MUSIC_StopSong();
 
-    if (music_hooked && Mix_QuerySpec(NULL, NULL, NULL))
-        Mix_HookMusic(NULL, NULL);
+    if (music_hooked)
+        DSL_SetMusicCallback(NULL);
     music_hooked = 0;
 
     AL_Shutdown();
 
-    SDL_DestroyMutex(music_lock);
-    music_lock = NULL;
     MUSIC_SoundDevice = -1;
     music_initialized = 0;
 
@@ -328,36 +322,44 @@ int MUSIC_Shutdown(void)
 
 void MUSIC_SetMaxFMMidiChannel(int channel)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     AL_SetMaxMidiChannel(channel);
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_SetMaxFMMidiChannel
 
 
 void MUSIC_SetVolume(int volume)
 {
+    uint32_t flags;
+
     volume = max(0, volume);
     volume = min(volume, 255);
 
-    SDL_LockMutex(music_lock);
+    flags = DisableInterrupts();
     MIDI_SetVolume(volume);
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_SetVolume
 
 
 void MUSIC_SetMidiChannelVolume(int channel, int volume)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     MIDI_SetUserChannelVolume(channel, volume);
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_SetMidiChannelVolume
 
 
 void MUSIC_ResetMidiChannelVolumes(void)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     MIDI_ResetUserChannelVolume();
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_ResetMidiChannelVolumes
 
 
@@ -369,9 +371,11 @@ int MUSIC_GetVolume(void)
 
 void MUSIC_SetLoopFlag(int loopflag)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     MIDI_SetLoopFlag(loopflag);
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_SetLoopFlag
 
 
@@ -383,25 +387,31 @@ int MUSIC_SongPlaying(void)
 
 void MUSIC_Continue(void)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     MIDI_ContinueSong();
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_Continue
 
 
 void MUSIC_Pause(void)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     MIDI_PauseSong();
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_Pause
 
 
 int MUSIC_StopSong(void)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     MIDI_StopSong();
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 
     // PlayMusic's copy; MUSIC_PlaySong's caller owns its own.
     free(music_songdata);
@@ -412,13 +422,15 @@ int MUSIC_StopSong(void)
 
 int MUSIC_PlaySong(unsigned char *song, int loopflag)
 {
+    uint32_t flags;
+
     int status;
 
     MUSIC_StopSong();
 
-    SDL_LockMutex(music_lock);
+    flags = DisableInterrupts();
     status = MIDI_PlaySong(song, loopflag);
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 
     if (status != MIDI_Ok)
     {
@@ -480,9 +492,11 @@ void PlayMusic(char *_filename)
 
 void MUSIC_SetContext(int context)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     MIDI_SetContext(context);
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_SetContext
 
 
@@ -494,41 +508,51 @@ int MUSIC_GetContext(void)
 
 void MUSIC_SetSongTick(uint32_t PositionInTicks)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     MIDI_SetSongTick(PositionInTicks);
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_SetSongTick
 
 
 void MUSIC_SetSongTime(uint32_t milliseconds)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     MIDI_SetSongTime(milliseconds);
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 }// MUSIC_SetSongTime
 
 
 void MUSIC_SetSongPosition(int measure, int beat, int tick)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     MIDI_SetSongPosition(measure, beat, tick);
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_SetSongPosition
 
 
 void MUSIC_GetSongPosition(songposition *pos)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     MIDI_GetSongPosition(pos);
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_GetSongPosition
 
 
 void MUSIC_GetSongLength(songposition *pos)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     MIDI_GetSongLength(pos);
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_GetSongLength
 
 
@@ -554,18 +578,22 @@ void MUSIC_StopFade(void)
 
 void MUSIC_RerouteMidiChannel(int channel, int cdecl (*function)( int event, int c1, int c2 ))
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     MIDI_RerouteMidiChannel(channel, function);
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_RerouteMidiChannel
 
 
 // Duke's own FM instruments, D3DTIMBR.TMB, loaded by loadtmb().
 void MUSIC_RegisterTimbreBank(unsigned char *timbres)
 {
-    SDL_LockMutex(music_lock);
+    uint32_t flags;
+
+    flags = DisableInterrupts();
     AL_RegisterTimbreBank(timbres);
-    SDL_UnlockMutex(music_lock);
+    RestoreInterrupts(flags);
 } // MUSIC_RegisterTimbreBank
 
 

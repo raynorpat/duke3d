@@ -4,9 +4,9 @@
 
 #include "dsl.h"
 #include "util.h"
+#include "interrup.h"
 
 #include "SDL.h"
-#include "SDL_mixer.h"
 
 extern volatile int MV_MixPage;
 
@@ -21,11 +21,20 @@ static int _NumDivisions;
 static int _SampleRate;
 static int _remainder;
 
-static Mix_Chunk *blank;
-static unsigned char *blank_buf;
+static SDL_AudioDeviceID audio_device;
+static SDL_AudioSpec audio_spec;
+static void ( *_MusicFunc )( unsigned char *stream, int len );
+
+/* DisableInterrupts() takes this, and the audio callback holds it while it
+   mixes, as the sound card interrupt couldn't run while interrupts were off.
+   It isn't the device's own lock: MV_Shutdown closes the device with it
+   held, and closing waits for the callback, so the callback must be able to
+   give up on it then (audio_closing). */
+static SDL_mutex *audio_lock;
+static SDL_atomic_t audio_closing;
 
 /*
-possible todo ideas: cache sdl/sdl mixer error messages.
+possible todo ideas: cache sdl error messages.
 */
 
 char *DSL_ErrorString( int ErrorNumber )
@@ -76,6 +85,11 @@ int DSL_Init( void )
 		
 		return DSL_Error;
 	}
+
+	/* Kept for good: a sound restart mustn't swap it under a holder. */
+	if (audio_lock == NULL) {
+		audio_lock = SDL_CreateMutex();
+	}
 	
 	return DSL_Ok;
 }
@@ -85,57 +99,52 @@ void DSL_Shutdown( void )
 	DSL_StopPlayback();
 }
 
-static void mixer_callback(int chan, void *stream, int len, void *udata)
+static void mixer_callback(void *udata, Uint8 *stream, int len)
 {
-	Uint8 *stptr;
 	Uint8 *fxptr;
 	int copysize;
-	
-	/* len should equal _BufferSize, else this is screwed up */
 
-	stptr = (Uint8 *)stream;
-	
-	if (_remainder > 0) {
+	while (SDL_TryLockMutex(audio_lock) != 0) {
+		if (SDL_AtomicGet(&audio_closing)) {
+			SDL_memset(stream, audio_spec.silence, len);
+			return;
+		}
+		SDL_Delay(1);
+	}
+
+	SDL_memset(stream, audio_spec.silence, len);
+
+	if (_MusicFunc) {
+		_MusicFunc(stream, len);
+	}
+
+	/* The digitized sound comes from MV_ServiceVoc a division at a time;
+	   the rest of a division carries over to the next callback. */
+	while (len > 0) {
+		if (_remainder == 0) {
+			_CallBackFunc();
+			_remainder = _BufferSize;
+		}
+
+		fxptr = (Uint8 *)(&_BufferStart[MV_MixPage * _BufferSize]);
 		copysize = min(len, _remainder);
-		
-		fxptr = (Uint8 *)(&_BufferStart[MV_MixPage * 
-			_BufferSize]);
-		
-		memcpy(stptr, fxptr+(_BufferSize-_remainder), copysize);
-		
+
+		SDL_MixAudioFormat(stream, fxptr + (_BufferSize - _remainder),
+			audio_spec.format, copysize, SDL_MIX_MAXVOLUME);
+
 		len -= copysize;
 		_remainder -= copysize;
-		
-		stptr += copysize;
+		stream += copysize;
 	}
-	
-	while (len > 0) {
-		/* new buffer */
-		
-		_CallBackFunc();
-		
-		fxptr = (Uint8 *)(&_BufferStart[MV_MixPage * 
-			_BufferSize]);
 
-		copysize = min(len, _BufferSize);
-		
-		memcpy(stptr, fxptr, copysize);
-		
-		len -= copysize;
-		
-		stptr += copysize;
-	}
-	
-	_remainder = len;
+	SDL_UnlockMutex(audio_lock);
 }
 
 int   DSL_BeginBufferedPlayback( char *BufferStart,
       int BufferSize, int NumDivisions, unsigned SampleRate,
       int MixMode, void ( *CallBackFunc )( void ) )
 {
-	Uint16 format;
-	Uint8 *tmp;
-	int channels;
+	SDL_AudioSpec want;
 	int chunksize;
 		
 	if (mixer_initialized) {
@@ -151,9 +160,6 @@ int   DSL_BeginBufferedPlayback( char *BufferStart,
 	_SampleRate = SampleRate;
 
 	_remainder = 0;
-	
-	format = (MixMode & SIXTEEN_BIT) ? AUDIO_S16SYS : AUDIO_U8;
-	channels = (MixMode & STEREO) ? 2 : 1;
 
 /*
 	23ms is typically ideal (11025,22050,44100)
@@ -164,32 +170,24 @@ int   DSL_BeginBufferedPlayback( char *BufferStart,
 	
 	if (SampleRate >= 16000) chunksize *= 2;
 	if (SampleRate >= 32000) chunksize *= 2;
-	
-/*	
-// SDL mixer does this already
-	if (MixMode & SIXTEEN_BIT) chunksize *= 2;
-	if (MixMode & STEREO) chunksize *= 2;
-*/
-	
-	if (Mix_OpenAudio(SampleRate, format, channels, chunksize) < 0) {
+
+	SDL_zero(want);
+	want.freq = SampleRate;
+	want.format = (MixMode & SIXTEEN_BIT) ? AUDIO_S16SYS : AUDIO_U8;
+	want.channels = (MixMode & STEREO) ? 2 : 1;
+	want.samples = chunksize;
+	want.callback = mixer_callback;
+
+	/* No changes allowed: MV_ServiceVoc mixes in exactly this format, and
+	   SDL converts it for the hardware. */
+	audio_device = SDL_OpenAudioDevice(NULL, 0, &want, &audio_spec, 0);
+	if (audio_device == 0) {
 		DSL_SetErrorCode(DSL_MixerInitFailure);
 		
 		return DSL_Error;
 	}
 
-/*
-	Mix_SetPostMix(mixer_callback, NULL);
-*/
-	/* have to use a channel because postmix will overwrite the music... */
-	Mix_RegisterEffect(0, mixer_callback, NULL, NULL);
-	
-	/* create a dummy sample just to allocate that channel */
-	blank_buf = (Uint8 *)malloc(4096);
-	memset(blank_buf, 0, 4096);
-	
-	blank = Mix_QuickLoad_RAW(blank_buf, 4096);
-		
-	Mix_PlayChannel(0, blank, -1);
+	SDL_PauseAudioDevice(audio_device, 0);
 	
 	mixer_initialized = 1;
 	
@@ -199,24 +197,10 @@ int   DSL_BeginBufferedPlayback( char *BufferStart,
 void DSL_StopPlayback( void )
 {
 	if (mixer_initialized) {
-		Mix_HaltChannel(0);
-	}
-	
-	if (blank != NULL) {
-		Mix_FreeChunk(blank);
-	}
-
-	blank = NULL;
-	
-	if (blank_buf  != NULL) {
-		free(blank_buf);
-	}
-	
-	blank_buf = NULL;
-
-	if (mixer_initialized) {
-		SDL_UnlockAudio();  /* just in case */
-		Mix_CloseAudio();
+		SDL_AtomicSet(&audio_closing, 1);
+		SDL_CloseAudioDevice(audio_device);
+		SDL_AtomicSet(&audio_closing, 0);
+		audio_device = 0;
 	}
 	
 	mixer_initialized = 0;
@@ -227,14 +211,41 @@ unsigned DSL_GetPlaybackRate( void )
 	return _SampleRate;
 }
 
+/* The music driver's way in: the device's format, and a function that
+   writes music into each buffer before the digitized sound is mixed on. */
+int DSL_GetPlaybackFormat( unsigned *rate, int *bits, int *channels )
+{
+	if (!mixer_initialized) {
+		return DSL_Error;
+	}
+
+	*rate = audio_spec.freq;
+	*bits = SDL_AUDIO_BITSIZE(audio_spec.format);
+	*channels = audio_spec.channels;
+	return DSL_Ok;
+}
+
+void DSL_SetMusicCallback( void ( *func )( unsigned char *stream, int len ) )
+{
+	uint32_t flags;
+
+	flags = DisableInterrupts();
+	_MusicFunc = func;
+	RestoreInterrupts(flags);
+}
+
 uint32_t DisableInterrupts( void )
 {
-    SDL_LockAudio();
+	if (audio_lock) {
+		SDL_LockMutex(audio_lock);
+	}
 	return 0;
 }
 
 void RestoreInterrupts( uint32_t flags )
 {
-    SDL_UnlockAudio();
+	if (audio_lock) {
+		SDL_UnlockMutex(audio_lock);
+	}
 }
 

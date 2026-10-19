@@ -73,7 +73,6 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #if USE_SDL
 #include "SDL.h"
-#include "SDL_mixer.h"
 #endif
 
 #include "build/pragmas.h"

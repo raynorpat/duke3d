@@ -24,5 +24,7 @@ int   DSL_BeginBufferedPlayback( char *BufferStart,
       int BufferSize, int NumDivisions, unsigned SampleRate,
       int MixMode, void ( *CallBackFunc )( void ) );
 void  DSL_Shutdown( void );
+int   DSL_GetPlaybackFormat( unsigned *rate, int *bits, int *channels );
+void  DSL_SetMusicCallback( void ( *func )( unsigned char *stream, int len ) );
 
 #endif
