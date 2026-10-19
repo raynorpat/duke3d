@@ -310,6 +310,7 @@ typedef struct
 #if HAVE_PRAGMA_PACK
 #pragma pack(pop)
 #endif
+BUILD_STATIC_ASSERT(sizeof(input) == 10, input_size);
 
 /* !!! FIXME: "sync" is defined in unistd.h ... :(  --ryan. */
 #define sync duke_sync
