@@ -2117,7 +2117,15 @@ void checkhitsprite(short i,short sn)
                 case HEAVYHBOMB:
                     for(k=0;k<64;k++)
                     {
-                        j = EGS(SECT,SX,SY,SZ-(TRAND%(48<<8)),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,5);
+                        {
+                            // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                            int32_t r_zv = -(TRAND&4095)-(sprite[i].zvel>>2);
+                            int32_t r_vel = (TRAND&63)+64;
+                            int32_t r_ang = TRAND&2047;
+                            int32_t r_pn = SCRAP3+(TRAND&3);
+                            int32_t r_z = SZ-(TRAND%(48<<8));
+                            j = EGS(SECT,SX,SY,r_z,r_pn,-8,48,48,r_ang,r_vel,r_zv,i,5);
+                        }
                         sprite[j].pal = 8;
                     }
 
@@ -2134,7 +2142,14 @@ void checkhitsprite(short i,short sn)
         case GENERICPOLE2:
 #endif
             for(k=0;k<6;k++)
-                EGS(SECT,SX,SY,SZ-(8<<8),SCRAP1+(TRAND&15),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,5);
+                {
+                    // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                    int32_t r_zv = -(TRAND&4095)-(sprite[i].zvel>>2);
+                    int32_t r_vel = (TRAND&63)+64;
+                    int32_t r_ang = TRAND&2047;
+                    int32_t r_pn = SCRAP1+(TRAND&15);
+                    EGS(SECT,SX,SY,SZ-(8<<8),r_pn,-8,48,48,r_ang,r_vel,r_zv,i,5);
+                }
             spritesound(GLASS_HEAVYBREAK,i);
             deletesprite(i);
             break;
@@ -2169,8 +2184,14 @@ void checkhitsprite(short i,short sn)
             if(sprite[sn].extra != *SCRIPT_PTR(actorscrptr[SHOTSPARK1]) )
             {
                 for(j=0;j<15;j++)
-                    EGS(SECT,SX,SY,sector[SECT].floorz-(12<<8)-(j<<9),SCRAP1+(TRAND&15),-8,64,64,
-                        TRAND&2047,(TRAND&127)+64,-(TRAND&511)-256,i,5);
+                    {
+                        // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                        int32_t r_zv = -(TRAND&511)-256;
+                        int32_t r_vel = (TRAND&127)+64;
+                        int32_t r_ang = TRAND&2047;
+                        int32_t r_pn = SCRAP1+(TRAND&15);
+                        EGS(SECT,SX,SY,sector[SECT].floorz-(12<<8)-(j<<9),r_pn,-8,64,64,r_ang,r_vel,r_zv,i,5);
+                    }
                 spawn(i,EXPLOSION2);
                 deletesprite(i);
             }

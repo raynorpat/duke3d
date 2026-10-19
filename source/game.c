@@ -1016,7 +1016,9 @@ void check_fta_sounds(short i)
     if(sprite[i].extra > 0) switch(PN)
     {
         case LIZTROOPONTOILET:
+#if DUKE3D_GAMEVER >= GAMEVER_14
         case LIZTROOPJUSTSIT:
+#endif
         case LIZTROOPSHOOT:
         case LIZTROOPJETPACK:
         case LIZTROOPDUCKING:
@@ -1064,12 +1066,14 @@ void check_fta_sounds(short i)
                 sound(BOS3_RECOG);
             else sound(RIPHEADNECK);
             break;
+#if DUKE3D_GAMEVER >= GAMEVER_14
         case BOSS4:
         case BOSS4STAYPUT:
             if(sprite[i].pal == 1)
                 sound(BOS4_RECOG);
             sound(BOSS4_FIRSTSEE);
             break;
+#endif
         case GREENSLIME:
             spritesound(SLIM_RECOG,i);
             break;
@@ -1102,7 +1106,9 @@ short badguy(spritetype *s)
             case RECON:
             case DRONE:
             case LIZTROOPONTOILET:
+#if DUKE3D_GAMEVER >= GAMEVER_14
             case LIZTROOPJUSTSIT:
+#endif
             case LIZTROOPSTAYPUT:
             case LIZTROOPSHOOT:
             case LIZTROOPJETPACK:
@@ -1124,8 +1130,11 @@ short badguy(spritetype *s)
             case BOSS1:
             case BOSS2:
             case BOSS3:
+#if DUKE3D_GAMEVER >= GAMEVER_14
             case BOSS4:
+#endif
             case GREENSLIME:
+#if DUKE3D_GAMEVER >= GAMEVER_14
             case GREENSLIME+1:
             case GREENSLIME+2:
             case GREENSLIME+3:
@@ -1133,11 +1142,14 @@ short badguy(spritetype *s)
             case GREENSLIME+5:
             case GREENSLIME+6:
             case GREENSLIME+7:
+#endif
             case RAT:
             case ROTATEGUN:
                 return 1;
     }
+#if DUKE3D_GAMEVER >= GAMEVER_14
     if( actortype[s->picnum] ) return 1;
+#endif
 
     return 0;
 }
@@ -1152,7 +1164,9 @@ short badguypic(short pn)
             case RECON:
             case DRONE:
             case LIZTROOPONTOILET:
+#if DUKE3D_GAMEVER >= GAMEVER_14
             case LIZTROOPJUSTSIT:
+#endif
             case LIZTROOPSTAYPUT:
             case LIZTROOPSHOOT:
             case LIZTROOPJETPACK:
@@ -1174,8 +1188,11 @@ short badguypic(short pn)
             case BOSS1:
             case BOSS2:
             case BOSS3:
+#if DUKE3D_GAMEVER >= GAMEVER_14
             case BOSS4:
+#endif
             case GREENSLIME:
+#if DUKE3D_GAMEVER >= GAMEVER_14
             case GREENSLIME+1:
             case GREENSLIME+2:
             case GREENSLIME+3:
@@ -1183,12 +1200,15 @@ short badguypic(short pn)
             case GREENSLIME+5:
             case GREENSLIME+6:
             case GREENSLIME+7:
+#endif
             case RAT:
             case ROTATEGUN:
                 return 1;
     }
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
     if( actortype[pn] ) return 1;
+#endif
 
     return 0;
 }
@@ -3072,6 +3092,21 @@ short LocateTheLocator(short n,short sn)
     return -1;
 }
 
+// RANDOMSCRAP: scrap from sprite i at s.
+void randomscrap(spritetype *s, short i)
+{
+    // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+    int32_t r_zv = -512-(TRAND&2047);
+    int32_t r_vel = (TRAND&63)+64;
+    int32_t r_ang = TRAND&2047;
+    int32_t r_pn = SCRAP6+(TRAND&15);
+    int32_t r_z = s->z-(8<<8)-(TRAND&8191);
+    int32_t r_y = s->y+(TRAND&255)-128;
+    int32_t r_x = s->x+(TRAND&255)-128;
+
+    EGS(s->sectnum,r_x,r_y,r_z,r_pn,-8,48,48,r_ang,r_vel,r_zv,i,5);
+}
+
 short EGS(short whatsect,int32_t s_x,int32_t s_y,int32_t s_z,short s_pn,signed char s_s,signed char s_xr,signed char s_yr,short s_a,short s_ve,int32_t s_zv,short s_ow,signed char s_ss)
 {
     short i;
@@ -3241,11 +3276,19 @@ short spawn( short j, short pn )
 
         T1 = T2 = T3 = T4 = T5 = T6 = 0;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+        if( PN != TRIPBOMB && PN != VIEWSCREEN && PN != VIEWSCREEN2 && (CS&48) )
+#else
         if( PN != SPEAKER && PN != LETTER && PN != DUCK && PN != TARGET && PN != TRIPBOMB && PN != VIEWSCREEN && PN != VIEWSCREEN2 && (CS&48) )
+#endif
             if( !(PN >= CRACK1 && PN <= CRACK4) )
         {
             if(SS == 127) return i;
+#if DUKE3D_GAMEVER < GAMEVER_14
+            if( wallswitchcheck(i) == 1 )
+#else
             if( wallswitchcheck(i) == 1 && (CS&16) )
+#endif
             {
                 if( PN != ACCESSSWITCH && PN != ACCESSSWITCH2 && sprite[i].pal)
                 {
@@ -3293,6 +3336,10 @@ short spawn( short j, short pn )
     {
             default:
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                // 1.3D's spawn leaves sprites it has no case for as they are.
+                break;
+#endif
                 if( actorscrptr[sp->picnum] )
                 {
                     if( j == -1 && sp->lotag > ud.player_skill )
@@ -3353,7 +3400,11 @@ short spawn( short j, short pn )
                 if(j >= 0)
                 {
                     setsprite(i,sprite[j].x,sprite[j].y,sprite[j].z);
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    sp->xrepeat = sp->yrepeat = 16+(TRAND&15);
+#else
                     sp->xrepeat = sp->yrepeat = 8+(TRAND&7);
+#endif
                 }
                 else sp->xrepeat = sp->yrepeat = 16+(TRAND&15);
 
@@ -3385,12 +3436,15 @@ short spawn( short j, short pn )
             case NUKEBUTTON:
                 if(sp->picnum == DOMELITE)
                     sp->cstat |= 257;
+#if DUKE3D_GAMEVER >= GAMEVER_14
             case JIBS1:
             case JIBS2:
             case JIBS3:
             case JIBS4:
             case JIBS5:
+#endif
             case JIBS6:
+#if DUKE3D_GAMEVER >= GAMEVER_14
             case HEADJIB1:
             case ARMJIB1:
             case LEGJIB1:
@@ -3400,6 +3454,7 @@ short spawn( short j, short pn )
             case DUKETORSO:
             case DUKEGUN:
             case DUKELEG:
+#endif
                 changespritestat(i,5);
                 break;
             case TONGUE:
@@ -3456,16 +3511,39 @@ short spawn( short j, short pn )
                     sp->yrepeat = sprite[j].yrepeat;
                     T2 = sprite[j].picnum;
                 }
+#if DUKE3D_GAMEVER < GAMEVER_14
+                else break;
+#else
                 else sp->xrepeat = sp->yrepeat = 0;
+#endif
 
                 changespritestat(i,5);
 
                 break;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+            case FIRE:
+            case FIRE2:
+                sp->shade = -127;
+                sp->cstat = 128;
+                if(j >= 0)
+                {
+                    sp->xrepeat = sp->yrepeat = 0;
+                    setsprite(i,sp->x,sp->y,sp->y); // 1.3D passes y as z
+                    if(sp->sectnum >= 0 && !(sector[sp->sectnum].floorstat&1))
+                        sp->xrepeat = sp->yrepeat = 16;
+                }
+                changespritestat(i,5);
+                break;
+#endif
+
             case LASERLINE:
                 sp->yrepeat = 6;
                 sp->xrepeat = 32;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                sp->cstat = 16;
+#else
                 if(lasermode == 1)
                     sp->cstat = 16 + 2;
                 else if(lasermode == 0 || lasermode == 2)
@@ -3475,6 +3553,7 @@ short spawn( short j, short pn )
                     sp->xrepeat = 0;
                     sp->yrepeat = 0;
                 }
+#endif
 
                 if(j >= 0) sp->ang = hittype[j].temp_data[5]+512;
                 changespritestat(i,5);
@@ -3496,8 +3575,10 @@ short spawn( short j, short pn )
             case BLOOD:
                sp->xrepeat = sp->yrepeat = 16;
                sp->z -= (26<<8);
+#if DUKE3D_GAMEVER >= GAMEVER_14
                if( j >= 0 && sprite[j].pal == 6 )
                    sp->pal = 6;
+#endif
                changespritestat(i,5);
                break;
             case BLOODPOOL:
@@ -3532,11 +3613,20 @@ short spawn( short j, short pn )
                     break;
                 }
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                if(j >= 0)
+                {
+                    // 1.3D bleeds red from pal-6 parents too.
+                    if( sprite[j].pal == 1)
+                        sp->pal = 1;
+                    else if( sprite[j].picnum != NUKEBARREL && sprite[j].picnum != TIRE )
+#else
                 if(j >= 0 && sp->picnum != PUKE)
                 {
                     if( sprite[j].pal == 1)
                         sp->pal = 1;
                     else if( sprite[j].pal != 6 && sprite[j].picnum != NUKEBARREL && sprite[j].picnum != TIRE )
+#endif
                     {
                         if(sprite[j].picnum == FECES)
                             sp->pal = 7; // Brown
@@ -3562,8 +3652,10 @@ short spawn( short j, short pn )
                 sp->xrepeat = 7+(TRAND&7);
                 sp->yrepeat = 7+(TRAND&7);
                 sp->z -= (16<<8);
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 if(j >= 0 && sprite[j].pal == 6)
                     sp->pal = 6;
+#endif
                 insertspriteq(i);
                 changespritestat(i,5);
                 break;
@@ -3597,6 +3689,9 @@ short spawn( short j, short pn )
                 changespritestat(i,2);
                 break;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+            case CLOCK:
+#endif
             case HYDRENT:
             case PANNEL1:
             case PANNEL2:
@@ -3793,6 +3888,10 @@ short spawn( short j, short pn )
                 sp->xvel = 292;
                 sp->zvel = 360;
             case RESPAWNMARKERRED:
+#if DUKE3D_GAMEVER < GAMEVER_14
+            case SATELLITE:
+            case 487:
+#endif
             case BLIMP:
 
                 if(sp->picnum == RESPAWNMARKERRED)
@@ -3818,7 +3917,11 @@ short spawn( short j, short pn )
                 break;
             case BULLETHOLE:
                 sp->xrepeat = sp->yrepeat = 3;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                sp->cstat = 16;
+#else
                 sp->cstat = 16+(krand()&12);
+#endif
                 insertspriteq(i);
             case MONEY:
             case MAIL:
@@ -3970,7 +4073,11 @@ short spawn( short j, short pn )
                 {
                     if( j >= 0 )
                         sp->ang = sprite[j].ang;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    sp->xrepeat = sp->yrepeat = (TRAND&7)+1;
+#else
                     sp->xrepeat = sp->yrepeat = 4;
+#endif
                 }
                 else sp->xrepeat = sp->yrepeat = 32;
 
@@ -4039,7 +4146,9 @@ short spawn( short j, short pn )
                 {
                     sp->z += (4<<8);
                     T1 = sp->z;
+#if DUKE3D_GAMEVER >= GAMEVER_14
                     T2 = TRAND&127;
+#endif
                 }
             case TRASH:
 
@@ -4115,7 +4224,9 @@ short spawn( short j, short pn )
                     sp->extra = 1;
             case DRONE:
             case LIZTROOPONTOILET:
+#if DUKE3D_GAMEVER >= GAMEVER_14
             case LIZTROOPJUSTSIT:
+#endif
             case LIZTROOPSHOOT:
             case LIZTROOPJETPACK:
             case LIZTROOPDUCKING:
@@ -4132,7 +4243,14 @@ short spawn( short j, short pn )
             case RAT:
             case SHARK:
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                // 1.3D doubles the strength of recoloured enemies.
+                if(sp->pal)
+                    sp->extra <<= 1;
+                else
+#else
                 if(sp->pal == 0)
+#endif
                 {
                     switch(sp->picnum)
                     {
@@ -4142,7 +4260,9 @@ short spawn( short j, short pn )
                         case LIZTROOPDUCKING:
                         case LIZTROOPRUNNING:
                         case LIZTROOPSTAYPUT:
+#if DUKE3D_GAMEVER >= GAMEVER_14
                         case LIZTROOPJUSTSIT:
+#endif
                         case LIZTROOP:
                             sp->pal = 22;
                             break;
@@ -4176,9 +4296,15 @@ short spawn( short j, short pn )
                     }
                     else
                     {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        sp->xrepeat = 24;
+                        sp->yrepeat = 24;
+                        sp->clipdist = 80;
+#else
                         sp->xrepeat = 60;
                         sp->yrepeat = 60;
                         sp->clipdist = 40;
+#endif
                     }
                 }
 
@@ -4219,8 +4345,10 @@ short spawn( short j, short pn )
                     else changespritestat(i,2);
                 }
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 if(sp->picnum == ROTATEGUN)
                     sp->zvel = 0;
+#endif
 
                 break;
 
@@ -4231,9 +4359,15 @@ short spawn( short j, short pn )
 
             case ACTIVATORLOCKED:
             case ACTIVATOR:
+#if DUKE3D_GAMEVER < GAMEVER_14
+                sp->cstat |= (short) 32768;
+                if(sp->picnum == ACTIVATORLOCKED)
+                    sector[sp->sectnum].lotag ^= 16384;
+#else
                 sp->cstat = (short) 32768;
                 if(sp->picnum == ACTIVATORLOCKED)
                     sector[sp->sectnum].lotag |= 16384;
+#endif
                 changespritestat(i,8);
                 break;
 
@@ -4251,7 +4385,9 @@ short spawn( short j, short pn )
                 {
                     if( sprite[j].picnum == NUKEBARREL )
                         sp->pal = 8;
+#if DUKE3D_GAMEVER >= GAMEVER_14
                     insertspriteq(i);
+#endif
                 }
 
                 changespritestat(i,1);
@@ -4262,14 +4398,20 @@ short spawn( short j, short pn )
 
                 sp->yrepeat = j;
                 sp->xrepeat = 25-(j>>1);
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 sp->cstat |= (TRAND&4);
+#endif
 
                 break;
 
             case HEAVYHBOMB:
+#if DUKE3D_GAMEVER < GAMEVER_14
+                sp->owner = i;
+#else
                 if(j >= 0)
                     sp->owner = j;
                 else sp->owner = i;
+#endif
                 sp->xrepeat = sp->yrepeat = 9;
                 sp->yvel = 4;
             case REACTOR2:
@@ -4349,12 +4491,16 @@ short spawn( short j, short pn )
                     sp->z -= (32<<8);
                     sp->zvel = -1024;
                     ssp(i,CLIPMASK0);
+#if DUKE3D_GAMEVER >= GAMEVER_14
                     sp->cstat = TRAND&4;
+#endif
                 }
                 else
                 {
                     sp->owner = i;
+#if DUKE3D_GAMEVER >= GAMEVER_14
                     sp->cstat = 0;
+#endif
                 }
 
                 if( ( ud.multimode < 2 && sp->pal != 0) || (sp->lotag > ud.player_skill) )
@@ -4365,11 +4511,19 @@ short spawn( short j, short pn )
                 }
 
                 sp->pal = 0;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                // 1.3D draws a random number here, then discards it below.
+                sp->cstat |= TRAND&12;
+#endif
 
             case ACCESSCARD:
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                sp->cstat = (sp->picnum == ATOMICHEALTH) ? 128 : 0;
+#else
                 if(sp->picnum == ATOMICHEALTH)
                     sp->cstat |= 128;
+#endif
 
                 if(ud.multimode > 1 && ud.coop != 1 && sp->picnum == ACCESSCARD)
                 {
@@ -4465,15 +4619,23 @@ short spawn( short j, short pn )
 
                 switch(sp->lotag)
                 {
+#if DUKE3D_GAMEVER >= GAMEVER_14
                     case 28:
                         T6 = 65;// Delay for lightning
                         break;
+#endif
                     case 7: // Transporters!!!!
+#if DUKE3D_GAMEVER >= GAMEVER_14
                     case 23:// XPTR END
+#endif
                         if(sp->lotag != 23)
                         {
                             for(j=0;j<MAXSPRITES;j++)
+#if DUKE3D_GAMEVER < GAMEVER_14
+                                if(sprite[j].statnum < MAXSTATUS && sprite[j].picnum == SECTOREFFECTOR && sprite[j].lotag == 7 && i != j && sprite[j].hitag == SHT)
+#else
                                 if(sprite[j].statnum < MAXSTATUS && sprite[j].picnum == SECTOREFFECTOR && ( sprite[j].lotag == 7 || sprite[j].lotag == 23 ) && i != j && sprite[j].hitag == SHT)
+#endif
                                 {
                                     OW = j;
                                     break;
@@ -4489,6 +4651,7 @@ short spawn( short j, short pn )
                         sp->owner = -1;
                         T1 = 1;
                         break;
+#if DUKE3D_GAMEVER >= GAMEVER_14
                     case 18:
 
                         if(sp->ang == 512)
@@ -4506,13 +4669,18 @@ short spawn( short j, short pn )
 
                         sp->hitag <<= 2;
                         break;
+#endif
 
                     case 19:
                         sp->owner = -1;
                         break;
                     case 25: // Pistons
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        T5 = sector[sect].ceilingz;
+#else
                         T4 = sector[sect].ceilingz;
                         T5 = 1;
+#endif
                         sector[sect].ceilingz = sp->z;
                         setinterpolation(&sector[sect].ceilingz);
                         break;
@@ -4681,6 +4849,9 @@ short spawn( short j, short pn )
 
                     case 31:
                         T2 = sector[sect].floorz;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        T3 = sp->hitag;
+#endif
                     //    T3 = sp->hitag;
                         if(sp->ang != 1536) sector[sect].floorz = sp->z;
 
@@ -4870,9 +5041,11 @@ short spawn( short j, short pn )
                 {
                     case 6:
                     case 14:
+#if DUKE3D_GAMEVER >= GAMEVER_14
                         j = callsound(sect,i);
                         if(j == -1) j = SUBWAY;
                         hittype[i].lastvx = j;
+#endif
                     case 30:
                         if(numplayers > 1) break;
                     case 0:
@@ -4946,7 +5119,9 @@ short spawn( short j, short pn )
                     break;
                 }
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 sp->pal = 0;
+#endif
                 sp->owner = i;
                 changespritestat(i,6);
                 sp->xvel = 8;
@@ -9524,7 +9699,18 @@ void vglass(int32_t x,int32_t y,short a,short wn,short n)
     zincs = ( sector[sect].floorz-sector[sect].ceilingz ) / n;
 
     for(z = sector[sect].ceilingz;z < sector[sect].floorz; z += zincs )
-        EGS(sect,x,y,z-(TRAND&8191),GLASSPIECES+(z&(TRAND%3)),-32,36,36,a+128-(TRAND&255),16+(TRAND&31),0,-1,5);
+    {
+        // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+        int32_t r_vel = 16+(TRAND&31);
+        int32_t r_ang = a+128-(TRAND&255);
+        int32_t r_pn = GLASSPIECES+(z&(TRAND%3));
+#if DUKE3D_GAMEVER < GAMEVER_14
+        EGS(sect,x,y,z,r_pn,-32,36,36,r_ang,r_vel,0,-1,5); // 1.3D: no random z
+#else
+        int32_t r_z = z-(TRAND&8191);
+        EGS(sect,x,y,r_z,r_pn,-32,36,36,r_ang,r_vel,0,-1,5);
+#endif
+    }
 }
 
 void lotsofglass(short i,short wallnum,short n)
@@ -9539,7 +9725,12 @@ void lotsofglass(short i,short wallnum,short n)
         for(j=n-1; j >= 0 ;j--)
         {
             a = SA-256+(TRAND&511)+1024;
-            EGS(SECT,SX,SY,SZ,GLASSPIECES+(j%3),-32,36,36,a,32+(TRAND&63),1024-(TRAND&1023),i,5);
+            {
+                // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                int32_t r_zv = 1024-(TRAND&1023);
+                int32_t r_vel = 32+(TRAND&63);
+                EGS(SECT,SX,SY,SZ,GLASSPIECES+(j%3),-32,36,36,a,r_vel,r_zv,i,5);
+            }
         }
         return;
      }
@@ -9570,7 +9761,12 @@ void lotsofglass(short i,short wallnum,short n)
               if( z < -(32<<8) || z > (32<<8) )
                   z = SZ-(32<<8)+(TRAND&((64<<8)-1));
               a = SA-1024;
-              EGS(SECT,x1,y1,z,GLASSPIECES+(j%3),-32,36,36,a,32+(TRAND&63),-(TRAND&1023),i,5);
+              {
+                  // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                  int32_t r_zv = -(TRAND&1023);
+                  int32_t r_vel = 32+(TRAND&63);
+                  EGS(SECT,x1,y1,z,GLASSPIECES+(j%3),-32,36,36,a,r_vel,r_zv,i,5);
+              }
           }
          }
 }
@@ -9583,7 +9779,13 @@ void spriteglass(short i,short n)
     {
         a = TRAND&2047;
         z = SZ-((TRAND&16)<<8);
-        k = EGS(SECT,SX,SY,z,GLASSPIECES+(j%3),TRAND&15,36,36,a,32+(TRAND&63),-512-(TRAND&2047),i,5);
+        {
+            // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+            int32_t r_zv = -512-(TRAND&2047);
+            int32_t r_vel = 32+(TRAND&63);
+            int32_t r_shade = TRAND&15;
+            k = EGS(SECT,SX,SY,z,GLASSPIECES+(j%3),r_shade,36,36,a,r_vel,r_zv,i,5);
+        }
         sprite[k].pal = sprite[i].pal;
     }
 }
@@ -9627,7 +9829,13 @@ void lotsofcolourglass(short i,short wallnum,short n)
         for(j=n-1; j >= 0 ;j--)
         {
             a = TRAND&2047;
-            k = EGS(SECT,SX,SY,SZ-(TRAND&(63<<8)),GLASSPIECES+(j%3),-32,36,36,a,32+(TRAND&63),1024-(TRAND&2047),i,5);
+            {
+                // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                int32_t r_zv = 1024-(TRAND&2047);
+                int32_t r_vel = 32+(TRAND&63);
+                int32_t r_z = SZ-(TRAND&(63<<8));
+                k = EGS(SECT,SX,SY,r_z,GLASSPIECES+(j%3),-32,36,36,a,r_vel,r_zv,i,5);
+            }
             sprite[k].pal = TRAND&15;
         }
         return;
@@ -9650,7 +9858,12 @@ void lotsofcolourglass(short i,short wallnum,short n)
           if( z < -(32<<8) || z > (32<<8) )
               z = SZ-(32<<8)+(TRAND&((64<<8)-1));
           a = SA-1024;
-          k = EGS(SECT,x1,y1,z,GLASSPIECES+(j%3),-32,36,36,a,32+(TRAND&63),-(TRAND&2047),i,5);
+          {
+              // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+              int32_t r_zv = -(TRAND&2047);
+              int32_t r_vel = 32+(TRAND&63);
+              k = EGS(SECT,x1,y1,z,GLASSPIECES+(j%3),-32,36,36,a,r_vel,r_zv,i,5);
+          }
           sprite[k].pal = TRAND&7;
          }
 }

@@ -2649,11 +2649,18 @@ char parse(void)
                                 dnum+s,g_sp->shade,xr,yr,ang,vel,zv,g_i,5);
                     }
 #else
-                    l = EGS(g_sp->sectnum,
-                            g_sp->x+(TRAND&255)-128,g_sp->y+(TRAND&255)-128,g_sp->z-(8<<8)-(TRAND&8191),
-                            dnum+s,g_sp->shade,32+(TRAND&15),32+(TRAND&15),
-                            TRAND&2047,(TRAND&127)+32,
-                            -(TRAND&2047),g_i,5);
+                    {
+                        // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                        int32_t r_zv = -(TRAND&2047);
+                        int32_t r_vel = (TRAND&127)+32;
+                        int32_t r_ang = TRAND&2047;
+                        int32_t r_yr = 32+(TRAND&15);
+                        int32_t r_xr = 32+(TRAND&15);
+                        int32_t r_z = g_sp->z-(8<<8)-(TRAND&8191);
+                        int32_t r_y = g_sp->y+(TRAND&255)-128;
+                        int32_t r_x = g_sp->x+(TRAND&255)-128;
+                        l = EGS(g_sp->sectnum,r_x,r_y,r_z,dnum+s,g_sp->shade,r_xr,r_yr,r_ang,r_vel,r_zv,g_i,5);
+                    }
 #endif
                     if(g_sp->picnum == BLIMP && dnum == SCRAP1)
                         sprite[l].yvel = weaponsandammosprites[j%14];

@@ -726,7 +726,12 @@ void lotsofmoney(spritetype *s, short n)
     short i ,j;
     for(i=n;i>0;i--)
     {
-        j = EGS(s->sectnum,s->x,s->y,s->z-(TRAND%(47<<8)),MONEY,-32,8,8,TRAND&2047,0,0,0,5);
+        {
+            // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+            int32_t r_ang = TRAND&2047;
+            int32_t r_z = s->z-(TRAND%(47<<8));
+            j = EGS(s->sectnum,s->x,s->y,r_z,MONEY,-32,8,8,r_ang,0,0,0,5);
+        }
         sprite[j].cstat = TRAND&12;
     }
 }
@@ -736,7 +741,12 @@ void lotsofmail(spritetype *s, short n)
     short i ,j;
     for(i=n;i>0;i--)
     {
-        j = EGS(s->sectnum,s->x,s->y,s->z-(TRAND%(47<<8)),MAIL,-32,8,8,TRAND&2047,0,0,0,5);
+        {
+            // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+            int32_t r_ang = TRAND&2047;
+            int32_t r_z = s->z-(TRAND%(47<<8));
+            j = EGS(s->sectnum,s->x,s->y,r_z,MAIL,-32,8,8,r_ang,0,0,0,5);
+        }
         sprite[j].cstat = TRAND&12;
     }
 }
@@ -746,7 +756,12 @@ void lotsofpaper(spritetype *s, short n)
     short i ,j;
     for(i=n;i>0;i--)
     {
-        j = EGS(s->sectnum,s->x,s->y,s->z-(TRAND%(47<<8)),PAPER,-32,8,8,TRAND&2047,0,0,0,5);
+        {
+            // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+            int32_t r_ang = TRAND&2047;
+            int32_t r_z = s->z-(TRAND%(47<<8));
+            j = EGS(s->sectnum,s->x,s->y,r_z,PAPER,-32,8,8,r_ang,0,0,0,5);
+        }
         sprite[j].cstat = TRAND&12;
     }
 }
@@ -780,7 +795,15 @@ void guts(spritetype *s,short gtype, short n, short p)
     for(j=0;j<n;j++)
     {
         a = TRAND&2047;
-        i = EGS(s->sectnum,s->x+(TRAND&255)-128,s->y+(TRAND&255)-128,gutz-(TRAND&8191),gtype,-32,sx,sy,a,48+(TRAND&31),-512-(TRAND&2047),ps[p].i,5);
+        {
+            // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+            int32_t r_zv = -512-(TRAND&2047);
+            int32_t r_vel = 48+(TRAND&31);
+            int32_t r_z = gutz-(TRAND&8191);
+            int32_t r_y = s->y+(TRAND&255)-128;
+            int32_t r_x = s->x+(TRAND&255)-128;
+            i = EGS(s->sectnum,r_x,r_y,r_z,gtype,-32,sx,sy,a,r_vel,r_zv,ps[p].i,5);
+        }
         if(PN == JIBS2)
         {
             sprite[i].xrepeat >>= 2;
@@ -813,7 +836,12 @@ void gutsdir(spritetype *s,short gtype, short n, short p)
     for(j=0;j<n;j++)
     {
         a = TRAND&2047;
-        i = EGS(s->sectnum,s->x,s->y,gutz,gtype,-32,sx,sy,a,256+(TRAND&127),-512-(TRAND&2047),ps[p].i,5);
+        {
+            // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+            int32_t r_zv = -512-(TRAND&2047);
+            int32_t r_vel = 256+(TRAND&127);
+            i = EGS(s->sectnum,s->x,s->y,gutz,gtype,-32,sx,sy,a,r_vel,r_zv,ps[p].i,5);
+        }
     }
 }
 
@@ -930,10 +958,20 @@ void movefta(void)
                             i = nexti;
                             continue;
                         }
-                        j = cansee(sx,sy,s->z-(TRAND%(52<<8)),s->sectnum,px,py,ps[p].oposz-(TRAND%(32<<8)),ps[p].cursectnum);
+                        {
+                            // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                            int32_t r_z2 = ps[p].oposz-(TRAND%(32<<8));
+                            int32_t r_z1 = s->z-(TRAND%(52<<8));
+                            j = cansee(sx,sy,r_z1,s->sectnum,px,py,r_z2,ps[p].cursectnum);
+                        }
                     }
                     else
-                        j = cansee(s->x,s->y,s->z-((TRAND&31)<<8),s->sectnum,ps[p].oposx,ps[p].oposy,ps[p].oposz-((TRAND&31)<<8),ps[p].cursectnum);
+                        {
+                            // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                            int32_t r_z2 = ps[p].oposz-((TRAND&31)<<8);
+                            int32_t r_z1 = s->z-((TRAND&31)<<8);
+                            j = cansee(s->x,s->y,r_z1,s->sectnum,ps[p].oposx,ps[p].oposy,r_z2,ps[p].cursectnum);
+                        }
 
        //             j = 1;
 
@@ -1919,7 +1957,15 @@ void movestandables(void)
 
             for(k=0;k<16;k++)
             {
-                j = EGS(SECT,SX,SY,SZ-(TRAND%(48<<8)),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(sprite[i].zvel>>2),i,5);
+                {
+                    // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                    int32_t r_zv = -(TRAND&4095)-(sprite[i].zvel>>2);
+                    int32_t r_vel = (TRAND&63)+64;
+                    int32_t r_ang = TRAND&2047;
+                    int32_t r_pn = SCRAP3+(TRAND&3);
+                    int32_t r_z = SZ-(TRAND%(48<<8));
+                    j = EGS(SECT,SX,SY,r_z,r_pn,-8,48,48,r_ang,r_vel,r_zv,i,5);
+                }
                 sprite[j].pal = 2;
             }
 
@@ -3632,7 +3678,13 @@ void moveactors(void)
                         if(j == FREEZEBLAST) goto BOLT;
                         for(j=16; j >= 0 ;j--)
                         {
-                            k = EGS(SECT,SX,SY,SZ,GLASSPIECES+(j%3),-32,36,36,TRAND&2047,32+(TRAND&63),1024-(TRAND&1023),i,5);
+                            {
+                                // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                                int32_t r_zv = 1024-(TRAND&1023);
+                                int32_t r_vel = 32+(TRAND&63);
+                                int32_t r_ang = TRAND&2047;
+                                k = EGS(SECT,SX,SY,SZ,GLASSPIECES+(j%3),-32,36,36,r_ang,r_vel,r_zv,i,5);
+                            }
                             sprite[k].pal = 1;
                         }
                         spritesound(GLASS_BREAKING,i);
@@ -3669,7 +3721,14 @@ void moveactors(void)
                     {
                         for(x=0;x<8;x++)
                         {
-                            j = EGS(sect,s->x,s->y,s->z-(8<<8),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(s->zvel>>2),i,5);
+                            {
+                                // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                                int32_t r_zv = -(TRAND&4095)-(s->zvel>>2);
+                                int32_t r_vel = (TRAND&63)+64;
+                                int32_t r_ang = TRAND&2047;
+                                int32_t r_pn = SCRAP3+(TRAND&3);
+                                j = EGS(sect,s->x,s->y,s->z-(8<<8),r_pn,-8,48,48,r_ang,r_vel,r_zv,i,5);
+                            }
                             sprite[j].pal = 6;
                         }
 
@@ -3782,7 +3841,14 @@ void moveactors(void)
 
                         for(x=0;x<8;x++)
                         {
-                            j = EGS(sect,s->x,s->y,s->z-(8<<8),SCRAP3+(TRAND&3),-8,48,48,TRAND&2047,(TRAND&63)+64,-(TRAND&4095)-(s->zvel>>2),i,5);
+                            {
+                                // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                                int32_t r_zv = -(TRAND&4095)-(s->zvel>>2);
+                                int32_t r_vel = (TRAND&63)+64;
+                                int32_t r_ang = TRAND&2047;
+                                int32_t r_pn = SCRAP3+(TRAND&3);
+                                j = EGS(sect,s->x,s->y,s->z-(8<<8),r_pn,-8,48,48,r_ang,r_vel,r_zv,i,5);
+                            }
                             sprite[j].pal = 6;
                         }
                         t[0] = -3;

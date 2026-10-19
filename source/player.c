@@ -128,7 +128,13 @@ void tracers(int32_t x1,int32_t y1,int32_t z1,int32_t x2,int32_t y2,int32_t z2,i
           if(sect >= 0)
           {
               if(sector[sect].lotag == 2)
-                  EGS(sect,x1,y1,z1,WATERBUBBLE,-32,4+(TRAND&3),4+(TRAND&3),TRAND&2047,0,0,ps[0].i,5);
+                  {
+                      // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                      int32_t r_ang = TRAND&2047;
+                      int32_t r_yr = 4+(TRAND&3);
+                      int32_t r_xr = 4+(TRAND&3);
+                      EGS(sect,x1,y1,z1,WATERBUBBLE,-32,r_xr,r_yr,r_ang,0,0,ps[0].i,5);
+                  }
               else
                   EGS(sect,x1,y1,z1,SMALLSMOKE,-32,14,14,0,0,0,ps[0].i,5);
           }
