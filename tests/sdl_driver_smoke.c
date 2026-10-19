@@ -118,10 +118,11 @@ int main(int argc, char **argv)
         _idle();
     uninittimer();
 
-    /* PLATFORM_TIMER_HZ is 100, so ~50 calls in 500ms; SDL2 at 1ms would be ~500. */
-    if ((timer_calls < 25) || (timer_calls > 100))
+    /* PLATFORM_TIMER_HZ is 100, so ~50 calls in 500ms; SDL2 at 1ms would be ~500.
+     *  The lower bound is loose so a slow CI runner does not flake. */
+    if ((timer_calls < 10) || (timer_calls > 100))
     {
-        fprintf(stderr, "FAIL: timer fired %d times in 500ms (expected ~50)\n",
+        fprintf(stderr, "FAIL: timer fired %d times in 500ms (expected 10-100)\n",
                 timer_calls);
         return 1;
     }

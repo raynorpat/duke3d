@@ -258,7 +258,8 @@ char framerateon=1,tabgraphic=0;
 
 static char sidemode=0;
 extern int32_t vel, svel, angvel;
-int32_t xvel, yvel, hvel, timeoff;
+int32_t xvel, yvel, timeoff;
+extern int32_t hvel;
 
 static char once=0;
 
