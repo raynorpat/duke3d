@@ -8,6 +8,18 @@ set_tests_properties(sdl_driver_smoke PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
   TIMEOUT 30)
 
+# Windows: config and saves go to Saved Games\Duke Nukem 3D, and existing
+# ones in the game folder are copied there. Needs no game data.
+if(WIN32)
+  add_test(NAME save_dir
+    COMMAND "${CMAKE_COMMAND}"
+            "-DDUKE3D=$<TARGET_FILE:duke3d>"
+            "-DEMPTY_GRP=${CMAKE_CURRENT_SOURCE_DIR}/data/empty.grp"
+            "-DWORK=${CMAKE_BINARY_DIR}/sd"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/save_dir.cmake")
+  set_tests_properties(save_dir PROPERTIES TIMEOUT 60)
+endif()
+
 # Renders E1L1's start view from a real GRP and compares the frame
 # checksum. Needs game data, so it is only registered when DUKE3D_GRP
 # names an existing file.
@@ -28,7 +40,7 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
 
   # Boots the real game to its title loop and into E1L1, headless.
   if(WIN32)
-    set(_cfg_dir ".")
+    set(_cfg_dir "Duke Nukem 3D")
   elseif(APPLE)
     set(_cfg_dir "Library/Application Support/Duke Nukem 3D")
   else()

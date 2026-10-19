@@ -30,6 +30,8 @@ set(ENV{SDL_VIDEODRIVER} dummy)
 set(ENV{BUILD_WINDOWED} 1)
 set(ENV{HOME} "${_home}")
 set(ENV{USERPROFILE} "${_home}")
+# Windows keeps config and saves in Saved Games; point it at the scratch home.
+set(ENV{DUKE3D_SAVE_DIR} "${_home}")
 
 set(_failed 0)
 foreach(_run_args "" "/v1;/l1;/s2")
