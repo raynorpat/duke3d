@@ -395,6 +395,13 @@ void add_ammo( short, short, short, short );
 
 extern int32_t fricxv,fricyv;
 
+// Weapons a co-op player has picked up and can't take again.
+#if DUKE3D_GAMEVER < GAMEVER_14
+#define MAX_WEAPRECS 256
+#else
+#define MAX_WEAPRECS 16
+#endif
+
 struct player_struct
 {
     int32_t zoom,exitx,exity,loogiex[64],loogiey[64],numloogs,loogcnt;
@@ -421,7 +428,7 @@ struct player_struct
     short dummyplayersprite,extra_extra8,quick_kick;
     short heat_amount,actorsqu,timebeforeexit,customexitsound;
 
-    short weaprecs[16],weapreccnt,interface_toggle_flag;
+    short weaprecs[MAX_WEAPRECS],weapreccnt,interface_toggle_flag;
 
     short rotscrnang,dead_flag,show_empty_weapon;
     short scuba_amount,jetpack_amount,steroids_amount,shield_amount;

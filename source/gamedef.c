@@ -41,6 +41,13 @@ static spritetype *g_sp;
 
 #define NUMKEYWORDS     112
 
+// 1.3D's compiler knows keywords 0-97 only (useractor and later came with 1.4).
+#if DUKE3D_GAMEVER < GAMEVER_14
+#define NUMCONKEYWORDS  98
+#else
+#define NUMCONKEYWORDS  NUMKEYWORDS
+#endif
+
 char *keyw[NUMKEYWORDS] =
 {
     "definelevelname",  // 0
@@ -323,7 +330,7 @@ int32_t keyword(void)
     }
     tempbuf[i] = 0;
 
-    for(i=0;i<NUMKEYWORDS;i++)
+    for(i=0;i<NUMCONKEYWORDS;i++)
         if( strcmp( tempbuf,keyw[i]) == 0 )
             return i;
 
@@ -350,7 +357,7 @@ int32_t transword(void) //Returns its code #
     }
     tempbuf[l] = 0;
 
-    for(i=0;i<NUMKEYWORDS;i++)
+    for(i=0;i<NUMCONKEYWORDS;i++)
     {
         if( strcmp( tempbuf,keyw[i]) == 0 )
         {
@@ -400,7 +407,7 @@ void transnum(void)
     }
     tempbuf[l] = 0;
 
-    for(i=0;i<NUMKEYWORDS;i++)
+    for(i=0;i<NUMCONKEYWORDS;i++)
         if( strcmp( label+(labelcnt<<6),keyw[i]) == 0 )
     {
         error++;
@@ -450,6 +457,9 @@ char parsecommand(void)
     {
         default:
         case -1:
+#if DUKE3D_GAMEVER < GAMEVER_14
+            scriptptr--; // 1.3D drops the word an unknown word or EOF reserved
+#endif
             return 0; //End
         case 39:      //Rem endrem
             scriptptr--;
@@ -484,7 +494,7 @@ char parsecommand(void)
 
             getlabel();
 
-            for(i=0;i<NUMKEYWORDS;i++)
+            for(i=0;i<NUMCONKEYWORDS;i++)
                 if( strcmp( label+(labelcnt<<6),keyw[i]) == 0 )
                 {
                     error++;
@@ -542,7 +552,7 @@ char parsecommand(void)
             getlabel();
             // Check to see it's already defined
 
-            for(i=0;i<NUMKEYWORDS;i++)
+            for(i=0;i<NUMCONKEYWORDS;i++)
                 if( strcmp( label+(labelcnt<<6),keyw[i]) == 0 )
                 {
                     error++;
@@ -603,7 +613,7 @@ char parsecommand(void)
                 getlabel();
                 // Check to see it's already defined
 
-                for(i=0;i<NUMKEYWORDS;i++)
+                for(i=0;i<NUMCONKEYWORDS;i++)
                     if( strcmp( label+(labelcnt<<6),keyw[i]) == 0 )
                 {
                     error++;
@@ -749,7 +759,7 @@ char parsecommand(void)
                 scriptptr--;
                 getlabel();
 
-                for(i=0;i<NUMKEYWORDS;i++)
+                for(i=0;i<NUMCONKEYWORDS;i++)
                     if( strcmp( label+(labelcnt<<6),keyw[i]) == 0 )
                     {
                         error++;
@@ -803,7 +813,7 @@ char parsecommand(void)
                 getlabel();
                 // Check to see it's already defined
 
-                for(i=0;i<NUMKEYWORDS;i++)
+                for(i=0;i<NUMCONKEYWORDS;i++)
                     if( strcmp( label+(labelcnt<<6),keyw[i]) == 0 )
                     {
                         error++;
@@ -1002,8 +1012,13 @@ char parsecommand(void)
             else
             {
                 scriptptr--;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                warning++;
+                printf("  * WARNING.(L%d) Found 'else' with no 'if', ignored.\n",line_number);
+#else
                 error++;
                 printf("  * ERROR!(L%d) Found 'else' with no 'if'.\n",line_number);
+#endif
             }
 
             return 0;
@@ -1184,9 +1199,15 @@ char parsecommand(void)
             {
                 level_file_names[j*11+k][i] = *textptr;
                 textptr++,i++;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                if(i > 13)
+                {
+                    printf("  * ERROR!(L%d) Level file name exceeds character size limit of 13.\n",line_number);
+#else
                 if(i > 127)
                 {
                     printf("  * ERROR!(L%d) Level file name exceeds character size limit of 128.\n",line_number);
+#endif
                     error++;
                     while( *textptr != ' ') textptr++;
                     break;
@@ -1228,11 +1249,10 @@ char parsecommand(void)
                     break;
                 }
             }
-#ifdef PLATFORM_UNIX
             level_names[j*11+k][i] = '\0';
-#else
-            level_names[j*11+k][i-1] = '\0';
-#endif
+            // Fix: drop the CR of a CRLF line on every platform; DOS cut one character, which lost a real one in LF files.
+            if(i > 0 && level_names[j*11+k][i-1] == '\r')
+                level_names[j*11+k][i-1] = '\0';
             return 0;
 
         case 79:
@@ -1267,9 +1287,15 @@ char parsecommand(void)
             scriptptr--;
             transnum();
             k = *(scriptptr-1);
+#if DUKE3D_GAMEVER < GAMEVER_14
+            if(k >= 348) // 1.3D's sound table size
+            {
+                printf("  * ERROR!(L%d) Exceeded sound limit of %d.\n",line_number,348);
+#else
             if(k >= NUM_SOUNDS)
             {
                 printf("  * ERROR!(L%d) Exceeded sound limit of %d.\n",line_number,NUM_SOUNDS);
+#endif
                 error++;
             }
             scriptptr--;
@@ -1350,7 +1376,11 @@ char parsecommand(void)
             {
 		// what a crap, skip GRAVITATIONALCONSTANT, MAXGROWAMMO, QSIZE,
 		// TRIPBOMBLASERMODE
+#if DUKE3D_GAMEVER < GAMEVER_14
+		if(1) // 1.3D's gamestartup has 26 parameters
+#else
 		if(dukever13)
+#endif
 		{
 		    switch(j)
 		    {
@@ -1363,7 +1393,11 @@ char parsecommand(void)
 			    ++j;
 			    break;
 			case 28:
+#if DUKE3D_GAMEVER < GAMEVER_14
+			    spriteqamount = 64; // 1.3D's queue is a fixed 64
+#else
 			    spriteqamount = 1024;
+#endif
 			    ++j;
 			    break;
 			case 29:
@@ -1546,7 +1580,7 @@ void loadefs(char *filenam,char *mptr)
         kclose(fp);
     }
 
-#ifdef PLATFORM_UNIX
+#if defined(PLATFORM_UNIX) && DUKE3D_GAMEVER >= GAMEVER_14
     textptr[fs - 1] = 0;
 #else
     textptr[fs - 2] = 0;
@@ -2193,7 +2227,11 @@ char parse(void)
         case 94:
             insptr++;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+            if(ud.coop > 0)
+#else
             if(ud.coop >= 1 && ud.multimode > 1)
+#endif
             {
                 if(*insptr == 0)
                 {
@@ -2203,7 +2241,7 @@ char parse(void)
 
                     parseifelse(j < ps[g_p].weapreccnt && g_sp->owner == g_i);
                 }
-                else if(ps[g_p].weapreccnt < 16)
+                else if(ps[g_p].weapreccnt < MAX_WEAPRECS)
                 {
                     ps[g_p].weaprecs[ps[g_p].weapreccnt++] = g_sp->picnum;
                     parseifelse(g_sp->owner == g_i);
@@ -2244,6 +2282,16 @@ char parse(void)
         case 28:
             insptr++;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+            // 1.3D steps each size only while more than one unit away.
+            j = ((*insptr)-g_sp->xrepeat)<<1;
+            if( klabs(j) > 2 ) g_sp->xrepeat += ksgn(j);
+
+            insptr++;
+
+            j = ((*insptr)-g_sp->yrepeat)<<1;
+            if( klabs(j) > 2 ) g_sp->yrepeat += ksgn(j);
+#else
             j = ((*insptr)-g_sp->xrepeat)<<1;
             g_sp->xrepeat += ksgn(j);
 
@@ -2254,6 +2302,7 @@ char parse(void)
                 j = ((*insptr)-g_sp->yrepeat)<<1;
                 if( klabs(j) ) g_sp->yrepeat += ksgn(j);
             }
+#endif
 
             insptr++;
 
@@ -2443,9 +2492,11 @@ char parse(void)
                  break;
             }
             addammo( *insptr, &ps[g_p], *(insptr+1) );
+#if DUKE3D_GAMEVER >= GAMEVER_14
             if(ps[g_p].curr_weapon == KNEE_WEAPON)
                 if( ps[g_p].gotweapon[*insptr] )
                     addweapon( &ps[g_p], *insptr );
+#endif
             insptr+=2;
             break;
         case 68:
@@ -2463,6 +2514,7 @@ char parse(void)
         case 25:
             insptr++;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
             if(ps[g_p].newowner >= 0)
             {
                 ps[g_p].newowner = -1;
@@ -2481,6 +2533,7 @@ char parse(void)
                     j = nextspritestat[j];
                 }
             }
+#endif
 
             j = sprite[ps[g_p].i].extra;
 
@@ -2591,11 +2644,23 @@ char parse(void)
                         s = 0;
                     else s = (TRAND%3);
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    {
+                        // 1.3D: no x/y jitter, a fixed z, and the random
+                        // numbers drawn in this order.
+                        int32_t zv = -(TRAND&2047), vel = (TRAND&127)+32;
+                        int32_t ang = TRAND&2047, yr = 32+(TRAND&15), xr = 32+(TRAND&15);
+
+                        l = EGS(g_sp->sectnum,g_sp->x,g_sp->y,g_sp->z-(16<<8),
+                                dnum+s,g_sp->shade,xr,yr,ang,vel,zv,g_i,5);
+                    }
+#else
                     l = EGS(g_sp->sectnum,
                             g_sp->x+(TRAND&255)-128,g_sp->y+(TRAND&255)-128,g_sp->z-(8<<8)-(TRAND&8191),
                             dnum+s,g_sp->shade,32+(TRAND&15),32+(TRAND&15),
                             TRAND&2047,(TRAND&127)+32,
                             -(TRAND&2047),g_i,5);
+#endif
                     if(g_sp->picnum == BLIMP && dnum == SCRAP1)
                         sprite[l].yvel = weaponsandammosprites[j%14];
                     else sprite[l].yvel = -1;
@@ -2640,7 +2705,9 @@ char parse(void)
                     cmenu(15000);
                 }
                 else ps[g_p].gm = MODE_RESTART;
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 killit_flag = 2;
+#endif
             }
             else
             {
@@ -2661,7 +2728,9 @@ char parse(void)
                 g_sp->pal = ps[g_p].palookup;
 
                 ps[g_p].last_extra = g_sp->extra = max_player_health;
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 ps[g_p].wantweaponfire = -1;
+#endif
                 ps[g_p].horiz = 100;
                 ps[g_p].on_crane = -1;
                 ps[g_p].frag_ps = g_p;
@@ -2676,7 +2745,9 @@ char parse(void)
                 ps[g_p].fta = 0;
                 ps[g_p].ftq = 0;
                 ps[g_p].posxv = ps[g_p].posyv = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 ps[g_p].rotscrnang = 0;
+#endif
 
                 ps[g_p].falling_counter = 0;
 
@@ -2797,7 +2868,11 @@ char parse(void)
                        j = 1;
                 else if( (l&256) && s <= -8 && (sync[g_p].bits&(1<<5)) )
                        j = 1;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                else if( (l&512) && ps[g_p].curr_weapon == KNEE_WEAPON && ps[g_p].kickback_pic > 0 )
+#else
                 else if( (l&512) && ( ps[g_p].quick_kick > 0 || ( ps[g_p].curr_weapon == KNEE_WEAPON && ps[g_p].kickback_pic > 0 ) ) )
+#endif
                        j = 1;
                 else if( (l&1024) && sprite[ps[g_p].i].xrepeat < 32 )
                        j = 1;
@@ -2839,9 +2914,15 @@ char parse(void)
             break;
         case 59:
             insptr++;
+#if DUKE3D_GAMEVER < GAMEVER_14
+            if(g_sp->owner >= 0 && sprite[g_sp->owner].picnum == *insptr)
+                parseifelse(1);
+            else
+#else
 //            if(g_sp->owner >= 0 && sprite[g_sp->owner].picnum == *insptr)
   //              parseifelse(1);
 //            else
+#endif
             parseifelse( hittype[g_i].picnum == *insptr);
             break;
         case 61:
@@ -3042,7 +3123,9 @@ char parse(void)
                 case FEM7:
                 case FEM8:
                 case FEM9:
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 case FEM10:
+#endif
                 case PODFEM1:
                 case NAKED1:
                 case STATUE:

@@ -11,9 +11,20 @@
  *  [0, scriptsize * 4). An absolute address doesn't.
  *
  * Run it from a directory holding game.con, DEFS.CON, USER.CON and
- *  prefix.con.
+ *  prefix.con, or name that directory as the first argument.
+ *
+ * With a second argument, it instead compiles game.con once and compares
+ *  script[] and actorscrptr[] word for word with a reference dump, as
+ *  tests/v13d_save_decode.py writes from a DOS save: "script <i> <value>"
+ *  and "actor <i> <value>" lines, addresses as byte offsets.
  */
 #define SDL_MAIN_HANDLED  /* game.c's main() is renamed; this one is ours. */
+#ifdef _WIN32
+#include <direct.h>
+#define chdir _chdir
+#else
+#include <unistd.h>
+#endif
 #include "duke3d.h"
 
 #define PREFIX_SLOTS 5  /* one action: five values, its keyword dropped */
@@ -63,15 +74,90 @@ static int compile(char *filename)
     return 1;
 }
 
-int main(void)
+/* No level name may keep the CR of a CRLF line. */
+static void check_level_names(void)
+{
+    int32_t i;
+
+    for (i = 0; i < 44; i++)
+        if (strchr(level_names[i], '\r') != NULL)
+            fail("level name keeps a CR", i, (int32_t)strlen(level_names[i]));
+}
+
+/* Compares the compiled script with a DOS reference dump. */
+static int compare_reference(const char *reffile)
+{
+    static int32_t want_script[MAXSCRIPTSIZE], want_actor[MAXTILES];
+    char name[16];
+    int32_t i, v, words = 0, actors = 0;
+    FILE *f = fopen(reffile, "r");
+
+    if (f == NULL)
+    {
+        printf("FAIL: can't open %s\n", reffile);
+        return 1;
+    }
+    while (fscanf(f, "%15s %d %d", name, &i, &v) == 3)
+    {
+        if (strcmp(name, "script") == 0 && i >= 0 && i < MAXSCRIPTSIZE)
+            { want_script[i] = v; if (i >= words) words = i + 1; }
+        else if (strcmp(name, "actor") == 0 && i >= 0 && i < MAXTILES)
+            { want_actor[i] = v; actors++; }
+    }
+    fclose(f);
+
+    if (!compile("game.con"))
+        return 1;
+    if (warning)
+    {
+        printf("FAIL: %d warning(s)\n", warning);
+        return 1;
+    }
+    check_level_names();
+    for (i = 0; i < MAXSCRIPTSIZE; i++)
+        if (script[i] != (i < words ? want_script[i] : 0))
+            fail("script differs from the reference, ours", i, script[i]);
+    for (i = 0; i < MAXTILES; i++)
+        if (actorscrptr[i] != want_actor[i])
+            fail("actorscrptr differs from the reference, ours", i, actorscrptr[i]);
+
+    printf("script: %d bytes, %d actors; reference: %d words, %d actors\n",
+           script[0], actors, words, actors);
+    if (words < 100 || actors == 0)
+    {
+        printf("FAIL: the reference is too small\n");
+        failures++;
+    }
+    if (failures)
+    {
+        printf("FAIL: %d problem(s)\n", failures);
+        return 1;
+    }
+    printf("PASS\n");
+    return 0;
+}
+
+int main(int argc, char **argv)
 {
     int32_t i, a, b, addrslots = 0, addrlabels = 0, actors = 0;
 
     groupfile = -1;          /* no GRP: never offer the internal defaults */
     loadfromgrouponly = 0;
 
+    if (argc > 1 && chdir(argv[1]) != 0)
+    {
+        printf("FAIL: can't change to %s\n", argv[1]);
+        return 1;
+    }
+    if (argc > 2)
+        return compare_reference(argv[2]);
+
     if (!compile("game.con"))
         return 1;
+    /* The in-repo CONs have LF line ends; no letter may be cut off. */
+    check_level_names();
+    if (strcmp(level_names[0], "HOLLYWOOD HOLOCAUST") != 0)
+        printf("FAIL: E1L1 is named \"%s\"\n", level_names[0]), failures++;
     a_size = script[0] / 4;
     a_labelcnt = labelcnt;
     memcpy(a_script, script, sizeof(script));

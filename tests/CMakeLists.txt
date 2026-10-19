@@ -84,23 +84,26 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
     TIMEOUT 30)
 
-  # Boots the real game to its title loop and into E1L1, headless.
-  if(WIN32)
-    set(_cfg_dir "Duke Nukem 3D")
-  elseif(APPLE)
-    set(_cfg_dir "Library/Application Support/Duke Nukem 3D")
-  else()
-    set(_cfg_dir ".duke3d")
+  # Boots the real game to its title loop and into E1L1, headless. It uses
+  # the in-repo 1.5 CONs, so not in 1.3D builds.
+  if(NOT DUKE3D_VERSION STREQUAL "1.3D")
+    if(WIN32)
+      set(_cfg_dir "Duke Nukem 3D")
+    elseif(APPLE)
+      set(_cfg_dir "Library/Application Support/Duke Nukem 3D")
+    else()
+      set(_cfg_dir ".duke3d")
+    endif()
+    add_test(NAME game_boot
+      COMMAND "${CMAKE_COMMAND}"
+              "-DDUKE3D=$<TARGET_FILE:duke3d>"
+              "-DGRP=${DUKE3D_GRP}"
+              "-DCON_DIR=${PROJECT_SOURCE_DIR}/testdata"
+              "-DWORK=${CMAKE_BINARY_DIR}/gb"
+              "-DCFG_DIR=${_cfg_dir}"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/game_boot.cmake")
+    set_tests_properties(game_boot PROPERTIES TIMEOUT 60)
   endif()
-  add_test(NAME game_boot
-    COMMAND "${CMAKE_COMMAND}"
-            "-DDUKE3D=$<TARGET_FILE:duke3d>"
-            "-DGRP=${DUKE3D_GRP}"
-            "-DCON_DIR=${PROJECT_SOURCE_DIR}/testdata"
-            "-DWORK=${CMAKE_BINARY_DIR}/gb"
-            "-DCFG_DIR=${_cfg_dir}"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/game_boot.cmake")
-  set_tests_properties(game_boot PROPERTIES TIMEOUT 60)
 endif()
 
 # Compiles the in-repo CON scripts with the game's own compiler and checks
@@ -124,8 +127,11 @@ file(READ "${PROJECT_SOURCE_DIR}/testdata/game.con" _game_con)
 file(WRITE "${_con_dir}/prefix.con"
   "action CONCOMPILE_PREFIX 0 1 1 1 1\r\n${_game_con}")
 
-add_test(NAME con_compile COMMAND con_compile WORKING_DIRECTORY "${_con_dir}")
-set_tests_properties(con_compile PROPERTIES TIMEOUT 30)
+# The in-repo CONs are 1.5 scripts, which a 1.3D build can't compile.
+if(NOT DUKE3D_VERSION STREQUAL "1.3D")
+  add_test(NAME con_compile COMMAND con_compile WORKING_DIRECTORY "${_con_dir}")
+  set_tests_properties(con_compile PROPERTIES TIMEOUT 30)
+endif()
 
 # Game helper functions against the original DOS libraries. Needs no data.
 add_executable(game_helpers game_helpers.c "${_game_c}")
@@ -147,7 +153,8 @@ set(DUKE3D_ATOMIC_GRP "" CACHE FILEPATH
 set(DUKE3D_DOS_SAVES_DIR "" CACHE PATH
     "Folder searched for DOS 1.5 .sav files for the DOS save tests")
 find_package(Python3 COMPONENTS Interpreter)
-if(DUKE3D_ATOMIC_GRP AND EXISTS "${DUKE3D_ATOMIC_GRP}" AND
+if(DUKE3D_VERSION STREQUAL "1.5" AND NOT DUKE3D_SHAREWARE AND
+   DUKE3D_ATOMIC_GRP AND EXISTS "${DUKE3D_ATOMIC_GRP}" AND
    DUKE3D_DOS_SAVES_DIR AND IS_DIRECTORY "${DUKE3D_DOS_SAVES_DIR}" AND
    Python3_Interpreter_FOUND)
   file(GLOB_RECURSE _saves "${DUKE3D_DOS_SAVES_DIR}/*")
@@ -202,5 +209,39 @@ if(DUKE3D_ATOMIC_GRP AND EXISTS "${DUKE3D_ATOMIC_GRP}" AND
     list(GET _saves 0 _first)
     add_dos_save_test(dos_save_refuse refuse "${_first}")
     add_dos_save_test(dos_save_hostile hostile "${_first}")
+  endif()
+endif()
+
+# 1.3D builds: compile the original 1.3D CONs and compare the bytecode with a
+# DOS save made by the original executable. Needs the 1.3D data, so the tests
+# are only registered when its folder is set (docs/v13d/reference.md).
+set(DUKE3D_V13D_DATA_DIR "" CACHE PATH "Duke Nukem 3D 1.3D full release folder")
+set(DUKE3D_V13D_SW_DATA_DIR "" CACHE PATH "Duke Nukem 3D 1.3D shareware folder")
+if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
+  if(DUKE3D_SHAREWARE)
+    set(_v13d_edition sw)
+    set(_v13d_data "${DUKE3D_V13D_SW_DATA_DIR}")
+  else()
+    set(_v13d_edition full)
+    set(_v13d_data "${DUKE3D_V13D_DATA_DIR}")
+  endif()
+  if(_v13d_data)
+    add_test(NAME con_compile_v13d_${_v13d_edition}
+      COMMAND "${CMAKE_COMMAND}"
+              "-DDATA=${_v13d_data}" "-DEDITION=${_v13d_edition}"
+              "-DCON_COMPILE=$<TARGET_FILE:con_compile>"
+              "-DPYTHON=${Python3_EXECUTABLE}"
+              "-DDECODER=${CMAKE_CURRENT_SOURCE_DIR}/v13d_save_decode.py"
+              "-DWORK=${CMAKE_BINARY_DIR}/cc13"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/con_compile_v13d.cmake")
+    set_tests_properties(con_compile_v13d_${_v13d_edition} PROPERTIES TIMEOUT 120)
+  endif()
+  # The edition check must name a wrong edition, not fail some other way.
+  if(DUKE3D_V13D_DATA_DIR)
+    add_test(NAME v13d_edition_mismatch
+      COMMAND "${CMAKE_COMMAND}" "-DDIR=${DUKE3D_V13D_DATA_DIR}" -DEDITION=sw
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/v13d_check.cmake")
+    set_tests_properties(v13d_edition_mismatch PROPERTIES
+      PASS_REGULAR_EXPRESSION "wrong edition: expected sw")
   endif()
 endif()
