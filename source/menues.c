@@ -695,6 +695,7 @@ int loadverify(char *loadname, char *savename)
      if(savename != NULL)
      {
          /* saveplayer writes the menu's screenshot tile; use the loaded one */
+         walock[MAXTILES-3] = 255;
          walock[MAXTILES-1] = 255;
          if (waloff[MAXTILES-1] == 0) allocache(&waloff[MAXTILES-1],160*100,&walock[MAXTILES-1]);
          copybufbyte((void *)waloff[MAXTILES-3],(void *)waloff[MAXTILES-1],160*100);
