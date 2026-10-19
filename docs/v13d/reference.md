@@ -292,3 +292,53 @@ and assembly line references. Each module's 1.3D (full EXE) address range:
 | premap.c | `0x4ad50`–`0x4debd` |
 | sector.c | `0x4dec0`–`0x54bf0` |
 | sounds.c | `0x54c30`– |
+
+## Demo reference capture
+
+`tests/data/v13d_demo_refs.cmake` holds the final state of the five original demos.
+The values are captured without the debugger. A scratch copy of `DUKE3D.EXE` is patched
+so that when demo playback ends, it writes `STATE.BIN` (`reccnt`, `randomseed`,
+`sprite[4096]`) and hangs:
+
+1. `python3 -I tools/v13d/le_flatten.py <DUKE3D.EXE> 37c3c <edition>13.bin 352a4` makes
+   the flattened image that the patcher searches.
+2. `V13D_FLAT=<edition>13.bin python3 -I tools/v13d/mkcapture.py <full|sw> <original DUKE3D.EXE> <scratch dir>/DUKE3D.EXE <demo n> [callsite <hex>]`
+   - redirects playback's demo-end branch (`cmp [reccnt],0 / jg / cmp byte [esp+4],0 / jnz END`)
+     to a code cave in the zero-filled slack after object 1 (full `0xaa620`, shareware
+     `0xaa330`);
+   - sets the title loop's first demo (`which_demo`, full `0xc76d6`, shareware `0xc782e`).
+
+   The cave finds `randomseed`'s runtime address from `krand`'s own operand, so it
+   works wherever DOS/4G loads the image.
+3. Copy that edition's GRP, CONs, `DUKE.RTS` and demos, plus a `DUKE3D.CFG` with a Sound
+   Blaster set up (device 0), into the scratch directory. Run it headless:
+   `SDL_VIDEODRIVER=dummy dosbox-x -conf <conf> -fastlaunch -nomenu`, with `cycles=max`,
+   `[mixer] nosound=true`, `sbtype=sb16`, and an autoexec that runs `DUKE3D.EXE`. Without
+   an emulated Sound Blaster the game stalls after "Could not detect FM chip".
+4. Wait for `STATE.BIN` (180232 bytes), kill DOSBox-X, and run
+   `python3 -I tools/v13d/statebin.py STATE.BIN <id>`. It refuses captures where `reccnt`
+   isn't 0, because that would mean playback ran more than one tic in the final frame.
+
+The captures are deterministic: two runs of shareware demo 3 produced byte-identical
+`STATE.BIN` files. To bisect a desync, use `callsite <hex>` to divert any `call` (for
+example, `domovethings`' call inside the tic loop) to the same cave.
+
+## DOS reference saves (needs the user at the keyboard)
+
+Task 7 step 3 needs saves made by actually playing, so a person does it. Run each
+edition's original `DUKE3D.EXE` from a scratch copy in DOSBox-X with a window, using the
+same config as above but without `SDL_VIDEODRIVER=dummy` and with `nosound=false` if
+wanted. Save into these slots, then copy `GAME<n>.SAV` to `<data dir>/refsaves/`:
+
+| Edition | Slot | Name | State |
+|---|---|---|---|
+| sw, full | 0 | `e1l1start` | E1L1 right after the level starts, without moving |
+| sw, full | 1 | `e1l1fight` | E1L1 with awake enemies nearby and a door or elevator moving |
+| sw, full | 2 | `inventory` | any E1 level holding several weapons, ammo types and inventory items |
+| sw | 3 | `e1late` | a later E1 level (E1L4 or after) |
+| full | 3 | `e2` | any E2 level |
+| full | 4 | `e3` | any E3 level |
+
+The expected values in `tests/data/v13d_save_refs.cmake` are read from the save files
+themselves with the "Save file" layout above. They need no debugger: player position
+and health from `sprite[ps[0].i]`, plus `curr_weapon` (ps `+0x2a8`) and level.
