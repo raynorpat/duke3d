@@ -45,6 +45,7 @@ extern int stricmp(const char *x, const char *y);
 // we load this in to get default button and key assignments
 // as well as setting up function mappings
 
+#define __SETUP__
 #include "_functio.h"
 
 //
@@ -77,7 +78,7 @@ int32 ScreenMode;
 int32 ScreenWidth;
 int32 ScreenHeight;
 
-static char setupfilename[128];
+static char setupfilename[MAX_PATH];
 static int32 scripthandle;
 static int32 setupread=0;
 /*
@@ -92,7 +93,7 @@ void CONFIG_GetSetupFilename( void )
    {
  // this isn't hooked up to read from stdin, so skip it on Unix for now. --ryan.
 #if PLATFORM_UNIX
-   GetPathFromEnvironment(setupfilename, 128, SETUPFILENAME);
+   GetPathFromEnvironment(setupfilename, sizeof(setupfilename), SETUPFILENAME);
 #else
    struct find_t fblock;
    char extension[10];
@@ -102,7 +103,7 @@ void CONFIG_GetSetupFilename( void )
    int32 numfiles;
    int32 i;
 
-   GetPathFromEnvironment(setupfilename, 128, SETUPFILENAME);
+   GetPathFromEnvironment(setupfilename, sizeof(setupfilename), SETUPFILENAME);
 
    // determine extension
 
@@ -304,6 +305,13 @@ void CONFIG_SetDefaults( void )
    ud.crosshair = 0;
    ud.m_marker = 1;
    ud.m_ffire = 1;
+   ScreenMode = 2;
+   ScreenWidth = 320;
+   ScreenHeight = 200;
+   NumVoices = 8;
+   NumChannels = 2;
+   NumBits = 16;
+   MixRate = 22050;
 }
 /*
 ===================
@@ -596,14 +604,29 @@ void CONFIG_ReadSetup( void )
    int32 dummy;
    char commmacro[] = "CommbatMacro# ";
 
-   if (!SafeFileExists(setupfilename))
-      {
-      Error("ReadSetup: %s does not exist\n"
-            "           Please run SETUP.EXE\n",setupfilename);
-      }
-
    CONFIG_SetDefaults();
-   scripthandle = SCRIPT_Load( setupfilename );
+   if (SafeFileExists(setupfilename))
+      scripthandle = SCRIPT_Load( setupfilename );
+   else
+      {
+      // No setup file: start an empty one holding the default bindings,
+      // which are then read back below like entries loaded from a file.
+      scripthandle = SCRIPT_Init( setupfilename );
+      for (dummy=0;dummy<NUMKEYENTRIES;dummy++)
+         SCRIPT_PutDoubleString( scripthandle, "KeyDefinitions",
+            keydefaults[dummy*3], keydefaults[dummy*3+1], keydefaults[dummy*3+2] );
+      for (dummy=0;dummy<(int32)(sizeof(mousedefaults)/sizeof(mousedefaults[0]));dummy++)
+         {
+         sprintf(buf,"MouseButton%d",dummy);
+         SCRIPT_PutString( scripthandle, "Controls", buf, mousedefaults[dummy] );
+         }
+      for (dummy=0;dummy<(int32)(sizeof(joystickdefaults)/sizeof(joystickdefaults[0]));dummy++)
+         {
+         sprintf(buf,"JoystickButton%d",dummy);
+         SCRIPT_PutString( scripthandle, "Controls", buf, joystickdefaults[dummy] );
+         }
+      SCRIPT_Save( scripthandle, setupfilename );
+      }
 
    for(dummy = 0;dummy < 10;dummy++)
    {

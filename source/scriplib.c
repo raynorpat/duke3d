@@ -337,9 +337,13 @@ static scriptnode_t *SCRIPT_findinchildren (scriptnode_t *parent, char *s)
 */
 int32 SCRIPT_Init( char * name )
 {
-	STUBBED("Init");
-	
-	return -1;
+	if (script_numscriptsopen == MAX_SCRIPTS) return -1;
+
+	/* An empty script, as SCRIPT_Load starts one before parsing */
+	script_numscriptsopen++;
+	script_headnode[script_nexthandle] = SCRIPT_constructnode ();
+
+	return script_nexthandle++;	/* postincrement is important here */
 }
 
 
@@ -919,7 +923,45 @@ void SCRIPT_PutDoubleString
    char * string2
    )
 {
-	STUBBED("PutDoubleString");
+	scriptnode_t *head;
+	scriptnode_t *section;
+	scriptnode_t *node;
+
+	if(scripthandle >= MAX_SCRIPTS || scripthandle < 0)
+		return;
+
+	head = script_headnode[scripthandle];
+
+	/* We're screwed if there's no head */
+	if (head == NULL) return;
+
+	section = SCRIPT_findinchildren (head, sectionname);
+	if (section == NULL)
+	{
+		/* Add the section if it does not exist */
+		section = SCRIPT_constructnode ();
+		section->type = SCRIPTFLAG_CATEGORY;
+		section->key = SCRIPT_copystring (sectionname);
+		SCRIPT_addchild (head, section);
+	}
+
+	node = SCRIPT_findinchildren (section, entryname);
+	if (node == NULL)
+	{
+		/* Add the entry if it does not exist */
+		node = SCRIPT_constructnode ();
+		node->key = SCRIPT_copystring (entryname);
+		SCRIPT_addchild (section, node);
+	} else if (node->type == SCRIPTFLAG_ONESTRING) {
+		free (node->data.string[0]);
+	} else if (node->type == SCRIPTFLAG_TWOSTRING) {
+		free (node->data.string[0]);
+		free (node->data.string[1]);
+	}
+
+	node->type = SCRIPTFLAG_TWOSTRING;
+	node->data.string[0] = SCRIPT_copystring (string1);
+	node->data.string[1] = SCRIPT_copystring (string2);
 }
 
 /*
