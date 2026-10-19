@@ -29,6 +29,10 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 extern char everyothertime;
 short which_palookup = 9;
+#if DUKE3D_GAMEVER < GAMEVER_14
+// 1.3D keeps each player's colour from the first level of a game.
+static char savedpal[MAXPLAYERS];
+#endif
 
 
 static void tloadtile(short tilenume)
@@ -267,7 +271,7 @@ void precachenecessarysounds(void)
     if (FXDevice == NumSoundCards) return;
     j = 0;
 
-    for(i=0;i<NUM_SOUNDS;i++)
+    for(i=0;i<GAME_NUM_SOUNDS;i++)
         if(Sound[i].ptr == 0)
         {
 #if DUKE3D_GAMEVER >= GAMEVER_15
@@ -401,9 +405,19 @@ void pickrandomspot(short snum)
 
     p = &ps[snum];
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+    // 1.3D starts every co-op player at the first player's spot.
+    if( ud.multimode > 1 )
+    {
+        if( ud.coop == 1 ) i = 0;
+        else i = TRAND%numplayersprites;
+    }
+    else i = snum;
+#else
     if( ud.multimode > 1 && ud.coop != 1)
         i = TRAND%numplayersprites;
     else i = snum;
+#endif
 
     p->bobposx = p->oposx = p->posx = po[i].ox;
     p->bobposy = p->oposy = p->posy = po[i].oy;
@@ -418,6 +432,11 @@ void resetplayerstats(short snum)
     short i;
 
     p = &ps[snum];
+
+#if DUKE3D_GAMEVER < GAMEVER_14
+    if(ud.last_level == -1 || ud.recstat == 2)
+        p->aim_mode = 0;
+#endif
 
     ud.show_help        = 0;
     ud.showallmap       = 0;
@@ -630,6 +649,14 @@ void setupbackdrop(short sky)
 {
     short i;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+    for(i=0;i<8;i++) pskyoff[i]=0;
+
+    parallaxyscale = 32768;
+
+    switch(sky)
+    {
+#else
     for(i=0;i<MAXPSKYTILES;i++) pskyoff[i]=0;
 
     if(parallaxyscale != 65536L)
@@ -640,6 +667,7 @@ void setupbackdrop(short sky)
         case CLOUDYOCEAN:
             parallaxyscale = 65536L;
             break;
+#endif
         case MOONSKY1 :
             pskyoff[6]=1; pskyoff[1]=2; pskyoff[4]=2; pskyoff[2]=3;
             break;
@@ -667,7 +695,9 @@ void prelevel(char g)
     clearbufbyte(show2dsprite,sizeof(show2dsprite),0L);
 
     resetprestat(0,g);
+#if DUKE3D_GAMEVER >= GAMEVER_14
     numclouds = 0;
+#endif
 
     for(i=0;i<numsectors;i++)
     {
@@ -693,8 +723,10 @@ void prelevel(char g)
             }
             setupbackdrop(sector[i].ceilingpicnum);
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
             if(sector[i].ceilingpicnum == CLOUDYSKIES && numclouds < 127)
                 clouds[numclouds++] = i;
+#endif
 
             if(ps[0].one_parallax_sectnum == -1)
                 ps[0].one_parallax_sectnum = i;
@@ -948,12 +980,14 @@ void prelevel(char g)
             case SCREENBREAK11:
             case SCREENBREAK12:
             case SCREENBREAK13:
+#if DUKE3D_GAMEVER >= GAMEVER_14
             case SCREENBREAK14:
             case SCREENBREAK15:
             case SCREENBREAK16:
             case SCREENBREAK17:
             case SCREENBREAK18:
             case SCREENBREAK19:
+#endif
 
                 animwall[numanimwalls].wallnum = i;
                 animwall[numanimwalls].tag = wal->picnum;
@@ -981,16 +1015,21 @@ void newgame(char vn,char ln,char sk)
     struct player_struct *p = &ps[0];
     short i;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+    if(ud.multimode < 2) p->aim_mode = 0;
+#else
     if(globalskillsound >= 0)
         while(Sound[globalskillsound].lock>=200);
     globalskillsound = -1;
 
     waitforeverybody();
+#endif
     ready2send = 0;
 
     if( ud.m_recstat != 2 && ud.last_level >= 0 && ud.multimode > 1 && ud.coop != 1)
         dobonus(1);
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
     if( ln == 0 && vn == 3 && ud.multimode < 2 && ud.lockout == 0)
     {
         playmusic(&env_music_fn[1][0]);
@@ -1012,6 +1051,7 @@ void newgame(char vn,char ln,char sk)
 
         FX_StopAllSounds();
     }
+#endif
 
     show_shareware = 26*34;
 
@@ -1020,10 +1060,14 @@ void newgame(char vn,char ln,char sk)
     ud.player_skill =   sk;
     ud.secretlevel =    0;
     ud.from_bonus = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_14
     parallaxyscale = 0;
+#endif
 
     ud.last_level = -1;
+#if DUKE3D_GAMEVER >= GAMEVER_14
     lastsavedpos = -1;
+#endif
     p->zoom            = 768;
     p->gm              = 0;
 
@@ -1167,6 +1211,16 @@ void resetpspritevars(char g)
 
             s->yvel = j;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+            if(ud.last_level == -1)
+            {
+                s->pal = ps[j].palookup = which_palookup;
+                savedpal[j] = (char)which_palookup;
+                which_palookup++;
+                if( which_palookup == 17 ) which_palookup = 9;
+            }
+            else s->pal = ps[j].palookup = savedpal[j];
+#else
             if(s->pal == 0)
             {
                 s->pal = ps[j].palookup = which_palookup;
@@ -1174,6 +1228,7 @@ void resetpspritevars(char g)
                 if( which_palookup >= 17 ) which_palookup = 9;
             }
             else ps[j].palookup = s->pal;
+#endif
 
             ps[j].i = i;
             ps[j].frag_ps = j;
@@ -1371,7 +1426,9 @@ void enterlevel(char g)
     ud.monsters_off = ud.m_monsters_off;
     ud.coop = ud.m_coop;
     ud.marker = ud.m_marker;
+#if DUKE3D_GAMEVER >= GAMEVER_14
     ud.ffire = ud.m_ffire;
+#endif
 
     if( (g&MODE_DEMO) == 0 && ud.recstat == 2)
         ud.recstat = 0;
@@ -1387,6 +1444,16 @@ void enterlevel(char g)
     dofrontscreens();
     vscrn();
     ud.screen_size = i;
+
+#if DUKE3D_GAMEVER < GAMEVER_14
+    // 1.3D starts the level music before loading the map.
+    if(ud.recstat != 2)
+    {
+        MUSIC_StopSong();
+        music_select = (ud.volume_number*11) + ud.level_number;
+        playmusic(&music_fn[0][(int)music_select][0]);
+    }
+#endif
 
 #ifndef VOLUMEONE
 
@@ -1418,6 +1485,12 @@ void enterlevel(char g)
     }
 #endif
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+    FX_StopAllSounds();
+    clearsoundlocks();
+    FX_SetReverb(0);
+#endif
+
     clearbufbyte(gotpic,sizeof(gotpic),0L);
 
     prelevel(g);
@@ -1428,17 +1501,21 @@ void enterlevel(char g)
     cachedebug = 0;
     automapping = 0;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
     if(ud.recstat != 2) MUSIC_StopSong();
+#endif
 
     cacheit();
     docacheit();
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
     if(ud.recstat != 2)
     {
         music_select = (ud.volume_number*11) + ud.level_number;
         playmusic(&music_fn[0][(int)music_select][0]);
     }
-#if DUKE3D_GAMEVER < GAMEVER_15
+#endif
+#if DUKE3D_GAMEVER >= GAMEVER_14 && DUKE3D_GAMEVER < GAMEVER_15
     clearsoundlocks();
     FX_SetReverb(0);
 #endif
@@ -1495,7 +1572,7 @@ void enterlevel(char g)
 
      restorepalette = 1;
 
-#if DUKE3D_GAMEVER < GAMEVER_15
+#if DUKE3D_GAMEVER >= GAMEVER_14 && DUKE3D_GAMEVER < GAMEVER_15
      FX_StopAllSounds();
 #endif
      flushpackets();

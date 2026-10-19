@@ -244,6 +244,15 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
               -P "${CMAKE_CURRENT_SOURCE_DIR}/con_compile_v13d.cmake")
     set_tests_properties(con_compile_v13d_${_v13d_edition} PROPERTIES TIMEOUT 120)
   endif()
+  if(_v13d_data)
+    add_test(NAME game_boot_v13d_${_v13d_edition}
+      COMMAND "${CMAKE_COMMAND}"
+              "-DDUKE3D=$<TARGET_FILE:duke3d>"
+              "-DDATA=${_v13d_data}" "-DEDITION=${_v13d_edition}"
+              "-DWORK=${CMAKE_BINARY_DIR}/gb13"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/game_boot_v13d.cmake")
+    set_tests_properties(game_boot_v13d_${_v13d_edition} PROPERTIES TIMEOUT 240)
+  endif()
   if(_v13d_data AND EXISTS "${_v13d_data}/refsaves/e1l1start.SAV")
     add_test(NAME lzw_dos_v13d_${_v13d_edition}
       COMMAND lzw_roundtrip "${_v13d_data}/refsaves/e1l1start.SAV"

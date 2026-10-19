@@ -1287,15 +1287,9 @@ char parsecommand(void)
             scriptptr--;
             transnum();
             k = *(scriptptr-1);
-#if DUKE3D_GAMEVER < GAMEVER_14
-            if(k >= 348) // 1.3D's sound table size
+            if(k >= GAME_NUM_SOUNDS)
             {
-                printf("  * ERROR!(L%d) Exceeded sound limit of %d.\n",line_number,348);
-#else
-            if(k >= NUM_SOUNDS)
-            {
-                printf("  * ERROR!(L%d) Exceeded sound limit of %d.\n",line_number,NUM_SOUNDS);
-#endif
+                printf("  * ERROR!(L%d) Exceeded sound limit of %d.\n",line_number,GAME_NUM_SOUNDS);
                 error++;
             }
             scriptptr--;

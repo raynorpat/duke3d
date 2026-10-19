@@ -164,6 +164,13 @@ struct player_struct;
 
 #define NUM_SOUNDS 450
 
+// Sounds the game logic may name: 1.3D's sound table held 348.
+#if DUKE3D_GAMEVER < GAMEVER_14
+#define GAME_NUM_SOUNDS 348
+#else
+#define GAME_NUM_SOUNDS NUM_SOUNDS
+#endif
+
 #define    ALT_IS_PRESSED ( KB_KeyPressed( sc_RightAlt ) || KB_KeyPressed( sc_LeftAlt ) )
 #define    SHIFTS_IS_PRESSED ( KB_KeyPressed( sc_RightShift ) || KB_KeyPressed( sc_LeftShift ) )
 #define    RANDOMSCRAP EGS(s->sectnum,s->x+(TRAND&255)-128,s->y+(TRAND&255)-128,s->z-(8<<8)-(TRAND&8191),SCRAP6+(TRAND&15),-8,48,48,TRAND&2047,(TRAND&63)+64,-512-(TRAND&2047),i,5)
