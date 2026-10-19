@@ -1666,6 +1666,79 @@ static void non3dr_menus(void)
 }
 
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+// 1.3D's credits: eight pages of text, as its menus() draws them (page, y, line).
+static const struct { short page, y; const char *text; } credits13[] =
+{
+    { 0, 40, "ORIGINAL CONCEPT" },
+    { 0, 49, "TODD REPLOGLE" },
+    { 0, 58, "ALLEN H. BLUM III" },
+    { 0, 76, "PRODUCED & DIRECTED BY" },
+    { 0, 85, "GREG MALONE" },
+    { 0, 103, "EXECUTIVE PRODUCER" },
+    { 0, 112, "GEORGE BROUSSARD" },
+    { 0, 130, "BUILD ENGINE" },
+    { 0, 139, "KEN SILVERMAN" },
+    { 1, 40, "GAME PROGRAMMING" },
+    { 1, 49, "TODD REPLOGLE" },
+    { 1, 67, "3D ENGINE/TOOLS/NET" },
+    { 1, 76, "KEN SILVERMAN" },
+    { 1, 94, "NETWORK LAYER/SETUP PROGRAM" },
+    { 1, 103, "MARK DOCHTERMANN" },
+    { 2, 40, "MAP DESIGN" },
+    { 2, 49, "ALLEN H BLUM III" },
+    { 2, 58, "RICHARD GRAY" },
+    { 2, 76, "3D MODELING" },
+    { 2, 85, "CHUCK JONES" },
+    { 2, 94, "SAPPHIRE CORPORATION" },
+    { 2, 112, "ARTWORK" },
+    { 2, 121, "DIRK JONES, STEPHEN HORNBACK" },
+    { 2, 130, "JAMES STOREY, DAVID DEMARET" },
+    { 2, 139, "DOUGLAS R WOOD" },
+    { 3, 40, "SOUND ENGINE" },
+    { 3, 49, "JIM DOSE" },
+    { 3, 67, "SOUND & MUSIC DEVELOPMENT" },
+    { 3, 76, "ROBERT PRINCE" },
+    { 3, 85, "LEE JACKSON" },
+    { 3, 103, "VOICE TALENT" },
+    { 3, 112, "LANI MINELLA - VOICE PRODUCER" },
+    { 3, 121, "JON ST. JOHN AS \"DUKE NUKEM\"" },
+    { 4, 60, "GRAPHIC DESIGN" },
+    { 4, 69, "PACKAGING, MANUAL, ADS" },
+    { 4, 78, "ROBERT M. ATKINS" },
+    { 4, 87, "MICHAEL HADWIN" },
+    { 4, 105, "SPECIAL THANKS TO" },
+    { 4, 114, "STEVEN BLACKBURN, TOM HALL" },
+    { 4, 123, "SCOTT MILLER, JOE SIEGLER" },
+    { 4, 132, "TERRY NAGY, COLLEEN COMPTON" },
+    { 4, 141, "HASH INC., FORMGEN, INC." },
+    { 5, 49, "THE 3D REALMS BETA TESTERS" },
+    { 5, 67, "NATHAN ANDERSON, WAYNE BENNER" },
+    { 5, 76, "GLENN BRENSINGER, ROB BROWN" },
+    { 5, 85, "ERIK HARRIS, KEN HECKBERT" },
+    { 5, 94, "TERRY HERRIN, GREG HIVELY" },
+    { 5, 103, "HANK LEUKART, ERIC BAKER" },
+    { 5, 112, "JEFF RAUSCH, KELLY ROGERS" },
+    { 5, 121, "MIKE DUNCAN, DOUG HOWELL" },
+    { 5, 130, "BILL BLAIR" },
+    { 6, 32, "COMPANY PRODUCT SUPPORT" },
+    { 6, 50, "THE FOLLOWING COMPANIES WERE COOL" },
+    { 6, 59, "ENOUGH TO GIVE US LOTS OF STUFF" },
+    { 6, 68, "DURING THE MAKING OF DUKE NUKEM 3D." },
+    { 6, 86, "ALTEC LANSING MULTIMEDIA" },
+    { 6, 95, "FOR TONS OF SPEAKERS AND THE" },
+    { 6, 104, "THX-LICENSED SOUND SYSTEM" },
+    { 6, 113, "FOR INFO CALL 1-800-548-0620" },
+    { 6, 131, "CREATIVE LABS, INC." },
+    { 6, 149, "THANKS FOR THE HARDWARE, GUYS." },
+    { 7, 50, "DUKE NUKEM IS A TRADEMARK OF" },
+    { 7, 59, "3D REALMS ENTERTAINMENT" },
+    { 7, 78, "DUKE NUKEM 3D" },
+    { 7, 87, "(C) 1996 3D REALMS ENTERTAINMENT" },
+    { 7, 115, "MADE IN DALLAS, TEXAS USA" },
+};
+#endif
+
 void menus(void)
 {
     int count;
@@ -2107,6 +2180,10 @@ void menus(void)
 //            rotatesprite(c<<16,200<<15,65536L,0,MENUSCREEN,16,0,10+64,0,0,xdim-1,ydim-1);
 //            rotatesprite(c<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
 //            menutext(c,24,0,0,"CREDITS");
+#if DUKE3D_GAMEVER < GAMEVER_14
+            rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
+            menutext(160,24,0,0,"CREDITS");
+#endif
 
             if(KB_KeyPressed(sc_Escape)) { cmenu(0); break; }
 
@@ -2124,7 +2201,11 @@ void menus(void)
 
                 sound(KICK_HIT);
                 current_menu--;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                if(current_menu < 990) current_menu = 997;
+#else
                 if(current_menu < 990) current_menu = 992;
+#endif
             }
             else if(
                 KB_KeyPressed( sc_PgDn ) ||
@@ -2148,9 +2229,18 @@ void menus(void)
                 KB_ClearKeyDown(sc_Space);
                 sound(KICK_HIT);
                 current_menu++;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                if(current_menu > 997) current_menu = 990;
+#else
                 if(current_menu > 992) current_menu = 990;
+#endif
             }
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+            for(l=0;l<(int)(sizeof(credits13)/sizeof(credits13[0]));l++)
+                if(credits13[l].page == current_menu-990)
+                    gametext(160,credits13[l].y,(char *)credits13[l].text,0,2+8+16);
+#else
             switch(current_menu)
             {
                 case 990:
@@ -2161,6 +2251,7 @@ void menus(void)
                    break;
 
             }
+#endif
             break;
 
         case 0:
