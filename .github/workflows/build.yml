@@ -1,0 +1,45 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SDL2 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-dev libsdl2-mixer-dev
+
+      - name: Install SDL2 (macOS)
+        if: runner.os == 'macOS'
+        run: brew install sdl2 sdl2_mixer
+
+      # Windows has no SDL2 installed, so this also tests the FetchContent path.
+      - name: Configure
+        run: cmake --preset default
+
+      - name: Build
+        run: cmake --build --preset default --parallel
+
+      # Not on Windows yet: see tests/CMakeLists.txt.
+      - name: Test
+        if: runner.os != 'Windows'
+        run: ctest --preset default
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: duke3d-${{ runner.os }}
+          path: build/bin/
