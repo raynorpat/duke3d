@@ -47,6 +47,10 @@ target_include_directories(pragmas_semantics PRIVATE "${PROJECT_SOURCE_DIR}/sour
 target_link_libraries(pragmas_semantics PRIVATE buildengine)
 add_test(NAME pragmas_semantics COMMAND pragmas_semantics)
 
+add_executable(vline_counts vline_counts.c)
+target_link_libraries(vline_counts PRIVATE buildengine)
+add_test(NAME vline_counts COMMAND vline_counts)
+
 # The engine's LZW compressor and decompressor must agree. In 1.3D builds
 # with the 1.3D data, it also reads a save written by the DOS executable.
 add_executable(lzw_roundtrip lzw_roundtrip.c)
@@ -101,7 +105,7 @@ add_executable(render_e1l1 render_e1l1.c)
 target_link_libraries(render_e1l1 PRIVATE buildengine duke3d::SDL2main)
 
 set(DUKE3D_GRP "" CACHE FILEPATH "DUKE3D.GRP for tests that need game data")
-set(DUKE3D_E1L1_CHECKSUM "8e9d8814" CACHE STRING
+set(DUKE3D_E1L1_CHECKSUM "e0517697" CACHE STRING
     "Expected render_e1l1 frame checksum (hex); empty just prints it")
 if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
   add_test(NAME render_e1l1

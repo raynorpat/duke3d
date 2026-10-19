@@ -328,6 +328,8 @@ int32_t mvlineasm1(int32_t vince, intptr_t palookupoffse, int32_t i3, int32_t vp
     uint32_t temp;
     unsigned char *dest = (unsigned char *)i6;
 
+    /* Fix: A.ASM draws i3+1 rows like vlineasm1; drawing i3 cut the bottom row off masked walls and HUD tiles. */
+    i3++;
     while (i3)
     {
 	    temp = ((unsigned)vplce) >> machmv;
