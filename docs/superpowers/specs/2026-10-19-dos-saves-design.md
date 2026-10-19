@@ -210,6 +210,7 @@ Found while writing the plan:
 5. **Thumbnail.** `saveplayer` writes the screenshot tile (`MAXTILES-1`), which only the
    menu fills. Before saving, `-saveverify` copies in the thumbnail that the load just
    read (`MAXTILES-3`), so the thumbnail takes part in the round trip.
+6. **More round-trip masks.** The round trip also ignores `lockclock`, which `loadplayer` resets through `resettimevars()`, and `animateptr` entries at or past `animatecnt`, which DOS saves leave as stale pointer offsets and the game never reads.
 
 ## Out of scope
 

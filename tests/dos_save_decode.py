@@ -233,10 +233,15 @@ def state(save):
         get(PLAYER_OFFS, ps0, 'posy'))
 
 
-def masked(name, data):
+def masked(name, data, save):
     """Bytes that may differ after a load and an immediate save."""
     if name in ('scriptptrs', 'hitptrs'):
         return b''      # offset bitmaps: DOS fills them, the port writes zeros
+    if name == 'lockclock':
+        return b''      # loadplayer resets the clock via resettimevars
+    if name == 'animateptr':
+        n = struct.unpack('<i', save.calls['animatecnt'])[0]
+        return data[:4 * n]     # entries past animatecnt are stale in DOS saves, never read
     if name == 'ps':
         data = bytearray(data)
         for p in range(MAXPLAYERS):
@@ -250,7 +255,7 @@ def masked(name, data):
 def compare(a, b):
     bad = 0
     for name, _, _ in CALLS:
-        x, y = masked(name, a.calls[name]), masked(name, b.calls[name])
+        x, y = masked(name, a.calls[name], a), masked(name, b.calls[name], b)
         if x != y:
             n = min(len(x), len(y))
             at = next((j for j in range(n) if x[j] != y[j]), n)
