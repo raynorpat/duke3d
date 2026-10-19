@@ -311,6 +311,40 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
     add_test(NAME lzw_dos_v13d_${_v13d_edition}
       COMMAND lzw_roundtrip "${_v13d_data}/refsaves/e1l1start.SAV"
       WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lzw_dos")
+    # Each DOS reference save of this edition must load with the state its status
+    # bar showed, and survive our own save and reload.
+    include("${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_save_refs.cmake")
+    get_cmake_property(_v13d_vars VARIABLES)
+    foreach(_var IN LISTS _v13d_vars)
+      if(_var MATCHES "^V13D_SAVE_(.+)_EDITION$" AND "${${_var}}" STREQUAL _v13d_edition)
+        set(_name "${CMAKE_MATCH_1}")
+        add_test(NAME dos_save_v13d_${_name}
+          COMMAND "${CMAKE_COMMAND}" -DMODE=load
+                  "-DDUKE3D=$<TARGET_FILE:duke3d>"
+                  "-DDATA=${_v13d_data}" "-DEDITION=${_v13d_edition}"
+                  "-DREFS=${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_save_refs.cmake"
+                  "-DPYTHON=${Python3_EXECUTABLE}"
+                  "-DDECODER=${CMAKE_CURRENT_SOURCE_DIR}/v13d_save_decode.py"
+                  "-DNAME=${_name}" "-DWORK=${CMAKE_BINARY_DIR}/sv13_${_name}"
+                  -P "${CMAKE_CURRENT_SOURCE_DIR}/dos_save_v13d.cmake")
+        set_tests_properties(dos_save_v13d_${_name} PROPERTIES TIMEOUT 120)
+      endif()
+    endforeach()
+    # The other edition's DOS save, and a 1.5 one, must be refused.
+    if(_v13d_edition STREQUAL "full")
+      set(_v13d_other "${DUKE3D_V13D_SW_DATA_DIR}/refsaves/e1l1start.SAV")
+    else()
+      set(_v13d_other "${DUKE3D_V13D_DATA_DIR}/refsaves/e1l1start.SAV")
+    endif()
+    if(EXISTS "${_v13d_other}")
+      add_test(NAME save_refuse_v13d_${_v13d_edition}
+        COMMAND "${CMAKE_COMMAND}" -DMODE=refuse
+                "-DDUKE3D=$<TARGET_FILE:duke3d>"
+                "-DDATA=${_v13d_data}" "-DEDITION=${_v13d_edition}"
+                "-DOTHER=${_v13d_other}" "-DWORK=${CMAKE_BINARY_DIR}/sr13"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/dos_save_v13d.cmake")
+      set_tests_properties(save_refuse_v13d_${_v13d_edition} PROPERTIES TIMEOUT 120)
+    endif()
   endif()
   if(_v13d_data)
     # Two copies of this build must meet over UDP on localhost, and both

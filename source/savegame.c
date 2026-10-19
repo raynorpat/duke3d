@@ -1,5 +1,5 @@
 /*
- * Converts saved records to and from the DOS 1.5 layout. See savegame.h.
+ * Converts saved records to and from the DOS save layout. See savegame.h.
  */
 #include "duke3d.h"
 #include "savegame.h"
@@ -74,6 +74,69 @@ int32_t sg_sprite(unsigned char *b, void *rec, int write)
     return o;
 }
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+/*
+ * The DOS 1.3D player_struct (0x552 bytes, docs/v13d/reference.md and ledger
+ * F-007): no subweapon or wantweaponfire, aim_mode is a char near the end,
+ * 11 weapons, 256 weaprecs and a 13-byte name.
+ */
+int32_t sg_player(unsigned char *b, void *rec, int write)
+{
+    struct player_struct *p = (struct player_struct *)rec;
+    int32_t o = 0, k;
+
+    if (!write) { p->subweapon = 0; p->wantweaponfire = 0; }
+
+    F32(p->zoom); F32(p->exitx); F32(p->exity);
+    A32(p->loogiex,64); A32(p->loogiey,64); F32(p->numloogs); F32(p->loogcnt);
+    F32(p->posx); F32(p->posy); F32(p->posz); F32(p->horiz); F32(p->ohoriz);
+    F32(p->ohorizoff); F32(p->invdisptime);
+    F32(p->bobposx); F32(p->bobposy); F32(p->oposx); F32(p->oposy); F32(p->oposz);
+    F32(p->pyoff); F32(p->opyoff);
+    F32(p->posxv); F32(p->posyv); F32(p->poszv); F32(p->last_pissed_time);
+    F32(p->truefz); F32(p->truecz);
+    F32(p->player_par); F32(p->visibility);
+    F32(p->bobcounter); F32(p->weapon_sway);
+    F32(p->pals_time); F32(p->randomflamex); F32(p->crack_time);
+
+    F16(p->ang); F16(p->oang); F16(p->angvel); F16(p->cursectnum); F16(p->look_ang);
+    F16(p->last_extra);
+    A16(p->ammo_amount,11); F16(p->wackedbyactor); F16(p->frag); F16(p->fraggedself);
+    F16(p->curr_weapon); F16(p->last_weapon); F16(p->tipincs); F16(p->horizoff);
+    F16(p->holoduke_amount); F16(p->newowner); F16(p->hurt_delay); F16(p->hbomb_hold_delay);
+    F16(p->jumping_counter); F16(p->airleft); F16(p->knee_incs); F16(p->access_incs);
+    F16(p->fta); F16(p->ftq); F16(p->access_wallnum); F16(p->access_spritenum);
+    F16(p->kickback_pic); F16(p->got_access); F16(p->weapon_ang); F16(p->firstaid_amount);
+    F16(p->somethingonplayer); F16(p->on_crane); F16(p->i); F16(p->one_parallax_sectnum);
+    F16(p->over_shoulder_on); F16(p->random_club_frame); F16(p->fist_incs);
+    F16(p->one_eighty_count); F16(p->cheat_phase);
+    F16(p->dummyplayersprite); F16(p->extra_extra8); F16(p->quick_kick);
+    F16(p->heat_amount); F16(p->actorsqu); F16(p->timebeforeexit); F16(p->customexitsound);
+    A16(p->weaprecs,256); F16(p->weapreccnt); F16(p->interface_toggle_flag);
+    F16(p->rotscrnang); F16(p->dead_flag); F16(p->show_empty_weapon);
+    F16(p->scuba_amount); F16(p->jetpack_amount); F16(p->steroids_amount); F16(p->shield_amount);
+    F16(p->holoduke_on); F16(p->pycount); F16(p->weapon_pos); F16(p->frag_ps);
+    F16(p->transporter_hold); F16(p->last_full_weapon); F16(p->footprintshade); F16(p->boot_amount);
+
+    F32(p->scream_voice);
+
+    F8(p->gm); F8(p->on_warping_sector); F8(p->footprintcount);
+    F8(p->hbomb_on); F8(p->jumping_toggle); F8(p->rapid_fire_hold); F8(p->on_ground);
+    A8(p->name,13); F8(p->inven_icon); F8(p->buttonpalette);
+    F8(p->jetpack_on); F8(p->spritebridge); F8(p->lastrandomspot);
+    F8(p->scuba_on); F8(p->footprintpal); F8(p->heat_on);
+    F8(p->holster_weapon); F8(p->falling_counter); F8(p->aim_mode);
+    A8(p->gotweapon,11); F8(p->refresh_inventory);
+    /* palette: a 32-bit DOS pointer. Written as zeros, never read back. */
+    if (write) b[o] = b[o+1] = b[o+2] = b[o+3] = 0;
+    o += 4;
+    F8(p->toggle_key_flag); F8(p->knuckle_incs);
+    F8(p->walking_snd_toggle); F8(p->palookup); F8(p->hard_landing);
+    F8(p->max_secret_rooms); F8(p->secret_rooms); A8(p->pals,3);
+    F8(p->max_actors_killed); F8(p->actors_killed); F8(p->return_to_center);
+    return o;
+}
+#else
 int32_t sg_player(unsigned char *b, void *rec, int write)
 {
     struct player_struct *p = (struct player_struct *)rec;
@@ -130,6 +193,7 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
     F8(p->max_actors_killed); F8(p->actors_killed); F8(p->return_to_center);
     return o;
 }
+#endif
 
 int32_t sg_playerorig(unsigned char *b, void *rec, int write)
 {
@@ -255,7 +319,10 @@ int32_t sg_playerblocksize(int32_t fil)
     /* The dfwrite calls between the version block and ps[]. */
     static const int32_t calls[][2] =
     {
-        {4,1}, {19,1}, {4,1}, {4,1}, {4,1}, {160,100},
+#if DUKE3D_GAMEVER >= GAMEVER_14
+        {4,1},  /* ud.multimode; 1.3D doesn't save it */
+#endif
+        {19,1}, {4,1}, {4,1}, {4,1}, {160,100},
         {2,1}, {SG_WALL_SIZE,MAXWALLS}, {2,1}, {SG_SECTOR_SIZE,MAXSECTORS},
         {SG_SPRITE_SIZE,MAXSPRITES},
         {2,MAXSECTORS+1}, {2,MAXSPRITES}, {2,MAXSPRITES},

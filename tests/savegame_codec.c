@@ -75,6 +75,42 @@ static void test_sprite(void)
     CHECK(memcmp(&s, &back, sizeof(s)) == 0);
 }
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+/* The DOS 1.3D player_struct (docs/v13d/reference.md, ledger F-007). */
+static void test_player(void)
+{
+    static struct player_struct p, back;
+    static unsigned char b[2048];
+
+    memset(&p, 0, sizeof(p)); memset(&back, 0, sizeof(back)); memset(b, 0xee, sizeof(b));
+    p.zoom = 0x01020304; p.loogiey[63] = 0x44; p.posx = -5; p.ang = 0x0605;
+    p.curr_weapon = 7; p.i = 0x0a0b; p.shield_amount = 100; p.scream_voice = 0x0c0d0e0f;
+    p.gm = 0x11; p.name[0] = 'D'; p.aim_mode = 1; p.gotweapon[10] = 1; p.palette = (char *)b;
+    p.toggle_key_flag = 0x22; p.return_to_center = 0x33;
+    CHECK(sg_player(b, &p, 1) == 0x552);
+    CHECK(b[0] == 0x04 && b[1] == 0x03 && b[2] == 0x02 && b[3] == 0x01);
+    CHECK(le32(b + 520) == 0x44);
+    CHECK(le32(b + 0x214) == -5);
+    CHECK(le16(b + 0x280) == 0x0605);
+    CHECK(le16(b + 0x2a8) == 7);
+    CHECK(le16(b + 0x2d4) == 0x0a0b);
+    CHECK(le16(b + 0x500) == 100);
+    CHECK(le32(b + 0x512) == 0x0c0d0e0f);
+    CHECK(b[0x516] == 0x11);
+    CHECK(b[0x51d] == 'D');
+    CHECK(b[0x534] == 1);
+    CHECK(b[0x53f] == 1);
+    CHECK(b[0x541] == 0 && b[0x542] == 0 && b[0x543] == 0 && b[0x544] == 0);
+    CHECK(b[0x545] == 0x22);
+    CHECK(b[0x551] == 0x33);
+    CHECK(b[0x552] == 0xee);
+    b[0x541] = 0x99;   /* a DOS pointer: must not be restored */
+    CHECK(sg_player(b, &back, 0) == 0x552);
+    CHECK(back.palette == NULL);
+    back.palette = p.palette;
+    CHECK(memcmp(&p, &back, sizeof(p)) == 0);
+}
+#else
 static void test_player(void)
 {
     static struct player_struct p, back;
@@ -107,6 +143,7 @@ static void test_player(void)
     back.palette = p.palette;
     CHECK(memcmp(&p, &back, sizeof(p)) == 0);
 }
+#endif
 
 static void test_small(void)
 {

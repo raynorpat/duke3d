@@ -177,7 +177,11 @@ static int loadpheader(char spot,int32 *vn,int32 *ln,int32 *psk,int32 *nump)
         return 1;
      }
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+     *nump = 1;  // 1.3D saves have no player count
+#else
      *nump = sg_read32(fil);
+#endif
 
      kdfread(tempbuf,19,1,fil);
      *vn = sg_read32(fil);
@@ -258,9 +262,13 @@ int loadplayerfile(char *fnptr, signed char spot)
         return 1;
      }
      i = sg_playerblocksize(fil);
-     if(i != SG_PLAYER_SIZE*MAXPLAYERS)
+     if(i != SG_PLAYER_BLOCK0)
      {
+#if DUKE3D_GAMEVER < GAMEVER_14
+        printf("%s is not a DOS 1.3D save (player block is %d bytes).\n",fnptr,i);
+#else
         printf("%s is not a DOS 1.5 save (player block is %d bytes).\n",fnptr,i);
+#endif
         FTA(114,&ps[myconnectindex]);
         kclose(fil);
         ototalclock = totalclock;
@@ -268,7 +276,11 @@ int loadplayerfile(char *fnptr, signed char spot)
         return 1;
      }
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+     nump = 1;  // 1.3D saves have no player count
+#else
      nump = sg_read32(fil);
+#endif
      if(nump != numplayers)
      {
         kclose(fil);
@@ -328,7 +340,7 @@ int loadplayerfile(char *fnptr, signed char spot)
      sg_read16s(fil,nextspritestat,2,MAXSPRITES);
      numcyclers = clampcount(sg_read16(fil),MAXCYCLERS);
      sg_read16s(fil,&cyclers[0][0],12,MAXCYCLERS);
-     sg_readrecs(fil,ps,sizeof(struct player_struct),sg_player,MAXPLAYERS,SG_PLAYER_SIZE*MAXPLAYERS,1);
+     sg_readrecs(fil,ps,sizeof(struct player_struct),sg_player,MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
      for(i=0;i<MAXPLAYERS;i++) ps[i].palette = (char *) &palette[0];
      sg_readrecs(fil,po,sizeof(struct player_orig),sg_playerorig,MAXPLAYERS,SG_PLAYERORIG_SIZE*MAXPLAYERS,1);
      numanimwalls = clampcount(sg_read16(fil),MAXANIMWALLS);
@@ -336,13 +348,20 @@ int loadplayerfile(char *fnptr, signed char spot)
      sg_read32s(fil,msx,4,sizeof(msx)/sizeof(msx[0]));
      sg_read32s(fil,msy,4,sizeof(msy)/sizeof(msy[0]));
      spriteqloc = sg_read16(fil);
+#if DUKE3D_GAMEVER < GAMEVER_14
+     // 1.3D's sprite queue is always 64 long and its length isn't saved.
+     spriteqamount = 64;
+     sg_read16s(fil,spriteq,2,64);
+#else
      spriteqamount = sg_read16(fil);
      sg_read16sn(fil,spriteq,1024,2,spriteqamount);
      spriteqamount = clampcount(spriteqamount,1024);
+#endif
      mirrorcnt = clampcount(sg_read16(fil),64);
      sg_read16s(fil,mirrorwall,2,64);
      sg_read16s(fil,mirrorsector,2,64);
      kdfread(&show2dsector[0],sizeof(char),MAXSECTORS>>3,fil);
+#if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D saves no actortype, boardfilename or clouds
      clearbufbyte(actortype,MAXTILES,0L);
      kdfread(&actortype[0],sizeof(char),SG_DOS_MAXTILES,fil);
      kdfread(&boardfilename[0],sizeof(boardfilename),1,fil);
@@ -351,6 +370,7 @@ int loadplayerfile(char *fnptr, signed char spot)
      sg_read16s(fil,clouds,sizeof(short)<<7,1);
      sg_read16s(fil,cloudx,sizeof(short)<<7,1);
      sg_read16s(fil,cloudy,sizeof(short)<<7,1);
+#endif
 
      kdfread(&scriptptrs[0],1,MAXSCRIPTSIZE,fil);
      sg_read32s(fil,script,4,MAXSCRIPTSIZE);
@@ -358,8 +378,14 @@ int loadplayerfile(char *fnptr, signed char spot)
      clearbuf(actorscrptr,MAXTILES,0L);
      sg_read32s(fil,actorscrptr,4,SG_DOS_MAXTILES);
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+     clearbufbyte(hittype,sizeof(hittype),0L);
+     kdfread(&scriptptrs[0],1,SG_DOS_MAXHITTYPES,fil);
+     sg_readrecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,SG_DOS_MAXHITTYPES,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES);
+#else
      kdfread(&scriptptrs[0],1,MAXSPRITES,fil);
      sg_readrecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,MAXSPRITES,SG_WEAPONHIT_SIZE,MAXSPRITES);
+#endif
 
      lockclock = sg_read32(fil);
      pskybits = sg_read16(fil);
@@ -390,6 +416,7 @@ int loadplayerfile(char *fnptr, signed char spot)
      ud.last_level = sg_read16(fil);
      ud.eog = sg_read8(fil);
 
+#if DUKE3D_GAMEVER >= GAMEVER_14 // a 1.3D save ends here
      ud.coop = sg_read32(fil);
      ud.m_coop = ud.coop;
      ud.marker = sg_read32(fil);
@@ -406,6 +433,7 @@ int loadplayerfile(char *fnptr, signed char spot)
      randomseed = sg_read32(fil);
      global_random = sg_read16(fil);
      parallaxyscale = sg_read32(fil);
+#endif
 
      kclose(fil);
 
@@ -570,7 +598,9 @@ int saveplayerfile(char *fnptr, signed char spot)
      ready2send = 0;
 
      sg_write32(fil,BYTEVERSION);
+#if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D saves have no player count
      sg_write32(fil,ud.multimode);
+#endif
 
      dfwrite(&ud.savegame[spot][0],19,1,fil);
      sg_write32(fil,ud.volume_number);
@@ -591,19 +621,24 @@ int saveplayerfile(char *fnptr, signed char spot)
      sg_write16s(fil,nextspritestat,2,MAXSPRITES);
      sg_write16(fil,numcyclers);
      sg_write16s(fil,&cyclers[0][0],12,MAXCYCLERS);
-     sg_writerecs(fil,ps,sizeof(struct player_struct),sg_player,MAXPLAYERS,SG_PLAYER_SIZE*MAXPLAYERS,1);
+     sg_writerecs(fil,ps,sizeof(struct player_struct),sg_player,MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
      sg_writerecs(fil,po,sizeof(struct player_orig),sg_playerorig,MAXPLAYERS,SG_PLAYERORIG_SIZE*MAXPLAYERS,1);
      sg_write16(fil,numanimwalls);
      sg_writerecs(fil,animwall,sizeof(struct animwalltype),sg_animwall,MAXANIMWALLS,SG_ANIMWALL_SIZE*MAXANIMWALLS,1);
      sg_write32s(fil,msx,4,sizeof(msx)/sizeof(msx[0]));
      sg_write32s(fil,msy,4,sizeof(msy)/sizeof(msy[0]));
      sg_write16(fil,spriteqloc);
+#if DUKE3D_GAMEVER < GAMEVER_14
+     sg_write16s(fil,spriteq,2,64);  // 1.3D's queue is always 64 long
+#else
      sg_write16(fil,spriteqamount);
      sg_write16s(fil,spriteq,2,spriteqamount);
+#endif
      sg_write16(fil,mirrorcnt);
      sg_write16s(fil,mirrorwall,2,64);
      sg_write16s(fil,mirrorsector,2,64);
      dfwrite(&show2dsector[0],sizeof(char),MAXSECTORS>>3,fil);
+#if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D saves no actortype, boardfilename or clouds
      dfwrite(&actortype[0],sizeof(char),SG_DOS_MAXTILES,fil);
      dfwrite(&boardfilename[0],sizeof(boardfilename),1,fil);
 
@@ -611,6 +646,7 @@ int saveplayerfile(char *fnptr, signed char spot)
      sg_write16s(fil,clouds,sizeof(short)<<7,1);
      sg_write16s(fil,cloudx,sizeof(short)<<7,1);
      sg_write16s(fil,cloudy,sizeof(short)<<7,1);
+#endif
 
      // Script values are already offsets; the pointer flag blocks are kept zeroed.
      clearbufbyte(scriptptrs,MAXSCRIPTSIZE,0L);
@@ -620,8 +656,13 @@ int saveplayerfile(char *fnptr, signed char spot)
 
      sg_write32s(fil,actorscrptr,4,SG_DOS_MAXTILES);
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+     dfwrite(&scriptptrs[0],1,SG_DOS_MAXHITTYPES,fil);
+     sg_writerecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,SG_DOS_MAXHITTYPES,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES);
+#else
      dfwrite(&scriptptrs[0],1,MAXSPRITES,fil);
      sg_writerecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,MAXSPRITES,SG_WEAPONHIT_SIZE,MAXSPRITES);
+#endif
 
      sg_write32(fil,lockclock);
      sg_write16(fil,pskybits);
@@ -646,6 +687,7 @@ int saveplayerfile(char *fnptr, signed char spot)
      sg_write32(fil,ud.monsters_off);
      sg_write16(fil,ud.last_level);
      sg_write8(fil,ud.eog);
+#if DUKE3D_GAMEVER >= GAMEVER_14 // a 1.3D save ends here
      sg_write32(fil,ud.coop);
      sg_write32(fil,ud.marker);
      sg_write32(fil,ud.ffire);
@@ -658,6 +700,7 @@ int saveplayerfile(char *fnptr, signed char spot)
      sg_write32(fil,randomseed);
      sg_write16(fil,global_random);
      sg_write32(fil,parallaxyscale);
+#endif
 
          fclose(fil);
 

@@ -5,6 +5,11 @@ Written from the DOS file layout (docs/v13d/reference.md, "Save file"), not
 from the game's save code. 1.3D compresses each block with the 1996 LZW
 variant (ledger E-012), which this file implements itself.
 
+  v13d_save_decode.py compare <dos save> <our save>
+      decompress both files block by block. Prints one line per block that
+      differs and exits 1 if the block layouts differ or if any block other
+      than the ones our saves legitimately change differs (see compare()).
+
   v13d_save_decode.py script <save> <out>
       write the compiled CON script the save holds, one "<name> <index> <value>"
       line per word: "script" for script[0..20000) and "actor" for each
@@ -99,7 +104,58 @@ def read_script(path):
     return script, actors
 
 
+def blocks(path):
+    """Every block's decompressed bytes, in file order."""
+    data, pos, out = open(path, 'rb').read(), 0, []
+    while pos + 2 <= len(data):
+        n, = struct.unpack_from('<h', data, pos)
+        out.append(uncompress(data[pos + 2:pos + 2 + n]))
+        pos += 2 + n
+    if pos != len(data):
+        raise ValueError('%s: a block runs past the end' % path)
+    return out
+
+
+# Blocks our saves change, by index in a single-player save: the script and
+# hittype pointer bitmaps (we keep script values as offsets, so ours are all
+# zero), and lockclock (loadplayer resets the clock, as DOS does).
+ALLOWED = {60: 'script bitmap', 61: 'script bitmap', 68: 'hittype bitmap', 78: 'lockclock'}
+PALETTE = 0x541     # each player's DOS palette pointer; we write zeros
+GM = 0x516          # loading clears MODE_MENU (1) from gm, as DOS's loadplayer does
+
+
+def compare(dos, ours):
+    a, b = blocks(dos), blocks(ours)
+    if [len(x) for x in a] != [len(x) for x in b]:
+        print('block layouts differ: %d blocks %s vs %d blocks %s'
+              % (len(a), [len(x) for x in a], len(b), [len(x) for x in b]))
+        return 1
+    # animateptr: entries past animatecnt are stale in DOS saves and never
+    # read, and we write zeros there.
+    n = 4 * struct.unpack('<i', a[81])[0]
+    a[83], b[83] = a[83][:n], b[83][:n]
+    # ps[0..11] and ps[12..15]: kdfread stores each player as a difference
+    # from the one before, so undo that before masking.
+    for x in (a, b):
+        ps = bytearray(x[47] + x[48])
+        for p in range(PLAYER_SIZE, len(ps), PLAYER_SIZE):
+            for j in range(PLAYER_SIZE):
+                ps[p + j] = (ps[p + j] + ps[p - PLAYER_SIZE + j]) & 255
+        for p in range(0, len(ps), PLAYER_SIZE):
+            ps[p + PALETTE:p + PALETTE + 4] = bytes(4)
+            ps[p + GM] &= 0xfe
+        x[47], x[48] = bytes(ps[:len(x[47])]), bytes(ps[len(x[47]):])
+    bad = 0
+    for i, (x, y) in enumerate(zip(a, b)):
+        if x != y:
+            print('block %d differs (%s)' % (i, ALLOWED.get(i, 'not allowed')))
+            bad += i not in ALLOWED
+    return 1 if bad else 0
+
+
 def main():
+    if len(sys.argv) == 4 and sys.argv[1] == 'compare':
+        return compare(sys.argv[2], sys.argv[3])
     if len(sys.argv) == 4 and sys.argv[1] == 'script':
         script, actors = read_script(sys.argv[2])
         with open(sys.argv[3], 'w') as f:

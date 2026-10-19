@@ -213,7 +213,11 @@ struct player_struct;
 #define NUMOFFIRSTTIMEACTIVE 192
 
 #define MAXCYCLERS 256
+#if DUKE3D_GAMEVER < GAMEVER_14
+#define MAXSCRIPTSIZE 20000  // 1.3D's script[], as its saves hold it
+#else
 #define MAXSCRIPTSIZE 20460
+#endif
 #define MAXANIMATES 64
 
 #define SP  sprite[i].yvel
