@@ -27,6 +27,8 @@ foreach(_con GAME.CON DEFS.CON USER.CON)
 endforeach()
 
 set(ENV{SDL_VIDEODRIVER} dummy)
+# No sound: killing the game at the timeout would pop the speakers.
+set(ENV{SDL_AUDIODRIVER} dummy)
 set(ENV{BUILD_WINDOWED} 1)
 set(ENV{HOME} "${_home}")
 set(ENV{USERPROFILE} "${_home}")

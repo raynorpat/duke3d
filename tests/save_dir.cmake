@@ -20,6 +20,8 @@ file(WRITE "${_run}/duke3d.cfg" "save_dir marker\n")
 file(WRITE "${_run}/game3.sav" "save_dir marker 3\n")
 
 set(ENV{SDL_VIDEODRIVER} dummy)
+# No sound: killing the game at the timeout would pop the speakers.
+set(ENV{SDL_AUDIODRIVER} dummy)
 set(ENV{BUILD_WINDOWED} 1)
 set(ENV{DUKE3D_SAVE_DIR} "${_saves}")
 execute_process(COMMAND "${DUKE3D}"
