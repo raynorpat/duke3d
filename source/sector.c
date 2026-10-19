@@ -2032,18 +2032,6 @@ char checkhitceiling(short sn)
     return 0;
 }                                     
 
-#if DUKE3D_GAMEVER < GAMEVER_14
-// 1.3D's scrap: no x/y/z jitter, and the random numbers drawn in this order.
-static void randomscrap13(short i)
-{
-    spritetype *s = &sprite[i];
-    int32_t zv = -512-(TRAND&2047), vel = (TRAND&63)+64;
-    int32_t ang = TRAND&2047, pn = SCRAP6+(TRAND&15);
-
-    EGS(s->sectnum,s->x,s->y,s->z-(12<<8),pn,-8,48,48,ang,vel,zv,i,5);
-}
-#endif
-
 void checkhitsprite(short i,short sn)
 {
     short j, k, l, nextj, p;
@@ -2161,13 +2149,11 @@ void checkhitsprite(short i,short sn)
             if( sector[SECT].floorpicnum == FANSHADOW )
                 sector[SECT].floorpicnum = FANSHADOWBROKE;
 
-#if DUKE3D_GAMEVER < GAMEVER_14
-            for(j=0;j<16;j++) randomscrap13(i);
-#else
+#if DUKE3D_GAMEVER >= GAMEVER_14
             spritesound(GLASS_HEAVYBREAK,i);
+#endif
             s = &sprite[i];
             for(j=0;j<16;j++) RANDOMSCRAP;
-#endif
 
             break;
         case WATERFOUNTAIN:
@@ -2405,7 +2391,8 @@ void checkhitsprite(short i,short sn)
         case POT3:
 #if DUKE3D_GAMEVER < GAMEVER_14
             spritesound(GLASS_HEAVYBREAK,i);
-            for(j=0;j<16;j++) randomscrap13(i);
+            s = &sprite[i];
+            for(j=0;j<16;j++) RANDOMSCRAP;
             deletesprite(i);
             break;
         case CLOCK:

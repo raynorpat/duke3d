@@ -127,8 +127,10 @@ void addweapon( struct player_struct *p,short weapon)
     if ( p->gotweapon[weapon] == 0 )
     {
         p->gotweapon[weapon] = 1;
+#if DUKE3D_GAMEVER >= GAMEVER_14
         if(weapon == SHRINKER_WEAPON)
             p->gotweapon[GROW_WEAPON] = 1;
+#endif
     }
 
     p->random_club_frame = 0;
@@ -180,6 +182,157 @@ void checkavailinven( struct player_struct *p )
     else p->inven_icon = 0;
 }
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+// 1.3D picks the next weapon by scanning up and down from the current one
+// (the older algorithm kept commented out below), with no expander.
+void checkavailweapon( struct player_struct *p )
+{
+    short i,okay,check_shoot,check_bombs;
+
+    if(p->ammo_amount[p->curr_weapon] > 0) return;
+    okay = check_shoot = check_bombs = 0;
+
+    switch(p->curr_weapon)
+    {
+        case PISTOL_WEAPON:
+        case CHAINGUN_WEAPON:
+        case SHOTGUN_WEAPON:
+#ifndef VOLUMEONE
+        case FREEZE_WEAPON:
+        case DEVISTATOR_WEAPON:
+        case SHRINKER_WEAPON:
+#endif
+        case RPG_WEAPON:
+        case KNEE_WEAPON:
+            check_shoot = 1;
+            break;
+        case HANDBOMB_WEAPON:
+        case HANDREMOTE_WEAPON:
+#ifndef VOLUMEONE
+        case TRIPBOMB_WEAPON:
+#endif
+            check_bombs = 1;
+            break;
+    }
+
+    CHECK_SHOOT:
+    if(check_shoot)
+    {
+        for(i = p->curr_weapon+1; i < 11;i++)
+            switch(i)
+            {
+                case PISTOL_WEAPON:
+                case CHAINGUN_WEAPON:
+                case SHOTGUN_WEAPON:
+#ifndef VOLUMEONE
+                case FREEZE_WEAPON:
+                case SHRINKER_WEAPON:
+                case DEVISTATOR_WEAPON:
+#endif
+                    if ( p->gotweapon[i] && p->ammo_amount[i] > 0 )
+                    {
+                        okay = i;
+                        goto OKAY_HERE;
+                    }
+                    break;
+            }
+
+        for(i = p->curr_weapon-1; i > 0;i--)
+            switch(i)
+            {
+                case PISTOL_WEAPON:
+                case CHAINGUN_WEAPON:
+                case SHOTGUN_WEAPON:
+#ifndef VOLUMEONE
+                case FREEZE_WEAPON:
+                case DEVISTATOR_WEAPON:
+                case SHRINKER_WEAPON:
+#endif
+                    if ( p->gotweapon[i] && p->ammo_amount[i] > 0 )
+                    {
+                        okay = i;
+                        goto OKAY_HERE;
+                    }
+                    break;
+            }
+
+        if( p->gotweapon[RPG_WEAPON] && p->ammo_amount[RPG_WEAPON] > 0 )
+        {
+            okay = RPG_WEAPON;
+            goto OKAY_HERE;
+        }
+
+        if(check_bombs == 0)
+            check_bombs = 1;
+        else
+        {
+            addweapon(p,KNEE_WEAPON);
+            return;
+        }
+    }
+
+    if(check_bombs)
+    {
+        for(i = p->curr_weapon-1; i > 0;i--)
+            switch(i)
+            {
+                case HANDBOMB_WEAPON:
+#ifndef VOLUMEONE
+                case TRIPBOMB_WEAPON:
+#endif
+                    if ( p->gotweapon[i] && p->ammo_amount[i] > 0 )
+                    {
+                        okay = i;
+                        goto OKAY_HERE;
+                    }
+                    break;
+            }
+
+        for(i = p->curr_weapon+1; i < 11;i++)
+            switch(i)
+            {
+                case HANDBOMB_WEAPON:
+#ifdef VOLUMEONE
+                case TRIPBOMB_WEAPON:
+#endif
+                    if ( p->gotweapon[i] && p->ammo_amount[i] > 0 )
+                    {
+                        okay = i;
+                        goto OKAY_HERE;
+                    }
+                    break;
+            }
+
+        if(check_shoot == 0)
+        {
+            check_shoot = 1;
+            goto CHECK_SHOOT;
+        }
+        else
+        {
+            addweapon(p,KNEE_WEAPON);
+            return;
+        }
+    }
+
+    OKAY_HERE:
+
+    if(okay)
+    {
+        p->last_weapon  = p->curr_weapon;
+        p->random_club_frame = 0;
+        p->curr_weapon  = okay;
+        p->kickback_pic = 0;
+        if(p->holster_weapon == 1)
+        {
+            p->holster_weapon = 0;
+            p->weapon_pos = 10;
+        }
+        else p->weapon_pos   = -1;
+        return;
+    }
+}
+#else
 void checkavailweapon( struct player_struct *p )
 {
     short i,snum;
@@ -233,6 +386,7 @@ void checkavailweapon( struct player_struct *p )
     }
     else p->weapon_pos   = -1;
 }
+#endif
 
  /*
 void checkavailweapon( struct player_struct *p )
@@ -399,6 +553,9 @@ int32_t ifsquished(short i, short p)
     sc = &sector[SECT];
     floorceildist = sc->floorz - sc->ceilingz;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+    squishme = floorceildist < (sprite[i].pal == 1 ? (32<<8) : (6<<8)) && (sc->lotag&32768) == 0;
+#else
     if(sc->lotag != 23)
     {
         if(sprite[i].pal == 1)
@@ -407,6 +564,7 @@ int32_t ifsquished(short i, short p)
             squishme = floorceildist < (12<<8); // && (sc->lotag&32768) == 0;
     }
     else squishme = 0;
+#endif
 
     if( squishme )
     {
@@ -554,7 +712,11 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
                             hittype[j].extra = hp1 + (TRAND%(hp2-hp1));
                         }
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        if( sprite[j].picnum != ROTATEGUN && sprite[j].picnum != RECON && sprite[j].picnum != BOSS1 && sprite[j].picnum != BOSS2 && sprite[j].picnum != BOSS3 )
+#else
                         if( sprite[j].picnum != TANK && sprite[j].picnum != ROTATEGUN && sprite[j].picnum != RECON && sprite[j].picnum != BOSS1 && sprite[j].picnum != BOSS2 && sprite[j].picnum != BOSS3 && sprite[j].picnum != BOSS4 )
+#endif
                         {
                             if(sj->xvel < 0) sj->xvel = 0;
                             sj->xvel += (s->extra<<2);
@@ -565,7 +727,10 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
                             sj->picnum == FEM4 || sj->picnum == FEM5 ||
                             sj->picnum == FEM6 || sj->picnum == FEM7 ||
                             sj->picnum == FEM8 || sj->picnum == FEM9 ||
-                            sj->picnum == FEM10 || sj->picnum == STATUE ||
+#if DUKE3D_GAMEVER >= GAMEVER_14
+                            sj->picnum == FEM10 ||
+#endif
+                            sj->picnum == STATUE ||
                             sj->picnum == STATUEFLASH || sj->picnum == SPACEMARINE || sj->picnum == QUEBALL || sj->picnum == STRIPEBALL)
                                 checkhitsprite( j, i );
                     }
@@ -642,8 +807,10 @@ short movesprite(short spritenum, int32_t xchange, int32_t ychange, int32_t zcha
         {
             if(sprite[spritenum].picnum == LIZMAN)
                 cd = 292L;
+#if DUKE3D_GAMEVER >= GAMEVER_14
             else if( (actortype[sprite[spritenum].picnum]&3) )
                 cd = sprite[spritenum].clipdist<<2;
+#endif
             else
                 cd = 192L;
 
@@ -677,7 +844,11 @@ short movesprite(short spritenum, int32_t xchange, int32_t ychange, int32_t zcha
                 clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),8L,(4<<8),(4<<8),cliptype);
         else
             retval =
+#if DUKE3D_GAMEVER < GAMEVER_14
+                clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),128L,(4<<8),(4<<8),cliptype);
+#else
                 clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),(int32_t)(sprite[spritenum].clipdist<<2),(4<<8),(4<<8),cliptype);
+#endif
     }
 
     if( dasectnum >= 0)
@@ -799,11 +970,18 @@ void guts(spritetype *s,short gtype, short n, short p)
             // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
             int32_t r_zv = -512-(TRAND&2047);
             int32_t r_vel = 48+(TRAND&31);
+#if DUKE3D_GAMEVER < GAMEVER_14
+            // 1.3D: guts start exactly at the body, and keep their size and colour.
+            i = EGS(s->sectnum,s->x,s->y,gutz,gtype,-32,sx,sy,a,r_vel,r_zv,ps[p].i,5);
+        }
+        continue;
+#else
             int32_t r_z = gutz-(TRAND&8191);
             int32_t r_y = s->y+(TRAND&255)-128;
             int32_t r_x = s->x+(TRAND&255)-128;
             i = EGS(s->sectnum,r_x,r_y,r_z,gtype,-32,sx,sy,a,r_vel,r_zv,ps[p].i,5);
         }
+#endif
         if(PN == JIBS2)
         {
             sprite[i].xrepeat >>= 2;
@@ -982,9 +1160,11 @@ void movefta(void)
                         case WOODENHORSE:
                         case HORSEONSIDE:
                         case CANWITHSOMETHING:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles
                         case CANWITHSOMETHING2:
                         case CANWITHSOMETHING3:
                         case CANWITHSOMETHING4:
+#endif
                         case FIREBARREL:
                         case FIREVASE:
                         case NUKEBARREL:
@@ -1050,11 +1230,13 @@ short ifhitbyweapon(short sn)
                 p = npc->yvel;
                 j = hittype[sn].owner;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 if( j >= 0 &&
                     sprite[j].picnum == APLAYER &&
                     ud.coop == 1 &&
                     ud.ffire == 0 )
                         return -1;
+#endif
 
                 npc->extra -= hittype[sn].extra;
 
@@ -1163,7 +1345,11 @@ void movedummyplayers(void)
 
         p = sprite[OW].yvel;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+        if( sector[ps[p].cursectnum].lotag != 1 || sprite[ps[p].i].extra <= 0 )
+#else
         if( ps[p].on_crane >= 0 || sector[ps[p].cursectnum].lotag != 1 || sprite[ps[p].i].extra <= 0 )
+#endif
         {
             ps[p].dummyplayersprite = -1;
             KILLIT(i);
@@ -1218,7 +1404,11 @@ void moveplayers(void) //Players
             {
                 s->x = p->oposx;
                 s->y = p->oposy;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                s->z = p->oposz+PHEIGHT;
+#else
                 hittype[i].bposz = s->z = p->oposz+PHEIGHT;
+#endif
                 s->ang = p->oang;
                 setsprite(i,s->x,s->y,s->z);
             }
@@ -1259,7 +1449,9 @@ void moveplayers(void) //Players
                 {
                     hittype[i].owner = i;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                     if(ud.god == 0)
+#endif
                         if( ceilingspace(s->sectnum) || floorspace(s->sectnum) )
                             quickkill(p);
                 }
@@ -1491,17 +1683,27 @@ void movefallers(void)
             if(s->lotag > 0)
             {
                 s->lotag-=3;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                // 1.3D rerolls the fall speed on every tic of the wait.
+                s->xvel = ((TRAND+64)&127);
+                s->zvel = -(1024+(TRAND&1023));
+#else
                 if(s->lotag <= 0)
                 {
                     s->xvel = ((32+TRAND)&63);
                     s->zvel = -(1024+(TRAND&1023));
                 }
+#endif
             }
             else
             {
                 if( s->xvel > 0)
                 {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    s->xvel -= 2;
+#else
                     s->xvel -= 8;
+#endif
                     ssp(i,CLIPMASK0);
                 }
 
@@ -1786,17 +1988,40 @@ void movestandables(void)
                     KILLIT(i);
                 }
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                // 1.3D sets one nearby flammable on fire. Its test reads
+                // sprite[j], j being the new size, not the neighbour.
+                if(j < 32 && (global_random&1))
+                {
+                    short k = headspritestat[s->statnum];
+
+                    while(k >= 0)
+                    {
+                        if(k != i && AFLAMABLE(sprite[j].picnum) && dist(s,&sprite[k]) < 1024)
+                        {
+                            hittype[k].temp_data[0] = 1;
+                            if(TRAND&1) spawn(i,FIRE);
+                            else spawn(i,FIRE2);
+                            break;
+                        }
+                        k = nextspritestat[k];
+                    }
+                }
+#endif
+
                 s->xrepeat = j;
 
                 j = s->yrepeat-(TRAND&7);
                 if(j < 4) { KILLIT(i); }
                 s->yrepeat = j;
             }
+#if DUKE3D_GAMEVER >= GAMEVER_14
             if(s->picnum == BOX)
             {
                 makeitfall(i);
                 hittype[i].ceilingz = sector[s->sectnum].ceilingz;
             }
+#endif
             goto BOLT;
         }
 
@@ -2188,10 +2413,12 @@ void movestandables(void)
                 else KILLIT(i);
                 break;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles
             case SIDEBOLT1:
             case SIDEBOLT1+1:
             case SIDEBOLT1+2:
             case SIDEBOLT1+3:
+#endif
                 p = findplayer(s, &x);
                 if( x > 20480 ) goto BOLT;
 
@@ -2263,7 +2490,11 @@ void movestandables(void)
 
                 if(l&1) s->cstat ^= 2;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                if( s->picnum == (BOLT1+1) && (TRAND&1) && sector[sect].floorpicnum == HURTRAIL )
+#else
                 if( s->picnum == (BOLT1+1) && (TRAND&7) == 0 && sector[sect].floorpicnum == HURTRAIL )
+#endif
                     spritesound(SHORT_CIRCUIT,i);
 
                 if(s->picnum==BOLT1+4) s->picnum=BOLT1;
@@ -2298,7 +2529,11 @@ void movestandables(void)
                     {
                         s->cstat |= 32768;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        if(s->pal != 2)
+#else
                         if(s->pal != 2 && s->hitag == 0)
+#endif
                             spritesound(SOMETHING_DRIPPING,i);
 
                         if(sprite[s->owner].picnum != WATERDRIP)
@@ -2317,6 +2552,10 @@ void movestandables(void)
                 goto BOLT;
 
             case DOORSHOCK:
+#if DUKE3D_GAMEVER < GAMEVER_14
+                p = findplayer(s, &x);
+                if(x > 4096) goto BOLT; // 1.3D only updates it near a player
+#endif
                 j = klabs(sector[sect].ceilingz-sector[sect].floorz)>>9;
                 s->yrepeat = j+4;
                 s->xrepeat = 16;
@@ -2363,7 +2602,11 @@ void movestandables(void)
                 if(t[5] == 1) goto BOLT;
 
                 p = checkcursectnums(sect);
+#if DUKE3D_GAMEVER < GAMEVER_14
+                if( p >= 0 && ps[p].on_ground )
+#else
                 if( p >= 0 && ( ps[p].on_ground || s->ang == 512) )
+#endif
                 {
                     if( t[0] == 0 && !check_activator_motion(s->lotag) )
                     {
@@ -2397,9 +2640,11 @@ void movestandables(void)
                 goto BOLT;
 
             case CANWITHSOMETHING:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles
             case CANWITHSOMETHING2:
             case CANWITHSOMETHING3:
             case CANWITHSOMETHING4:
+#endif
                 makeitfall(i);
                 IFHIT
                 {
@@ -2539,7 +2784,11 @@ void moveweapons(void)
                 goto BOLT;
 
             case FREEZEBLAST:
+#if DUKE3D_GAMEVER < GAMEVER_14
+                if(s->yvel < 1)
+#else
                 if(s->yvel < 1 || s->extra < 2 || (s->xvel|s->zvel) == 0)
+#endif
                 {
                     j = spawn(i,TRANSPORTERSTAR);
                     sprite[j].pal = 1;
@@ -2605,8 +2854,12 @@ void moveweapons(void)
                         s->zvel = -1;
                     }
                     else
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        if( s->z > hittype[i].floorz )
+#else
                         if( ( s->z > hittype[i].floorz && sector[s->sectnum].lotag != 1 ) ||
                             ( s->z > hittype[i].floorz+(16<<8) && sector[s->sectnum].lotag == 1 ) )
+#endif
                     {
                         j = 16384|(s->sectnum);
                         if(sector[s->sectnum].lotag != 1)
@@ -2708,7 +2961,9 @@ void moveweapons(void)
                             {
                                 if( wall[j].overpicnum != MIRROR && wall[j].picnum != MIRROR )
                                 {
+#if DUKE3D_GAMEVER >= GAMEVER_14
                                     s->extra >>= 1;
+#endif
                                     s->yvel--;
                                 }
 
@@ -2737,11 +2992,13 @@ void moveweapons(void)
                         {
                             bounce(i);
                             ssp(i,qq);
+#if DUKE3D_GAMEVER >= GAMEVER_14
                             s->extra >>= 1;
                             if(s->xrepeat > 8)
                                 s->xrepeat -= 2;
                             if(s->yrepeat > 8)
                                 s->yrepeat -= 2;
+#endif
                             s->yvel--;
                             goto BOLT;
                         }
@@ -2807,7 +3064,11 @@ void moveweapons(void)
                     s->shade++;
                     if(s->shade >= 40) KILLIT(i);
                 }
+#if DUKE3D_GAMEVER < GAMEVER_14
+                else if(s->picnum == RPG && sector[s->sectnum].lotag == 2 && s->xrepeat >= 10 && rnd(184))
+#else
                 else if(s->picnum == RPG && sector[s->sectnum].lotag == 2 && s->xrepeat >= 10 && rnd(140))
+#endif
                     spawn(i,WATERBUBBLE);
 
                 goto BOLT;
@@ -2824,6 +3085,290 @@ void moveweapons(void)
 }
 
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+// 1.3D's transporters. They differ from the later ones throughout (see the
+// G13-A18 ledger row), so they are a separate function.
+void movetransports(void)
+{
+    char warpspriteto;
+    short i, j, k, p, sect, sectlotag, nexti, nextj;
+    int32_t ll,onfloorz;
+
+    i = headspritestat[9]; //Transporters
+
+    while(i >= 0)
+    {
+        sect = SECT;
+        sectlotag = sector[sect].lotag;
+
+        nexti = nextspritestat[i];
+
+        onfloorz = T5;
+
+        if(T1 > 0) T1--;
+
+        j = headspritesect[sect];
+        while(j >= 0)
+        {
+            nextj = nextspritesect[j];
+
+            switch(sprite[j].statnum)
+            {
+                case 10:    // Player
+
+                    if( sprite[j].owner != -1 )
+                    {
+                        p = sprite[j].yvel;
+
+                        ps[p].on_warping_sector = 1;
+
+                        // While holding or jumping, nothing at all happens.
+                        if( ps[p].transporter_hold != 0 || ps[p].jumping_counter != 0 )
+                            break;
+
+                        if(ps[p].on_ground && sectlotag == 0 && onfloorz && ps[p].jetpack_on == 0 )
+                        {
+                            spawn(i,TRANSPORTERBEAM);
+                            spritesound(TELEPORTER,i);
+
+                            for(k=connecthead;k>=0;k=connectpoint2[k])
+                                if(ps[k].cursectnum == sprite[OW].sectnum)
+                            {
+                                ps[k].frag_ps = p;
+                                sprite[ps[k].i].extra = 0;
+                            }
+
+                            ps[p].ang = sprite[OW].ang;
+
+                            T1 = 13;
+                            hittype[OW].temp_data[0] = 13;
+                            ps[p].transporter_hold = 13;
+
+                            ps[p].bobposx = ps[p].oposx = ps[p].posx = sprite[OW].x;
+                            ps[p].bobposy = ps[p].oposy = ps[p].posy = sprite[OW].y;
+                            ps[p].oposz = ps[p].posz = sprite[OW].z-PHEIGHT;
+
+                            changespritesect(j,sprite[OW].sectnum);
+                            ps[p].cursectnum = sprite[j].sectnum;
+
+                            k = spawn(OW,TRANSPORTERBEAM);
+                            spritesound(TELEPORTER,k);
+
+                            break;
+                        }
+
+                        if(onfloorz == 0 && klabs(SZ-ps[p].posz) < 6144 )
+                            if( (ps[p].jetpack_on == 0 ) || (ps[p].jetpack_on && (sync[p].bits&1) ) ||
+                                (ps[p].jetpack_on && (sync[p].bits&2) ) )
+                        {
+                            ps[p].oposx = ps[p].posx += sprite[OW].x-SX;
+                            ps[p].oposy = ps[p].posy += sprite[OW].y-SY;
+
+                            if( ps[p].jetpack_on && ( (sync[p].bits&1) || ps[p].jetpack_on < 11 ) )
+                                ps[p].posz = sprite[OW].z-6144;
+                            else ps[p].posz = sprite[OW].z+6144;
+                            ps[p].oposz = ps[p].posz;
+
+                            changespritesect(j,sprite[OW].sectnum);
+                            ps[p].cursectnum = sprite[OW].sectnum;
+
+                            break;
+                        }
+
+                        k = 0;
+
+                        if( onfloorz && sectlotag == 1 && ps[p].posz > (sector[sect].floorz-(6<<8)) )
+                        {
+                            k = 1;
+                            if(screenpeek == p)
+                            {
+                                FX_StopAllSounds();
+                                clearsoundlocks();
+                            }
+                            spritesound(DUKE_UNDERWATER,ps[p].i);
+                            ps[p].oposz = ps[p].posz =
+                                sector[sprite[OW].sectnum].ceilingz+(7<<8);
+                        }
+
+                        if( onfloorz && sectlotag == 2 && ps[p].posz < (sector[sect].ceilingz+(6<<8)) && sprite[ps[p].i].extra > 0 )
+                        {
+                            k = 1;
+                            if(screenpeek == p)
+                            {
+                                FX_StopAllSounds();
+                                clearsoundlocks();
+                            }
+                            spritesound(DUKE_GASP,j);
+
+                            ps[p].oposz = ps[p].posz =
+                                sector[sprite[OW].sectnum].floorz-(7<<8);
+                        }
+
+                        if(k == 1)
+                        {
+                            ps[p].oposx = ps[p].posx += sprite[OW].x-SX;
+                            ps[p].oposy = ps[p].posy += sprite[OW].y-SY;
+
+                            ps[p].transporter_hold = -2;
+                            ps[p].cursectnum = sprite[OW].sectnum;
+
+                            changespritesect(j,sprite[OW].sectnum);
+
+                            setpal(&ps[p]);
+
+                            if( (TRAND&255) < 32 )
+                                spawn(ps[p].i,WATERSPLASH2);
+                        }
+                    }
+                    break;
+
+                // 1.3D's monster skip tested the transporter's own picnum, so
+                // it never skipped anything.
+                case 1:
+                case 4:
+                case 5:
+                case 13:
+
+                    ll = klabs(sprite[j].zvel);
+
+                    {
+                        warpspriteto = 0;
+                        if( ll && sectlotag == 2 && sprite[j].z < (sector[sect].ceilingz+ll) )
+                            warpspriteto = 1;
+
+                        if( ll && sectlotag == 1 && sprite[j].z > (sector[sect].floorz-ll) )
+                            warpspriteto = 1;
+
+                        if( sectlotag == 0 && ( onfloorz || klabs(sprite[j].z-SZ) < 4096) )
+                        {
+                            if( onfloorz && T1 > 0 && sprite[j].statnum != 5 )
+                            {
+                                T1++;
+                                goto BOLT;
+                            }
+                            warpspriteto = 1;
+                        }
+
+                        if( warpspriteto ) switch(sprite[j].picnum)
+                        {
+                            case TRANSPORTERSTAR:
+                            case TRANSPORTERBEAM:
+                            case BULLETHOLE:
+                            case WATERSPLASH2:
+                            case BURNING:
+                            case FIRE:
+                            case BURNING2:
+                            case FIRE2:
+                            case SHELL:
+                            case SHOTGUNSHELL:
+                            case TRIPBOMB:
+                                goto JBOLT;
+                            case PLAYERONWATER:
+                                if(sectlotag == 2)
+                                {
+                                    sprite[j].cstat &= 32767;
+                                    break;
+                                }
+                            default:
+                                if(sprite[j].statnum == 5)
+                                    break;
+
+                            case WATERBUBBLE:
+                                if( rnd(192) && sprite[j].picnum == WATERBUBBLE)
+                                    break;
+
+                                if(sectlotag > 0)
+                                {
+                                    k = spawn(j,WATERSPLASH2);
+                                    if( sectlotag == 1 && sprite[j].statnum == 4 )
+                                    {
+                                        sprite[k].xvel = sprite[j].xvel>>1;
+                                        sprite[k].ang = sprite[j].ang;
+                                        ssp(k,CLIPMASK0);
+                                    }
+                                }
+
+                                switch(sectlotag)
+                                {
+                                    case 0:
+                                        if(onfloorz)
+                                        {
+                                            if( checkcursectnums(sect) == -1 && checkcursectnums(sprite[OW].sectnum) == -1 )
+                                            {
+                                                sprite[j].x += (sprite[OW].x-SX);
+                                                sprite[j].y += (sprite[OW].y-SY);
+                                                sprite[j].z -= SZ - sector[sprite[OW].sectnum].floorz;
+                                                sprite[j].ang = sprite[OW].ang;
+
+                                                hittype[j].bposx = sprite[j].x;
+                                                hittype[j].bposy = sprite[j].y;
+                                                hittype[j].bposz = sprite[j].z;
+
+                                                k = spawn(i,TRANSPORTERBEAM);
+                                                spritesound(TELEPORTER,k);
+
+                                                k = spawn(OW,TRANSPORTERBEAM);
+                                                spritesound(TELEPORTER,k);
+
+                                                T1 = 13;
+                                                hittype[OW].temp_data[0] = 13;
+
+                                                changespritesect(j,sprite[OW].sectnum);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            sprite[j].x += (sprite[OW].x-SX);
+                                            sprite[j].y += (sprite[OW].y-SY);
+                                            sprite[j].z = sprite[OW].z+4096;
+
+                                            hittype[j].bposx = sprite[j].x;
+                                            hittype[j].bposy = sprite[j].y;
+                                            hittype[j].bposz = sprite[j].z;
+
+                                            changespritesect(j,sprite[OW].sectnum);
+                                        }
+                                        break;
+                                    case 1:
+                                        sprite[j].x += (sprite[OW].x-SX);
+                                        sprite[j].y += (sprite[OW].y-SY);
+                                        sprite[j].z = sector[sprite[OW].sectnum].ceilingz+ll;
+
+                                        hittype[j].bposx = sprite[j].x;
+                                        hittype[j].bposy = sprite[j].y;
+                                        hittype[j].bposz = sprite[j].z;
+
+                                        changespritesect(j,sprite[OW].sectnum);
+
+                                        break;
+                                    case 2:
+                                        sprite[j].x += (sprite[OW].x-SX);
+                                        sprite[j].y += (sprite[OW].y-SY);
+                                        sprite[j].z = sector[sprite[OW].sectnum].floorz-ll;
+
+                                        hittype[j].bposx = sprite[j].x;
+                                        hittype[j].bposy = sprite[j].y;
+                                        hittype[j].bposz = sprite[j].z;
+
+                                        changespritesect(j,sprite[OW].sectnum);
+
+                                        break;
+                                }
+
+                                break;
+                        }
+                }
+                break;
+
+            }
+            JBOLT:
+            j = nextj;
+        }
+        BOLT:
+        i = nexti;
+    }
+}
+#else
 void movetransports(void)
 {
     char warpspriteto;
@@ -3163,6 +3708,7 @@ void movetransports(void)
         i = nexti;
     }
 }
+#endif
 
 
 
@@ -3194,8 +3740,10 @@ void moveactors(void)
 
         switch(s->picnum)
         {
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles
             case DUCK:
             case TARGET:
+#endif
                 if(s->cstat&32)
                 {
                     t[0]++;
@@ -3254,7 +3802,9 @@ void moveactors(void)
                     PN = RESPAWNMARKERYELLOW;
                 else if( T1 > ((respawnitemtime>>1)+(respawnitemtime>>2)) )
                     PN = RESPAWNMARKERGREEN;
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 makeitfall(i);
+#endif
                 break;
 
             case HELECOPT:
@@ -3280,7 +3830,11 @@ void moveactors(void)
                 makeitfall(i);
                 IFMOVING
                 {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if( (TRAND&255) == 0 ) spritesound(RATTY,i);
+#else
                     if( (TRAND&255) < 3 ) spritesound(RATTY,i);
+#endif
                     s->ang += (TRAND&31)-15+(sintable[(t[0]<<8)&2047]>>11);
                 }
                 else
@@ -3603,7 +4157,9 @@ void moveactors(void)
                 goto BOLT;
 
             case OOZ:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles
             case OOZ2:
+#endif
 
                 getglobalz(i);
 
@@ -3648,6 +4204,7 @@ void moveactors(void)
 
                 p = findplayer(s,&x);
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 if(x > 20480)
                 {
                     hittype[i].timetosleep++;
@@ -3658,6 +4215,7 @@ void moveactors(void)
                         goto BOLT;
                     }
                 }
+#endif
 
                 if(t[0] == -5) // FROZEN
                 {
@@ -3716,8 +4274,13 @@ void moveactors(void)
 
                     s->ang = ps[p].ang;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if( (sync[p].bits&4) && sprite[ps[p].i].extra > 0 )
+                        if( ps[p].curr_weapon != HANDREMOTE_WEAPON && ps[p].curr_weapon != HANDBOMB_WEAPON && ps[p].curr_weapon != TRIPBOMB_WEAPON && ps[p].curr_weapon != KNEE_WEAPON && ps[p].ammo_amount[ps[p].curr_weapon] >= 0 )
+#else
                     if( ( (sync[p].bits&4) || (ps[p].quick_kick > 0) ) && sprite[ps[p].i].extra > 0 )
                         if( ps[p].quick_kick > 0 || ( ps[p].curr_weapon != HANDREMOTE_WEAPON && ps[p].curr_weapon != HANDBOMB_WEAPON && ps[p].curr_weapon != TRIPBOMB_WEAPON && ps[p].ammo_amount[ps[p].curr_weapon] >= 0) )
+#endif
                     {
                         for(x=0;x<8;x++)
                         {
@@ -3864,6 +4427,10 @@ void moveactors(void)
 
 //                    if(s->yrepeat > 62)
   //                      guts(s,JIBS6,5,myconnectindex);
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if(s->yrepeat > 62)
+                        guts(s,JIBS6,5,myconnectindex);
+#endif
 
                     if(s->xrepeat > 32) s->xrepeat -= TRAND&7;
                     if(s->yrepeat > 16) s->yrepeat -= TRAND&7;
@@ -3877,7 +4444,11 @@ void moveactors(void)
 
                     goto BOLT;
                 }
+#if DUKE3D_GAMEVER < GAMEVER_14
+                else getglobalz(i);
+#else
                 else if(t[0] != -2) getglobalz(i);
+#endif
 
                 if(t[0] == -2) //On top of somebody
                 {
@@ -3918,7 +4489,9 @@ void moveactors(void)
                             case LIZTROOP:
                             case LIZMAN:
                             case PIGCOP:
+#if DUKE3D_GAMEVER >= GAMEVER_14
                             case NEWBEAST:
+#endif
                                 if( ldist(s,&sprite[j]) < 768 && (klabs(s->z-sprite[j].z)<8192) ) //Gulp them
                                 {
                                     t[5] = j;
@@ -3959,7 +4532,11 @@ void moveactors(void)
                         makeitfall(i);
                     }
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    ssp(i,CLIPMASK0);
+#else
                     if( everyothertime&1 ) ssp(i,CLIPMASK0);
+#endif
 
                     if(s->xvel > 96)
                     {
@@ -4081,11 +4658,19 @@ void moveactors(void)
                             s->zvel >>= 2;
                         s->yvel++;
                     }
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if( s->z < hittype[i].ceilingz+(16<<8) && sector[sect].lotag != 2 )
+                    {
+                        s->zvel = 0;
+                        s->z = hittype[i].ceilingz+(16<<8);
+                    }
+#else
                     if( s->z < hittype[i].ceilingz ) // && sector[sect].lotag != 2 )
                     {
                         s->z = hittype[i].ceilingz+(3<<8);
                         s->zvel = 0;
                     }
+#endif
                 }
 
                 j = movesprite(i,
@@ -4176,6 +4761,9 @@ void moveactors(void)
 
                     if(t[4] > 20)
                     {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        KILLIT(i);
+#endif
                         if(s->owner != i || ud.respawn_items == 0)
                         {
                             KILLIT(i);
@@ -4194,6 +4782,18 @@ void moveactors(void)
                     if( cansee(s->x,s->y,s->z-(8<<8),s->sectnum,ps[p].posx,ps[p].posy,ps[p].posz,ps[p].cursectnum) )
                         if(ps[p].ammo_amount[HANDBOMB_WEAPON] < max_ammo_amount[HANDBOMB_WEAPON] )
                 {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    // 1.3D records which bomb sprite was taken, from any owner.
+                    if(ud.coop >= 1)
+                    {
+                        for(j=0;j<ps[p].weapreccnt;j++)
+                            if(ps[p].weaprecs[j] == i)
+                                goto BOLT;
+
+                        if(ps[p].weapreccnt < 255)
+                            ps[p].weaprecs[ps[p].weapreccnt++] = i;
+                    }
+#else
                     if(ud.coop >= 1 && s->owner == i)
                     {
                         for(j=0;j<ps[p].weapreccnt;j++)
@@ -4203,6 +4803,7 @@ void moveactors(void)
                         if(ps[p].weapreccnt < 255)
                             ps[p].weaprecs[ps[p].weapreccnt++] = s->picnum;
                     }
+#endif
 
                     addammo(HANDBOMB_WEAPON,&ps[p],1);
                     spritesound(DUKE_GET,ps[p].i);
@@ -4218,12 +4819,21 @@ void moveactors(void)
                         ps[p].pals_time = 32;
                     }
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if( !( hittype[s->owner].picnum == HEAVYHBOMB && ud.respawn_items && sprite[s->owner].picnum != APLAYER ) )
+                    {
+                        if(ud.coop >= 1 && sprite[s->owner].picnum != APLAYER)
+                            goto BOLT;
+                        KILLIT(i);
+                    }
+#else
                     if( s->owner != i || ud.respawn_items == 0 )
                     {
                         if(s->owner == i && ud.coop >= 1)
                             goto BOLT;
                         KILLIT(i);
                     }
+#endif
                     else
                     {
                         t[2] = respawnitemtime;
@@ -4610,19 +5220,33 @@ void moveexplosions(void)  // STATNUM 5
                 break;
             case TONGUE:
                 KILLIT(i);
+#if DUKE3D_GAMEVER >= GAMEVER_14
             case MONEY+1:
             case MAIL+1:
             case PAPER+1:
                 hittype[i].floorz = s->z = getflorzofslope(s->sectnum,s->x,s->y);
                 break;
+#endif
             case MONEY:
+#if DUKE3D_GAMEVER >= GAMEVER_14
             case MAIL:
             case PAPER:
+#endif
 
                 s->xvel = (TRAND&7)+(sintable[T1&2047]>>9);
                 T1 += (TRAND&63);
                 if( (T1&2047) > 512 && (T1&2047) < 1596)
                 {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if(sector[sect].lotag == 2)
+                    {
+                        if(s->zvel < 64)
+                            s->zvel += (TRAND&7)+4;
+                    }
+                    else
+                        if(s->zvel < 144)
+                            s->zvel += (TRAND&7)+4;
+#else
                     if(sector[sect].lotag == 2)
                     {
                         if(s->zvel < 64)
@@ -4631,18 +5255,26 @@ void moveexplosions(void)  // STATNUM 5
                     else
                         if(s->zvel < 144)
                             s->zvel += (gc>>5)+(TRAND&7);
+#endif
                 }
 
                 ssp(i,CLIPMASK0);
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 if( (TRAND&3) == 0 )
                     setsprite(i,s->x,s->y,s->z);
 
                 if(s->sectnum == -1) KILLIT(i);
+#endif
                 l = getflorzofslope(s->sectnum,s->x,s->y);
 
                 if( s->z > l )
                 {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    // 1.3D moves the bill into its sector before settling it.
+                    setsprite(i,s->x,s->y,s->z);
+                    l = getflorzofslope(s->sectnum,s->x,s->y);
+#endif
                     s->z = l;
 
                     insertspriteq(i);
@@ -4682,6 +5314,7 @@ void moveexplosions(void)  // STATNUM 5
                 if(s->xvel > 0) s->xvel--;
                 else s->xvel = 0;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 if( t[5] < 30*10 )
                     t[5]++;
                 else { KILLIT(i); }
@@ -4692,6 +5325,7 @@ void moveexplosions(void)  // STATNUM 5
                     setsprite(i,s->x,s->y,s->z);
                     sect = s->sectnum;
                 }
+#endif
 
                 l = getflorzofslope(sect,s->x,s->y);
                 x = getceilzofslope(sect,s->x,s->y);
@@ -4699,6 +5333,9 @@ void moveexplosions(void)  // STATNUM 5
 
                 if( s->z < l-(2<<8) )
                 {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if(sector[sect].lotag == 1) KILLIT(i); // 1.3D: no gibs falling in water
+#endif
                     if(t[1] < 2) t[1]++;
                     else if(sector[sect].lotag != 2)
                     {
@@ -4718,6 +5355,14 @@ void moveexplosions(void)  // STATNUM 5
 
                     if(s->zvel < 6144)
                     {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        if(sector[sect].lotag == 2)
+                        {
+                            if(s->zvel < 1024)
+                                s->zvel += 48;
+                        }
+                        else s->zvel += 128;
+#else
                         if(sector[sect].lotag == 2)
                         {
                             if(s->zvel < 1024)
@@ -4725,6 +5370,7 @@ void moveexplosions(void)  // STATNUM 5
                             else s->zvel = 1024;
                         }
                         else s->zvel += gc-50;
+#endif
                     }
 
                     s->x += (s->xvel*sintable[(s->ang+512)&2047])>>14;
@@ -4734,6 +5380,9 @@ void moveexplosions(void)  // STATNUM 5
                 }
                 else
                 {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    setsprite(i,s->x,s->y,s->z);
+#endif
                     if(t[2] == 0)
                     {
                         if( s->sectnum == -1) { KILLIT(i); }
@@ -4757,7 +5406,9 @@ void moveexplosions(void)  // STATNUM 5
                 goto BOLT;
 
             case BLOODPOOL:
+#if DUKE3D_GAMEVER >= GAMEVER_14
             case PUKE:
+#endif
 
                 if(t[0] == 0)
                 {
@@ -4797,9 +5448,11 @@ void moveexplosions(void)  // STATNUM 5
                 {
                     if( s->pal == 0 && (TRAND&255) < 16 && s->picnum != PUKE)
                     {
+#if DUKE3D_GAMEVER >= GAMEVER_14
                         if(ps[p].boot_amount > 0)
                             ps[p].boot_amount--;
                         else
+#endif
                         {
                             if(Sound[DUKE_LONGTERM_PAIN].num < 1)
                                 spritesound(DUKE_LONGTERM_PAIN,ps[p].i);
@@ -4843,6 +5496,10 @@ void moveexplosions(void)  // STATNUM 5
             case FORCERIPPLE:
             case TRANSPORTERSTAR:
             case TRANSPORTERBEAM:
+#if DUKE3D_GAMEVER < GAMEVER_14
+            case FIRE:
+            case FIRE2:
+#endif
                 p = findplayer(s,&x);
                 execute(i,p,x);
                 goto BOLT;
@@ -4852,7 +5509,11 @@ void moveexplosions(void)  // STATNUM 5
 
                 ssp(i,CLIPMASK0);
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                if(sect < 0) KILLIT(i);
+#else
                 if(sect < 0 || ( sector[sect].floorz+(24<<8) ) < s->z ) KILLIT(i);
+#endif
 
                 if(sector[sect].lotag == 2)
                 {
@@ -4863,8 +5524,12 @@ void moveexplosions(void)  // STATNUM 5
                         t[0]++;
                         t[0] &= 3;
                     }
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if(s->zvel < 128) s->zvel += 8;
+#else
                     if(s->zvel < 128) s->zvel += (gc/13); // 8
                     else s->zvel -= 64;
+#endif
                     if(s->xvel > 0)
                         s->xvel -= 4;
                     else s->xvel = 0;
@@ -4878,7 +5543,11 @@ void moveexplosions(void)  // STATNUM 5
                         t[0]++;
                         t[0] &= 3;
                     }
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if(s->zvel < 512) s->zvel += 52;
+#else
                     if(s->zvel < 512) s->zvel += (gc/3); // 52;
+#endif
                     if(s->xvel > 0)
                         s->xvel --;
                     else KILLIT(i);
@@ -4902,8 +5571,10 @@ void moveexplosions(void)  // STATNUM 5
                         s->zvel >>= 1;
                     s->xrepeat >>= 1;
                     s->yrepeat >>= 1;
+#if DUKE3D_GAMEVER >= GAMEVER_14
                     if( rnd(96) )
                       setsprite(i,s->x,s->y,s->z);
+#endif
                     t[0]++;//Number of bounces
                 }
                 else if( t[0] == 3 ) KILLIT(i);
@@ -4926,11 +5597,13 @@ void moveexplosions(void)  // STATNUM 5
                     s->xvel--;
                 else s->xvel = 0;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                 if(s->zvel > 1024 && s->zvel < 1280)
                 {
                     setsprite(i,s->x,s->y,s->z);
                     sect = s->sectnum;
                 }
+#endif
 
                 if( s->z < sector[sect].floorz-(2<<8) )
                 {
@@ -4952,14 +5625,22 @@ void moveexplosions(void)  // STATNUM 5
                             else t[0]++;
                         }
                     }
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if(s->zvel < 4096) s->zvel += 128;
+#else
                     if(s->zvel < 4096) s->zvel += gc-50;
+#endif
                     s->x += (s->xvel*sintable[(s->ang+512)&2047])>>14;
                     s->y += (s->xvel*sintable[s->ang&2047])>>14;
                     s->z += s->zvel;
                 }
                 else
                 {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if(s->picnum == SCRAP1 && s->yvel >= 0)
+#else
                     if(s->picnum == SCRAP1 && s->yvel > 0)
+#endif
                     {
                         j = spawn(i,s->yvel);
                         setsprite(j,s->x,s->y,s->z);
@@ -5117,11 +5798,13 @@ void moveeffectors(void)   //STATNUM 3
                             ps[p].posx = m;
                             ps[p].posy = x;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                             if(sprite[ps[p].i].extra <= 0)
                             {
                                 sprite[ps[p].i].x = m;
                                 sprite[ps[p].i].y = x;
                             }
+#endif
                         }
                     }
 
@@ -5129,9 +5812,15 @@ void moveeffectors(void)   //STATNUM 3
                     while(p >= 0)
                     {
                         if(sprite[p].statnum != 3 && sprite[p].statnum != 4)
+#if DUKE3D_GAMEVER >= GAMEVER_14
                             if( sprite[p].picnum != LASERLINE )
+#endif
                         {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                            if(sprite[p].picnum == APLAYER)
+#else
                             if(sprite[p].picnum == APLAYER && sprite[p].owner >= 0)
+#endif
                             {
                                 p = nextspritesect[p];
                                 continue;
@@ -5175,7 +5864,11 @@ void moveeffectors(void)   //STATNUM 3
 
                 break;
             case 6:
+#if DUKE3D_GAMEVER < GAMEVER_14
+                k = 256; // 1.3D's subways all run at the same speed
+#else
                 k = sc->extra;
+#endif
 
                 if(t[4] > 0)
                 {
@@ -5232,7 +5925,11 @@ void moveeffectors(void)   //STATNUM 3
                 {
                     if(st==6)
                         if(sprite[s->owner].hitag&1)
+#if DUKE3D_GAMEVER < GAMEVER_14
+                            t[4]=256; //Slow it down
+#else
                             t[4]=sc->extra; //Slow it down
+#endif
                     t[3]++;
                     s->owner = LocateTheLocator(t[3],t[0]);
                     if(s->owner==-1)
@@ -5250,6 +5947,17 @@ void moveeffectors(void)   //STATNUM 3
                     t[2] += q;
                     s->ang += q;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if(s->xvel == 256 )
+                    {
+                        if( (sc->floorstat&1) == 0 && (sc->ceilingstat&1) == 0 )
+                        {
+                            if( Sound[SUBWAY].num == 0 )
+                                spritesound(SUBWAY,i);
+                        }
+                        else if( rnd(8) )
+                        {
+#else
                     if(s->xvel == sc->extra )
                     {
                         if( (sc->floorstat&1) == 0 && (sc->ceilingstat&1) == 0 )
@@ -5259,6 +5967,7 @@ void moveeffectors(void)   //STATNUM 3
                         }
                         else if( ud.monsters_off == 0 && sc->floorpal == 0 && (sc->floorstat&1) && rnd(8) )
                         {
+#endif
                             p = findplayer(s,&x);
                             if(x < 20480)
                             {
@@ -5271,7 +5980,11 @@ void moveeffectors(void)   //STATNUM 3
                     }
 
                     if(s->xvel <= 64 && (sc->floorstat&1) == 0 && (sc->ceilingstat&1) == 0 )
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        stopsound(SUBWAY);
+#else
                         stopsound(hittype[i].lastvx);
+#endif
 
                     if( (sc->floorz-sc->ceilingz) < (108<<8) )
                     {
@@ -5297,7 +6010,9 @@ void moveeffectors(void)   //STATNUM 3
                     x = (s->xvel*sintable[s->ang&2047])>>14;
 
                     for(p = connecthead;p >= 0;p=connectpoint2[p])
+#if DUKE3D_GAMEVER >= GAMEVER_14
                        if(sector[ps[p].cursectnum].lotag != 2)
+#endif
                     {
                         if(po[p].os == s->sectnum)
                         {
@@ -5320,19 +6035,27 @@ void moveeffectors(void)   //STATNUM 3
                             if(numplayers > 1)
                             {
                                 ps[p].oposx = ps[p].posx;
+#if DUKE3D_GAMEVER >= GAMEVER_14
                                 ps[p].oposy = ps[p].posy;
+#endif
                             }
+#if DUKE3D_GAMEVER >= GAMEVER_14
                             if( sprite[ps[p].i].extra <= 0 )
                             {
                                 sprite[ps[p].i].x = ps[p].posx;
                                 sprite[ps[p].i].y = ps[p].posy;
                             }
+#endif
                         }
                     }
                     j = headspritesect[s->sectnum];
                     while(j >= 0)
                     {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        if (sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
+#else
                         if (sprite[j].statnum != 10 && sector[sprite[j].sectnum].lotag != 2 && sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS )
+#endif
                         {
                             rotatepoint(s->x,s->y,
                                 sprite[j].x,sprite[j].y,q,
@@ -5343,11 +6066,13 @@ void moveeffectors(void)   //STATNUM 3
 
                             sprite[j].ang+=q;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                             if(numplayers > 1)
                             {
                                 hittype[j].bposx = sprite[j].x;
                                 hittype[j].bposy = sprite[j].y;
                             }
+#endif
                         }
                         j = nextspritesect[j];
                     }
@@ -5365,8 +6090,13 @@ void moveeffectors(void)   //STATNUM 3
                             updatesector(ps[p].posx,ps[p].posy,&k);
                             if( ( k == -1 && ud.clipping == 0 ) || ( k == s->sectnum && ps[p].cursectnum != s->sectnum ) )
                             {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                                ps[p].posx = s->x;
+                                ps[p].posy = s->y;
+#else
                                 ps[p].oposx = ps[p].posx = s->x;
                                 ps[p].oposy = ps[p].posy = s->y;
+#endif
                                 ps[p].cursectnum = s->sectnum;
 
                                 setsprite(ps[p].i,s->x,s->y,s->z);
@@ -5904,6 +6634,12 @@ void moveeffectors(void)   //STATNUM 3
                     if(j == 1)
                     {
                         if(t[0] > sh )
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        {
+                            activatebysector(s->sectnum,i);
+                            t[0] = 0;
+                        }
+#else
                             switch(sector[s->sectnum].lotag)
                             {
                                 case 20:
@@ -5917,6 +6653,7 @@ void moveeffectors(void)   //STATNUM 3
                                   t[0] = 0;
                                   break;
                             }
+#endif
                         else t[0]++;
                     }
                 }
@@ -6270,6 +7007,12 @@ void moveeffectors(void)   //STATNUM 3
                         }
                         else if( sprite[k].statnum != 3 )
                         {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                            // 1.3D keeps the position from before the ride.
+                            hittype[k].bposx = sprite[k].x;
+                            hittype[k].bposy = sprite[k].y;
+                            hittype[k].bposz = sprite[k].z;
+#endif
                             sprite[k].x +=
                                 sprite[j].x-s->x;
                             sprite[k].y +=
@@ -6277,9 +7020,11 @@ void moveeffectors(void)   //STATNUM 3
                             sprite[k].z = sector[sprite[j].sectnum].floorz-
                                 (sc->floorz-sprite[k].z);
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                             hittype[k].bposx = sprite[k].x;
                             hittype[k].bposy = sprite[k].y;
                             hittype[k].bposz = sprite[k].z;
+#endif
 
                             changespritesect(k,sprite[j].sectnum);
                             setsprite(k,sprite[k].x,sprite[k].y,sprite[k].z);
@@ -6293,6 +7038,7 @@ void moveeffectors(void)   //STATNUM 3
                 }
                 break;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D has no such effector
             case 18:
                 if(t[0])
                 {
@@ -6374,6 +7120,7 @@ void moveeffectors(void)   //STATNUM 3
                 }
                 break;
 
+#endif
             case 19: //Battlestar galactia shields
 
                 if(t[0])
@@ -6587,6 +7334,48 @@ void moveeffectors(void)   //STATNUM 3
                     if(sprite[j].zvel >= 0)
                         switch(sprite[j].statnum)
                     {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        // 1.3D conveyors: wipe footprints and pools, leave
+                        // other effects but splashes, and move by half.
+                        case 5:
+                            switch(sprite[j].picnum)
+                            {
+                                case BLOODPOOL:
+                                case FOOTPRINTS:
+                                case FOOTPRINTS2:
+                                case FOOTPRINTS3:
+                                    sprite[j].xrepeat = sprite[j].yrepeat = 0;
+                                    j = nextj;
+                                    continue;
+                                case WATERSPLASH2:
+                                    break;
+                                default:
+                                    j = nextj;
+                                    continue;
+                            }
+                        case 6:
+                            if(sprite[j].picnum == TRIPBOMB) break;
+                        case 1:
+                        case 0:
+                            if( !(sprite[j].picnum >= CRANE && sprite[j].picnum <= (CRANE+3)) && !(sprite[j].cstat&16) )
+                            {
+                                if( sprite[j].z > (hittype[j].floorz-(16<<8)) )
+                                {
+                                    hittype[j].bposx = sprite[j].x;
+                                    hittype[j].bposy = sprite[j].y;
+
+                                    sprite[j].x += x>>1;
+                                    sprite[j].y += l>>1;
+
+                                    setsprite(j,sprite[j].x,sprite[j].y,sprite[j].z);
+
+                                    if( sector[sprite[j].sectnum].floorstat&2 )
+                                        if(sprite[j].statnum == 2)
+                                            makeitfall(j);
+                                }
+                            }
+                            break;
+#else
                         case 5:
                             switch(sprite[j].picnum)
                             {
@@ -6643,13 +7432,18 @@ void moveeffectors(void)   //STATNUM 3
                                 }
                             }
                             break;
+#endif
                     }
                     j = nextj;
                 }
 
                 p = myconnectindex;
                 if(ps[p].cursectnum == s->sectnum && ps[p].on_ground)
+#if DUKE3D_GAMEVER < GAMEVER_14
+                    if( klabs(ps[p].posz-ps[p].truefz) < PHEIGHT+(8<<8) )
+#else
                     if( klabs(ps[p].posz-ps[p].truefz) < PHEIGHT+(9<<8) )
+#endif
                 {
                     fricxv += x<<3;
                     fricyv += l<<3;
@@ -6696,9 +7490,15 @@ void moveeffectors(void)   //STATNUM 3
 
                 if( t[4] == 0 ) break;
 
+#if DUKE3D_GAMEVER < GAMEVER_14
+                // In 1.3D t[4] is the piston's top height (spawn sets it).
+#define PISTONTOP t[4]
+#else
+#define PISTONTOP t[3]
+#endif
                 if(sc->floorz <= sc->ceilingz)
                     s->shade = 0;
-                else if( sc->ceilingz <= t[3])
+                else if( sc->ceilingz <= PISTONTOP)
                     s->shade = 1;
 
                 if(s->shade)
@@ -6710,9 +7510,10 @@ void moveeffectors(void)   //STATNUM 3
                 else
                 {
                     sc->ceilingz   -= SP<<4;
-                    if(sc->ceilingz < t[3])
-                        sc->ceilingz = t[3];
+                    if(sc->ceilingz < PISTONTOP)
+                        sc->ceilingz = PISTONTOP;
                 }
+#undef PISTONTOP
 
                 break;
 
@@ -6818,6 +7619,7 @@ void moveeffectors(void)   //STATNUM 3
                     }
                 }
                 break;
+#if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D has no such effector
             case 28:
                 if(t[5] > 0)
                 {
@@ -6904,11 +7706,155 @@ void moveeffectors(void)   //STATNUM 3
                     }
                 }
                 break;
+#endif
             case 29:
                 s->hitag += 64;
                 l = mulscale12((int32_t)s->yvel,sintable[s->hitag&2047]);
                 sc->floorz = s->z + l;
                 break;
+#if DUKE3D_GAMEVER < GAMEVER_14
+            case 31: // True Drop Floor (1.3D)
+                if(t[0] == 1)
+                {
+                    // Choose dir
+
+                    if(t[3] > 0)
+                    {
+                        t[3]--;
+                        break;
+                    }
+
+                    if(t[2] == 1) // Retract
+                    {
+                        if(SA != 1536)
+                        {
+                            l = 0;
+                            if( klabs( sc->floorz - s->z ) < SP*2 )
+                            {
+                                sc->floorz = s->z;
+                                t[2] = 0;
+                                t[0] = 0;
+                                t[3] = s->hitag;
+                                callsound(s->sectnum,i);
+                            }
+                            else
+                            {
+                                l = sgn(s->z-sc->floorz)*SP;
+                                sc->floorz += l;
+                            }
+
+                            j = headspritesect[s->sectnum];
+                            while(j >= 0)
+                            {
+                                if(sprite[j].picnum == APLAYER && sprite[j].owner >= 0)
+                                    if( ps[sprite[j].yvel].on_ground == 1 )
+                                        ps[sprite[j].yvel].posz += l;
+                                if( sprite[j].zvel == 0 && sprite[j].statnum != 3 )
+                                {
+                                    hittype[j].bposz = sprite[j].z; sprite[j].z += l;
+                                    hittype[j].floorz = sc->floorz;
+                                }
+                                j = nextspritesect[j];
+                            }
+                        }
+                        else
+                        {
+                            l = 0;
+                            if( klabs( sc->floorz - t[1] ) < SP*2 )
+                            {
+                                sc->floorz = t[1];
+                                callsound(s->sectnum,i);
+                                t[2] = 0;
+                                t[0] = 0;
+                                t[3] = s->hitag;
+                            }
+                            else
+                            {
+                                l = sgn(t[1]-sc->floorz)*SP;
+                                sc->floorz += l;
+                            }
+
+                            j = headspritesect[s->sectnum];
+                            while(j >= 0)
+                            {
+                                if(sprite[j].picnum == APLAYER && sprite[j].owner >= 0)
+                                    if( ps[sprite[j].yvel].on_ground == 1 )
+                                        ps[sprite[j].yvel].posz += l;
+                                if( sprite[j].zvel == 0 && sprite[j].statnum != 3 )
+                                {
+                                    hittype[j].bposz = sprite[j].z; sprite[j].z += l;
+                                    hittype[j].floorz = sc->floorz;
+                                }
+                                j = nextspritesect[j];
+                            }
+                        }
+                        break;
+                    }
+
+                    if( (s->ang&2047) == 1536)
+                    {
+                        l = 0;
+                        if( klabs( s->z-sc->floorz ) < SP*2 )
+                        {
+                            callsound(s->sectnum,i);
+                            t[0] = 0;
+                            t[2] = 1;
+                            t[3] = s->hitag;
+                        }
+                        else
+                        {
+                            l = sgn(s->z-sc->floorz)*SP;
+                            sc->floorz += l;
+                        }
+
+                        j = headspritesect[s->sectnum];
+                        while(j >= 0)
+                        {
+                            if(sprite[j].picnum == APLAYER && sprite[j].owner >= 0)
+                                if( ps[sprite[j].yvel].on_ground == 1 )
+                                    ps[sprite[j].yvel].posz += l;
+                            if( sprite[j].zvel == 0 && sprite[j].statnum != 3 )
+                            {
+                                hittype[j].bposz = sprite[j].z; sprite[j].z += l;
+                                hittype[j].floorz = sc->floorz;
+                            }
+                            j = nextspritesect[j];
+                        }
+                    }
+                    else
+                    {
+                        l = 0;
+                        if( klabs( sc->floorz-t[1] ) < SP*2 )
+                        {
+                            t[0] = 0;
+                            callsound(s->sectnum,i);
+                            t[2] = 1;
+                            t[3] = s->hitag;
+                        }
+                        else
+                        {
+                            l = sgn(s->z-t[1])*SP;
+                            sc->floorz -= l;
+                        }
+
+                        j = headspritesect[s->sectnum];
+                        while(j >= 0)
+                        {
+                            if(sprite[j].picnum == APLAYER && sprite[j].owner >= 0)
+                                if( ps[sprite[j].yvel].on_ground == 1 )
+                                    ps[sprite[j].yvel].posz -= l;
+                            if(sprite[j].zvel == 0 && sprite[j].statnum != 3 )
+                            {
+                                hittype[j].bposz = sprite[j].z; sprite[j].z -= l;
+                                hittype[j].floorz = sc->floorz;
+                            }
+                            j = nextspritesect[j];
+                        }
+                    }
+                }
+                break;
+
+#else
             case 31: // True Drop Floor
                 if(t[0] == 1)
                 {
@@ -7046,6 +7992,7 @@ void moveeffectors(void)   //STATNUM 3
                 }
                 break;
 
+#endif
            case 32: // True Drop Ceiling
                 if(t[0] == 1)
                 {

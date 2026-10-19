@@ -3112,11 +3112,16 @@ void randomscrap(spritetype *s, short i)
     int32_t r_vel = (TRAND&63)+64;
     int32_t r_ang = TRAND&2047;
     int32_t r_pn = SCRAP6+(TRAND&15);
+#if DUKE3D_GAMEVER < GAMEVER_14
+    // 1.3D throws scrap from the sprite's own x/y and a fixed height.
+    EGS(s->sectnum,s->x,s->y,s->z-(12<<8),r_pn,-8,48,48,r_ang,r_vel,r_zv,i,5);
+#else
     int32_t r_z = s->z-(8<<8)-(TRAND&8191);
     int32_t r_y = s->y+(TRAND&255)-128;
     int32_t r_x = s->x+(TRAND&255)-128;
 
     EGS(s->sectnum,r_x,r_y,r_z,r_pn,-8,48,48,r_ang,r_vel,r_zv,i,5);
+#endif
 }
 
 short EGS(short whatsect,int32_t s_x,int32_t s_y,int32_t s_z,short s_pn,signed char s_s,signed char s_xr,signed char s_yr,short s_a,short s_ve,int32_t s_zv,short s_ow,signed char s_ss)
