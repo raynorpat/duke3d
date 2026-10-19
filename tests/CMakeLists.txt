@@ -305,9 +305,12 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
     set_tests_properties(demo_refuse_v13d_${_v13d_edition} PROPERTIES TIMEOUT 120)
   endif()
   if(_v13d_data AND EXISTS "${_v13d_data}/refsaves/e1l1start.SAV")
+    # Its own directory: lzw_roundtrip writes a scratch file in its working
+    # directory, and the plain lzw_roundtrip test may run at the same time.
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lzw_dos")
     add_test(NAME lzw_dos_v13d_${_v13d_edition}
       COMMAND lzw_roundtrip "${_v13d_data}/refsaves/e1l1start.SAV"
-      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lzw_dos")
   endif()
   if(_v13d_data)
     # Two copies of this build must meet over UDP on localhost, and both
