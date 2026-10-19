@@ -179,3 +179,98 @@ Tools outside the tree, under `~/Projects/ref/`:
 | `randomseed` | `0x251998` | `0x251ae8` | `krand`: `seed = seed*0x1a4e86d + 1; return seed >> 16` |
 | `ud.reccnt` | `0x14de0a` | `0x14df5a` | other `ud` fields are listed under Formats |
 | `BYTEVERSION` | `103` (`0x67`) | `14` (`0x0e`) | compared in getpackets; written by saveplayer and checked by loadplayer/loadpheader |
+
+## Formats
+
+### Save pointers (spec risk): answered
+
+The 1.3D `saveplayer` (full `0x3b8a0`, shareware `0x3baf0`) does **not** write raw DOS
+addresses. Before writing, it converts every pointer-valued field to an offset, writes
+it, and converts it back afterwards, the same scheme as 1.5:
+
+- `script[]` (20000 longs): every entry that falls inside `script[]` (full
+  `0x106300`–`0x119b7f`) gets an offset from the `script` base. A 20000-byte bitmap
+  written first marks which entries were converted.
+- `actorscrptr[]` (4096): every non-zero entry is converted to an offset from `script`.
+- `hittype[]` (2048 × 71 bytes): for sprites whose picnum has an actor script,
+  `temp_data` slots 1, 4 and 5 (hittype offsets `+0x33`, `+0x3f`, `+0x43`) are converted
+  when they point inside `script[]`. A 2048-byte bitmap is written first (bit 0 = t[1],
+  bit 1 = t[4], bit 2 = t[5]).
+- `animateptr[]` (64): converted to offsets from `sector[]` (full `0x245ec0`).
+
+So loading a DOS save needs no knowledge of DOS addresses.
+
+### BYTEVERSION
+
+| Edition | Value | Where checked |
+|---|---|---|
+| full | 103 (`0x67`) | `getpackets` (`packbuf[1]`), first long of the save file (`saveplayer`/`loadplayer`/`loadpheader`) |
+| shareware | 14 (`0x0e`) | the same places |
+
+### Demo file
+
+The header is 24 bytes, little-endian, packed. There is no version byte (`opendemoread`
+`0x206f0`):
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 4 | `ud.reccnt` (tics) |
+| 4 | 1 | `ud.volume_number` |
+| 5 | 1 | `ud.level_number` |
+| 6 | 1 | `ud.player_skill` |
+| 7 | 1 | `ud.m_coop` |
+| 8 | 2 | `ud.multimode` |
+| 10 | 2 | `ud.m_monsters_off` |
+| 12 | 4 | `ud.m_respawn_monsters` |
+| 16 | 4 | `ud.m_respawn_items` |
+| 20 | 4 | `ud.m_respawn_inventory` |
+
+It is followed by `kdfread`-compressed blocks of up to 2520 `input` records (10 bytes
+each: `avel` s8, `horz` s8, `fvel` s16, `svel` s16, `bits` u32), interleaved per
+player. Then `newgame(volume, level, skill)` runs. The five original demos decode as:
+
+| Demo | Tics | Episode/level (0-based) | Skill | Players |
+|---|---|---|---|---|
+| full DEMO1 | 7031 | 1 / 7 | 1 | 1 |
+| full DEMO2 | 11269 | 2 / 2 | 2 | 1 |
+| sw DEMO1 | 2164 | 0 / 1 | 4 | 1 |
+| sw DEMO2 | 3325 | 0 / 5 | 4 | 1 |
+| sw DEMO3 | 1582 | 0 / 0 | 4 | 1 |
+
+`playback` (`0x20b10`) runs one `domovethings` per 4 `totalclock` ticks. The demo number
+wraps from 10 back to 1.
+
+### Save file (`saveplayer`, in write order)
+
+1. `BYTEVERSION` (4)
+2. save name (19). There is **no `ud.multimode`** field, unlike 1.5.
+3. `ud.volume_number`, `ud.level_number`, `ud.player_skill` (4 each)
+4. thumbnail (160 × 100)
+5. `numwalls` (2), `wall[8192]` (32 each), `numsectors` (2), `sector[1024]` (40 each),
+   `sprite[4096]` (44 each)
+6. `headspritesect[1025]`, `prevspritesect[4096]`, `nextspritesect[4096]`,
+   `headspritestat[1025]`, `prevspritestat[4096]`, `nextspritestat[4096]` (2 each)
+7. `numcyclers` (2), `cyclers[256]` (12 each)
+8. `ps[16]` (`0x552` each), `po[16]` (16 each)
+9. `numanimwalls` (2), `animwall` (3072 bytes)
+10. `msx[2048]`, `msy[2048]` (4 each)
+11. `spriteqloc` (2), `spriteq[64]` (2 each). There is **no `spriteqamount`**; the queue
+    is a fixed 64.
+12. `mirrorcnt` (2), `mirrorwall[64]`, `mirrorsector[64]` (2 each)
+13. `show2dsector[128]` (1 each). There is **no `actortype[]`, `boardfilename` or clouds**.
+14. script bitmap (20000), `script[20000]` (4 each, offsets)
+15. `actorscrptr[4096]` (4 each, offsets)
+16. hittype bitmap (2048), `hittype[2048]` (71 each)
+17. `lockclock` (4), `pskybits` (2), `pskyoff[256]` (2 each)
+18. `animatecnt` (4), `animatesect[64]` (2), `animateptr[64]` (4, offsets from
+    `sector`), `animategoal[64]` (4), `animatevel[64]` (4)
+19. Twelve scalars, in the same order as the first twelve in 1.5 after `animatevel`:
+    `earthquaketime` (1), `ud.from_bonus` (2), `ud.secretlevel` (2),
+    `ud.respawn_monsters` (4), `ud.respawn_items` (4), `ud.respawn_inventory` (4),
+    `ud.god` (1), `ud.auto_run` (4), `ud.crosshair` (4), `ud.monsters_off` (4),
+    `ud.last_level` (2), `ud.eog` (1). These names come from matching the 1.5 order. The
+    file ends there: there is **no `coop`, `marker`, `ffire`, `camsprite`, `connecthead`,
+    `connectpoint2`, `numplayersprites`, `frags`, `randomseed`, `global_random` or
+    `parallaxyscale`**.
+
+The shareware save has the same layout, with its own addresses and `BYTEVERSION`.
