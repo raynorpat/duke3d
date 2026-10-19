@@ -295,7 +295,7 @@ void CONFIG_SetDefaults( void )
    VoiceToggle = 1;
    AmbienceToggle = 1;
    FXVolume = 192;
-   MusicVolume = 128;
+   MusicVolume = 192;
    ReverseStereo = 0;
    ps[0].aim_mode = 0;
    ud.screen_size = 8;
