@@ -41,6 +41,12 @@ target_compile_definitions(version_macros PRIVATE
   EXPECT_VOLUMEONE=${_vone})
 add_test(NAME version_macros COMMAND version_macros)
 
+# The engine's C fixed-point helpers against the original x86 results.
+add_executable(pragmas_semantics pragmas_semantics.c)
+target_include_directories(pragmas_semantics PRIVATE "${PROJECT_SOURCE_DIR}/source")
+target_link_libraries(pragmas_semantics PRIVATE buildengine)
+add_test(NAME pragmas_semantics COMMAND pragmas_semantics)
+
 # Bad DUKE3D_VERSION values must stop the configure step.
 add_test(NAME version_config_rejects
   COMMAND "${CMAKE_COMMAND}" "-DSRC=${PROJECT_SOURCE_DIR}"

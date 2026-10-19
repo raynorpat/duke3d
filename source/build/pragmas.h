@@ -2604,7 +2604,8 @@ static __inline int ksgn(int i1)
 static __inline int sgn(int i1) { return ksgn(i1); }
 static __inline int klabs (int i1)
 {
-  if (i1 < 0) i1 = -i1;
+  /* Fix: negate as unsigned, since -INT32_MIN is undefined in C; x86 neg leaves it as is. */
+  if (i1 < 0) i1 = (int)(0u - (unsigned)i1);
   return i1;
 }
 static __inline int mul3 (int i1) { return i1*3; }
