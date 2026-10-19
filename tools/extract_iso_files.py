@@ -14,14 +14,14 @@ import sys
 
 
 class Image:
-    def __init__(self, path):
-        self.f = open(path, 'rb')
+    def __init__(self, f):
+        self.f = f
         self.raw = False
         self.f.seek(16 * 2352 + 16 + 1)
         if self.f.read(5) == b'CD001':
             self.raw = True
         elif self.sector(16)[1:6] != b'CD001':
-            raise SystemExit('%s: no ISO 9660 volume found' % path)
+            raise SystemExit('%s: no ISO 9660 volume found' % f.name)
 
     def sector(self, lba):
         if self.raw:
@@ -33,7 +33,10 @@ class Image:
     def extent(self, lba, size):
         out = bytearray()
         while len(out) < size:
-            out += self.sector(lba)
+            sec = self.sector(lba)
+            if len(sec) < 2048:
+                raise SystemExit('image ends early')
+            out += sec
             lba += 1
         return bytes(out[:size])
 
@@ -73,14 +76,15 @@ def main(argv):
     if len(argv) < 4:
         print(__doc__)
         return 2
-    image = Image(argv[1])
-    os.makedirs(argv[2], exist_ok=True)
-    for path in argv[3:]:
-        lba, size = image.find(path)
-        dest = os.path.join(argv[2], path.split('/')[-1].upper())
-        with open(dest, 'wb') as out:
-            out.write(image.extent(lba, size))
-        print('%s -> %s (%d bytes)' % (path, dest, size))
+    with open(argv[1], 'rb') as f:
+        image = Image(f)
+        os.makedirs(argv[2], exist_ok=True)
+        for path in argv[3:]:
+            lba, size = image.find(path)
+            dest = os.path.join(argv[2], path.split('/')[-1].upper())
+            with open(dest, 'wb') as out:
+                out.write(image.extent(lba, size))
+            print('%s -> %s (%d bytes)' % (path, dest, size))
     return 0
 
 
