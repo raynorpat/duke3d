@@ -148,6 +148,11 @@ Tools outside the tree, under `~/Projects/ref/`:
 | nextsectorneighborz | engine | `0x666a2` | `0x663c2` | source order between anchors; sw match: exact |
 | lintersect | engine | `0x68131` | `0x67e51` | source order between anchors; sw match: exact |
 | dragpoint | engine | `0x68337` | `0x68057` | source order between anchors; sw match: exact |
+| kdfread | engine | `0x76a86` | `0x767a6` | only caller pair of uncompress; sw match: offset |
+| dfread | engine | `0x76ca3` | `0x769c3` | other caller of uncompress; sw match: offset |
+| dfwrite | engine | `0x76eb0` | `0x76bd0` | only caller of compress; sw match: offset |
+| compress | engine | `0x7712c` | `0x76e4c` | loads 9 and `0x200` (1996 LZW, E-012); sw match: offset |
+| uncompress | engine | `0x77308` | `0x77028` | loads 9 and `0x200` (1996 LZW, E-012); sw match: offset |
 | rotatepoint | engine | `0x6a2d8` | `0x69ff8` | decompiled; sw match: exact |
 | getceilzofslope | engine | `0x74126` | `0x73e46` | processinput call order; sw match: order |
 | getflorzofslope | engine | `0x74220` | `0x73f40` | processinput call order; sw match: order |
@@ -225,9 +230,9 @@ The header is 24 bytes, little-endian, packed. There is no version byte (`opende
 | 16 | 4 | `ud.m_respawn_items` |
 | 20 | 4 | `ud.m_respawn_inventory` |
 
-It is followed by `kdfread`-compressed blocks of up to 2520 `input` records (10 bytes
-each: `avel` s8, `horz` s8, `fvel` s16, `svel` s16, `bits` u32), interleaved per
-player. Then `newgame(volume, level, skill)` runs. The five original demos decode as:
+It is followed by `kdfread`-compressed blocks of up to 2520 `input` records, using the
+1996 LZW variant (ledger E-012), not ours. Each record is 10 bytes (`avel` s8, `horz` s8,
+`fvel` s16, `svel` s16, `bits` u32), interleaved per player. Then `newgame(volume, level, skill)` runs. The five original demos decode as:
 
 | Demo | Tics | Episode/level (0-based) | Skill | Players |
 |---|---|---|---|---|
@@ -241,6 +246,11 @@ player. Then `newgame(volume, level, skill)` runs. The five original demos decod
 wraps from 10 back to 1.
 
 ### Save file (`saveplayer`, in write order)
+
+Every field below is written with `dfwrite`, so every field is an LZW block in the 1996
+variant (ledger E-012), including the header fields. A full save starts `08 00 04 00 00 00 67 00 00 00`:
+block length 8, then the block's 4-byte header (length 4, not compressed) and `BYTEVERSION` 103. A
+shareware save should have `0e` in place of `67`; no shareware save has been checked yet.
 
 1. `BYTEVERSION` (4)
 2. save name (19). There is **no `ud.multimode`** field, unlike 1.5.
