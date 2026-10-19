@@ -247,7 +247,8 @@ every platform except Windows.
    both are fetched, the step is skipped, because the DLL list is empty and
    `copy_if_different` would fail.
 
-Minimum CMake version: 3.21 (needed for `TARGET_RUNTIME_DLLS` and presets v3).
+Minimum CMake version: 3.24 (needed for `DOWNLOAD_EXTRACT_TIMESTAMP` in FetchContent and
+SDL 2.32.10's own requirement on Apple; `TARGET_RUNTIME_DLLS` and presets v3 are covered too).
 
 ## CI
 
@@ -292,7 +293,7 @@ so `source/build/` isn't ignored.
 
 ## Definition of done
 
-1. On local macOS arm64, `cmake --preset default && cmake --build build` builds
+1. On local macOS arm64, `cmake --preset default && cmake --build --preset default` builds
    `build/bin/duke3d`, `build/bin/build` and `build/bin/sdl_driver_smoke` with zero
    errors. Warnings are allowed.
 2. `ctest --preset default` passes on macOS, both with installed SDL2 and with

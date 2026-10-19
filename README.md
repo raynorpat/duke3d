@@ -9,7 +9,7 @@ Below is the original 3DRealms README, unchanged beyond some Markdown formatting
 
 ## Building
 
-The build uses CMake (3.21 or newer) and SDL2 + SDL2_mixer, and produces
+The build uses CMake (3.24 or newer) and SDL2 + SDL2_mixer, and produces
 64-bit binaries for Windows, macOS and Linux.
 
 Prerequisites:
@@ -23,7 +23,7 @@ Then, from the repository root:
 
 ```
 cmake --preset default
-cmake --build build
+cmake --build --preset default
 ```
 
 This produces `build/bin/duke3d` (the game) and `build/bin/build` (the map
