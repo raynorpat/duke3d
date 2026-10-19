@@ -82,3 +82,6 @@ BUILDLIC.TXT LICENSE.md
   `INT32_MIN` as x86 `neg` does instead of undefined behaviour (ledger E-009)
 - `engine.c`: version-guarded 1.4 engine logic, on `BUILD_ENGINEREV` (see
   ledger E-005)
+- `engine.c`, `cache1d.c`: version-guarded 1.3D engine logic, on
+  `BUILD_ENGINEREV`: the 1996 logic square root, slope maths, `inside` and the
+  1996 LZW format (see ledger E-001 to E-004, E-012)

@@ -879,6 +879,111 @@ void dfwrite32(int32_t *_buffer, size_t count, FILE *fil)
 }
 
 
+#if (BUILD_ENGINEREV < 19960820L)
+/* The LZW format before revision 19960820: codes start at 9 bits, and every
+ * code takes its full width (no dropped bit). Duke Nukem 3D 1.3D wrote its
+ * demos and saves this way. */
+int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf)
+{
+	int32_t i, addr, newaddr, addrcnt, zx, *longptr;
+	int32_t bytecnt1, bytecnt2, bitcnt, numbits, oneupnumbits;
+	short *shortptr;
+
+	for(i=255;i>=0;i--) { lzwbuf1[i] = (char) i; lzwbuf3[i] = (short) ((i+1)&255); }
+	clearbuf((void *) FP_OFF(lzwbuf2),256>>1,0xffffffff);
+	clearbuf((void *) FP_OFF(lzwoutbuf),((uncompleng+15)+3)>>2,0L);
+
+	addrcnt = 256; bytecnt1 = 0; bytecnt2 = 4; bitcnt = 0;
+	numbits = 9; oneupnumbits = (1<<9);
+	do
+	{
+		addr = lzwinbuf[bytecnt1];
+		do
+		{
+			bytecnt1++;
+			if (bytecnt1 == uncompleng) break;
+			if (lzwbuf2[addr] < 0) {lzwbuf2[addr] = (short) addrcnt; break;}
+			newaddr = lzwbuf2[addr];
+			while (lzwbuf1[newaddr] != lzwinbuf[bytecnt1])
+			{
+				zx = lzwbuf3[newaddr];
+				if (zx < 0) {lzwbuf3[newaddr] = (short) addrcnt; break;}
+				newaddr = zx;
+			}
+			if (lzwbuf3[newaddr] == addrcnt) break;
+			addr = newaddr;
+		} while (addr >= 0);
+		lzwbuf1[addrcnt] = lzwinbuf[bytecnt1];
+		lzwbuf2[addrcnt] = -1;
+		lzwbuf3[addrcnt] = -1;
+
+		longptr = (int32_t *)&lzwoutbuf[bytecnt2];
+		*longptr = BUILDSWAP_INTEL32(*longptr);  //convert to native format.
+		*longptr |= (addr<<bitcnt);  // add new data.
+		*longptr = BUILDSWAP_INTEL32(*longptr);  //convert back to littleendian
+		bitcnt += numbits; bytecnt2 += (bitcnt>>3); bitcnt &= 7;
+
+		addrcnt++;
+		if (addrcnt == oneupnumbits) { numbits++; oneupnumbits <<= 1; }
+	} while ((bytecnt1 < uncompleng) && (bytecnt2 < uncompleng));
+
+	longptr = (int32_t *)&lzwoutbuf[bytecnt2];
+	*longptr = BUILDSWAP_INTEL32(*longptr);  //convert to native format.
+	*longptr |= (addr<<bitcnt);
+	*longptr = BUILDSWAP_INTEL32(*longptr);  //convert back.
+	bitcnt += numbits; bytecnt2 += (bitcnt>>3);
+
+	shortptr = (short *)lzwoutbuf;
+	*shortptr = (short)uncompleng;
+	*shortptr = BUILDSWAP_INTEL16(*shortptr);
+	if (bytecnt2 < uncompleng)
+	{
+		shortptr[1] = (short)addrcnt;
+		shortptr[1] = BUILDSWAP_INTEL16(shortptr[1]);
+		return(bytecnt2);
+	}
+	shortptr[1] = (short)0;
+	for(i=0;i<uncompleng;i++) lzwoutbuf[i+4] = lzwinbuf[i];
+	return(uncompleng+4);
+}
+
+int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
+{
+	int32_t strtot, currstr, numbits, oneupnumbits;
+	int32_t i, dat, leng, inbytecnt, bitcnt, outbytecnt, *longptr;
+	short *shortptr;
+
+	shortptr = (short *)lzwinbuf;
+	strtot = (int32_t) BUILDSWAP_INTEL16(shortptr[1]);
+	if (strtot == 0)
+	{
+		copybuf((void *)(FP_OFF(lzwinbuf)+4),(void *)(FP_OFF(lzwoutbuf)),((compleng-4)+3)>>2);
+		return((int32_t) BUILDSWAP_INTEL16(shortptr[0])); /* uncompleng */
+	}
+	for(i=255;i>=0;i--) { lzwbuf2[i] = (short) i; lzwbuf3[i] = (short) i; }
+	bitcnt = 0; currstr = 256; inbytecnt = 4; outbytecnt = 0;
+	numbits = 9; oneupnumbits = (1<<9);
+	do
+	{
+		longptr = (int32_t *)&lzwinbuf[inbytecnt];
+		dat = ((BUILDSWAP_INTEL32(longptr[0])>>bitcnt) & (oneupnumbits-1));
+		bitcnt += numbits; inbytecnt += (bitcnt>>3); bitcnt &= 7;
+
+		lzwbuf3[currstr] = (short) dat;
+
+		for(leng=0;dat>=256;leng++,dat=lzwbuf3[dat])
+			lzwbuf1[leng] = (char) lzwbuf2[dat];
+
+		lzwoutbuf[outbytecnt++] = (char) dat;
+		for(i=leng-1;i>=0;i--) lzwoutbuf[outbytecnt++] = lzwbuf1[i];
+
+		lzwbuf2[currstr-1] = (short) dat; lzwbuf2[currstr] = (short) dat;
+		currstr++;
+		if (currstr >= oneupnumbits) { numbits++; oneupnumbits <<= 1; }
+	} while (currstr < strtot);
+	return((int32_t) BUILDSWAP_INTEL16(shortptr[0])); /* uncompleng */
+}
+#else
 int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf)
 {
 	int32_t i, addr, newaddr, addrcnt, zx, *longptr;
@@ -985,3 +1090,4 @@ int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 	} while (currstr < strtot);
 	return((int32_t) BUILDSWAP_INTEL16(shortptr[0])); /* uncompleng */
 }
+#endif

@@ -3212,6 +3212,63 @@ int saveboard(char *filename, int32_t *daposx, int32_t *daposy,
 }
 
 
+#if (BUILD_ENGINEREV < 19960427L)
+/* Before revision 19960427 the game logic took square roots with ksqrtasm
+ * from a 2048-entry table built by Newton's method. Rendering keeps the
+ * table above. */
+static unsigned short ksqrtable[2048];
+
+static void initksqrt1996(void)
+{
+	uint32_t i, root, num;
+	int32_t temp;
+
+	for(i=0;i<2048;i++)
+	{
+		root = 128;
+		num = i<<20;
+		do
+		{
+			temp = root;
+			root = (root+num/root)>>1;
+		} while((temp-root+1) > 2);
+		temp = root*root-num;
+		while (klabs(temp-2*root+1) < klabs(temp))
+		{
+			temp += -(2*root)+1;
+			root--;
+		}
+		while (klabs(temp+2*root+1) < klabs(temp))
+		{
+			temp += 2*root+1;
+			root++;
+		}
+		ksqrtable[i] = (unsigned short)root;
+	}
+}
+
+/* The 1996 ksqrtasm: below 2^11 a table lookup, above it the table at a
+ * reduced precision, scaled back up. */
+static int32_t ksqrtasm(int32_t num)
+{
+	uint32_t a = (uint32_t)num;
+	int32_t b, r;
+
+	if (num < 0) a = 0u-a;
+	if (a < 2048) r = ksqrtable[a];
+	else
+	{
+		for(b=31;!(a>>b);b--);
+		b = (b-9)&~1;
+		r = ksqrtable[a>>b]<<(b>>1);
+	}
+	return(r>>10);
+}
+#define LOGICSQRT(x) ksqrtasm(x)
+#else
+#define LOGICSQRT(x) nsqrtasm(x)
+#endif
+
 static void initksqrt(void)
 {
 	int32_t i, j, k;
@@ -3234,6 +3291,9 @@ static void loadtables(void)
 	if (tablesloaded == 0)
 	{
 		initksqrt();
+#if (BUILD_ENGINEREV < 19960427L)
+		initksqrt1996();
+#endif
 
 		for(i=0;i<2048;i++) reciptable[i] = divscale30(2048L,i+2048);
 
@@ -4278,7 +4338,11 @@ int inside(int32_t x, int32_t y, short sectnum)
 {
 	walltype *wal;
 	int32_t i, x1, y1, x2, y2;
+#if (BUILD_ENGINEREV < 19960427L)
+	int32_t cnt;
+#else
 	uint32_t cnt;
+#endif
 
 	if ((sectnum < 0) || (sectnum >= numsectors)) return(-1);
 
@@ -4291,11 +4355,19 @@ int inside(int32_t x, int32_t y, short sectnum)
 		if ((y1^y2) < 0)
 		{
 			x1 = wal->x-x; x2 = wall[wal->point2].x-x;
+#if (BUILD_ENGINEREV < 19960427L)
+			if ((x1^x2) < 0) cnt ^= (x1*y2-x2*y1)^(y1-y2); else cnt ^= ~x1;
+#else
 			if ((x1^x2) >= 0) cnt ^= x1; else cnt ^= (x1*y2-x2*y1)^y2;
+#endif
 		}
 		wal++; i--;
 	} while (i);
+#if (BUILD_ENGINEREV < 19960427L)
+	return(cnt<0);
+#else
 	return(cnt>>31);
+#endif
 }
 
 
@@ -4314,7 +4386,7 @@ int getangle(int32_t xvect, int32_t yvect)
 
 int ksqrt(int32_t num)
 {
-	return(nsqrtasm(num));
+	return(LOGICSQRT(num));
 }
 
 
@@ -6145,7 +6217,7 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 		{
 			wal = &wall[sec->wallptr]; wal2 = &wall[wal->point2];
 			dax = wal2->x-wal->x; day = wal2->y-wal->y;
-			i = nsqrtasm(dax*dax+day*day); if (i == 0) continue;
+			i = LOGICSQRT(dax*dax+day*day); if (i == 0) continue;
 			i = divscale15(sec->ceilingheinum,i);
 			dax *= i; day *= i;
 
@@ -6184,7 +6256,7 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 		{
 			wal = &wall[sec->wallptr]; wal2 = &wall[wal->point2];
 			dax = wal2->x-wal->x; day = wal2->y-wal->y;
-			i = nsqrtasm(dax*dax+day*day); if (i == 0) continue;
+			i = LOGICSQRT(dax*dax+day*day); if (i == 0) continue;
 			i = divscale15(sec->floorheinum,i);
 			dax *= i; day *= i;
 
@@ -6657,7 +6729,7 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 	cy = (((*y)+goaly)>>1);
 		/* Extra walldist for sprites on sector lines */
 	gx = goalx-(*x); gy = goaly-(*y);
-	rad = nsqrtasm(gx*gx + gy*gy) + MAXCLIPDIST+walldist + 8;
+	rad = LOGICSQRT(gx*gx + gy*gy) + MAXCLIPDIST+walldist + 8;
 	xmin = cx-rad; ymin = cy-rad;
 	xmax = cx+rad; ymax = cy+rad;
 
@@ -8714,11 +8786,22 @@ int getceilzofslope(short sectnum, int32_t dax, int32_t day)
 	walltype *wal;
 
 	if (!(sector[sectnum].ceilingstat&2)) return(sector[sectnum].ceilingz);
+#if (BUILD_ENGINEREV < 19960427L)
+	j = sector[sectnum].wallptr;
+	i = wall[j].point2;
+	dx = wall[i].x-wall[j].x;
+	dy = wall[i].y-wall[j].y;
+	i = (LOGICSQRT(dx*dx+dy*dy)); if (i == 0) return(sector[sectnum].ceilingz);
+	i = divscale15(sector[sectnum].ceilingheinum,i);
+	dx *= i; dy *= i;
+	return(sector[sectnum].ceilingz+dmulscale23(dx,day-wall[j].y,-dy,dax-wall[j].x));
+#else
 	wal = &wall[sector[sectnum].wallptr];
 	dx = wall[wal->point2].x-wal->x; dy = wall[wal->point2].y-wal->y;
 	i = (nsqrtasm(dx*dx+dy*dy)<<5); if (i == 0) return(sector[sectnum].ceilingz);
 	j = dmulscale3(dx,day-wal->y,-dy,dax-wal->x);
 	return(sector[sectnum].ceilingz+scale(sector[sectnum].ceilingheinum,j,i));
+#endif
 }
 
 
@@ -8728,11 +8811,22 @@ int getflorzofslope(short sectnum, int32_t dax, int32_t day)
 	walltype *wal;
 
 	if (!(sector[sectnum].floorstat&2)) return(sector[sectnum].floorz);
+#if (BUILD_ENGINEREV < 19960427L)
+	j = sector[sectnum].wallptr;
+	i = wall[j].point2;
+	dx = wall[i].x-wall[j].x;
+	dy = wall[i].y-wall[j].y;
+	i = (LOGICSQRT(dx*dx+dy*dy)); if (i == 0) return(sector[sectnum].floorz);
+	i = divscale15(sector[sectnum].floorheinum,i);
+	dx *= i; dy *= i;
+	return(sector[sectnum].floorz+dmulscale23(dx,day-wall[j].y,-dy,dax-wall[j].x));
+#else
 	wal = &wall[sector[sectnum].wallptr];
 	dx = wall[wal->point2].x-wal->x; dy = wall[wal->point2].y-wal->y;
 	i = (nsqrtasm(dx*dx+dy*dy)<<5); if (i == 0) return(sector[sectnum].floorz);
 	j = dmulscale3(dx,day-wal->y,-dy,dax-wal->x);
 	return(sector[sectnum].floorz+scale(sector[sectnum].floorheinum,j,i));
+#endif
 }
 
 
@@ -8748,7 +8842,7 @@ void getzsofslope(short sectnum, int32_t dax, int32_t day, int32_t *ceilz, int32
 	{
 		wal = &wall[sec->wallptr]; wal2 = &wall[wal->point2];
 		dx = wal2->x-wal->x; dy = wal2->y-wal->y;
-		i = (nsqrtasm(dx*dx+dy*dy)<<5); if (i == 0) return;
+		i = (LOGICSQRT(dx*dx+dy*dy)<<5); if (i == 0) return;
 		j = dmulscale3(dx,day-wal->y,-dy,dax-wal->x);
 		if (sec->ceilingstat&2) *ceilz = (*ceilz)+scale(sec->ceilingheinum,j,i);
 		if (sec->floorstat&2) *florz = (*florz)+scale(sec->floorheinum,j,i);
@@ -8767,7 +8861,7 @@ void alignceilslope(short dasect, int32_t x, int32_t y, int32_t z)
 
 	i = (y-wal->y)*dax - (x-wal->x)*day; if (i == 0) return;
 	sector[dasect].ceilingheinum = scale((z-sector[dasect].ceilingz)<<8,
-													 nsqrtasm(dax*dax+day*day),i);
+													 LOGICSQRT(dax*dax+day*day),i);
 
 	if (sector[dasect].ceilingheinum == 0) sector[dasect].ceilingstat &= ~2;
 												 else sector[dasect].ceilingstat |= 2;
@@ -8785,7 +8879,7 @@ void alignflorslope(short dasect, int32_t x, int32_t y, int32_t z)
 
 	i = (y-wal->y)*dax - (x-wal->x)*day; if (i == 0) return;
 	sector[dasect].floorheinum = scale((z-sector[dasect].floorz)<<8,
-												  nsqrtasm(dax*dax+day*day),i);
+												  LOGICSQRT(dax*dax+day*day),i);
 
 	if (sector[dasect].floorheinum == 0) sector[dasect].floorstat &= ~2;
 											  else sector[dasect].floorstat |= 2;

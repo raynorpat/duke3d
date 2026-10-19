@@ -47,6 +47,14 @@ target_include_directories(pragmas_semantics PRIVATE "${PROJECT_SOURCE_DIR}/sour
 target_link_libraries(pragmas_semantics PRIVATE buildengine)
 add_test(NAME pragmas_semantics COMMAND pragmas_semantics)
 
+# The engine's LZW compressor and decompressor must agree. In 1.3D builds
+# with the 1.3D data, it also reads a save written by the DOS executable.
+add_executable(lzw_roundtrip lzw_roundtrip.c)
+target_include_directories(lzw_roundtrip PRIVATE "${PROJECT_SOURCE_DIR}/source")
+target_link_libraries(lzw_roundtrip PRIVATE buildengine)
+add_test(NAME lzw_roundtrip COMMAND lzw_roundtrip
+         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+
 # Bad DUKE3D_VERSION values must stop the configure step.
 add_test(NAME version_config_rejects
   COMMAND "${CMAKE_COMMAND}" "-DSRC=${PROJECT_SOURCE_DIR}"
@@ -235,6 +243,11 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
               "-DWORK=${CMAKE_BINARY_DIR}/cc13"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/con_compile_v13d.cmake")
     set_tests_properties(con_compile_v13d_${_v13d_edition} PROPERTIES TIMEOUT 120)
+  endif()
+  if(_v13d_data AND EXISTS "${_v13d_data}/refsaves/e1l1start.SAV")
+    add_test(NAME lzw_dos_v13d_${_v13d_edition}
+      COMMAND lzw_roundtrip "${_v13d_data}/refsaves/e1l1start.SAV"
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
   endif()
   # The edition check must name a wrong edition, not fail some other way.
   if(DUKE3D_V13D_DATA_DIR)
