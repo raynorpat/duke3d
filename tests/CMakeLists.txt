@@ -68,3 +68,10 @@ file(WRITE "${_con_dir}/prefix.con"
 
 add_test(NAME con_compile COMMAND con_compile WORKING_DIRECTORY "${_con_dir}")
 set_tests_properties(con_compile PROPERTIES TIMEOUT 30)
+
+# Checks the save record codec against the DOS 1.5 byte layout. Needs no
+# game data.
+add_executable(savegame_codec savegame_codec.c "${_game_c}")
+target_link_libraries(savegame_codec PRIVATE duke3d_game)
+add_test(NAME savegame_codec COMMAND savegame_codec)
+set_tests_properties(savegame_codec PROPERTIES TIMEOUT 30)

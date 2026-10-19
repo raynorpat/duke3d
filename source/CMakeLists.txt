@@ -13,6 +13,7 @@ add_library(duke3d_game OBJECT
   player.c
   premap.c
   rts.c
+  savegame.c
   scriplib.c
   sector.c
   sounds.c)
