@@ -584,7 +584,7 @@ void readsavenames(void)
         if ((fil = fopen(fullname,"rb")) == NULL ) continue;
         dfread32(&dummy,1,fil);
 
-        if(dummy != BYTEVERSION) return;
+        if(dummy != BYTEVERSION) { fclose(fil); continue; }
         dfread32(&dummy,1,fil);
         dfread(&ud.savegame[i][0],19,1,fil);
         fclose(fil);
