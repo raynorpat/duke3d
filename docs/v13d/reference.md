@@ -250,7 +250,7 @@ wraps from 10 back to 1.
 Every field below is written with `dfwrite`, so every field is an LZW block in the 1996
 variant (ledger E-012), including the header fields. A full save starts `08 00 04 00 00 00 67 00 00 00`:
 block length 8, then the block's 4-byte header (length 4, not compressed) and `BYTEVERSION` 103. A
-shareware save should have `0e` in place of `67`; no shareware save has been checked yet.
+shareware save has `0e` in place of `67` (checked on the shareware reference saves).
 
 1. `BYTEVERSION` (4)
 2. save name (19). There is **no `ud.multimode`** field, unlike 1.5.
@@ -363,6 +363,14 @@ field (`inventory` after allowing for a weapon switch the user made after saving
 | `e1l1start` | E1L1 | `dc61d7aa5d4817533565bea36f33a5eb` |
 | `e1l1fight` | E1L1 | `b7e697dc5cd3f21612debbfb9de59220` |
 | `inventory` | E1L1 | `b50cbf83c2f8ebb77cb27a44d57465b6` |
+
+Shareware (copies in the shareware data dir's `refsaves/`; same `ps[]` layout, which the
+status bars confirm):
+
+| Name | Level | MD5 |
+|---|---|---|
+| `e1l1start` | E1L1 | `93cbfbe5cdca8ed494511e44d6910e27` |
+| `inventory` | E1L1 | `0d88ef4374042a0947d275805de7f741` |
 
 The expected values in `tests/data/v13d_save_refs.cmake` must be observed
 **independently of the save layout**. Otherwise a layout mistake would be repeated in
