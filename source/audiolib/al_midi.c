@@ -30,21 +30,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 **********************************************************************/
 
 #include <stdint.h>
-#ifdef PLAT_DOS
-#include <conio.h>
-#include <dos.h>
-#endif
 #include <stddef.h>
 #include <stdlib.h>
 //#include <math.h>
 #include "dpmi.h"
 #include "interrup.h"
 #include "sndcards.h"
-#ifdef PLAT_DOS
-#include "blaster.h"
-#else
 #include "oplemu.h"
-#endif
 #include "user.h"
 #include "al_midi.h"
 #include "_al_midi.h"
@@ -178,29 +170,8 @@ void AL_SendOutputToPort
    )
 
    {
-#ifdef PLAT_DOS
-   int delay;
-
-   outp( port, reg );
-
-   for( delay = 6; delay > 0 ; delay-- )
-//   for( delay = 2; delay > 0 ; delay-- )
-      {
-      inp( port );
-      }
-
-   outp( port + 1, data );
-
-//   for( delay = 35; delay > 0 ; delay-- )
-   for( delay = 27; delay > 0 ; delay-- )
-//   for( delay = 2; delay > 0 ; delay-- )
-      {
-      inp( port );
-      }
-#else
    // The right port is the OPL3's second register bank.
    OPLEMU_WriteReg( ( port == AL_RightPort ) ? ( reg | 0x100 ) : reg, data );
-#endif
    }
 
 
@@ -1259,39 +1230,8 @@ int AL_DetectFM
    )
 
    {
-#ifdef PLAT_DOS
-   int status1;
-   int status2;
-   int i;
-
-   if ( USER_CheckParameter( NO_ADLIB_DETECTION ) )
-      {
-      return( FALSE );
-      }
-
-   AL_SendOutputToPort( ADLIB_PORT, 4, 0x60 );   // Reset T1 & T2
-   AL_SendOutputToPort( ADLIB_PORT, 4, 0x80 );   // Reset IRQ
-
-   status1 = inp( ADLIB_PORT );
-
-   AL_SendOutputToPort( ADLIB_PORT, 2, 0xff );   // Set timer 1
-   AL_SendOutputToPort( ADLIB_PORT, 4, 0x21 );   // Start timer 1
-
-   for( i = 100; i > 0; i-- )
-      {
-      inp( ADLIB_PORT );
-      }
-
-   status2 = inp( ADLIB_PORT );
-
-   AL_SendOutputToPort( ADLIB_PORT, 4, 0x60 );
-   AL_SendOutputToPort( ADLIB_PORT, 4, 0x80 );
-
-   return( ( ( status1 & 0xe0 ) == 0x00 ) && ( ( status2 & 0xe0 ) == 0xc0 ) );
-#else
    // The emulated chip is always there.
    return( TRUE );
-#endif
    }
 
 
@@ -1377,9 +1317,6 @@ int AL_Init
    )
 
    {
-#ifdef PLAT_DOS
-   BLASTER_CONFIG Blaster;
-#endif
    int status;
 
    status  = DPMI_LockMemoryRegion( AL_LockStart, AL_LockEnd );
@@ -1412,44 +1349,10 @@ int AL_Init
    AL_LeftPort = 0x388;
    AL_RightPort = 0x388;
 
-#ifndef PLAT_DOS
    // The emulated chip is an OPL3, set up as on a Sound Blaster 16.
    AL_OPL3 = TRUE;
    AL_LeftPort  = 0x388;
    AL_RightPort = 0x38A;
-#else
-   switch( soundcard )
-      {
-      case ProAudioSpectrum :
-      case SoundMan16 :
-         AL_OPL3 = TRUE;
-         AL_LeftPort = 0x388;
-         AL_RightPort = 0x38A;
-         break;
-
-      case SoundBlaster :
-         status = BLASTER_GetCardSettings( &Blaster );
-         if ( status != BLASTER_Ok )
-            {
-            status = BLASTER_GetEnv( &Blaster );
-            if ( status != BLASTER_Ok )
-               {
-               break;
-               }
-            }
-
-         switch( Blaster.Type )
-            {
-            case SBPro2 :
-            case SB16 :
-               AL_OPL3 = TRUE;
-               AL_LeftPort  = Blaster.Address;
-               AL_RightPort = Blaster.Address + 2;
-               break;
-            }
-         break;
-      }
-#endif
 // Temporarally commented out for ROTT.
 // Stereo FM seems to take too long on some computers and
 // causes the mouse driver to miss interrupts.

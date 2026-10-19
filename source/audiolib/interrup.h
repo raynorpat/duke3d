@@ -35,17 +35,4 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 uint32_t DisableInterrupts( void );
 void          RestoreInterrupts( uint32_t flags );
 
-#ifdef PLAT_DOS
-#pragma aux DisableInterrupts = \
-   "pushfd",                    \
-   "pop    eax",                \
-   "cli"                        \
-   modify [ eax ];
-
-#pragma aux RestoreInterrupts = \
-   "push   eax",                \
-   "popfd"                      \
-   parm [ eax ];
-#endif
-
 #endif
