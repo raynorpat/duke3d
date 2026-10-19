@@ -39,10 +39,10 @@ Options (pass with `-D` when configuring):
 | `DUKE3D_FETCH_SDL` | `AUTO` | `ON` always builds SDL2 from source, `OFF` never does |
 
 **64-bit:** the game runs as a native 64-bit binary. That's verified on macOS
-arm64; Linux and Windows are built and tested in CI. Saves from this build
-can't be loaded by the original DOS game, and original DOS saves can't be
-loaded yet. Demo recording, the editor's map saving and network play haven't
-been verified on 64-bit. Those are the next steps.
+arm64; Linux and Windows are built and tested in CI. Saves from this build can't
+be loaded by the original DOS game, and original DOS saves can't be loaded yet.
+Demo recording and playback and the editor's map saving are verified on 64-bit.
+Network play builds but hasn't been verified on 64-bit.
 
 Without a `duke3d.cfg`, the game starts with default settings and writes one:
 to `~/Library/Application Support/Duke Nukem 3D/` on macOS, `~/.duke3d/` on

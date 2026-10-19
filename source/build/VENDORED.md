@@ -76,3 +76,5 @@ BUILDLIC.TXT LICENSE.md
 - printf formats match their now-32-bit arguments; C-library narrowings
   (`read`, `lseek`, `sendto`, `recvfrom`, `time`, `strtol`, `strlen`) are
   explicit casts
+- `mmulti.c`: `socklen_t` is `int` on Windows (it was `size_t`, which is 8
+  bytes on Win64 while Winsock's `recvfrom` takes an `int *`)
