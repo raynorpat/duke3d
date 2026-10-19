@@ -7,6 +7,19 @@ if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
 endif()
 
 option(DUKE3D_SHAREWARE "Build the shareware (VOLUMEONE) version" OFF)
+# Which release's game logic to build. 1.3D and 1.4 need their own data; see
+# docs/v13d/reference.md.
+set(DUKE3D_VERSION "1.5" CACHE STRING "Game version to build: 1.3D, 1.4 or 1.5")
+set_property(CACHE DUKE3D_VERSION PROPERTY STRINGS 1.3D 1.4 1.5)
+if(NOT DUKE3D_VERSION MATCHES "^(1\\.3D|1\\.4|1\\.5)$")
+  message(FATAL_ERROR
+    "DUKE3D_VERSION is \"${DUKE3D_VERSION}\"; it must be one of 1.3D, 1.4, 1.5")
+endif()
+if(DUKE3D_VERSION STREQUAL "1.4" AND DUKE3D_SHAREWARE)
+  message(FATAL_ERROR
+    "1.4 has no shareware build; use DUKE3D_VERSION 1.3D, 1.4, 1.5 without "
+    "DUKE3D_SHAREWARE for 1.4")
+endif()
 option(DUKE3D_CONTROLS_MENU "Enable the in-game controls config menu" ON)
 set(DUKE3D_FETCH_SDL "AUTO" CACHE STRING
     "Download and build SDL2/SDL2_mixer: AUTO (only if not found), ON, OFF")

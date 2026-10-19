@@ -9,6 +9,12 @@
 #define _INCLUDE_BUILD_H_
 #include <stdint.h>
 
+/* Engine revision as a date (gamesrc-ver-recreation's LIBVER_BUILDREV). This
+ * tree is Ken's 20000614 release; CMake sets an older one for 1.3D and 1.4. */
+#ifndef BUILD_ENGINEREV
+#define BUILD_ENGINEREV 20000614L
+#endif
+
 #define MAXSECTORS 1024
 #define MAXWALLS 8192
 #define MAXSPRITES 4096

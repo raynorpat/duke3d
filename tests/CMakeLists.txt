@@ -8,6 +8,46 @@ set_tests_properties(sdl_driver_smoke PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
   TIMEOUT 30)
 
+# Checks DUKE3D_GAMEVER, BUILD_ENGINEREV, BYTEVERSION and the volume macros
+# against this configuration's DUKE3D_VERSION. The table is kept here, apart
+# from the one that sets them, so a mistake in either shows up.
+set(_vexp_1.3D    199604190 19960419 103 0)
+set(_vexp_1.3D_sw 199604190 19960419 14  0)
+set(_vexp_1.4     199610210 19960820 116 1)
+set(_vexp_1.5     199610320 20000614 117 1)
+set(_vexp_1.5_sw  199610320 20000614 27  0)
+set(_vkey "${DUKE3D_VERSION}")
+if(DUKE3D_SHAREWARE)
+  string(APPEND _vkey "_sw")
+endif()
+list(GET _vexp_${_vkey} 0 _vgame)
+list(GET _vexp_${_vkey} 1 _veng)
+list(GET _vexp_${_vkey} 2 _vbyte)
+list(GET _vexp_${_vkey} 3 _vpluto)
+if(DUKE3D_SHAREWARE)
+  set(_vone 1)
+else()
+  set(_vone 0)
+endif()
+add_executable(version_macros version_macros.c)
+# Only the headers are needed, so it takes duke3d_game's include path and
+# options rather than its objects.
+target_include_directories(version_macros PRIVATE "${PROJECT_SOURCE_DIR}/source")
+target_link_libraries(version_macros PRIVATE
+  duke3d_game_options buildengine audiolib duke3d::SDL2_mixer duke3d::SDL2main)
+target_compile_definitions(version_macros PRIVATE
+  SDL_MAIN_HANDLED EXPECT_GAMEVER=${_vgame}L EXPECT_ENGINEREV=${_veng}L
+  EXPECT_BYTEVERSION=${_vbyte} EXPECT_PLUTOPAK=${_vpluto}
+  EXPECT_VOLUMEONE=${_vone})
+add_test(NAME version_macros COMMAND version_macros)
+
+# Bad DUKE3D_VERSION values must stop the configure step.
+add_test(NAME version_config_rejects
+  COMMAND "${CMAKE_COMMAND}" "-DSRC=${PROJECT_SOURCE_DIR}"
+          "-DWORK=${CMAKE_BINARY_DIR}/vcr" -P
+          "${CMAKE_CURRENT_SOURCE_DIR}/version_config_rejects.cmake")
+set_tests_properties(version_config_rejects PROPERTIES TIMEOUT 120)
+
 # Windows: config and saves go to Saved Games\Duke Nukem 3D, and existing
 # ones in the game folder are copied there. Needs no game data.
 if(WIN32)

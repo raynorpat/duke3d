@@ -92,8 +92,10 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define VOLUMEALL
 #endif
 
-// Define plutopak if volumeall. --ryan.
-#if (defined VOLUMEALL)
+#include "gamever.h"
+
+// Define plutopak if volumeall. --ryan. The Plutonium Pak came with 1.4.
+#if (defined VOLUMEALL) && DUKE3D_GAMEVER >= GAMEVER_14
 #define PLUTOPAK
 #endif
 
@@ -105,11 +107,19 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define MAXSLEEPDIST  16384
 #define SLEEPTIME 24*64
 
-#ifdef VOLUMEONE
+#if DUKE3D_GAMEVER < GAMEVER_14
+    // 1.3D: the shareware and full releases' own values.
+    #ifdef VOLUMEONE
+        #define BYTEVERSION 14
+    #else
+        #define BYTEVERSION 103
+    #endif
+#elif DUKE3D_GAMEVER < GAMEVER_15
+    #define BYTEVERSION 116
+#elif defined VOLUMEONE
     #define BYTEVERSION 27
 #else
     // 116 is Duke 1.4, 117 is 1.5.  --ryan.
-    //#define BYTEVERSION 116
     #define BYTEVERSION 117
 #endif
 
