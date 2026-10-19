@@ -7,6 +7,45 @@ Below is the original 3DRealms README, unchanged beyond some Markdown formatting
 
 --ryan. (icculus@icculus.org)
 
+## Building
+
+The build uses CMake (3.21 or newer) and SDL2 + SDL2_mixer, and produces
+64-bit binaries for Windows, macOS and Linux.
+
+Prerequisites:
+
+- **macOS:** `brew install cmake sdl2 sdl2_mixer`
+- **Linux (Debian/Ubuntu):** `sudo apt install cmake build-essential libsdl2-dev libsdl2-mixer-dev`
+- **Windows:** Visual Studio 2022 with "Desktop development with C++", and CMake. SDL2 is
+  downloaded and built automatically if it isn't installed.
+
+Then, from the repository root:
+
+```
+cmake --preset default
+cmake --build build
+```
+
+This produces `build/bin/duke3d` (the game) and `build/bin/build` (the map
+editor); on Windows they're in `build/bin/RelWithDebInfo/`. Run `ctest
+--preset default` to run the SDL driver smoke test.
+
+Options (pass with `-D` when configuring):
+
+| Option | Default | Effect |
+|---|---|---|
+| `DUKE3D_SHAREWARE` | `OFF` | Build the shareware version (`VOLUMEONE`) |
+| `DUKE3D_CONTROLS_MENU` | `ON` | In-game controls configuration menu |
+| `DUKE3D_FETCH_SDL` | `AUTO` | `ON` always builds SDL2 from source, `OFF` never does |
+
+**Known issue:** the 64-bit builds don't run the game yet. The engine stores
+pointers and file data in `long`, which is 64 bits on macOS/Linux and too
+small for pointers on Windows. On macOS/Linux, loading the GRP fails with
+"Not enough memory for file grouping system". Fixing that is the next step.
+
+The original DOS/Watcom makefiles (`source/makefile.dos`,
+`source/makefile.lnk`) are kept for reference only.
+
 
 # Duke Nukem 3D (v1.5 CD Version) Source Code Release - April 1, 2003
 
