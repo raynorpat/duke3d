@@ -23,3 +23,14 @@ BUILDLIC.TXT LICENSE.md
   `unix_compat.c`, which refuses to build without `PLATFORM_UNIX`.
 - `win32_compat.h`: don't include `<dos.h>` under MSVC (it no longer ships
   one); only map `snprintf` to `_snprintf` before VS2015.
+- `sdl_driver.c`: ported from SDL 1.2 to SDL2:
+  - window + renderer + streaming ARGB texture; the 8-bit surface is
+    blitted through its palette on every present
+  - keycode table replaced by an `SDL_Scancode` table (positional, so the
+    old AZERTY special cases are gone); key repeat ignored
+  - mouse wheel via `SDL_MOUSEWHEEL`; grab via relative mouse mode
+  - timer callback returns its interval (SDL2 took the old `return(1)`
+    literally and ran the game at 1000 Hz)
+  - `VBE_setPalette` presents immediately, because Duke's fades
+    (`palto()`) never call `nextpage()`
+  - `splash.bmp` support and the PowerPC/Gestalt AltiVec probe removed

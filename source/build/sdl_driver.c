@@ -86,8 +86,23 @@ extern long setvlinebpl(long);
 
 #endif
 
-#ifdef PLATFORM_MACOSX
-#include <CoreServices/CoreServices.h>
+#if (defined PLATFORM_WIN32)
+#include <malloc.h>  /* alloca() */
+#ifndef alloca
+#define alloca _alloca
+#endif
+#ifndef S_IRUSR
+#define S_IRUSR _S_IREAD
+#endif
+#ifndef S_IWUSR
+#define S_IWUSR _S_IWRITE
+#endif
+#ifndef S_IRGRP
+#define S_IRGRP 0
+#endif
+#ifndef S_IROTH
+#define S_IROTH 0
+#endif
 #endif
 
 
@@ -136,8 +151,12 @@ long buffermode, origbuffermode, linearmode;
 char permanentupdate = 0, vgacompatible;
 
 SDL_Surface *surface = NULL; /* This isn't static so that we can use it elsewhere AH */
+static SDL_Window *sdl_window = NULL;
+static SDL_Renderer *sdl_renderer = NULL;
+static SDL_Texture *sdl_texture = NULL;
+static SDL_Surface *sdl_rgbsurface = NULL;  /* 32-bit staging copy of surface */
 static int debug_hall_of_mirrors = 0;
-static Uint32 sdl_flags = SDL_HWPALETTE;
+static int sdl_fullscreen = 0;
 static long mouse_x = 0;
 static long mouse_y = 0;
 static long mouse_relative_x = 0;
@@ -145,7 +164,7 @@ static long mouse_relative_y = 0;
 static short mouse_buttons = 0;
 static int mouse_grabbed = 0;
 static unsigned int lastkey = 0;
-static SDL_TimerID primary_timer = NULL;
+static SDL_TimerID primary_timer = 0;
 /* so we can make use of setcolor16()... - DDOI */
 static unsigned char drawpixel_color=0;
 /* These hold the colors for the 256 color palette when in 16-color mode - DDOI */
@@ -170,7 +189,7 @@ static char egapalette[] = { 0, 0, 0,
 			    63, 63, 63
 			   };
 
-static unsigned int scancodes[SDLK_LAST];
+static unsigned int scancodes[SDL_NUM_SCANCODES];
 
 static long last_render_ticks = 0;
 long total_render_time = 1;
@@ -226,27 +245,9 @@ void sgldebug(const char *fmt, ...)
 #endif
 
 
-static void __append_sdl_surface_flag(SDL_Surface *_surface, char *str,
-                                      size_t strsize, Uint32 flag,
-                                      const char *flagstr)
-{
-    if (_surface->flags & flag)
-    {
-        if ( (strlen(str) + strlen(flagstr)) >= (strsize - 1) )
-            strcpy(str + (strsize - 5), " ...");
-        else
-            strcat(str, flagstr);
-    } /* if */
-} /* append_sdl_surface_flag */
-
-
-#define append_sdl_surface_flag(a, b, c, fl) __append_sdl_surface_flag(a, b, c, fl, " " #fl)
-#define print_tf_state(str, val) sdldebug("%s: {%s}", str, (val) ? "true" : "false" )
-
 static void output_surface_info(SDL_Surface *_surface)
 {
-    const SDL_VideoInfo *info;
-    char f[256];
+    SDL_RendererInfo info;
 
     if (!_sdl_debug_file)
         return;
@@ -254,72 +255,98 @@ static void output_surface_info(SDL_Surface *_surface)
     if (_surface == NULL)
     {
         sdldebug("-WARNING- You've got a NULL screen surface!");
-    }
-    else
-    {
-        f[0] = '\0';
-        sdldebug("screen surface is (%dx%dx%dbpp).",
-                _surface->w, _surface->h, _surface->format->BitsPerPixel);
+        return;
+    } /* if */
 
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_SWSURFACE);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_HWSURFACE);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_ASYNCBLIT);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_ANYFORMAT);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_HWPALETTE);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_DOUBLEBUF);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_FULLSCREEN);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_OPENGL);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_OPENGLBLIT);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_RESIZABLE);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_NOFRAME);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_HWACCEL);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_SRCCOLORKEY);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_RLEACCELOK);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_RLEACCEL);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_SRCALPHA);
-        append_sdl_surface_flag(_surface, f, sizeof (f), SDL_PREALLOC);
+    sdldebug("screen surface is (%dx%dx%dbpp), %s.",
+            _surface->w, _surface->h, _surface->format->BitsPerPixel,
+            sdl_fullscreen ? "fullscreen" : "windowed");
 
-        if (f[0] == '\0')
-            strcpy(f, " (none)");
-
-        sdldebug("New vidmode flags:%s", f);
-
-        info = SDL_GetVideoInfo();
-        assert(info != NULL);
-
-        print_tf_state("hardware surface available", info->hw_available);
-        print_tf_state("window manager available", info->wm_available);
-        print_tf_state("accelerated hardware->hardware blits", info->blit_hw);
-        print_tf_state("accelerated hardware->hardware colorkey blits", info->blit_hw_CC);
-        print_tf_state("accelerated hardware->hardware alpha blits", info->blit_hw_A);
-        print_tf_state("accelerated software->hardware blits", info->blit_sw);
-        print_tf_state("accelerated software->hardware colorkey blits", info->blit_sw_CC);
-        print_tf_state("accelerated software->hardware alpha blits", info->blit_sw_A);
-        print_tf_state("accelerated color fills", info->blit_fill);
-
-        sdldebug("video memory: (%d)", info->video_mem);
-    } /* else */
+    if ((sdl_renderer != NULL) && (SDL_GetRendererInfo(sdl_renderer, &info) == 0))
+        sdldebug("SDL renderer is \"%s\".", info.name);
 } /* output_surface_info */
 
 
 static void output_driver_info(void)
 {
-    char buffer[256];
+    const char *driver;
 
     if (!_sdl_debug_file)
         return;
 
     sdldebug("Using BUILD renderer \"%s\".", renderer_name[renderer]);
 
-    if (SDL_VideoDriverName(buffer, sizeof (buffer)) == NULL)
-    {
-        sdldebug("-WARNING- SDL_VideoDriverName() returned NULL!");
-    } /* if */
+    driver = SDL_GetCurrentVideoDriver();
+    if (driver == NULL)
+        sdldebug("-WARNING- SDL_GetCurrentVideoDriver() returned NULL!");
     else
-    {
-        sdldebug("Using SDL video driver \"%s\".", buffer);
-    } /* else */
+        sdldebug("Using SDL video driver \"%s\".", driver);
 } /* output_driver_info */
+
+
+/* Push the 8-bit surface through the palette to the window. */
+static void present_surface(void)
+{
+    if ((surface == NULL) || (sdl_texture == NULL))
+        return;
+
+    SDL_BlitSurface(surface, NULL, sdl_rgbsurface, NULL);
+    SDL_UpdateTexture(sdl_texture, NULL, sdl_rgbsurface->pixels,
+                      sdl_rgbsurface->pitch);
+    SDL_RenderClear(sdl_renderer);
+    SDL_RenderCopy(sdl_renderer, sdl_texture, NULL, NULL);
+    SDL_RenderPresent(sdl_renderer);
+} /* present_surface */
+
+
+static void free_video_surfaces(void)
+{
+    if (sdl_texture != NULL)
+    {
+        SDL_DestroyTexture(sdl_texture);
+        sdl_texture = NULL;
+    } /* if */
+
+    if (sdl_rgbsurface != NULL)
+    {
+        SDL_FreeSurface(sdl_rgbsurface);
+        sdl_rgbsurface = NULL;
+    } /* if */
+
+    if (surface != NULL)
+    {
+        SDL_FreeSurface(surface);
+        surface = NULL;
+    } /* if */
+} /* free_video_surfaces */
+
+
+static void shutdown_video(void)
+{
+    free_video_surfaces();
+
+    if (sdl_renderer != NULL)
+    {
+        SDL_DestroyRenderer(sdl_renderer);
+        sdl_renderer = NULL;
+    } /* if */
+
+    if (sdl_window != NULL)
+    {
+        SDL_DestroyWindow(sdl_window);
+        sdl_window = NULL;
+    } /* if */
+
+    SDL_QuitSubSystem(SDL_INIT_VIDEO);
+} /* shutdown_video */
+
+
+static void set_mouse_grab(int grab)
+{
+    SDL_SetRelativeMouseMode(grab ? SDL_TRUE : SDL_FALSE);
+    if (sdl_window != NULL)
+        SDL_SetWindowGrab(sdl_window, grab ? SDL_TRUE : SDL_FALSE);
+} /* set_mouse_grab */
 
 
 static Uint8 *get_framebuffer(void)
@@ -357,7 +384,7 @@ static void init_new_res_vars(int davidoption)
 
     setupmouse();
 
-    SDL_WM_SetCaption(titlelong, titleshort);
+    SDL_SetWindowTitle(sdl_window, titlelong);
 
     xdim = xres = surface->w;
     ydim = yres = surface->h;
@@ -440,20 +467,66 @@ static void init_new_res_vars(int davidoption)
 
 static void go_to_new_vid_mode(int vidoption, int w, int h)
 {
+    int scale;
+
     getvalidvesamodes();
     SDL_ClearError();
-    surface = SDL_SetVideoMode(w, h, 8, sdl_flags);
-    if (surface == NULL)
+
+    if ((sdl_window == NULL) && (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0))
+        goto vidmode_failed;
+
+    free_video_surfaces();
+
+    /* low-res modes get a bigger window so they aren't a postage stamp. */
+    scale = (w < 640) ? (640 / w) : 1;
+    if (scale < 1)
+        scale = 1;
+
+    if (sdl_window == NULL)
     {
-        fprintf(stderr, "BUILDSDL: Failed to set %dx%d video mode!\n"
-                        "BUILDSDL: SDL_Error() says [%s].\n",
-                        w, h, SDL_GetError());
-        SDL_Quit();
-        exit(13);
+        sdl_window = SDL_CreateWindow(titlelong,
+                        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                        w * scale, h * scale,
+                        sdl_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+        if (sdl_window == NULL)
+            goto vidmode_failed;
+
+        sdl_renderer = SDL_CreateRenderer(sdl_window, -1, SDL_RENDERER_PRESENTVSYNC);
+        if (sdl_renderer == NULL)
+            sdl_renderer = SDL_CreateRenderer(sdl_window, -1, 0);
+        if (sdl_renderer == NULL)
+            goto vidmode_failed;
     } /* if */
+    else if (!sdl_fullscreen)
+    {
+        SDL_SetWindowSize(sdl_window, w * scale, h * scale);
+        SDL_SetWindowPosition(sdl_window, SDL_WINDOWPOS_CENTERED,
+                              SDL_WINDOWPOS_CENTERED);
+    } /* else if */
+
+    SDL_RenderSetLogicalSize(sdl_renderer, w, h);
+
+    surface = SDL_CreateRGBSurface(0, w, h, 8, 0, 0, 0, 0);
+    sdl_rgbsurface = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32,
+                                                    SDL_PIXELFORMAT_ARGB8888);
+    sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_ARGB8888,
+                                    SDL_TEXTUREACCESS_STREAMING, w, h);
+    if ((surface == NULL) || (sdl_rgbsurface == NULL) || (sdl_texture == NULL))
+        goto vidmode_failed;
+
+    /* the engine assumes bytesperline == width. */
+    assert(surface->pitch == surface->w);
 
     output_surface_info(surface);
     init_new_res_vars(vidoption);
+    return;
+
+vidmode_failed:
+    fprintf(stderr, "BUILDSDL: Failed to set %dx%d video mode!\n"
+                    "BUILDSDL: SDL_Error() says [%s].\n",
+                    w, h, SDL_GetError());
+    SDL_Quit();
+    exit(13);
 } /* go_to_new_vid_mode */
 
 
@@ -470,7 +543,9 @@ static __inline int sdl_mouse_button_filter(SDL_MouseButtonEvent const *event)
          *  additionally 3&4 are set for the mouse wheel
          */
     Uint8 button = event->button;
-    if (button >= sizeof (mouse_buttons) * 8)
+
+    /* SDL2 reports the wheel separately; buttons 4/5 are X1/X2 now. */
+    if (button > SDL_BUTTON_RIGHT)
         return(0);
 
     if (button == SDL_BUTTON_RIGHT)
@@ -493,6 +568,17 @@ static __inline int sdl_mouse_button_filter(SDL_MouseButtonEvent const *event)
 
     return(0);
 } /* sdl_mouse_up_filter */
+
+
+static int sdl_mouse_wheel_filter(SDL_MouseWheelEvent const *event)
+{
+    /* bits 3 and 4 are wheel up/down; readmousebstatus() clears them. */
+    if (event->y > 0)
+        mouse_buttons |= 8;
+    else if (event->y < 0)
+        mouse_buttons |= 16;
+    return(0);
+} /* sdl_mouse_wheel_filter */
 
 
 static int sdl_mouse_motion_filter(SDL_Event const *event)
@@ -534,158 +620,24 @@ static int sdl_mouse_motion_filter(SDL_Event const *event)
 } /* sdl_mouse_motion_filter */
 
 
-/**
- * Attempt to flip the video surface to fullscreen or windowed mode.
- *  Attempts to maintain the surface's state, but makes no guarantee
- *  that pointers (i.e., the surface's pixels field) will be the same
- *  after this call.
- *
- * Caveats: Your surface pointers will be changing; if you have any other
- *           copies laying about, they are invalidated.
- *
- *          Do NOT call this from an SDL event filter on Windows. You can
- *           call it based on the return values from SDL_PollEvent, etc, just
- *           not during the function you passed to SDL_SetEventFilter().
- *
- *          Thread safe? Likely not.
- *
- *   @param surface pointer to surface ptr to toggle. May be different
- *                  pointer on return. MAY BE NULL ON RETURN IF FAILURE!
- *   @param flags   pointer to flags to set on surface. The value pointed
- *                  to will be XOR'd with SDL_FULLSCREEN before use. Actual
- *                  flags set will be filled into pointer. Contents are
- *                  undefined on failure. Can be NULL, in which case the
- *                  surface's current flags are used.
- *  @return non-zero on success, zero on failure.
- */
-static int attempt_fullscreen_toggle(SDL_Surface **surface, Uint32 *flags)
+/* With SDL2 the surface survives the toggle, so no pointer fixups needed. */
+static int attempt_fullscreen_toggle(void)
 {
-    long framesize = 0;
-    void *pixels = NULL;
-    SDL_Rect clip;
-    Uint32 tmpflags = 0;
-    int w = 0;
-    int h = 0;
-    int bpp = 0;
-    int grabmouse = (SDL_WM_GrabInput(SDL_GRAB_QUERY) == SDL_GRAB_ON);
-    int showmouse = SDL_ShowCursor(-1);
-
-#if 0
-    SDL_Color *palette = NULL;
-    int ncolors = 0;
-#endif
+    Uint32 flags = sdl_fullscreen ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP;
 
     sdldebug("attempting to toggle fullscreen flag...");
 
-    if ( (!surface) || (!(*surface)) )  /* don't try if there's no surface. */
+    if (sdl_window == NULL)
+        return(0);
+
+    if (SDL_SetWindowFullscreen(sdl_window, flags) != 0)
     {
-        sdldebug("Null surface (?!). Not toggling fullscreen flag.");
+        sdldebug("SDL_SetWindowFullscreen() failed: [%s].", SDL_GetError());
         return(0);
     } /* if */
 
-    if (SDL_WM_ToggleFullScreen(*surface))
-    {
-        sdldebug("SDL_WM_ToggleFullScreen() seems to work on this system.");
-        if (flags)
-            *flags ^= SDL_FULLSCREEN;
-        return(1);
-    } /* if */
-
-#if !PLATFORM_MACOSX
-    if ( !(SDL_GetVideoInfo()->wm_available) )
-    {
-        sdldebug("No window manager. Not toggling fullscreen flag.");
-        return(0);
-    } /* if */
-#endif
-
-    sdldebug("toggling fullscreen flag The Hard Way...");
-    tmpflags = (*surface)->flags;
-    w = (*surface)->w;
-    h = (*surface)->h;
-    bpp = (*surface)->format->BitsPerPixel;
-
-    if (flags == NULL)  /* use the surface's flags. */
-        flags = &tmpflags;
-
-    SDL_GetClipRect(*surface, &clip);
-
-        /* save the contents of the screen. */
-    if ( (!(tmpflags & SDL_OPENGL)) && (!(tmpflags & SDL_OPENGLBLIT)) )
-    {
-        framesize = (w * h) * ((*surface)->format->BytesPerPixel);
-        pixels = malloc(framesize);
-        if (pixels == NULL)
-            return(0);
-        memcpy(pixels, (*surface)->pixels, framesize);
-    } /* if */
-
-#if 0
-    if ((*surface)->format->palette != NULL)
-    {
-        ncolors = (*surface)->format->palette->ncolors;
-        palette = malloc(ncolors * sizeof (SDL_Color));
-        if (palette == NULL)
-        {
-            free(pixels);
-            return(0);
-        } /* if */
-        memcpy(palette, (*surface)->format->palette->colors,
-               ncolors * sizeof (SDL_Color));
-    } /* if */
-#endif
-
-    if (grabmouse)
-        SDL_WM_GrabInput(SDL_GRAB_OFF);
-
-    SDL_ShowCursor(1);
-
-    *surface = SDL_SetVideoMode(w, h, bpp, (*flags) ^ SDL_FULLSCREEN);
-
-    if (*surface != NULL)
-        *flags ^= SDL_FULLSCREEN;
-
-    else  /* yikes! Try to put it back as it was... */
-    {
-        *surface = SDL_SetVideoMode(w, h, bpp, tmpflags);
-        if (*surface == NULL)  /* completely screwed. */
-        {
-            if (pixels != NULL)
-                free(pixels);
-            if (palette != NULL)
-                free(palette);
-            return(0);
-        } /* if */
-    } /* if */
-
-    /* Unfortunately, you lose your OpenGL image until the next frame... */
-
-    if (pixels != NULL)
-    {
-        memcpy((*surface)->pixels, pixels, framesize);
-        free(pixels);
-    } /* if */
-
-#if 0
-    if (palette != NULL)
-    {
-            /* !!! FIXME : No idea if that flags param is right. */
-        SDL_SetPalette(*surface, SDL_LOGPAL, palette, 0, ncolors);
-        free(palette);
-    } /* if */
-#else
-	setbrightness((char) curbrightness, (unsigned char *) &palette[0]);
-#endif
-
-    SDL_SetClipRect(*surface, &clip);
-
-    if (grabmouse)
-        SDL_WM_GrabInput(SDL_GRAB_ON);
-
-    SDL_ShowCursor(showmouse);
-
-    output_surface_info(*surface);
-
+    sdl_fullscreen = !sdl_fullscreen;
+    output_surface_info(surface);
     return(1);
 } /* attempt_fullscreen_toggle */
 
@@ -709,7 +661,7 @@ static __inline int handle_keypad_enter_hack(const SDL_Event *event)
             if (event->key.keysym.mod & KMOD_SHIFT)
             {
                 kp_enter_hack = 1;
-                lastkey = scancodes[SDLK_KP_ENTER];
+                lastkey = scancodes[SDL_SCANCODE_KP_ENTER];
                 retval = 1;
             } /* if */
         } /* if */
@@ -719,7 +671,7 @@ static __inline int handle_keypad_enter_hack(const SDL_Event *event)
             if (kp_enter_hack)
             {
                 kp_enter_hack = 0;
-                lastkey = scancodes[SDLK_KP_ENTER];
+                lastkey = scancodes[SDL_SCANCODE_KP_ENTER];
                 retval = 1;
             } /* if */
         } /* if */
@@ -731,16 +683,19 @@ static __inline int handle_keypad_enter_hack(const SDL_Event *event)
 
 static int sdl_key_filter(const SDL_Event *event)
 {
-    SDL_GrabMode grab_mode = SDL_GRAB_OFF;
+    SDL_Scancode sc = event->key.keysym.scancode;
     int extended;
-    int tmp;
+
+    /* SDL 1.2 never sent key repeat here; the engine expects none. */
+    if (event->key.repeat)
+        return(0);
 
     #if PLATFORM_MACOSX  /* Apple-Q */
     {
         static Uint32 cmdqticks = 0;
         if ( (event->key.keysym.sym == SDLK_q) &&
              (event->key.state == SDL_PRESSED) &&
-             (event->key.keysym.mod & KMOD_META) )
+             (event->key.keysym.mod & KMOD_GUI) )
         {
             Uint32 t = SDL_GetTicks();
             if (t - cmdqticks < 500)  /* 2 hits within .5 second? */
@@ -759,9 +714,7 @@ static int sdl_key_filter(const SDL_Event *event)
          (event->key.keysym.mod & KMOD_CTRL) )
     {
         mouse_grabbed = ((mouse_grabbed) ? 0 : 1);
-        if (mouse_grabbed)
-            grab_mode = SDL_GRAB_ON;
-        SDL_WM_GrabInput(grab_mode);
+        set_mouse_grab(mouse_grabbed);
         return(0);
     } /* if */
 
@@ -770,16 +723,12 @@ static int sdl_key_filter(const SDL_Event *event)
               (event->key.state == SDL_PRESSED) &&
               (event->key.keysym.mod & KMOD_ALT) )
     {
-        tmp = ((void *) frameplace == (void *) surface->pixels);
-        attempt_fullscreen_toggle(&surface, &sdl_flags);
-        assert(surface != NULL);
-        if (tmp)
-            frameplace = (long) surface->pixels;
+        attempt_fullscreen_toggle();
         return(0);
     } /* if */
 
     if (!handle_keypad_enter_hack(event))
-        lastkey = scancodes[event->key.keysym.sym];
+        lastkey = scancodes[sc];
 
     if (lastkey == 0x0000)   /* No DOS equivalent defined. */
         return(0);
@@ -789,7 +738,7 @@ static int sdl_key_filter(const SDL_Event *event)
     {
         lastkey = extended;
         keyhandler();
-        lastkey = (scancodes[event->key.keysym.sym] & 0xFF);
+        lastkey = (scancodes[sc] & 0xFF);
     } /* if */
 
     if (event->key.state == SDL_RELEASED)
@@ -812,7 +761,13 @@ static int root_sdl_event_filter(const SDL_Event *event)
             return(sdl_mouse_motion_filter(event));
         case SDL_MOUSEBUTTONUP:
         case SDL_MOUSEBUTTONDOWN:
-	    return(sdl_mouse_button_filter((const SDL_MouseButtonEvent*)event));
+	    return(sdl_mouse_button_filter(&event->button));
+        case SDL_MOUSEWHEEL:
+            return(sdl_mouse_wheel_filter(&event->wheel));
+        case SDL_WINDOWEVENT:
+            if (event->window.event == SDL_WINDOWEVENT_EXPOSED)
+                present_surface();
+            return(0);
         case SDL_QUIT:
             /* !!! rcg TEMP */
             SDL_Quit();
@@ -876,7 +831,9 @@ void _joystick_init(void)
 
     for (i = 0; i < numsticks; i++)
     {
-        const char *stickname = SDL_JoystickName(i);
+        const char *stickname = SDL_JoystickNameForIndex(i);
+        if (stickname == NULL)
+            stickname = "(unnamed)";
         if ((envr != NULL) && (strcmp(envr, stickname) == 0))
             favored = i;
 
@@ -1102,10 +1059,12 @@ static __inline void init_debugging(void)
 
 static __inline void output_sdl_versions(void)
 {
-    const SDL_version *linked_ver = SDL_Linked_Version();
+    SDL_version linked;
+    const SDL_version *linked_ver = &linked;
     SDL_version compiled_ver;
 
     SDL_VERSION(&compiled_ver);
+    SDL_GetVersion(&linked);
 
     sdldebug("SDL display driver for the BUILD engine initializing.");
     sdldebug("  sdl_driver.c by Ryan C. Gordon (icculus@clutteredmind.org).");
@@ -1206,42 +1165,13 @@ static void init_renderer_names(void)
 } /* init_renderer_names */
 
 
-void set_splash(void)
-{
-    SDL_Surface *screen;
-    SDL_Surface *bmp = SDL_LoadBMP("splash.bmp");
-    if (bmp == NULL)
-        return;
-
-    putenv("SDL_VIDEO_WINDOW_POS=center");
-    screen  = SDL_SetVideoMode(bmp->w, bmp->h, 0, SDL_NOFRAME);
-    putenv("SDL_VIDEO_WINDOW_POS=nopref");
-
-    if (screen != NULL)
-    {
-        SDL_BlitSurface(bmp, NULL, screen, NULL);
-        SDL_Flip(screen);
-    }
-
-    SDL_FreeSurface(bmp);
-} /* set_splash */
-
-
 void _platform_init(int argc, char **argv, const char *title, const char *icon)
 {
     #if (defined PLATFORM_MACOSX)
     char buf[MAXPATHLEN];
     char realbuf[MAXPATHLEN];
-    long cpufeature = 0;
-    OSErr err;
 
-	has_altivec = 0;
-    err = Gestalt(gestaltPowerPCProcessorFeatures, &cpufeature);
-    if (err == noErr)
-    {
-        if ((1 << gestaltPowerPCHasVectorInstructions) & cpufeature)
-	       has_altivec = 1;
-    } /* if */
+	has_altivec = 0;  /* no PowerPC Macs anymore. */
 
     /* deal with Application Bundles on MacOS X... */
     if ((argv[0] != NULL) && (strchr(argv[0], '/') != NULL))
@@ -1292,141 +1222,123 @@ void _platform_init(int argc, char **argv, const char *title, const char *icon)
     else
         mouse_grabbed = 0;
 
-    sdl_flags = ((getenv(BUILD_WINDOWED) == NULL) ? SDL_FULLSCREEN : 0);
-
-    sdl_flags |= SDL_HWPALETTE;
-    /*sdl_flags |= SDL_HWSURFACE;   !!! */
-    /*sdl_flags |= SDL_DOUBLEBUF; */
+    sdl_fullscreen = (getenv(BUILD_WINDOWED) == NULL);
 
     set_sdl_renderer();
-    set_splash();
 
     output_sdl_versions();
     output_driver_info();
     detect_vmware();
 
     memset(scancodes, '\0', sizeof (scancodes));
-    scancodes[SDLK_ESCAPE]          = 0x01;
-    scancodes[SDLK_1]               = 0x02;
-    scancodes[SDLK_2]               = 0x03;
-    scancodes[SDLK_3]               = 0x04;
-    scancodes[SDLK_4]               = 0x05;
-    scancodes[SDLK_5]               = 0x06;
-    scancodes[SDLK_6]               = 0x07;
-    scancodes[SDLK_7]               = 0x08;
-    scancodes[SDLK_8]               = 0x09;
-    scancodes[SDLK_9]               = 0x0A;
-    scancodes[SDLK_0]               = 0x0B;
-    scancodes[SDLK_MINUS]           = 0x0C; /* was 0x4A */
-    scancodes[SDLK_EQUALS]          = 0x0D; /* was 0x4E */
-    scancodes[SDLK_BACKSPACE]       = 0x0E;
-    scancodes[SDLK_TAB]             = 0x0F;
-    scancodes[SDLK_q]               = 0x10;
-    scancodes[SDLK_w]               = 0x11;
-    scancodes[SDLK_e]               = 0x12;
-    scancodes[SDLK_r]               = 0x13;
-    scancodes[SDLK_t]               = 0x14;
-    scancodes[SDLK_y]               = 0x15;
-    scancodes[SDLK_u]               = 0x16;
-    scancodes[SDLK_i]               = 0x17;
-    scancodes[SDLK_o]               = 0x18;
-    scancodes[SDLK_p]               = 0x19;
-    scancodes[SDLK_LEFTBRACKET]     = 0x1A;
-    scancodes[SDLK_RIGHTBRACKET]    = 0x1B;
-    scancodes[SDLK_RETURN]          = 0x1C;
-    scancodes[SDLK_LCTRL]           = 0x1D;
-    scancodes[SDLK_a]               = 0x1E;
-    scancodes[SDLK_s]               = 0x1F;
-    scancodes[SDLK_d]               = 0x20;
-    scancodes[SDLK_f]               = 0x21;
-    scancodes[SDLK_g]               = 0x22;
-    scancodes[SDLK_h]               = 0x23;
-    scancodes[SDLK_j]               = 0x24;
-    scancodes[SDLK_k]               = 0x25;
-    scancodes[SDLK_l]               = 0x26;
-    scancodes[SDLK_SEMICOLON]       = 0x27;
-    scancodes[SDLK_QUOTE]           = 0x28;
-    scancodes[SDLK_BACKQUOTE]       = 0x29;
-    scancodes[SDLK_LSHIFT]          = 0x2A;
-    scancodes[SDLK_BACKSLASH]       = 0x2B;
-    scancodes[SDLK_z]               = 0x2C;
-    scancodes[SDLK_x]               = 0x2D;
-    scancodes[SDLK_c]               = 0x2E;
-    scancodes[SDLK_v]               = 0x2F;
-    scancodes[SDLK_b]               = 0x30;
-    scancodes[SDLK_n]               = 0x31;
-    scancodes[SDLK_m]               = 0x32;
-    scancodes[SDLK_COMMA]           = 0x33;
-    scancodes[SDLK_PERIOD]          = 0x34;
-    scancodes[SDLK_SLASH]           = 0x35;
-    scancodes[SDLK_RSHIFT]          = 0x36;
-    scancodes[SDLK_KP_MULTIPLY]     = 0x37;
-    scancodes[SDLK_LALT]            = 0x38;
-    scancodes[SDLK_SPACE]           = 0x39;
-    scancodes[SDLK_CAPSLOCK]        = 0x3A;
-    scancodes[SDLK_F1]              = 0x3B;
-    scancodes[SDLK_F2]              = 0x3C;
-    scancodes[SDLK_F3]              = 0x3D;
-    scancodes[SDLK_F4]              = 0x3E;
-    scancodes[SDLK_F5]              = 0x3F;
-    scancodes[SDLK_F6]              = 0x40;
-    scancodes[SDLK_F7]              = 0x41;
-    scancodes[SDLK_F8]              = 0x42;
-    scancodes[SDLK_F9]              = 0x43;
-    scancodes[SDLK_F10]             = 0x44;
-    scancodes[SDLK_NUMLOCK]         = 0x45;
-    scancodes[SDLK_SCROLLOCK]       = 0x46;
-    scancodes[SDLK_KP7]             = 0x47;
-    scancodes[SDLK_KP8]             = 0x48;
-    scancodes[SDLK_KP9]             = 0x49;
-    scancodes[SDLK_KP_MINUS]        = 0x4A;
-    scancodes[SDLK_KP4]             = 0x4B;
-    scancodes[SDLK_KP5]             = 0x4C;
-    scancodes[SDLK_KP6]             = 0x4D;
-    scancodes[SDLK_KP_PLUS]         = 0x4E;
-    scancodes[SDLK_KP1]             = 0x4F;
-    scancodes[SDLK_KP2]             = 0x50;
-    scancodes[SDLK_KP3]             = 0x51;
-    scancodes[SDLK_KP0]             = 0x52;
-    scancodes[SDLK_KP_PERIOD]       = 0x53;
-    scancodes[SDLK_F11]             = 0x57;
-    scancodes[SDLK_F12]             = 0x58;
-    scancodes[SDLK_PAUSE]           = 0x59; /* SBF - technically incorrect */
-
-    /* Some AZERTY keys... */
-    scancodes[SDLK_AMPERSAND]       = 0x70;
-    scancodes[SDLK_QUOTEDBL]        = 0x71;
-    scancodes[SDLK_LEFTPAREN]       = 0x72;
-    scancodes[SDLK_EXCLAIM]         = 0x73;
-    scancodes[SDLK_CARET]           = 0x74;
-    scancodes[SDLK_DOLLAR]          = 0x75;
-    scancodes[SDLK_WORLD_0]         = 0x76;
-    scancodes[SDLK_WORLD_1]         = 0x77;
-    scancodes[SDLK_WORLD_2]         = 0x78;
-    scancodes[SDLK_WORLD_3]         = 0x79;
-    scancodes[SDLK_WORLD_4]         = 0x7A;
-    scancodes[SDLK_WORLD_5]         = 0x7B;
-    scancodes[SDLK_RIGHTPAREN]      = 0x7C;
-    scancodes[SDLK_COLON]           = 0x7D;
-    scancodes[SDLK_LESS]            = 0x7E;
+    /*
+     * SDL2 scancodes are positional, like DOS scancodes, so non-QWERTY
+     *  layouts (AZERTY, etc) map correctly without special cases.
+     */
+    scancodes[SDL_SCANCODE_ESCAPE]         = 0x01;
+    scancodes[SDL_SCANCODE_1]              = 0x02;
+    scancodes[SDL_SCANCODE_2]              = 0x03;
+    scancodes[SDL_SCANCODE_3]              = 0x04;
+    scancodes[SDL_SCANCODE_4]              = 0x05;
+    scancodes[SDL_SCANCODE_5]              = 0x06;
+    scancodes[SDL_SCANCODE_6]              = 0x07;
+    scancodes[SDL_SCANCODE_7]              = 0x08;
+    scancodes[SDL_SCANCODE_8]              = 0x09;
+    scancodes[SDL_SCANCODE_9]              = 0x0A;
+    scancodes[SDL_SCANCODE_0]              = 0x0B;
+    scancodes[SDL_SCANCODE_MINUS]          = 0x0C;
+    scancodes[SDL_SCANCODE_EQUALS]         = 0x0D;
+    scancodes[SDL_SCANCODE_BACKSPACE]      = 0x0E;
+    scancodes[SDL_SCANCODE_TAB]            = 0x0F;
+    scancodes[SDL_SCANCODE_Q]              = 0x10;
+    scancodes[SDL_SCANCODE_W]              = 0x11;
+    scancodes[SDL_SCANCODE_E]              = 0x12;
+    scancodes[SDL_SCANCODE_R]              = 0x13;
+    scancodes[SDL_SCANCODE_T]              = 0x14;
+    scancodes[SDL_SCANCODE_Y]              = 0x15;
+    scancodes[SDL_SCANCODE_U]              = 0x16;
+    scancodes[SDL_SCANCODE_I]              = 0x17;
+    scancodes[SDL_SCANCODE_O]              = 0x18;
+    scancodes[SDL_SCANCODE_P]              = 0x19;
+    scancodes[SDL_SCANCODE_LEFTBRACKET]    = 0x1A;
+    scancodes[SDL_SCANCODE_RIGHTBRACKET]   = 0x1B;
+    scancodes[SDL_SCANCODE_RETURN]         = 0x1C;
+    scancodes[SDL_SCANCODE_LCTRL]          = 0x1D;
+    scancodes[SDL_SCANCODE_A]              = 0x1E;
+    scancodes[SDL_SCANCODE_S]              = 0x1F;
+    scancodes[SDL_SCANCODE_D]              = 0x20;
+    scancodes[SDL_SCANCODE_F]              = 0x21;
+    scancodes[SDL_SCANCODE_G]              = 0x22;
+    scancodes[SDL_SCANCODE_H]              = 0x23;
+    scancodes[SDL_SCANCODE_J]              = 0x24;
+    scancodes[SDL_SCANCODE_K]              = 0x25;
+    scancodes[SDL_SCANCODE_L]              = 0x26;
+    scancodes[SDL_SCANCODE_SEMICOLON]      = 0x27;
+    scancodes[SDL_SCANCODE_APOSTROPHE]     = 0x28;
+    scancodes[SDL_SCANCODE_GRAVE]          = 0x29;
+    scancodes[SDL_SCANCODE_LSHIFT]         = 0x2A;
+    scancodes[SDL_SCANCODE_BACKSLASH]      = 0x2B;
+    scancodes[SDL_SCANCODE_Z]              = 0x2C;
+    scancodes[SDL_SCANCODE_X]              = 0x2D;
+    scancodes[SDL_SCANCODE_C]              = 0x2E;
+    scancodes[SDL_SCANCODE_V]              = 0x2F;
+    scancodes[SDL_SCANCODE_B]              = 0x30;
+    scancodes[SDL_SCANCODE_N]              = 0x31;
+    scancodes[SDL_SCANCODE_M]              = 0x32;
+    scancodes[SDL_SCANCODE_COMMA]          = 0x33;
+    scancodes[SDL_SCANCODE_PERIOD]         = 0x34;
+    scancodes[SDL_SCANCODE_SLASH]          = 0x35;
+    scancodes[SDL_SCANCODE_RSHIFT]         = 0x36;
+    scancodes[SDL_SCANCODE_KP_MULTIPLY]    = 0x37;
+    scancodes[SDL_SCANCODE_LALT]           = 0x38;
+    scancodes[SDL_SCANCODE_SPACE]          = 0x39;
+    scancodes[SDL_SCANCODE_CAPSLOCK]       = 0x3A;
+    scancodes[SDL_SCANCODE_F1]             = 0x3B;
+    scancodes[SDL_SCANCODE_F2]             = 0x3C;
+    scancodes[SDL_SCANCODE_F3]             = 0x3D;
+    scancodes[SDL_SCANCODE_F4]             = 0x3E;
+    scancodes[SDL_SCANCODE_F5]             = 0x3F;
+    scancodes[SDL_SCANCODE_F6]             = 0x40;
+    scancodes[SDL_SCANCODE_F7]             = 0x41;
+    scancodes[SDL_SCANCODE_F8]             = 0x42;
+    scancodes[SDL_SCANCODE_F9]             = 0x43;
+    scancodes[SDL_SCANCODE_F10]            = 0x44;
+    scancodes[SDL_SCANCODE_NUMLOCKCLEAR]   = 0x45;
+    scancodes[SDL_SCANCODE_SCROLLLOCK]     = 0x46;
+    scancodes[SDL_SCANCODE_KP_7]           = 0x47;
+    scancodes[SDL_SCANCODE_KP_8]           = 0x48;
+    scancodes[SDL_SCANCODE_KP_9]           = 0x49;
+    scancodes[SDL_SCANCODE_KP_MINUS]       = 0x4A;
+    scancodes[SDL_SCANCODE_KP_4]           = 0x4B;
+    scancodes[SDL_SCANCODE_KP_5]           = 0x4C;
+    scancodes[SDL_SCANCODE_KP_6]           = 0x4D;
+    scancodes[SDL_SCANCODE_KP_PLUS]        = 0x4E;
+    scancodes[SDL_SCANCODE_KP_1]           = 0x4F;
+    scancodes[SDL_SCANCODE_KP_2]           = 0x50;
+    scancodes[SDL_SCANCODE_KP_3]           = 0x51;
+    scancodes[SDL_SCANCODE_KP_0]           = 0x52;
+    scancodes[SDL_SCANCODE_KP_PERIOD]      = 0x53;
+    scancodes[SDL_SCANCODE_F11]            = 0x57;
+    scancodes[SDL_SCANCODE_F12]            = 0x58;
+    scancodes[SDL_SCANCODE_PAUSE]          = 0x59;
 
     /* extended DOS scancodes... */
-    scancodes[SDLK_KP_ENTER]        = 0xE01C;
-    scancodes[SDLK_RCTRL]           = 0xE01D;
-    scancodes[SDLK_KP_DIVIDE]       = 0xE035;
-    scancodes[SDLK_PRINT]           = 0xE037; /* SBF - technically incorrect */
-    scancodes[SDLK_SYSREQ]          = 0xE037; /* SBF - for windows... */
-    scancodes[SDLK_RALT]            = 0xE038;
-    scancodes[SDLK_HOME]            = 0xE047;
-    scancodes[SDLK_UP]              = 0xE048;
-    scancodes[SDLK_PAGEUP]          = 0xE049;
-    scancodes[SDLK_LEFT]            = 0xE04B;
-    scancodes[SDLK_RIGHT]           = 0xE04D;
-    scancodes[SDLK_END]             = 0xE04F;
-    scancodes[SDLK_DOWN]            = 0xE050;
-    scancodes[SDLK_PAGEDOWN]        = 0xE051;
-    scancodes[SDLK_INSERT]          = 0xE052;
-    scancodes[SDLK_DELETE]          = 0xE053;
+    scancodes[SDL_SCANCODE_KP_ENTER]       = 0xE01C;
+    scancodes[SDL_SCANCODE_RCTRL]          = 0xE01D;
+    scancodes[SDL_SCANCODE_KP_DIVIDE]      = 0xE035;
+    scancodes[SDL_SCANCODE_PRINTSCREEN]    = 0xE037;
+    scancodes[SDL_SCANCODE_SYSREQ]         = 0xE037;
+    scancodes[SDL_SCANCODE_RALT]           = 0xE038;
+    scancodes[SDL_SCANCODE_HOME]           = 0xE047;
+    scancodes[SDL_SCANCODE_UP]             = 0xE048;
+    scancodes[SDL_SCANCODE_PAGEUP]         = 0xE049;
+    scancodes[SDL_SCANCODE_LEFT]           = 0xE04B;
+    scancodes[SDL_SCANCODE_RIGHT]          = 0xE04D;
+    scancodes[SDL_SCANCODE_END]            = 0xE04F;
+    scancodes[SDL_SCANCODE_DOWN]           = 0xE050;
+    scancodes[SDL_SCANCODE_PAGEDOWN]       = 0xE051;
+    scancodes[SDL_SCANCODE_INSERT]         = 0xE052;
+    scancodes[SDL_SCANCODE_DELETE]         = 0xE053;
 
     if (has_altivec)
         sdldebug("CPU feature: Altivec\n");
@@ -1584,7 +1496,7 @@ void setvmode(int mode)
 
     if (mode == 0x3)  /* text mode. */
     {
-        SDL_QuitSubSystem(SDL_INIT_VIDEO);
+        shutdown_video();
         return;
     } /* if */
 
@@ -1776,28 +1688,24 @@ static __inline void add_user_defined_resolution(void)
 } /* add_user_defined_resolution */
 
 
-static __inline SDL_Rect **get_physical_resolutions(void)
+static __inline void add_physical_resolutions(void)
 {
-    const SDL_VideoInfo *vidInfo = SDL_GetVideoInfo();
-    SDL_Rect **modes = SDL_ListModes(vidInfo->vfmt, sdl_flags | SDL_FULLSCREEN);
-    if (modes == NULL)
+    SDL_DisplayMode mode;
+    int nummodes = SDL_GetNumDisplayModes(0);
+    int i;
+
+    if (nummodes < 1)
     {
-        sdl_flags &= ~SDL_FULLSCREEN;
-        modes = SDL_ListModes(vidInfo->vfmt, sdl_flags); /* try without fullscreen. */
-        if (modes == NULL)
-            modes = (SDL_Rect **) -1;  /* fuck it. */
+        sdldebug("Couldn't get any physical resolutions.");
+        return;
     } /* if */
 
-    if (modes == (SDL_Rect **) -1)
-        sdldebug("Couldn't get any physical resolutions.");
-    else
+    for (i = 0; i < nummodes; i++)
     {
-        sdldebug("Highest physical resolution is (%dx%d).",
-                  modes[0]->w, modes[0]->h);
-    } /* else */
-
-    return(modes);
-} /* get_physical_resolutions */
+        if (SDL_GetDisplayMode(0, i, &mode) == 0)
+            add_vesa_mode("physical", mode.w, mode.h);
+    } /* for */
+} /* add_physical_resolutions */
 
 
 static void remove_vesa_mode(int index, const char *reason)
@@ -1924,7 +1832,6 @@ void getvalidvesamodes(void)
 {
     static int already_checked = 0;
     int i;
-    SDL_Rect **modes = NULL;
     int stdres[][2] = {
                         {320, 200}, {320, 240}, {640, 350},
 			{640, 480}, {800, 600}, {1024, 768}
@@ -1942,9 +1849,7 @@ void getvalidvesamodes(void)
         add_vesa_mode("standard", stdres[i][0], stdres[i][1]);
 
          /* Anything the hardware can specifically do is added now... */
-    modes = get_physical_resolutions();
-    for (i = 0; (modes != (SDL_Rect **) -1) && (modes[i] != NULL); i++)
-        add_vesa_mode("physical", modes[i]->w, modes[i]->h);
+    add_physical_resolutions();
 
         /* Now add specific resolutions that the user wants... */
     add_user_defined_resolution();
@@ -2001,7 +1906,8 @@ int VBE_setPalette(long start, long num, char *palettebuffer)
         sdlp->b = (Uint8) ((((float) *p++) / 63.0) * 255.0);
         sdlp->g = (Uint8) ((((float) *p++) / 63.0) * 255.0);
         sdlp->r = (Uint8) ((((float) *p++) / 63.0) * 255.0);
-        sdlp->unused = *p++;   /* This byte is unused in BUILD, too. */
+        sdlp->a = 255;
+        p++;   /* This byte is unused in BUILD. */
 
 #if (defined USE_OPENGL)
         if (gl)
@@ -2026,7 +1932,16 @@ int VBE_setPalette(long start, long num, char *palettebuffer)
     } /* if */
 #endif
 
-    return(SDL_SetColors(surface, fmt_swap, start, num));
+    if (surface == NULL)
+        return(0);
+
+    if (SDL_SetPaletteColors(surface->format->palette, &fmt_swap[start],
+                             start, num) != 0)
+        return(0);
+
+    /* SDL 1.2 hardware palettes changed instantly; we must re-present. */
+    present_surface();
+    return(1);
 } /* VBE_setPalette */
 
 
@@ -2041,7 +1956,7 @@ int VBE_getPalette(long start, long num, char *palettebuffer)
         *p++ = (Uint8) ((((float) sdlp->b) / 255.0) * 63.0);
         *p++ = (Uint8) ((((float) sdlp->g) / 255.0) * 63.0);
         *p++ = (Uint8) ((((float) sdlp->r) / 255.0) * 63.0);
-        *p++ = sdlp->unused;   /* This byte is unused in both SDL and BUILD. */
+        *p++ = 0;   /* This byte is unused in BUILD. */
         sdlp++;
     } /* for */
 
@@ -2051,27 +1966,22 @@ int VBE_getPalette(long start, long num, char *palettebuffer)
 
 void _uninitengine(void)
 {
-   SDL_QuitSubSystem(SDL_INIT_VIDEO);
+   shutdown_video();
 } /* _uninitengine */
 
 
 void uninitvesa(void)
 {
-   SDL_QuitSubSystem(SDL_INIT_VIDEO);
+   shutdown_video();
 } /* uninitvesa */
 
 
 int setupmouse(void)
 {
-    SDL_GrabMode mode = SDL_GRAB_OFF;
-
     if (surface == NULL)
         return(0);
 
-    if (mouse_grabbed)
-        mode = SDL_GRAB_ON;
-
-    SDL_WM_GrabInput(mode);
+    set_mouse_grab(mouse_grabbed);
     SDL_ShowCursor(0);
 
     mouse_x = surface->w / 2;
@@ -2114,7 +2024,7 @@ static unsigned char mirrorcolor = 0;
 void _updateScreenRect(long x, long y, long w, long h)
 {
     if (renderer == RENDERER_SOFTWARE)
-        SDL_UpdateRect(surface, x, y, w, h);
+        present_surface();  /* the whole frame is cheap to push nowadays. */
 } /* _updatescreenrect */
 
 
@@ -2128,8 +2038,7 @@ void _nextpage(void)
     {
         if (qsetmode == 200)
             memcpy(surface->pixels, (const void *) frameplace, surface->w * surface->h);
-        SDL_UpdateRect(surface, 0, 0, 0, 0);
-        /*SDL_Flip(surface);  !!! */
+        present_surface();
     } /* if */
 
 #ifdef USE_OPENGL
@@ -2499,14 +2408,18 @@ void limitrate(void)
 static Uint32 _timer_catcher(Uint32 interval, void *bleh)
 {
     timerhandler();
-    return(1);
+    /*
+     * SDL 1.2 rounded the old "return(1)" up to its 10ms granularity;
+     *  SDL2 honors it literally, which would run the game 10x too fast.
+     */
+    return(interval);
 } /* _timer_catcher */
 
 void inittimer(void)
 {
     SDL_ClearError();
     primary_timer = SDL_AddTimer(1000 / PLATFORM_TIMER_HZ, _timer_catcher, NULL);
-    if (primary_timer == NULL)
+    if (primary_timer == 0)
     {
         fprintf(stderr, "BUILDSDL: -ERROR- Problem initializing primary timer!\n");
         fprintf(stderr, "BUILDSDL:  Reason: [%s]\n", SDL_GetError());
@@ -2517,10 +2430,10 @@ void inittimer(void)
 
 void uninittimer(void)
 {
-    if (primary_timer != NULL)
+    if (primary_timer != 0)
     {
         SDL_RemoveTimer(primary_timer);
-        primary_timer = NULL;
+        primary_timer = 0;
     } /* if */
 }
 
