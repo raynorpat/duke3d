@@ -33,9 +33,7 @@ jobs:
       - name: Build
         run: cmake --build --preset default --parallel
 
-      # Not on Windows yet: see tests/CMakeLists.txt.
       - name: Test
-        if: runner.os != 'Windows'
         run: ctest --preset default
 
       - name: Upload binaries
