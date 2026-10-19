@@ -184,8 +184,8 @@ All of it is in `source/build/sdl_driver.c`:
     pointer-fixup code is gone.
   - Mode lists come from `SDL_GetNumDisplayModes`/`SDL_GetDisplayMode`; titles from
     `SDL_SetWindowTitle`; driver info from `SDL_GetCurrentVideoDriver`.
-- **Palette:** `SDL_SetPaletteColors` on the surface's palette (this also fixes the
-  upstream offset bug when `start != 0`), followed by an immediate present.
+- **Palette:** `SDL_SetPaletteColors` on the surface's palette, followed by an immediate
+  present.
 - **Keyboard:** an `SDL_Scancode` → DOS scancode table sized `SDL_NUM_SCANCODES`.
   Scancodes are positional, so the AZERTY/`SDLK_WORLD_*` special cases are dropped.
   Key repeat events are ignored, as SDL 1.2 never sent them. Cmd-Q uses `KMOD_GUI`.
@@ -196,8 +196,13 @@ All of it is in `source/build/sdl_driver.c`:
 - **Timer:** the callback returns `interval` (100 Hz), not `1`.
 - **Shutdown:** `shutdown_video()` frees the texture, surfaces, renderer and window.
   It's used by `setvmode(0x3)`, `_uninitengine` and `uninitvesa`.
-- **Windows:** `S_IRUSR`-style fallbacks for `screencapture`; `alloca` is replaced by a
-  fixed buffer.
+- **Windows:** `alloca` via `<malloc.h>`, and `S_IRUSR`-style fallbacks, for
+  `screencapture`.
+- **Palette offset:** `SDL_SetPaletteColors` gets `&fmt_swap[start]`. This deliberately
+  fixes an upstream bug: upstream passed `fmt_swap`, which hands uninitialized colors to
+  SDL whenever `start != 0`.
+- Everything else in the driver is ported faithfully: no new keys, and the same mouse
+  press/release logic.
 
 Error handling keeps the existing pattern: on SDL failure, print `SDL_GetError()` and
 `exit()` with the driver's existing codes.
