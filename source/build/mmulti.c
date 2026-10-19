@@ -539,7 +539,7 @@ void deinit_network_transport(gcomtype *gcom)
 #  define EAGAIN WSAEWOULDBLOCK
 #  define EWOULDBLOCK WSAEWOULDBLOCK
 #  define ECONNREFUSED WSAECONNRESET
-#  define socklen_t size_t
+#  define socklen_t int
 #  define netstrerror() win32netstrerror()
 #  define neterrno() WSAGetLastError()
 #  define sockettype SOCKET
