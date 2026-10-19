@@ -428,7 +428,7 @@ void transnum(void)
         return;
     }
 
-    *scriptptr = atol(textptr);
+    *scriptptr = (int32_t)atol(textptr);
     scriptptr++;
 
     textptr += l;
@@ -461,7 +461,7 @@ char parsecommand(void)
                 if( *textptr == 0 )
                 {
 //                    printf("  * ERROR!(L%d) Found '/*' with no '*/'.\n",j,label+(labelcnt<<6));
-                    printf("  * ERROR!(L%ld) Found '/*' with no '*/'.\n",j);
+                    printf("  * ERROR!(L%d) Found '/*' with no '*/'.\n",j);
                     error++;
                     return 0;
                 }
@@ -1620,7 +1620,7 @@ void loadefs(char *filenam,char *mptr)
     else
     {
         total_lines += line_number;
-        printf("Code Size:%ld bytes(%ld labels).\n",(int32_t)((scriptptr-script)<<2)-4,labelcnt);
+        printf("Code Size:%d bytes(%d labels).\n",(int32_t)((scriptptr-script)<<2)-4,labelcnt);
     }
 }
 
@@ -2450,7 +2450,7 @@ char parse(void)
             break;
         case 68:
             insptr++;
-            printf("%ld\n",*insptr);
+            printf("%d\n",*insptr);
             insptr++;
             break;
         case 69:

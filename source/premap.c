@@ -248,7 +248,7 @@ char getsound(unsigned short num)
         ( l < 12288 ) )
     {
         Sound[num].lock = 2;
-        allocache((int32_t *)&Sound[num].ptr,l,(unsigned char *)&Sound[num].lock);
+        allocache((intptr_t *)&Sound[num].ptr,l,(unsigned char *)&Sound[num].lock);
         if(Sound[num].ptr != NULL)
             kread( fp, Sound[num].ptr , l);
     }

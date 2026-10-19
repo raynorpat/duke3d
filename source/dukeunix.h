@@ -60,7 +60,7 @@ void _dos_getdate(struct dosdate_t *date);
 #define max(x, y) ((x) > (y) ? (x) : (y))
 #endif
 
-#define FP_OFF(x) ((int32_t) (x))
+#define FP_OFF(x) ((intptr_t)(x))
 
 #ifndef strcmpi
 #define strcmpi(x, y) strcasecmp(x, y)

@@ -118,7 +118,7 @@ int DPMI_LockMemoryRegion
    {
    int status;
 
-   status = DPMI_LockMemory( start, ( char * )end - ( char * )start );
+   status = DPMI_LockMemory( start, ( unsigned )( ( char * )end - ( char * )start ) );
 
    return( status );
    }
@@ -156,23 +156,23 @@ int DPMI_UnlockMemoryRegion
    {
    int status;
 
-   status = DPMI_UnlockMemory( start, ( char * )end - ( char * )start );
+   status = DPMI_UnlockMemory( start, ( unsigned )( ( char * )end - ( char * )start ) );
 
    return( status );
    }
 
-int DPMI_GetDOSMemory( void **ptr, int *descriptor, unsigned length )
+int DPMI_GetDOSMemory( void **ptr, intptr_t *descriptor, unsigned length )
 {
 	/* Lovely... */
 	
 	*ptr = (void *)malloc(length);
 	
-	*descriptor = (int) *ptr;
+	*descriptor = (intptr_t) *ptr;
 	
 	return (descriptor == 0) ? DPMI_Error : DPMI_Ok;
 }
 
-int DPMI_FreeDOSMemory( int descriptor )
+int DPMI_FreeDOSMemory( intptr_t descriptor )
 {
 	free((void *)descriptor);
 	

@@ -259,7 +259,7 @@ static void SCRIPT_parseline (char *curline, scriptnode_t *node)
 	if (!strncmp (token, "0x", 2)) {
 		/* Found a hex digit! */
 		node->type = SCRIPTFLAG_HEX;
-		node->data.number = strtol (token, NULL, 16);
+		node->data.number = (int)strtol (token, NULL, 16);
 	} else if (isdigit (token[0]) || token[0] == '-') {
 		/* Found a number! */
 		node->type = SCRIPTFLAG_DECIMAL;

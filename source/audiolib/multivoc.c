@@ -108,7 +108,7 @@ static int MV_BuffShift;
 
 static int MV_TotalMemory;
 
-static int   MV_BufferDescriptor;
+static intptr_t MV_BufferDescriptor;
 static int   MV_BufferEmpty[ NumberOfBuffers ];
 char *MV_MixBuffer[ NumberOfBuffers + 1 ];
 
@@ -477,7 +477,7 @@ void MV_ServiceVoc
          count = length;
          if ( source + count > end )
             {
-            count = end - source;
+            count = ( int )( end - source );
             }
 
          if ( MV_Bits == 16 )
@@ -693,7 +693,7 @@ playbackstatus MV_GetNextVOCBlock
                }
             else
                {
-               voice->BlockLength  = ( ptr - 4 ) - (unsigned char *)voice->LoopStart;
+               voice->BlockLength  = ( uint32_t )( ( ptr - 4 ) - (unsigned char *)voice->LoopStart );
                voice->sound        = voice->LoopStart;
                voice->position     = 0;
                voice->length       = min( voice->BlockLength, 0x8000 );
@@ -849,18 +849,18 @@ playbackstatus MV_GetNextVOCBlock
 
       if ( voice->LoopEnd != NULL )
          {
-         if ( blocklength > ( uint32_t )voice->LoopEnd )
+         if ( blocklength > ( uintptr_t )voice->LoopEnd )
             {
-            blocklength = ( uint32_t )voice->LoopEnd;
+            blocklength = ( uint32_t )( uintptr_t )voice->LoopEnd;
             }
          else
             {
-            voice->LoopEnd = ( char * )blocklength;
+            voice->LoopEnd = ( char * )( uintptr_t )blocklength;
             }
 
-         voice->LoopStart = voice->sound + ( uint32_t )voice->LoopStart;
-         voice->LoopEnd   = voice->sound + ( uint32_t )voice->LoopEnd;
-         voice->LoopSize  = voice->LoopEnd - voice->LoopStart;
+         voice->LoopStart = voice->sound + ( uintptr_t )voice->LoopStart;
+         voice->LoopEnd   = voice->sound + ( uintptr_t )voice->LoopEnd;
+         voice->LoopSize  = ( uint32_t )( voice->LoopEnd - voice->LoopStart );
          }
 
       if ( voice->bits == 16 )
@@ -2395,7 +2395,7 @@ int MV_PlayLoopedRaw
    voice->callbackval = callbackval;
    voice->LoopStart   = loopstart;
    voice->LoopEnd     = loopend;
-   voice->LoopSize    = ( voice->LoopEnd - voice->LoopStart ) + 1;
+   voice->LoopSize    = ( uint32_t )( voice->LoopEnd - voice->LoopStart ) + 1;
 
    MV_SetVoicePitch( voice, rate, pitchoffset );
    MV_SetVoiceVolume( voice, vol, left, right );
@@ -2760,8 +2760,8 @@ int MV_PlayLoopedVOC
    voice->prev        = NULL;
    voice->priority    = priority;
    voice->callbackval = callbackval;
-   voice->LoopStart   = ( char * )loopstart;
-   voice->LoopEnd     = ( char * )loopend;
+   voice->LoopStart   = ( char * )( intptr_t )loopstart;
+   voice->LoopEnd     = ( char * )( intptr_t )loopend;
    voice->LoopSize    = loopend - loopstart + 1;
 
    if ( loopstart < 0 )

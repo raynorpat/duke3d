@@ -631,7 +631,7 @@ void getpackets(void)
                 }
 
                 if (j > packbufleng)
-                    printf("INVALID GAME PACKET!!! (%ld too many bytes)\n",j-packbufleng);
+                    printf("INVALID GAME PACKET!!! (%d too many bytes)\n",j-packbufleng);
 
                 while (j != packbufleng)
                 {
@@ -956,7 +956,7 @@ void caches(void)
      for(i=0;i<cacnum;i++)
           if ((*cac[i].lock) >= 200)
           {
-                sprintf(tempbuf,"Locked- %d: Leng:%ld, Lock:%d",i,cac[i].leng,*cac[i].lock);
+                sprintf(tempbuf,"Locked- %d: Leng:%d, Lock:%d",i,cac[i].leng,*cac[i].lock);
                 printext256(0L,k,31,-1,tempbuf,1); k += 6;
           }
 
@@ -1262,7 +1262,7 @@ void weaponnum(short ind,int32_t x,int32_t y,int32_t num1, int32_t num2,char ha)
     if(num1 > 99) num1 = 99;
     if(num2 > 99) num2 = 99;
 
-    sprintf(dabuf,"%ld",num1);
+    sprintf(dabuf,"%d",num1);
     if(num1 > 9)
     {
         rotatesprite((x)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
@@ -1270,7 +1270,7 @@ void weaponnum(short ind,int32_t x,int32_t y,int32_t num1, int32_t num2,char ha)
     }
     else rotatesprite((x+4)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
 
-    sprintf(dabuf,"%ld",num2);
+    sprintf(dabuf,"%d",num2);
     if(num2 > 9)
     {
         rotatesprite((x+13)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
@@ -1287,7 +1287,7 @@ void weaponnum999(char ind,int32_t x,int32_t y,int32_t num1, int32_t num2,char h
     rotatesprite((x-4)<<16,y<<16,65536L,0,THREEBYFIVE+10,ha,0,10+128,0,0,xdim-1,ydim-1);
     rotatesprite((x+13)<<16,y<<16,65536L,0,THREEBYFIVE+11,ha,0,10+128,0,0,xdim-1,ydim-1);
 
-    sprintf(dabuf,"%ld",num1);
+    sprintf(dabuf,"%d",num1);
     if(num1 > 99)
     {
         rotatesprite((x)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
@@ -1301,7 +1301,7 @@ void weaponnum999(char ind,int32_t x,int32_t y,int32_t num1, int32_t num2,char h
     }
     else rotatesprite((x+8)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
 
-    sprintf(dabuf,"%ld",num2);
+    sprintf(dabuf,"%d",num2);
     if(num2 > 99)
     {
         rotatesprite((x+17)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
@@ -1809,7 +1809,7 @@ void tics(void)
     i = totalclock;
     if (i != frameval[framecnt])
     {
-        sprintf(b,"%ld",(TICRATE*AVERAGEFRAMES)/(i-frameval[framecnt]));
+        sprintf(b,"%d",(TICRATE*AVERAGEFRAMES)/(i-frameval[framecnt]));
         printext256(windowx1,windowy1,31,-21,b,1);
         frameval[framecnt] = i;
     }
@@ -1829,15 +1829,15 @@ void coords(short snum)
             y = 16;
     }
 
-    sprintf(tempbuf,"X= %ld",ps[snum].posx);
+    sprintf(tempbuf,"X= %d",ps[snum].posx);
     printext256(250L,y,31,-1,tempbuf,1);
-    sprintf(tempbuf,"Y= %ld",ps[snum].posy);
+    sprintf(tempbuf,"Y= %d",ps[snum].posy);
     printext256(250L,y+7L,31,-1,tempbuf,1);
-    sprintf(tempbuf,"Z= %ld",ps[snum].posz);
+    sprintf(tempbuf,"Z= %d",ps[snum].posz);
     printext256(250L,y+14L,31,-1,tempbuf,1);
     sprintf(tempbuf,"A= %d",ps[snum].ang);
     printext256(250L,y+21L,31,-1,tempbuf,1);
-    sprintf(tempbuf,"ZV= %ld",ps[snum].poszv);
+    sprintf(tempbuf,"ZV= %d",ps[snum].poszv);
     printext256(250L,y+28L,31,-1,tempbuf,1);
     sprintf(tempbuf,"OG= %d",ps[snum].on_ground);
     printext256(250L,y+35L,31,-1,tempbuf,1);
@@ -1847,7 +1847,7 @@ void coords(short snum)
     printext256(250L,y+50L,31,-1,tempbuf,1);
     sprintf(tempbuf,"SECTL= %d",sector[ps[snum].cursectnum].lotag);
     printext256(250L,y+57L,31,-1,tempbuf,1);
-    sprintf(tempbuf,"SEED= %ld",randomseed);
+    sprintf(tempbuf,"SEED= %d",randomseed);
     printext256(250L,y+64L,31,-1,tempbuf,1);
     sprintf(tempbuf,"THOLD= %d",ps[snum].transporter_hold);
     printext256(250L,y+64L+7,31,-1,tempbuf,1);
@@ -2474,7 +2474,7 @@ void displayrest(int32_t smoothratio)
     }
 
     if(ps[myconnectindex].newowner == -1 && ud.overhead_on == 0 && ud.crosshair && ud.camerasprite == -1)
-        rotatesprite((160L-(ps[myconnectindex].look_ang>>1))<<16,100L<<16,65536L,0,CROSSHAIR,0,0,2+1,windowx1,windowy1,windowx2,windowy2);
+        rotatesprite((160-(ps[myconnectindex].look_ang>>1))<<16,100L<<16,65536L,0,CROSSHAIR,0,0,2+1,windowx1,windowy1,windowx2,windowy2);
 
     if(ps[myconnectindex].gm&MODE_TYPE)
         typemode();
@@ -2878,7 +2878,7 @@ void displayrooms(short snum,int32_t smoothratio)
         {
             walock[MAXTILES-1] = 254;
             if (waloff[MAXTILES-1] == 0)
-                allocache((int32_t *)&waloff[MAXTILES-1],100*160,&walock[MAXTILES-1]);
+                allocache(&waloff[MAXTILES-1],100*160,&walock[MAXTILES-1]);
             setviewtotile(MAXTILES-1,100L,160L);
         }
         else if( ( ud.screen_tilting && p->rotscrnang ) || ud.detail==0 )
@@ -4764,7 +4764,7 @@ short spawn( short j, short pn )
                             }
                             if(j == MAXSPRITES)
                             {
-                                sprintf(tempbuf,"Found lonely Sector Effector (lotag 0) at (%ld,%ld)\n",sp->x,sp->y);
+                                sprintf(tempbuf,"Found lonely Sector Effector (lotag 0) at (%d,%d)\n",sp->x,sp->y);
                                 gameexit(tempbuf);
                             }
                             sp->owner = j;
@@ -4781,7 +4781,7 @@ short spawn( short j, short pn )
                             tempwallptr++;
                             if(tempwallptr > 2047)
                             {
-                                sprintf(tempbuf,"Too many moving sectors at (%ld,%ld).\n",wall[s].x,wall[s].y);
+                                sprintf(tempbuf,"Too many moving sectors at (%d,%d).\n",wall[s].x,wall[s].y);
                                 gameexit(tempbuf);
                             }
                         }
@@ -4813,7 +4813,7 @@ short spawn( short j, short pn )
 
                             if(j == 0)
                             {
-                                sprintf(tempbuf,"Subway found no zero'd sectors with locators\nat (%ld,%ld).\n",sp->x,sp->y);
+                                sprintf(tempbuf,"Subway found no zero'd sectors with locators\nat (%d,%d).\n",sp->x,sp->y);
                                 gameexit(tempbuf);
                             }
 
@@ -6898,7 +6898,7 @@ void checkcommandline(int argc,char **argv)
                     case 'V':
                         c++;
                         ud.warp_on = 1;
-                        ud.m_volume_number = ud.volume_number = atol(c)-1;
+                        ud.m_volume_number = ud.volume_number = (int32_t)atol(c)-1;
                         break;
                     case 's':
                     case 'S':
@@ -7272,7 +7272,7 @@ void Startup(void)
 void sendscore(char *s)
 {
     if(numplayers > 1)
-      genericmultifunction(-1,s,strlen(s)+1,5);
+      genericmultifunction(-1,s,(int32_t)strlen(s)+1,5);
 }
 
 
@@ -7351,7 +7351,7 @@ void writestring(int32_t a1,int32_t a2,int32_t a3,short a4,int32_t vx,int32_t vy
 
     fp = (FILE *)fopen("debug.txt","rt+");
 
-    fprintf(fp,"%ld %ld %ld %d %ld %ld %ld\n",a1,a2,a3,a4,vx,vy,vz);
+    fprintf(fp,"%d %d %d %d %d %d %d\n",a1,a2,a3,a4,vx,vy,vz);
 
     fclose(fp);
 
@@ -7538,12 +7538,12 @@ int main(int argc,char **argv)
             puts("You don't have enough free memory to run Duke Nukem 3D.");
             puts("The DOS \"mem\" command should report 6,800K (or 6.8 megs)");
             puts("of \"total memory free\".\n");
-            printf("Duke Nukem 3D requires %ld more bytes to run.\n",3162000-350000-totalmemory);
+            printf("Duke Nukem 3D requires %d more bytes to run.\n",3162000-350000-totalmemory);
             exit(0);
         }
     }
     else
-        printf("Using %ld bytes for heap.\n",totalmemory);
+        printf("Using %d bytes for heap.\n",totalmemory);
 
 #ifndef ONELEVELDEMO
 // CTW - REMOVED
@@ -7638,7 +7638,7 @@ int main(int argc,char **argv)
     }*/
     if( setgamemode(ScreenMode,ScreenWidth,ScreenHeight) < 0 )
     {
-        printf("\nVESA driver for ( %ld * %ld ) not found/supported!\n",xdim,ydim);
+        printf("\nVESA driver for ( %d * %d ) not found/supported!\n",xdim,ydim);
         ScreenMode = 2;
         ScreenWidth = 320;
         ScreenHeight = 200;
@@ -9163,14 +9163,14 @@ void dobonus(char bonusonly)
         minitext(23,80,"   NAME                                           KILLS",8,2+8+16+128);
         for(i=0;i<playerswhenstarted;i++)
         {
-            sprintf(tempbuf,"%-4ld",i+1);
+            sprintf(tempbuf,"%-4d",i+1);
             minitext(92+(i*23),80,tempbuf,3,2+8+16+128);
         }
 
         for(i=0;i<playerswhenstarted;i++)
         {
             xfragtotal = 0;
-            sprintf(tempbuf,"%ld",i+1);
+            sprintf(tempbuf,"%d",i+1);
 
             minitext(30,90+t,tempbuf,0,2+8+16+128);
             minitext(38,90+t,ud.user_name[i],ps[i].palookup,2+8+16+128);
@@ -9192,12 +9192,12 @@ void dobonus(char bonusonly)
 
                 if(myconnectindex == connecthead)
                 {
-                    sprintf(tempbuf,"stats %ld killed %ld %d\n",i+1,y+1,frags[i][y]);
+                    sprintf(tempbuf,"stats %d killed %d %d\n",i+1,y+1,frags[i][y]);
                     sendscore(tempbuf);
                 }
             }
 
-            sprintf(tempbuf,"%-4ld",xfragtotal);
+            sprintf(tempbuf,"%-4d",xfragtotal);
             minitext(101+(8*23),90+t,tempbuf,2,2+8+16+128);
 
             t += 7;
@@ -9212,7 +9212,7 @@ void dobonus(char bonusonly)
                     yfragtotal += ps[i].fraggedself;
                 yfragtotal += frags[i][y];
             }
-            sprintf(tempbuf,"%-4ld",yfragtotal);
+            sprintf(tempbuf,"%-4d",yfragtotal);
             minitext(92+(y*23),96+(8*7),tempbuf,2,2+8+16+128);
         }
 
@@ -9341,17 +9341,17 @@ void dobonus(char bonusonly)
                         bonuscnt++;
                         sound(PIPEBOMB_EXPLODE);
                     }
-                    sprintf(tempbuf,"%02ld:%02ld",
+                    sprintf(tempbuf,"%02d:%02d",
                         (ps[myconnectindex].player_par/(26*60))%60,
                         (ps[myconnectindex].player_par/26)%60);
                     gametext((320>>2)+71,60+9,tempbuf,0,2+8+16);
 
-                    sprintf(tempbuf,"%02ld:%02ld",
+                    sprintf(tempbuf,"%02d:%02d",
                         (partime[ud.volume_number*11+ud.last_level-1]/(26*60))%60,
                         (partime[ud.volume_number*11+ud.last_level-1]/26)%60);
                     gametext((320>>2)+71,69+9,tempbuf,0,2+8+16);
 
-                    sprintf(tempbuf,"%02ld:%02ld",
+                    sprintf(tempbuf,"%02d:%02d",
                         (designertime[ud.volume_number*11+ud.last_level-1]/(26*60))%60,
                         (designertime[ud.volume_number*11+ud.last_level-1]/26)%60);
                     gametext((320>>2)+71,78+9,tempbuf,0,2+8+16);

@@ -590,7 +590,7 @@ void SafeWriteString (int handle, char * buffer)
 {
 	unsigned	iocount;
 
-   iocount=strlen(buffer);
+   iocount=(unsigned)strlen(buffer);
 	if (write (handle,buffer,iocount) != (int)iocount)
 			Error ("File write string failure writing %s\n",buffer);
 }
@@ -820,10 +820,10 @@ char *ltoa(int32_t value, char *string, int radix)
 {
 	switch (radix) {
 		case 10:
-			sprintf(string, "%ld", value);
+			sprintf(string, "%d", value);
 			break;
 		case 16:
-			sprintf(string, "%lx", value);
+			sprintf(string, "%x", value);
 			break;
 		default:
 			STUBBED("unknown radix");
@@ -837,10 +837,10 @@ char *ultoa(uint32_t value, char *string, int radix)
 {
 	switch (radix) {
 		case 10:
-			sprintf(string, "%lu", value);
+			sprintf(string, "%u", value);
 			break;
 		case 16:
-			sprintf(string, "%lux", value);
+			sprintf(string, "%ux", value);
 			break;
 		default:
 			STUBBED("unknown radix");

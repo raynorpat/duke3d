@@ -4912,7 +4912,7 @@ void moveexplosions(void)  // STATNUM 5
 
 void moveeffectors(void)   //STATNUM 3
 {
-    int32_t q=0l, l=0l, m=0l, x=0l, st=0l, j=0l, *t=NULL;
+    int32_t q=0l, l=0l, m=0l, x=0l, st=0l, j=0l, *t=NULL, *zp=NULL;
     short i=0, k=0, nexti=0, nextk=0, p=0, sh=0, nextj=0;
     spritetype *s=NULL;
     sectortype *sc=NULL;
@@ -5156,7 +5156,7 @@ void moveeffectors(void)   //STATNUM 3
 
                 if(s->owner == -1)
                 {
-                    sprintf(tempbuf,"Could not find any locators for SE# 6 and 14 with a hitag of %ld.\n",t[3]);
+                    sprintf(tempbuf,"Could not find any locators for SE# 6 and 14 with a hitag of %d.\n",t[3]);
                     gameexit(tempbuf);
                 }
 
@@ -6471,23 +6471,23 @@ void moveeffectors(void)   //STATNUM 3
                 if( t[0] == 0 ) break;
 
                 if( s->ang == 1536 )
-                    l = (int32_t) &sc->ceilingz;
+                    zp = &sc->ceilingz;
                 else
-                    l = (int32_t) &sc->floorz;
+                    zp = &sc->floorz;
 
                 if( t[0] == 1 ) //Decide if the s->sectnum should go up or down
                 {
-                    s->zvel = ksgn(s->z-*(int32_t *)l) * (SP<<4);
+                    s->zvel = ksgn(s->z-*zp) * (SP<<4);
                     t[0]++;
                 }
 
                 if( sc->extra == 0 )
                 {
-                    *(int32_t *)l += s->zvel;
+                    *zp += s->zvel;
 
-                    if(klabs(*(int32_t *)l-s->z) < 1024)
+                    if(klabs(*zp-s->z) < 1024)
                     {
-                        *(int32_t *)l = s->z;
+                        *zp = s->z;
                         KILLIT(i); //All done
                     }
                 }

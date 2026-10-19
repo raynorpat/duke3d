@@ -121,7 +121,7 @@ void cmenu(short cm)
 }
 
 
-void savetemp(char *fn,int32_t daptr,int32_t dasiz)
+void savetemp(char *fn,intptr_t daptr,int32_t dasiz)
 {
     int fp;
 
@@ -198,7 +198,7 @@ int loadplayer(signed char spot)
      char mpfn[] = "gameA_00.sav";
      char fullname[128];
      char *fnptr, scriptptrs[MAXSCRIPTSIZE];
-     int32_t fil, bv, i, j, x;
+     int32_t fil, bv, i, j, x, animoffs[MAXANIMATES];
      int32 nump;
 
      if(spot < 0)
@@ -360,8 +360,8 @@ int loadplayer(signed char spot)
 
          kdfread(&animatecnt,sizeof(animatecnt),1,fil);
          kdfread(&animatesect[0],2,MAXANIMATES,fil);
-         kdfread(&animateptr[0],4,MAXANIMATES,fil);
-     for(i = animatecnt-1;i>=0;i--) animateptr[i] = (int32_t *)((int32_t)animateptr[i]+(int32_t)(&sector[0]));
+         kdfread(&animoffs[0],4,MAXANIMATES,fil);
+     for(i = animatecnt-1;i>=0;i--) animateptr[i] = (int32_t *)((char *)&sector[0]+animoffs[i]);
          kdfread(&animategoal[0],4,MAXANIMATES,fil);
          kdfread(&animatevel[0],4,MAXANIMATES,fil);
 
@@ -515,7 +515,7 @@ int loadplayer(signed char spot)
 
 int saveplayer(signed char spot)
 {
-     int32_t i, j;
+     int32_t i, j, animoffs[MAXANIMATES];
      char fn[] = "game0.sav";
      char mpfn[] = "gameA_00.sav";
      char fullname[128];
@@ -683,9 +683,9 @@ int saveplayer(signed char spot)
      dfwrite(&pskyoff[0],sizeof(pskyoff[0]),MAXPSKYTILES,fil);
          dfwrite(&animatecnt,sizeof(animatecnt),1,fil);
          dfwrite(&animatesect[0],2,MAXANIMATES,fil);
-         for(i = animatecnt-1;i>=0;i--) animateptr[i] = (int32_t *)((int32_t)animateptr[i]-(int32_t)(&sector[0]));
-         dfwrite(&animateptr[0],4,MAXANIMATES,fil);
-         for(i = animatecnt-1;i>=0;i--) animateptr[i] = (int32_t *)((int32_t)animateptr[i]+(int32_t)(&sector[0]));
+         clearbuf(animoffs,MAXANIMATES,0L);
+         for(i = animatecnt-1;i>=0;i--) animoffs[i] = (int32_t)((char *)animateptr[i]-(char *)&sector[0]);
+         dfwrite(&animoffs[0],4,MAXANIMATES,fil);
          dfwrite(&animategoal[0],4,MAXANIMATES,fil);
          dfwrite(&animatevel[0],4,MAXANIMATES,fil);
 
@@ -1282,7 +1282,7 @@ int getfilenames(char kind[6])
                 {
                     /* need to expand support if this assertion ever fails. */
                     assert(stricmp(kind, "*.MAP") == 0);
-                    len = strlen(dent->d_name);
+                    len = (int)strlen(dent->d_name);
                     if (len >= 5)
                     {
                         ptr = ((char *) dent->d_name) + len;
@@ -1962,10 +1962,10 @@ void menus(void)
 
             dispnames();
 
-            sprintf(tempbuf,"PLAYERS: %-2ld                      ",numplr); // int32 = long
+            sprintf(tempbuf,"PLAYERS: %-2d                      ",numplr); // int32 = long
             gametext(160,158,tempbuf,0,2+8+16);
 
-            sprintf(tempbuf,"EPISODE: %-2ld / LEVEL: %-2ld / SKILL: %-2ld",1+volnum,1+levnum,plrskl);
+            sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+volnum,1+levnum,plrskl);
             gametext(160,170,tempbuf,0,2+8+16);
 
             gametext(160,90,"LOAD game:",0,2+8+16);
@@ -2078,10 +2078,10 @@ void menus(void)
             menutext(160,24,0,0,"SAVE GAME");
 
             rotatesprite(101<<16,97<<16,65536L,512,MAXTILES-3,-32,0,4+10+64,0,0,xdim-1,ydim-1);
-            sprintf(tempbuf,"PLAYERS: %-2ld                      ",ud.multimode);
+            sprintf(tempbuf,"PLAYERS: %-2d                      ",ud.multimode);
             gametext(160,158,tempbuf,0,2+8+16);
 
-            sprintf(tempbuf,"EPISODE: %-2ld / LEVEL: %-2ld / SKILL: %-2ld",1+ud.volume_number,1+ud.level_number,ud.player_skill);
+            sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill);
             gametext(160,170,tempbuf,0,2+8+16);
 
             dispnames();
@@ -2840,9 +2840,9 @@ void menus(void)
 
             if(current_menu >= 360 && current_menu <= 369 )
             {
-                sprintf(tempbuf,"PLAYERS: %-2ld                      ",ud.multimode);
+                sprintf(tempbuf,"PLAYERS: %-2d                      ",ud.multimode);
                 gametext(160,158,tempbuf,0,2+8+16);
-                sprintf(tempbuf,"EPISODE: %-2ld / LEVEL: %-2ld / SKILL: %-2ld",1+ud.volume_number,1+ud.level_number,ud.player_skill);
+                sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill);
                 gametext(160,170,tempbuf,0,2+8+16);
 
                 x = strget((320>>1),184,&ud.savegame[current_menu-360][0],19, 999 );
@@ -2886,7 +2886,7 @@ void menus(void)
 
                 rotatesprite(101<<16,97<<16,65536,512,MAXTILES-1,-32,0,2+4+8+64,0,0,xdim-1,ydim-1);
                 dispnames();
-                rotatesprite((c+67+strlen(&ud.savegame[current_menu-360][0])*4)<<16,(50+12*probey)<<16,32768L-10240,0,SPINNINGNUKEICON+(((totalclock)>>3)%7),0,0,10,0,0,xdim-1,ydim-1);
+                rotatesprite((c+67+(int32_t)strlen(&ud.savegame[current_menu-360][0])*4)<<16,(50+12*probey)<<16,32768L-10240,0,SPINNINGNUKEICON+(((totalclock)>>3)%7),0,0,10,0,0,xdim-1,ydim-1);
                 break;
             }
 
@@ -2905,9 +2905,9 @@ void menus(void)
                   }
 
                   rotatesprite(101<<16,97<<16,65536L,512,MAXTILES-3,-32,0,4+10+64,0,0,xdim-1,ydim-1);
-                  sprintf(tempbuf,"PLAYERS: %-2ld                      ",numplr);
+                  sprintf(tempbuf,"PLAYERS: %-2d                      ",numplr);
                   gametext(160,158,tempbuf,0,2+8+16);
-                  sprintf(tempbuf,"EPISODE: %-2ld / LEVEL: %-2ld / SKILL: %-2ld",1+volnum,1+levnum,plrskl);
+                  sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+volnum,1+levnum,plrskl);
                   gametext(160,170,tempbuf,0,2+8+16);
               }
               else menutext(69,70,0,0,"EMPTY");
@@ -2922,9 +2922,9 @@ void menus(void)
                   rotatesprite(101<<16,97<<16,65536L,512,MAXTILES-3,-32,0,4+10+64,0,0,xdim-1,ydim-1);
               }
               else menutext(69,70,0,0,"EMPTY");
-              sprintf(tempbuf,"PLAYERS: %-2ld                      ",ud.multimode);
+              sprintf(tempbuf,"PLAYERS: %-2d                      ",ud.multimode);
               gametext(160,158,tempbuf,0,2+8+16);
-              sprintf(tempbuf,"EPISODE: %-2ld / LEVEL: %-2ld / SKILL: %-2ld",1+ud.volume_number,1+ud.level_number,ud.player_skill);
+              sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill);
               gametext(160,170,tempbuf,0,2+8+16);
           }
 
@@ -3481,7 +3481,7 @@ void menus(void)
             menutext(c,57-9,SHX(-2),PHX(-2),"GAME TYPE");
 
 #ifdef VOLUMEONE
-            sprintf(tempbuf,"EPISODE %ld",ud.m_volume_number+1);
+            sprintf(tempbuf,"EPISODE %d",ud.m_volume_number+1);
             menutext(c,57+16-9,SHX(-3),1,tempbuf);
 #else
             sprintf(tempbuf,"EPISODE %ld",ud.m_volume_number+1);
@@ -3489,7 +3489,7 @@ void menus(void)
 #endif
 
 #ifndef ONELEVELDEMO
-            sprintf(tempbuf,"LEVEL %ld",ud.m_level_number+1);
+            sprintf(tempbuf,"LEVEL %d",ud.m_level_number+1);
             menutext(c,57+16+16-9,SHX(-4),PHX(-4),tempbuf);
 #else
             sprintf(tempbuf,"LEVEL %ld",ud.m_level_number+1);
@@ -4005,7 +4005,7 @@ void playanm(char *fn,char t)
     walock[MAXTILES-3-t] = 219+t;
 
     if(anim == 0 || lastanimhack != (MAXTILES-3-t))
-        allocache((int32_t *)&anim,length+sizeof(anim_t),&walock[MAXTILES-3-t]);
+        allocache((intptr_t *)&anim,length+sizeof(anim_t),&walock[MAXTILES-3-t]);
 
     animbuf = (char *)(FP_OFF(anim)+sizeof(anim_t));
 

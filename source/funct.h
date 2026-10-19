@@ -141,7 +141,7 @@ extern void computergetinput(int32_t snum, input *syn);
 extern void dummyfunc(void);
 extern void dummymess(int i, char *c);
 extern void cmenu(short cm);
-extern void savetemp(char *fn, int32_t daptr, int32_t dasiz);
+extern void savetemp(char *fn, intptr_t daptr, int32_t dasiz);
 extern void getangplayers(short snum);
 extern int loadplayer(signed char spot);
 extern int saveplayer(signed char spot);
