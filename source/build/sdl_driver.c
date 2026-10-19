@@ -2443,6 +2443,13 @@ static Uint32 _timer_catcher(Uint32 interval, void *bleh)
     Uint64 due = (SDL_GetPerformanceCounter() - timer_start) * PLATFORM_TIMER_HZ /
                  SDL_GetPerformanceFrequency();
 
+    /*
+     * Catch up on drift, but not on a stall (a debugger, Ctrl-Z, App Nap):
+     *  replaying all of it would fast-forward the game. Drop the backlog.
+     */
+    if (due - timer_calls > PLATFORM_TIMER_HZ/4)
+        timer_calls = due - 1;
+
     while (timer_calls < due)
     {
         timer_calls++;

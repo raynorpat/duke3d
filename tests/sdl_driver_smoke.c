@@ -5,6 +5,11 @@
  */
 #include <stdio.h>
 #include <string.h>
+#if !PLATFORM_WIN32
+#include <signal.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
 #include "platform.h"
 #include "build.h"
 #include "display.h"
@@ -127,6 +132,44 @@ int main(int argc, char **argv)
                 timer_calls);
         return 1;
     }
+
+#if !PLATFORM_WIN32
+    /*
+     * After a stall (a debugger, Ctrl-Z, App Nap) the clock must carry on
+     *  from where it is, not replay every tick it missed: that fast-forwards
+     *  the game. Stop the whole process for a second, then count.
+     */
+    {
+        pid_t child;
+        int before;
+
+        timer_calls = 0;
+        inittimer();
+        start = getticks();
+        while (getticks() - start < 100)
+            _idle();
+        child = fork();
+        if (child == 0)
+        {
+            sleep(1);
+            kill(getppid(), SIGCONT);
+            _exit(0);
+        }
+        before = timer_calls;
+        raise(SIGSTOP);
+        waitpid(child, NULL, 0);
+        start = getticks();
+        while (getticks() - start < 100)
+            _idle();
+        uninittimer();
+        if (timer_calls - before > 60)
+        {
+            fprintf(stderr, "FAIL: timer fired %d times in the 100ms after a 1s stall (expected under 60)\n",
+                    timer_calls - before);
+            return 1;
+        }
+    }
+#endif
 
     _uninitengine();
     printf("PASS: sdl_driver smoke test\n");
