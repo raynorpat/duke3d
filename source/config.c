@@ -585,7 +585,9 @@ void readsavenames(void)
         dfread32(&dummy,1,fil);
 
         if(dummy != BYTEVERSION) { fclose(fil); continue; }
+#if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D saves have no player count
         dfread32(&dummy,1,fil);
+#endif
         dfread(&ud.savegame[i][0],19,1,fil);
         fclose(fil);
     }
