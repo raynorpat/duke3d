@@ -274,3 +274,21 @@ wraps from 10 back to 1.
     `parallaxyscale`**.
 
 The shareware save has the same layout, with its own addresses and `BYTEVERSION`.
+
+## Comparison reports
+
+The per-module EXE-vs-source comparison reports behind the ledger's C and G13 rows are
+kept out of tree in `~/Projects/ref/notes/1.3d-<module>.md` (con-compiler,
+con-interpreter, game, actors, player, premap, sector). They hold the exact decompile
+and assembly line references. Each module's 1.3D (full EXE) address range:
+
+| Module | Range |
+|---|---|
+| game.c | `0x101d0`–`0x248df` |
+| actors.c | `0x248e0`–`0x339af` (`getincangle` at `0x339b0`) |
+| gamedef.c | `0x339b0`–`0x3a43f` |
+| menues.c | `0x3a440`–`0x41c6f` |
+| player.c | `0x41d40`–`0x4ad49` |
+| premap.c | `0x4ad50`–`0x4debd` |
+| sector.c | `0x4dec0`–`0x54bf0` |
+| sounds.c | `0x54c30`– |
