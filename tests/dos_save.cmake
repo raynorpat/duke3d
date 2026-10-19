@@ -2,6 +2,7 @@
 #   load       -loadverify must print the SAVESTATE the Python decoder prints
 #   roundtrip  load, save again with -saveverify, then compare field by field
 #   refuse     an old-layout copy and a version-103 copy must both exit 2
+#   hostile    a copy with out-of-range counts must exit 0, 1 or 2, not crash
 #
 #   cmake -DMODE=<mode> -DDUKE3D=<exe> -DGRP=<Atomic DUKE3D.GRP> -DSAVE=<.sav>
 #         -DPYTHON=<python3> -DDECODER=<dos_save_decode.py> -DWORK=<scratch dir>
@@ -91,6 +92,12 @@ elseif(MODE STREQUAL "refuse")
       message(FATAL_ERROR "${_file}: no '${_msg}' message")
     endif()
   endforeach()
+elseif(MODE STREQUAL "hostile")
+  run_decoder(_ignored fixture bigcounts dos.sav big.sav)
+  run_duke3d(_result _out -loadverify big.sav)
+  if(NOT _result MATCHES "^[0-9]+$")
+    message(FATAL_ERROR "big.sav: -loadverify ended with '${_result}'")
+  endif()
 else()
   message(FATAL_ERROR "dos_save: unknown MODE ${MODE}")
 endif()

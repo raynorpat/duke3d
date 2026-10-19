@@ -11,6 +11,9 @@ tests can hold the two against each other.
                                        copy with a 14720-byte player block
   dos_save_decode.py fixture version <in> <out>
                                        copy with BYTEVERSION 103
+  dos_save_decode.py fixture bigcounts <in> <out>
+                                       copy with out-of-range spriteqamount,
+                                       numanimwalls, mirrorcnt and animatecnt
 """
 import struct
 import sys
@@ -270,6 +273,18 @@ def fixture(kind, save, out):
         if data[0:2] != b'\x08\x00' or data[4:6] != b'\x00\x00':
             raise ValueError('the version block is not stored uncompressed')
         data[6:10] = struct.pack('<i', 103)
+    elif kind == 'bigcounts':
+        # Each count is one block of its own; swap in a stored block.
+        big = {'spriteqamount': struct.pack('<h', 30000),
+               'numanimwalls': struct.pack('<h', 30000),
+               'mirrorcnt': struct.pack('<h', 30000),
+               'animatecnt': struct.pack('<i', 100000)}
+        blocks = list(save.blocks)
+        for name, v in big.items():
+            first, count = save.call_blocks[name]
+            assert count == 1
+            blocks[first] = struct.pack('<hHh', 4 + len(v), len(v), 0) + v
+        data = b''.join(blocks)
     else:
         # The player block as an unpacked 64-bit build wrote it: 920 bytes a
         # player. A stored block (string count 0) needs no compressor.
@@ -297,7 +312,7 @@ def main(argv):
         print(state(read(argv[2])))
     elif cmd == 'compare' and len(argv) == 4:
         return compare(read(argv[2]), read(argv[3]))
-    elif cmd == 'fixture' and len(argv) == 5 and argv[2] in ('oldlayout', 'version'):
+    elif cmd == 'fixture' and len(argv) == 5 and argv[2] in ('oldlayout', 'version', 'bigcounts'):
         fixture(argv[2], read(argv[3]), argv[4])
     else:
         print(__doc__)

@@ -138,5 +138,6 @@ if(DUKE3D_ATOMIC_GRP AND EXISTS "${DUKE3D_ATOMIC_GRP}" AND
   if(_saves)
     list(GET _saves 0 _first)
     add_dos_save_test(dos_save_refuse refuse "${_first}")
+    add_dos_save_test(dos_save_hostile hostile "${_first}")
   endif()
 endif()
