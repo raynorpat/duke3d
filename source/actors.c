@@ -4800,7 +4800,8 @@ void moveactors(void)
                             if(ps[p].weaprecs[j] == s->picnum)
                                 goto BOLT;
 
-                        if(ps[p].weapreccnt < 255)
+                        // Fix: the bound was 255, overflowing weaprecs[16].
+                        if(ps[p].weapreccnt < MAX_WEAPRECS)
                             ps[p].weaprecs[ps[p].weapreccnt++] = s->picnum;
                     }
 #endif
