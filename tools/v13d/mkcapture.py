@@ -2,13 +2,21 @@
 game state to STATE.BIN and then hangs. Optionally starts the title demo loop at
 demo N.
 
-usage: mkcapture.py <full|sw> <in.exe> <out.exe> <demo number>
+usage: mkcapture.py <full|sw> <in.exe> <out.exe> <demo number> [krandlog]
 
-STATE.BIN = reccnt (4) + randomseed (4) + sprite[4096] (44 each)."""
+STATE.BIN = reccnt (4) + randomseed (4) + sprite[4096] (44 each) + ps[0] (0x552, the
+1.3D player_struct layout; see ledger F-007).
+
+krandlog: every direct call to krand goes through a logger first, which records
+the caller while reccnt is 0 (the demo's last tic, when the demo is cut to end
+there). STATE.BIN then also holds the runtime and link address of the logger
+(4 + 4), the call count (4) and up to 256 return addresses (4 each, runtime;
+subtract the runtime-minus-link difference to get EXE addresses). The code
+object is read-only, so the log lives in the slack after the data object."""
 import re, struct, sys
 ED = {
-    'full': dict(krand=0x6c241, randomseed=0x251998, sprite=0x1cdbc0, reccnt=0x14de0a, which_demo=0xc76d6, cave=0xaa620),
-    'sw':   dict(krand=0x6bf61, randomseed=0x251ae8, sprite=0x1cdd10, reccnt=0x14df5a, which_demo=0xc782e, cave=0xaa330),
+    'full': dict(krand=0x6c241, randomseed=0x251998, sprite=0x1cdbc0, reccnt=0x14de0a, which_demo=0xc76d6, cave=0xaa620, log=0x2d5400, ps=0x11bd30),
+    'sw':   dict(krand=0x6bf61, randomseed=0x251ae8, sprite=0x1cdd10, reccnt=0x14df5a, which_demo=0xc782e, cave=0xaa330, log=0x2d5550, ps=0x11be80),
 }
 LE, STUB = 0x37c3c, 0x352a4
 ed = ED[sys.argv[1]]; exe = bytearray(open(sys.argv[2], 'rb').read()); demo = int(sys.argv[4])
@@ -31,7 +39,7 @@ pat = re.compile(rb'\x83\x3d' + re.escape(struct.pack('<I', ed['reccnt'])) + rb'
 m = list(pat.finditer(code)); assert len(m) == 1, len(m)
 jnz = 0x10000 + m[0].start() + 14           # address of the 0f 85
 end = jnz + 6 + struct.unpack('<i', m[0].group(1))[0]
-cave = ed['cave']; assert not any(rd(cave, 0x200)), 'cave not empty'
+cave = ed['cave']; assert not any(rd(cave, 0x600)), 'cave not empty'
 c = bytearray(); nxt = cave + 5
 c += b'\xe8\x00\x00\x00\x00'                 # call next
 c += b'\x5d'                                 # next: pop ebp
@@ -46,12 +54,42 @@ def write(addr, n):
 write(ed['reccnt'], 4); write(ed['randomseed'], 4)
 for k in range(5): write(ed['sprite'] + k*32768, 32768)
 write(ed['sprite'] + 5*32768, 44*4096 - 5*32768)
+write(ed['ps'], 0x552)
+krandlog = 'krandlog' in sys.argv[5:]
+if krandlog:
+    write(ed['log'], 12 + 256*4)
 c += b'\x66\x89\xfb\xb4\x3e\xcd\x21'         # close
 c += b'\xeb\xfe'                             # hang
 fname = cave + len(c); c += b'STATE.BIN\x00'
 struct.pack_into('<i', c, fname_fix, fname - nxt)
+if krandlog:
+    hook = cave + len(c); hn = hook + 9      # address of the pop after its call
+    log = ed['log']                          # log: hn runtime, hn link, count, addrs[256]
+    h = bytearray(b'\x53\x50\x51\x52\xe8\x00\x00\x00\x00\x5b')
+    h += b'\x8b\x93' + struct.pack('<i', ed['krand'] + 2 - hn)        # mov edx,[ebx+...] (&randomseed)
+    h += b'\x81\xea' + struct.pack('<I', ed['randomseed'])          # sub edx, link -> data delta
+    h += b'\x83\xba' + struct.pack('<I', ed['reccnt']) + b'\x00'     # cmp dword [edx+reccnt],0
+    h += b'\x75\x00'; jne = len(h)
+    h += b'\x89\x9a' + struct.pack('<I', log)                       # log[0] = runtime hn ([edx+log])
+    h += b'\xc7\x82' + struct.pack('<I', log + 4) + struct.pack('<I', hn)  # log[1] = link hn
+    h += b'\x8b\x8a' + struct.pack('<I', log + 8)                   # ecx = count
+    h += b'\x81\xf9\x00\x01\x00\x00\x73\x00'; jae = len(h)      # cmp ecx,256 / jae skip
+    h += b'\x8b\x44\x24\x10'                                         # eax = caller
+    h += b'\x89\x84\x8a' + struct.pack('<I', log + 12)             # log[3+ecx] = eax ([edx+ecx*4])
+    h += b'\x41\x89\x8a' + struct.pack('<I', log + 8)              # count++
+    skip = len(h); h[jne-1] = skip - jne; h[jae-1] = skip - jae
+    h += b'\x5a\x59\x58\x5b\xe9'
+    h += struct.pack('<i', ed['krand'] - (hook + len(h) + 4))   # jmp krand
+    c += bytes(h)
+    whole = open(__import__('os').environ.get('V13D_FLAT') or __import__('os').path.expanduser(f'~/Projects/ref/ghidra/{sys.argv[1]}13.bin'), 'rb').read()
+    sites = [k + 0x10000 for k in range(0, 0xa0000 - 5) if whole[k] == 0xe8
+             and k + 0x10000 + 5 + struct.unpack_from('<i', whole, k + 1)[0] == ed['krand']]
+    for k in sites: wr(k + 1, struct.pack('<i', hook - (k + 5)))
+    print(f'krandlog: {len(sites)} krand calls go through {hook:#x}')
 wr(cave, bytes(c))
-if len(sys.argv) > 5 and sys.argv[5] == 'callsite':
+if len(sys.argv) > 5 and sys.argv[5] == 'krandlog':
+    wr(jnz + 2, struct.pack('<i', cave - (jnz + 6)))
+elif len(sys.argv) > 5 and sys.argv[5] == 'callsite':
     k = int(sys.argv[6], 16); assert code[k-0x10000] == 0xe8, 'not a call'
     wr(k + 1, struct.pack('<i', cave - (k + 5))); print(f'diagnostic: call at {k:#x} -> cave')
 elif len(sys.argv) > 5 and sys.argv[5] == 'firsttic':

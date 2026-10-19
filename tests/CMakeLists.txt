@@ -253,6 +253,33 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
               -P "${CMAKE_CURRENT_SOURCE_DIR}/game_boot_v13d.cmake")
     set_tests_properties(game_boot_v13d_${_v13d_edition} PROPERTIES TIMEOUT 240)
   endif()
+  if(_v13d_data)
+    # The original demos, played to the end and compared with the DOS state.
+    if(_v13d_edition STREQUAL "full")
+      set(_v13d_demos 1 2)
+    else()
+      set(_v13d_demos 1 2 3)
+    endif()
+    foreach(_demo IN LISTS _v13d_demos)
+      add_test(NAME demo_sync_v13d_${_v13d_edition}_${_demo}
+        COMMAND "${CMAKE_COMMAND}"
+                "-DDUKE3D=$<TARGET_FILE:duke3d>"
+                "-DDATA=${_v13d_data}" "-DEDITION=${_v13d_edition}"
+                "-DDEMO=${_demo}"
+                "-DREFS=${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_demo_refs.cmake"
+                "-DWORK=${CMAKE_BINARY_DIR}/ds13_${_demo}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
+      set_tests_properties(demo_sync_v13d_${_v13d_edition}_${_demo} PROPERTIES TIMEOUT 400)
+    endforeach()
+    add_test(NAME demo_refuse_v13d_${_v13d_edition}
+      COMMAND "${CMAKE_COMMAND}"
+              "-DDUKE3D=$<TARGET_FILE:duke3d>"
+              "-DDATA=${_v13d_data}" "-DEDITION=${_v13d_edition}"
+              -DDEMO=1 -DMODE=refuse
+              "-DWORK=${CMAKE_BINARY_DIR}/dr13"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
+    set_tests_properties(demo_refuse_v13d_${_v13d_edition} PROPERTIES TIMEOUT 120)
+  endif()
   if(_v13d_data AND EXISTS "${_v13d_data}/refsaves/e1l1start.SAV")
     add_test(NAME lzw_dos_v13d_${_v13d_edition}
       COMMAND lzw_roundtrip "${_v13d_data}/refsaves/e1l1start.SAV"

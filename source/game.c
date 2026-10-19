@@ -7967,6 +7967,13 @@ int main(int argc,char **argv)
     FX_StopAllSounds();
     clearsoundlocks();
 
+    i = CheckParm("DEMOVERIFY");
+    if(i && i+1 < _argc)
+    {
+        j = CheckParm("DEMODUMP");
+        exit(demoverify(atoi(_argv[i+1]),(j && j+1 < _argc) ? _argv[j+1] : NULL));
+    }
+
     i = CheckParm("LOADVERIFY");
     if(i && i+1 < _argc)
     {
@@ -8123,6 +8130,44 @@ char opendemoread(char which_demo) // 0 = mine
        if ((recfilep = kopen4load(d,loadfromgrouponly)) == -1) return(0);
 
      kread32(recfilep,&ud.reccnt);
+#if DUKE3D_GAMEVER < GAMEVER_14
+     // 1.3D demos have a 24-byte header and no version byte (reference.md
+     // "Demo file"). A later demo has its version where the volume goes, so
+     // a value no 1.3D game can have refuses it.
+     {
+         char vol, lev, skill, coop;
+         short mm, moff;
+
+         kread8(recfilep,&vol);
+         kread8(recfilep,&lev);
+         kread8(recfilep,&skill);
+         kread8(recfilep,&coop);
+         kread16(recfilep,&mm);
+         kread16(recfilep,&moff);
+#ifdef VOLUMEONE
+         if( vol != 0 || lev > 10 || skill > 4 || mm < 1 || mm > MAXPLAYERS )
+#else
+         if( vol > 2 || lev > 10 || skill > 4 || mm < 1 || mm > MAXPLAYERS )
+#endif
+         {
+            printf("%s isn't a Duke Nukem 3D 1.3D demo; refused.\n",fname);
+            kclose(recfilep);
+            return 0;
+         }
+         ud.volume_number = vol;
+         ud.level_number = lev;
+         ud.player_skill = skill;
+         ud.m_coop = coop;
+         ud.multimode = mm;
+         ud.m_monsters_off = moff;
+         kread32(recfilep,(int32 *)&ud.m_respawn_monsters);
+         kread32(recfilep,(int32 *)&ud.m_respawn_items);
+         kread32(recfilep,(int32 *)&ud.m_respawn_inventory);
+     }
+
+     newgame(ud.volume_number,ud.level_number,ud.player_skill);
+     return(1);
+#else
      kread8(recfilep,&ver);
      if( (ver != BYTEVERSION) ) // || (ud.reccnt < 512) )
      {
@@ -8187,6 +8232,7 @@ char opendemoread(char which_demo) // 0 = mine
 
      newgame(ud.volume_number,ud.level_number,ud.player_skill);
      return(1);
+#endif
 }
 
 
@@ -8209,6 +8255,24 @@ void opendemowrite(void)
 // CTW END - MODIFICATION
     val32 = BUILDSWAP_INTEL32(dummylong);
     fwrite(&val32,4,1,frecfilep);
+#if DUKE3D_GAMEVER < GAMEVER_14
+    // 1.3D builds record in 1.3D's own demo format.
+    fwrite((char *)&ud.volume_number,sizeof(char),1,frecfilep);
+    fwrite((char *)&ud.level_number,sizeof(char),1,frecfilep);
+    fwrite((char *)&ud.player_skill,sizeof(char),1,frecfilep);
+    fwrite((char *)&ud.m_coop,sizeof(char),1,frecfilep);
+    val16 = BUILDSWAP_INTEL16(ud.multimode);
+    fwrite((short *)&val16,sizeof(short),1,frecfilep);
+    val16 = BUILDSWAP_INTEL16(ud.m_monsters_off);
+    fwrite((short *)&val16,sizeof(short),1,frecfilep);
+    val32 = BUILDSWAP_INTEL32(ud.m_respawn_monsters);
+    fwrite((int32 *)&val32,sizeof(int32),1,frecfilep);
+    val32 = BUILDSWAP_INTEL32(ud.m_respawn_items);
+    fwrite((int32 *)&val32,sizeof(int32),1,frecfilep);
+    val32 = BUILDSWAP_INTEL32(ud.m_respawn_inventory);
+    fwrite((int32 *)&val32,sizeof(int32),1,frecfilep);
+    (void)ver; (void)i;
+#else
     fwrite(&ver,sizeof(char),1,frecfilep);
     fwrite((char *)&ud.volume_number,sizeof(char),1,frecfilep);
     fwrite((char *)&ud.level_number,sizeof(char),1,frecfilep);
@@ -8237,6 +8301,7 @@ void opendemowrite(void)
         val32 = BUILDSWAP_INTEL32(ps[i].aim_mode);
         fwrite(&val32,sizeof(char),1,frecfilep);
     }
+#endif
 
     totalreccnt = 0;
     ud.reccnt = 0;
@@ -8311,6 +8376,83 @@ void closedemowrite(void)
 // CTW END - MODIFICATION
 
 char in_menu = 0;
+
+/*
+ * -demoverify: play demo n headless and as fast as possible, then print the
+ *  state the sync tests compare with the DOS executable's. Returns the exit
+ *  code: 0 played, 2 refused. With -demodump <file> it also writes the state
+ *  in tools/v13d/mkcapture.py's STATE.BIN layout (reccnt, randomseed,
+ *  sprite[]) followed by ps[0] as this build lays it out, for finding where
+ *  a desync starts.
+ */
+int demoverify(int n, char *dumpname)
+{
+    int32_t i, j, l, cnt, tics = 0;
+    short k;
+
+    if( !opendemoread(n) )
+    {
+        printf("demo%d.dmo was refused.\n",n);
+        return 2;
+    }
+    ud.recstat = 2;
+    enterlevel(MODE_DEMO);
+
+    i = 0;
+    while (ud.reccnt > 0)
+    {
+        if ((i == 0) || (i >= RECSYNCBUFSIZ))
+        {
+            l = min(ud.reccnt,RECSYNCBUFSIZ);
+            cnt = l/ud.multimode;
+            kdfread(recsync,sizeof(input)*ud.multimode,cnt,recfilep);
+            #if PLATFORM_BIGENDIAN
+            {
+                input *inptr = (input *) recsync;
+                for (j = 0; j < cnt*ud.multimode; j++)
+                {
+                    inptr->fvel = BUILDSWAP_INTEL16(inptr->fvel);
+                    inptr->svel = BUILDSWAP_INTEL16(inptr->svel);
+                    inptr->bits = BUILDSWAP_INTEL32(inptr->bits);
+                    inptr++;
+                }
+            }
+            #endif
+            i = 0;
+        }
+
+        for(j=connecthead;j>=0;j=connectpoint2[j])
+        {
+            copybufbyte(&recsync[i],&inputfifo[movefifoend[j]&(MOVEFIFOSIZ-1)][j],sizeof(input));
+            movefifoend[j]++;
+            i++;
+            ud.reccnt--;
+        }
+        domovethings();
+        tics++;
+    }
+
+    // The player sprite (statnum 10), as the DOS reference capture reads it.
+    k = headspritestat[10];
+    if(k < 0) k = ps[myconnectindex].i;
+    printf("DEMOSTATE %d %d %d %d %d %d %u\n",tics,sprite[k].x,sprite[k].y,
+        sprite[k].z,sprite[k].ang,sprite[k].extra,(unsigned)randomseed);
+
+    if(dumpname)
+    {
+        FILE *f = fopen(dumpname,"wb");
+        int32_t v;
+
+        if(f == NULL)
+            return 1;
+        v = BUILDSWAP_INTEL32(ud.reccnt); fwrite(&v,4,1,f);
+        v = BUILDSWAP_INTEL32(randomseed); fwrite(&v,4,1,f);
+        fwrite(sprite,sizeof(spritetype),MAXSPRITES,f);
+        fwrite(&ps[0],sizeof(ps[0]),1,f); // in this build's own layout
+        fclose(f);
+    }
+    return 0;
+}
 
 // extern long syncs[];
 int32_t playback(void)

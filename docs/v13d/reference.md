@@ -332,8 +332,19 @@ so that when demo playback ends, it writes `STATE.BIN` (`reccnt`, `randomseed`,
    isn't 0, because that would mean playback ran more than one tic in the final frame.
 
 The captures are deterministic: two runs of shareware demo 3 produced byte-identical
-`STATE.BIN` files. To bisect a desync, use `callsite <hex>` to divert any `call` (for
-example, `domovethings`' call inside the tic loop) to the same cave.
+`STATE.BIN` files. `STATE.BIN` also ends with `ps[0]` in the 1.3D layout (0x552 bytes).
+
+To find where a desync starts, cut a copy of the demo to N tics (the first long of the
+file) and capture both sides at tic N: the DOS executable as above, and ours with
+`duke3d -demoverify <n> -demodump <file>` (a relative file name: arguments starting with
+`/` are taken as switches), which writes the same layout with `ps[0]` in our own layout.
+Bisect on N. Compare sprites ignoring free slots (statnum 1024) and the unused byte at
+offset 19, which DOS leaves as it was. To see which code drew random numbers in tic N,
+add `krandlog` to `mkcapture.py`: every `call krand` then goes through a logger that
+records return addresses while `reccnt` is 0, appended to `STATE.BIN` (the code object
+is read-only, so the log sits in the data object's slack). Run that with
+`core=normal`; the dynamic core won't run the logger's page. Our side: watch the
+variable in a debug build. `callsite <hex>` still diverts any one `call` to the cave.
 
 ## DOS reference saves (needs the user at the keyboard)
 
