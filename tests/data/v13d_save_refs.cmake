@@ -88,3 +88,16 @@ set(V13D_SAVE_sw_inventory_AMMO 10)
 set(V13D_SAVE_sw_inventory_LEVEL E1L1)
 set(V13D_SAVE_sw_inventory_X 26012)
 set(V13D_SAVE_sw_inventory_Y 40691)
+
+# The user was hit between saving and the screenshot (status bar showed 73), so HEALTH
+# alone comes from the file. The health decode was checked against the status bar on
+# the eight other saves.
+set(V13D_SAVE_sw_e1l1fight_EDITION sw)
+set(V13D_SAVE_sw_e1l1fight_FILE e1l1fight.SAV)
+set(V13D_SAVE_sw_e1l1fight_HEALTH 98)
+set(V13D_SAVE_sw_e1l1fight_ARMOR 0)
+set(V13D_SAVE_sw_e1l1fight_CURWEAPON 1)
+set(V13D_SAVE_sw_e1l1fight_AMMO 48)
+set(V13D_SAVE_sw_e1l1fight_LEVEL E1L1)
+set(V13D_SAVE_sw_e1l1fight_X 17781)
+set(V13D_SAVE_sw_e1l1fight_Y 57249)

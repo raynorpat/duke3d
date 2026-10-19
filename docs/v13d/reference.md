@@ -370,7 +370,12 @@ status bars confirm):
 | Name | Level | MD5 |
 |---|---|---|
 | `e1l1start` | E1L1 | `93cbfbe5cdca8ed494511e44d6910e27` |
+| `e1l1fight` | E1L1 | `c3c6b1c8e7a0d79abc1e3791811dab67` |
 | `inventory` | E1L1 | `0d88ef4374042a0947d275805de7f741` |
+
+`e1l1fight`'s health comes from the file (the user was hit before the screenshot). The
+shareware `e1late` save was skipped by the user's choice; the full `e2`/`e3` saves cover
+maps other than E1L1.
 
 The expected values in `tests/data/v13d_save_refs.cmake` must be observed
 **independently of the save layout**. Otherwise a layout mistake would be repeated in
