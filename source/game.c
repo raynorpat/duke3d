@@ -44,10 +44,13 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#ifdef VOLUMEONE
+// The release the build plays as (DUKE3D_VERSION), as its startup banner shows it.
+#if DUKE3D_GAMEVER < GAMEVER_14
+    #define VERSION "1.3D"
+#elif DUKE3D_GAMEVER < GAMEVER_15
     #define VERSION "1.4"
 #else
-    #define VERSION "1.4"
+    #define VERSION "1.5"
 #endif
 
 #define HEAD   "Duke Nukem 3D Unregistered Shareware v"VERSION" "
