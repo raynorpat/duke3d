@@ -127,6 +127,11 @@ file(WRITE "${_con_dir}/prefix.con"
 add_test(NAME con_compile COMMAND con_compile WORKING_DIRECTORY "${_con_dir}")
 set_tests_properties(con_compile PROPERTIES TIMEOUT 30)
 
+# Game helper functions against the original DOS libraries. Needs no data.
+add_executable(game_helpers game_helpers.c "${_game_c}")
+target_link_libraries(game_helpers PRIVATE duke3d_game)
+add_test(NAME game_helpers COMMAND game_helpers)
+
 # Checks the save record codec against the DOS 1.5 byte layout. Needs no
 # game data.
 add_executable(savegame_codec savegame_codec.c "${_game_c}")

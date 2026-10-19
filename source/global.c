@@ -431,6 +431,10 @@ int FindDistance2D(int ix, int iy)
   ix= abs(ix);        /* absolute values */
   iy= abs(iy);
 
+  /* Fix: the DOS library (MACT386.LIB) returns the exact length on an axis. */
+  if (!iy) return ix;
+  if (!ix) return iy;
+
   if (ix<iy)
   {
      int tmp = ix;
