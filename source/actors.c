@@ -719,7 +719,11 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
 #endif
                         {
                             if(sj->xvel < 0) sj->xvel = 0;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                            sj->xvel += (sj->extra<<2); // 1.3D pushes by the target's own strength
+#else
                             sj->xvel += (s->extra<<2);
+#endif
                         }
 
                         if( sj->picnum == PODFEM1 || sj->picnum == FEM1 ||
