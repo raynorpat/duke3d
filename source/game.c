@@ -8264,6 +8264,12 @@ char opendemoread(char which_demo) // 0 = mine
          kread16(recfilep,&mm);
          kread16(recfilep,&moff);
 #ifdef VOLUMEONE
+         if( (vol == 1 || vol == 2) && lev <= 10 && skill <= 4 && mm >= 1 && mm <= MAXPLAYERS )
+         {
+            printf("%s is an episode %d demo, which needs the full version; refused.\n",fname,vol+1);
+            kclose(recfilep);
+            return 0;
+         }
          if( vol != 0 || lev > 10 || skill > 4 || mm < 1 || mm > MAXPLAYERS )
 #else
          if( vol > 2 || lev > 10 || skill > 4 || mm < 1 || mm > MAXPLAYERS )

@@ -1,7 +1,9 @@
 # Plays one original 1.3D demo headless with -demoverify and compares the
 # final state with the values measured from the DOS executable
 # (tests/data/v13d_demo_refs.cmake). MODE refuse instead hands the build a
-# demo with a 1.5 header and expects it to be refused (exit 2).
+# demo with a 1.5 header and expects it to be refused (exit 2); MODE fullonly
+# hands a shareware build an episode 2 demo header and expects the refusal to
+# say it needs the full version.
 #
 #   cmake -DDUKE3D=<exe> -DDATA=<1.3D data dir> -DEDITION=<full|sw>
 #         -DDEMO=<n> -DREFS=<v13d_demo_refs.cmake> -DWORK=<scratch dir>
@@ -19,7 +21,9 @@ foreach(_con GAME.CON DEFS.CON USER.CON)
   file(COPY_FILE "${DATA}/${_con}" "${_run}/${_con}")
 endforeach()
 
-if(MODE STREQUAL "refuse")
+if(MODE STREQUAL "fullonly")
+  file(COPY_FILE "${CMAKE_CURRENT_LIST_DIR}/data/v13d_demo_e2_header.dmo" "${_run}/demo${DEMO}.dmo")
+elseif(MODE STREQUAL "refuse")
   # Any reccnt, then the 1.5 BYTEVERSION where a 1.3D demo has its volume.
   string(ASCII 1 1 1 1 117 1 1 1 1 1 1 1 _hdr)
   file(WRITE "${_run}/demo${DEMO}.dmo" "${_hdr}")
@@ -42,6 +46,13 @@ execute_process(COMMAND "${DUKE3D}" -demoverify ${DEMO}
   OUTPUT_VARIABLE _out
   ERROR_VARIABLE _err)
 
+if(MODE STREQUAL "fullonly")
+  if(NOT _result EQUAL 2 OR NOT _out MATCHES "needs the full version")
+    message(FATAL_ERROR "an episode 2 demo wasn't refused as full-version only: exit ${_result}\n${_out}${_err}")
+  endif()
+  message(STATUS "refused as expected")
+  return()
+endif()
 if(MODE STREQUAL "refuse")
   if(NOT _result EQUAL 2)
     message(FATAL_ERROR "a 1.5 demo wasn't refused: exit ${_result}\n${_out}${_err}")

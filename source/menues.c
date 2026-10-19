@@ -271,6 +271,8 @@ int loadplayerfile(char *fnptr, signed char spot)
      {
 #if DUKE3D_GAMEVER < GAMEVER_14
         printf("%s is not a DOS 1.3D save (player block is %d bytes).\n",fnptr,i);
+#elif DUKE3D_GAMEVER < GAMEVER_15
+        printf("%s is not a DOS 1.4 save (player block is %d bytes).\n",fnptr,i);
 #else
         printf("%s is not a DOS 1.5 save (player block is %d bytes).\n",fnptr,i);
 #endif

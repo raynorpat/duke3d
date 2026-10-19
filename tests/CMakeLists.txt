@@ -303,6 +303,16 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
               "-DWORK=${CMAKE_BINARY_DIR}/dr13"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
     set_tests_properties(demo_refuse_v13d_${_v13d_edition} PROPERTIES TIMEOUT 120)
+    if(_v13d_edition STREQUAL "sw")
+      add_test(NAME demo_fullonly_v13d_sw
+        COMMAND "${CMAKE_COMMAND}"
+                "-DDUKE3D=$<TARGET_FILE:duke3d>"
+                "-DDATA=${_v13d_data}" "-DEDITION=${_v13d_edition}"
+                -DDEMO=1 -DMODE=fullonly
+                "-DWORK=${CMAKE_BINARY_DIR}/df13"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
+      set_tests_properties(demo_fullonly_v13d_sw PROPERTIES TIMEOUT 120)
+    endif()
   endif()
   if(_v13d_data AND EXISTS "${_v13d_data}/refsaves/e1l1start.SAV")
     # Its own directory: lzw_roundtrip writes a scratch file in its working
