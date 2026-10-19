@@ -3289,9 +3289,10 @@ void processinput(short snum)
                     }
                 }
             }
+            // Fix: this else belongs to the bob test, as in the DOS code; the port's braces had moved it to the height test.
+            else if(p->walking_snd_toggle > 0)
+                p->walking_snd_toggle --;
         }
-        else if(p->walking_snd_toggle > 0)
-            p->walking_snd_toggle --;
 
         if(p->jetpack_on == 0 && p->steroids_amount > 0 && p->steroids_amount < 400)
             doubvel <<= 1;
