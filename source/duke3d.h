@@ -75,9 +75,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "SDL_mixer.h"
 #endif
 
-#include "buildengine/pragmas.h"
+#include "build/pragmas.h"
 //#undef getch	// quick hack
-#include "buildengine/build.h"
+#include "build/build.h"
 #include "function.h"
 
 //#define VOLUMEALL
@@ -144,7 +144,7 @@ struct player_struct;
 
 #include "names.h"
 
-#include "buildengine/engine.h"
+#include "build/engine.h"
 
 #define TICRATE (120)
 #define TICSPERFRAME (TICRATE/26)
@@ -528,7 +528,7 @@ extern long frameplace, chainplace, chainnumpages;
 extern volatile long checksume;
 
 #include "funct.h"
-#include "buildengine/engine_protos.h"
+#include "build/engine_protos.h"
 
 extern char screencapt;
 extern short soundps[NUM_SOUNDS],soundpe[NUM_SOUNDS],soundvo[NUM_SOUNDS];

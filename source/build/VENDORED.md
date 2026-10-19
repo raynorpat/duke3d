@@ -17,3 +17,9 @@ BUILDLIC.TXT LICENSE.md
 ## Local changes
 
 - `VENDORED.md`: added (this file).
+- `CMakeLists.txt`: added (build glue).
+- `win32_compat.c`: added. Defines `hbits[]`, `_inp_handler()` and
+  `_kinp_handler()` for Windows; upstream only defines them in
+  `unix_compat.c`, which refuses to build without `PLATFORM_UNIX`.
+- `win32_compat.h`: don't include `<dos.h>` under MSVC (it no longer ships
+  one); only map `snprintf` to `_snprintf` before VS2015.

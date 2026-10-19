@@ -34,7 +34,9 @@
 #include <io.h>
 #include <direct.h>
 #include <conio.h>
+#if (!defined _MSC_VER)
 #include <dos.h>
+#endif
 #include <assert.h>
 
 extern const int hbits[];   /* !!! what is this, and why is it here? */
@@ -129,7 +131,9 @@ int _kinp_handler(int port, char *source_file, int source_line);
 #define S_IRDWR _S_IRDWR
 #endif /* defined _MSC_VER */
 
+#if ((defined _MSC_VER) && (_MSC_VER < 1900))
 #define snprintf _snprintf
+#endif
 #endif
 
 /* end of win32_compat.h ... */

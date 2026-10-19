@@ -1,0 +1,27 @@
+cmake_minimum_required(VERSION 3.21)
+
+project(duke3d LANGUAGES C)
+
+if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
+endif()
+
+option(DUKE3D_SHAREWARE "Build the shareware (VOLUMEONE) version" OFF)
+option(DUKE3D_CONTROLS_MENU "Enable the in-game controls config menu" ON)
+set(DUKE3D_FETCH_SDL "AUTO" CACHE STRING
+    "Download and build SDL2/SDL2_mixer: AUTO (only if not found), ON, OFF")
+set_property(CACHE DUKE3D_FETCH_SDL PROPERTY STRINGS AUTO ON OFF)
+
+# Executables go to bin/, away from build/source/build (the engine's binary
+# dir), which the "build" editor executable would otherwise collide with.
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(Dependencies)
+include(CompileOptions)
+
+enable_testing()
+
+add_subdirectory(source/build)
+add_subdirectory(source/audiolib)
+add_subdirectory(source)

@@ -32,7 +32,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #define __MULTIVOC_H
 
 // platform.h is in buildengine, but I need the byteswapping macros... --ryan.
-#include "../buildengine/platform.h"
+#include "../build/platform.h"
 
 #define MV_MinVoiceHandle  1
 

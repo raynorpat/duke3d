@@ -1,0 +1,5 @@
+# CMake binary dirs (see CMakePresets.json). Anchored, so source/build/
+# (the vendored engine) is not ignored.
+/build/
+/build-debug/
+/build-*/

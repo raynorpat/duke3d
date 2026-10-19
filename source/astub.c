@@ -73,13 +73,13 @@ Duke Lookup Table
 #include <sys/stat.h>
 #include <memory.h>
 #include <stdlib.h>
-#include "buildengine/engine.h"
-#include "buildengine/platform.h"
-#include "buildengine/build.h"
-#include "buildengine/pragmas.h"
-#include "buildengine/bstub.h"
-#include "buildengine/cache1d.h"  /* rcg05232001 need groupfile support. */
-#include "buildengine/display.h"  /* rcg05232001 need some "vesa" routines. */
+#include "build/engine.h"
+#include "build/platform.h"
+#include "build/build.h"
+#include "build/pragmas.h"
+#include "build/bstub.h"
+#include "build/cache1d.h"  /* rcg05232001 need groupfile support. */
+#include "build/display.h"  /* rcg05232001 need some "vesa" routines. */
 #include "names.h"
 
 

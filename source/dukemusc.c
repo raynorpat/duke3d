@@ -13,7 +13,7 @@
 #include <assert.h>
 
 #include "duke3d.h"
-#include "buildengine/cache1d.h"
+#include "build/cache1d.h"
 
 #if PLATFORM_DOS
 // Use the original Apogee Sound System libs instead.  --ryan.
