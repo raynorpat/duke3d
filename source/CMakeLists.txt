@@ -1,10 +1,11 @@
-add_executable(duke3d
+# Everything but game.c, which holds main(). The con_compile test links
+# these objects with its own main().
+add_library(duke3d_game OBJECT
   actors.c
   animlib.c
   config.c
   control.c
   dukemusc.c
-  game.c
   gamedef.c
   global.c
   keyboard.c
@@ -17,9 +18,12 @@ add_executable(duke3d
   sounds.c)
 
 # "build/engine.h" etc. resolve against this directory.
-target_include_directories(duke3d PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(duke3d PRIVATE
-  duke3d_game_options buildengine audiolib duke3d::SDL2_mixer duke3d::SDL2main)
+target_include_directories(duke3d_game PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(duke3d_game PUBLIC
+  duke3d_game_options buildengine audiolib duke3d::SDL2_mixer)
+
+add_executable(duke3d game.c)
+target_link_libraries(duke3d PRIVATE duke3d_game duke3d::SDL2main)
 
 # Animation playback used to crash from an optimizer bug on Mac OS X.
 if(APPLE)
