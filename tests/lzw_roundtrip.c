@@ -3,6 +3,9 @@
  *  kdfread(), so the LZW compressor and decompressor have to agree. Needs
  *  no game data.
  *
+ * It also feeds kdfread() malformed blocks (bad lengths, string counts and
+ *  codes), which must come back without crashing or hanging.
+ *
  * With an argument, it also reads the start of that DOS save, which must
  *  have been written by the DOS executable of this build's version: the
  *  header and the map counts only come out right if kdfread() decompresses
@@ -12,6 +15,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#if !PLATFORM_WIN32
+#include <unistd.h>
+#endif
 #include "build/build.h"
 #include "build/cache1d.h"
 
@@ -53,6 +59,48 @@ static void roundtrip(const char *what, unsigned char *data, size_t dasizeof, si
     }
     free(back);
     remove(TMPNAME);
+}
+
+/* Writes one block (a length, then the bytes) followed by tail bytes of junk,
+   and reads it back with kdfread. Surviving is the test. */
+static void hostile(const char *what, short leng, const unsigned char *block, size_t n, size_t tail)
+{
+    static unsigned char out[65536];
+    FILE *f = fopen(TMPNAME, "wb");
+    int32_t fil;
+    size_t i;
+
+    fwrite(&leng, 2, 1, f);
+    fwrite(block, 1, n, f);
+    for (i = 0; i < tail; i++) fputc(rnd(), f);
+    fclose(f);
+    fil = kopen4load(TMPNAME, 0);
+    kdfread(out, 1, sizeof(out), fil);
+    kdfread(out, 4, 4096, fil);
+    kclose(fil);
+    remove(TMPNAME);
+    printf("hostile %s: survived\n", what);
+}
+
+static void hostile_blocks(void)
+{
+    static unsigned char b[40000];
+    size_t i;
+
+    for (i = 0; i < sizeof(b); i++) b[i] = rnd();
+    hostile("negative length", -2, b, 64, 8 << 20);
+    hostile("length past the buffer", 32767, b, 32767, 0);
+
+    b[0] = 100; b[1] = 0; b[2] = 0xff; b[3] = 0x7f;   /* 100 bytes from 32767 strings */
+    hostile("too many strings", 4000, b, 4000, 0);
+
+    b[0] = 0x80; b[1] = 0x3f; b[2] = 0; b[3] = 0;     /* uncompressed, says 16256 bytes */
+    hostile("uncompressed block past the buffer", 20000, b, 20000, 0);
+
+    memset(b, 0, 64);
+    b[0] = 100; b[1] = 0; b[2] = 0x2c; b[3] = 0x01;   /* 300 strings */
+    b[5] = 0x01;                                       /* first code 256: itself */
+    hostile("code that refers to itself", 64, b, 64, 0);
 }
 
 static void check_dos_save(const char *path)
@@ -112,6 +160,11 @@ int main(int argc, char **argv)
     roundtrip("records", buf, 44, 2000);
     roundtrip("one long", buf, 4, 1);
     roundtrip("odd size", buf + 3, 19, 1);
+
+#if !PLATFORM_WIN32
+    alarm(20);  /* a decoder caught in a loop fails here instead of hanging */
+#endif
+    hostile_blocks();
 
     if (argc > 1)
         check_dos_save(argv[1]);

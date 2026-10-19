@@ -647,6 +647,20 @@ void kclose(int32_t handle)
 
 	/* Internal LZW variables */
 #define LZWSIZE 16384           /* Watch out for shorts! */
+#define LZWBLOCK (LZWSIZE+(LZWSIZE>>4))  /* lzwbuf1, 2, 3 and 5 */
+
+/* Fix: block lengths come from the file; clamp them so a bad demo or save can't overrun the LZW buffers. */
+static int32_t lzwleng(short leng)
+{
+	if (leng < 4) return(0);
+	return(leng > LZWBLOCK ? LZWBLOCK : leng);
+}
+
+static int32_t lzwgoal(short uncompleng)
+{
+	if (uncompleng < 0) return(0);
+	return(uncompleng > LZWSIZE ? LZWSIZE : uncompleng);
+}
 static char *lzwbuf1, *lzwbuf4, *lzwbuf5;
 static unsigned char lzwbuflock[5];
 static short *lzwbuf2, *lzwbuf3;
@@ -654,7 +668,7 @@ static short *lzwbuf2, *lzwbuf3;
 void kdfread(void *buffer, size_t dasizeof, size_t count, int32_t fil)
 {
 	size_t i, j;
-	int32_t k, kgoal;
+	int32_t k, kgoal, n;
 	short leng;
 	char *ptr;
 
@@ -668,19 +682,19 @@ void kdfread(void *buffer, size_t dasizeof, size_t count, int32_t fil)
 	if (dasizeof > LZWSIZE) { count *= dasizeof; dasizeof = 1; }
 	ptr = (char *)buffer;
 
-	kread16(fil,&leng); kread(fil,lzwbuf5,(int32_t)leng);
+	leng = 0; kread16(fil,&leng); n = lzwleng(leng); kread(fil,lzwbuf5,n);
 	k = 0;
-	kgoal = uncompress(lzwbuf5,(int32_t)leng,lzwbuf4);
+	kgoal = n ? uncompress(lzwbuf5,n,lzwbuf4) : 0;
 
 	copybufbyte(lzwbuf4,ptr,(int32_t)dasizeof);
 	k += dasizeof;
 
 	for(i=1;i<count;i++)
 	{
-		if (k >= kgoal)
+		if (k >= kgoal || k+(int32_t)dasizeof > LZWSIZE)
 		{
-			kread16(fil,&leng); kread(fil,lzwbuf5,(int32_t)leng);
-			k = 0; kgoal = uncompress(lzwbuf5,(int32_t)leng,lzwbuf4);
+			leng = 0; kread16(fil,&leng); n = lzwleng(leng); kread(fil,lzwbuf5,n);
+			k = 0; kgoal = n ? uncompress(lzwbuf5,n,lzwbuf4) : 0;
 		}
 		for(j=0;j<dasizeof;j++) ptr[j+dasizeof] = (unsigned char) ((ptr[j]+lzwbuf4[j+k])&255);
 		k += dasizeof;
@@ -723,7 +737,7 @@ void kdfread32(int32_t *_buffer, size_t count, int32_t fil)
 void dfread(void *buffer, size_t dasizeof, size_t count, FILE *fil)
 {
 	size_t i, j;
-	int32_t k, kgoal;
+	int32_t k, kgoal, n;
 	short leng;
 	char *ptr;
 
@@ -737,22 +751,22 @@ void dfread(void *buffer, size_t dasizeof, size_t count, FILE *fil)
 	if (dasizeof > LZWSIZE) { count *= dasizeof; dasizeof = 1; }
 	ptr = (char *)buffer;
 
-	fread(&leng,2,1,fil);
+	leng = 0; fread(&leng,2,1,fil);
 	leng = BUILDSWAP_INTEL16(leng);
-	fread(lzwbuf5,(int32_t)leng,1,fil);
-	k = 0; kgoal = uncompress(lzwbuf5,(int32_t)leng,lzwbuf4);
+	n = lzwleng(leng); fread(lzwbuf5,n,1,fil);
+	k = 0; kgoal = n ? uncompress(lzwbuf5,n,lzwbuf4) : 0;
 
 	copybufbyte(lzwbuf4,ptr,(int32_t)dasizeof);
 	k += dasizeof;
 
 	for(i=1;i<count;i++)
 	{
-		if (k >= kgoal)
+		if (k >= kgoal || k+(int32_t)dasizeof > LZWSIZE)
 		{
-			fread(&leng,2,1,fil);
+			leng = 0; fread(&leng,2,1,fil);
 			leng = BUILDSWAP_INTEL16(leng);
-			fread(lzwbuf5,(int32_t)leng,1,fil);
-			k = 0; kgoal = uncompress(lzwbuf5,(int32_t)leng,lzwbuf4);
+			n = lzwleng(leng); fread(lzwbuf5,n,1,fil);
+			k = 0; kgoal = n ? uncompress(lzwbuf5,n,lzwbuf4) : 0;
 		}
 		for(j=0;j<dasizeof;j++) ptr[j+dasizeof] = (unsigned char) ((ptr[j]+lzwbuf4[j+k])&255);
 		k += dasizeof;
@@ -953,26 +967,32 @@ int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 	int32_t i, dat, leng, inbytecnt, bitcnt, outbytecnt, *longptr;
 	short *shortptr;
 
+	if (compleng < 4) return(0);
 	shortptr = (short *)lzwinbuf;
 	strtot = (int32_t) BUILDSWAP_INTEL16(shortptr[1]);
 	if (strtot == 0)
 	{
-		copybuf((void *)(FP_OFF(lzwinbuf)+4),(void *)(FP_OFF(lzwoutbuf)),((compleng-4)+3)>>2);
-		return((int32_t) BUILDSWAP_INTEL16(shortptr[0])); /* uncompleng */
+		i = min(compleng-4,LZWSIZE);
+		copybuf((void *)(FP_OFF(lzwinbuf)+4),(void *)(FP_OFF(lzwoutbuf)),(i+3)>>2);
+		return(lzwgoal(BUILDSWAP_INTEL16(shortptr[0]))); /* uncompleng */
 	}
+	if (strtot > LZWBLOCK-1) strtot = LZWBLOCK-1;
 	for(i=255;i>=0;i--) { lzwbuf2[i] = (short) i; lzwbuf3[i] = (short) i; }
 	bitcnt = 0; currstr = 256; inbytecnt = 4; outbytecnt = 0;
 	numbits = 9; oneupnumbits = (1<<9);
 	do
 	{
+		if (inbytecnt > LZWBLOCK-4) break;
 		longptr = (int32_t *)&lzwinbuf[inbytecnt];
 		dat = ((BUILDSWAP_INTEL32(longptr[0])>>bitcnt) & (oneupnumbits-1));
 		bitcnt += numbits; inbytecnt += (bitcnt>>3); bitcnt &= 7;
+		if (dat >= currstr) break;  /* never in a valid block; loops forever otherwise */
 
 		lzwbuf3[currstr] = (short) dat;
 
 		for(leng=0;dat>=256;leng++,dat=lzwbuf3[dat])
 			lzwbuf1[leng] = (char) lzwbuf2[dat];
+		if (outbytecnt+leng+1 > LZWSIZE) break;
 
 		lzwoutbuf[outbytecnt++] = (char) dat;
 		for(i=leng-1;i>=0;i--) lzwoutbuf[outbytecnt++] = lzwbuf1[i];
@@ -981,7 +1001,7 @@ int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 		currstr++;
 		if (currstr >= oneupnumbits) { numbits++; oneupnumbits <<= 1; }
 	} while (currstr < strtot);
-	return((int32_t) BUILDSWAP_INTEL16(shortptr[0])); /* uncompleng */
+	return(lzwgoal(BUILDSWAP_INTEL16(shortptr[0]))); /* uncompleng */
 }
 #else
 int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf)
@@ -1058,28 +1078,34 @@ int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 	int32_t i, dat, leng, bitcnt, outbytecnt, *longptr;
 	short *shortptr;
 
+	if (compleng < 4) return(0);
 	shortptr = (short *)lzwinbuf;
 	strtot = (int32_t) BUILDSWAP_INTEL16(shortptr[1]);
 	if (strtot == 0)
 	{
-		copybuf((void *)(FP_OFF(lzwinbuf)+4),(void *)(FP_OFF(lzwoutbuf)),((compleng-4)+3)>>2);
-		return((int32_t) BUILDSWAP_INTEL16(shortptr[0])); /* uncompleng */
+		i = min(compleng-4,LZWSIZE);
+		copybuf((void *)(FP_OFF(lzwinbuf)+4),(void *)(FP_OFF(lzwoutbuf)),(i+3)>>2);
+		return(lzwgoal(BUILDSWAP_INTEL16(shortptr[0]))); /* uncompleng */
 	}
+	if (strtot > LZWBLOCK-1) strtot = LZWBLOCK-1;
 	for(i=255;i>=0;i--) { lzwbuf2[i] = (short) i; lzwbuf3[i] = (short) i; }
 	currstr = 256; bitcnt = (4<<3); outbytecnt = 0;
 	numbits = 8; oneupnumbits = (1<<8);
 	do
 	{
+		if ((bitcnt>>3) > LZWBLOCK-4) break;
 		longptr = (int32_t *)&lzwinbuf[bitcnt>>3];
 		dat = ((BUILDSWAP_INTEL32(longptr[0])>>(bitcnt&7)) & (oneupnumbits-1));
 		bitcnt += numbits;
 		if ((dat&((oneupnumbits>>1)-1)) > ((currstr-1)&((oneupnumbits>>1)-1)))
 			{ dat &= ((oneupnumbits>>1)-1); bitcnt--; }
+		if (dat >= currstr) break;  /* never in a valid block */
 
 		lzwbuf3[currstr] = (short) dat;
 
 		for(leng=0;dat>=256;leng++,dat=lzwbuf3[dat])
 			lzwbuf1[leng] = (char) lzwbuf2[dat];
+		if (outbytecnt+leng+1 > LZWSIZE) break;
 
 		lzwoutbuf[outbytecnt++] = (char) dat;
 		for(i=leng-1;i>=0;i--) lzwoutbuf[outbytecnt++] = lzwbuf1[i];
@@ -1088,6 +1114,6 @@ int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 		currstr++;
 		if (currstr > oneupnumbits) { numbits++; oneupnumbits <<= 1; }
 	} while (currstr < strtot);
-	return((int32_t) BUILDSWAP_INTEL16(shortptr[0])); /* uncompleng */
+	return(lzwgoal(BUILDSWAP_INTEL16(shortptr[0]))); /* uncompleng */
 }
 #endif
