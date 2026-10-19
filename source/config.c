@@ -573,13 +573,13 @@ void readsavenames(void)
     int32_t dummy;
     short i;
     char filename[] = "game_.sav";
-    char fullname[128];
+    char fullname[MAX_PATH];
     FILE *fil;
 
     for (i=0;i<10;i++)
     {
         filename[4] = i+'0';
-        GetPathFromEnvironment(fullname, 128, filename);
+        GetPathFromEnvironment(fullname, sizeof(fullname), filename);
 
         if ((fil = fopen(fullname,"rb")) == NULL ) continue;
         dfread32(&dummy,1,fil);

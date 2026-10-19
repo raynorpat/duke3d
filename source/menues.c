@@ -158,12 +158,12 @@ static int loadpheader(char spot,int32 *vn,int32 *ln,int32 *psk,int32 *nump)
 
      int32_t i;
      char filename[] = "game0.sav";
-     char fullname[256];
+     char fullname[MAX_PATH];
      int32_t fil;
      int32_t bv = 0;
 
      filename[4] = spot+'0';
-     GetPathFromEnvironment(fullname, 128, filename);
+     GetPathFromEnvironment(fullname, sizeof(fullname), filename);
 
      if ((fil = kopen4load(fullname,0)) == -1) return(-1);
 
@@ -198,7 +198,7 @@ int loadplayer(signed char spot)
 {
      char fn[] = "game0.sav";
      char mpfn[] = "gameA_00.sav";
-     char fullname[128];
+     char fullname[MAX_PATH];
 
      if(spot < 0)
      {
@@ -219,13 +219,13 @@ int loadplayer(signed char spot)
          }
          else mpfn[7] = multiwho + '0';
 
-         GetPathFromEnvironment(fullname, 128, mpfn);
+         GetPathFromEnvironment(fullname, sizeof(fullname), mpfn);
      }
      else
      {
         fn[4] = spot + '0';
 
-        GetPathFromEnvironment(fullname, 128, fn);
+        GetPathFromEnvironment(fullname, sizeof(fullname), fn);
      }
 
      return loadplayerfile(fullname,spot);
@@ -518,7 +518,7 @@ int saveplayer(signed char spot)
 {
      char fn[] = "game0.sav";
      char mpfn[] = "gameA_00.sav";
-     char fullname[128];
+     char fullname[MAX_PATH];
 
      if(spot < 0)
      {
@@ -541,13 +541,13 @@ int saveplayer(signed char spot)
          }
          else mpfn[7] = multiwho + '0';
 
-         GetPathFromEnvironment(fullname, 128, mpfn);
+         GetPathFromEnvironment(fullname, sizeof(fullname), mpfn);
      }
      else
      {
         fn[4] = spot + '0';
 
-        GetPathFromEnvironment(fullname, 128, fn);
+        GetPathFromEnvironment(fullname, sizeof(fullname), fn);
      }
 
      return saveplayerfile(fullname,spot);
