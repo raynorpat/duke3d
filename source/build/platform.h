@@ -36,7 +36,8 @@
 #endif
 
 #if ((defined PLATFORM_SUPPORTS_SDL) && (!defined PLATFORM_TIMER_HZ))
-#define PLATFORM_TIMER_HZ 100
+/* Fix: was 100, which ran the game's 120Hz clock (TICRATE) at 100Hz. */
+#define PLATFORM_TIMER_HZ 120
 #endif
 
 #if (!defined PLATFORM_TIMER_HZ)

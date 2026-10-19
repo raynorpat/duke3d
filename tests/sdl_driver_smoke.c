@@ -114,15 +114,16 @@ int main(int argc, char **argv)
 
     inittimer();
     start = getticks();
-    while (getticks() - start < 500)
+    while (getticks() - start < 1000)
         _idle();
     uninittimer();
 
-    /* PLATFORM_TIMER_HZ is 100, so ~50 calls in 500ms; SDL2 at 1ms would be ~500.
-     *  The lower bound is loose so a slow CI runner does not flake. */
-    if ((timer_calls < 10) || (timer_calls > 100))
+    /* The game clock runs at TICRATE (120), so ~120 calls in a second; a
+     *  10ms SDL timer gave 100. The callback catches up on missed ticks, so
+     *  only a timer thread starved for 80ms at the very end reads low. */
+    if ((timer_calls < 110) || (timer_calls > 121))
     {
-        fprintf(stderr, "FAIL: timer fired %d times in 500ms (expected 10-100)\n",
+        fprintf(stderr, "FAIL: timer fired %d times in 1000ms (expected 110-121)\n",
                 timer_calls);
         return 1;
     }

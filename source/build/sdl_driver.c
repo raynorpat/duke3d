@@ -2431,9 +2431,23 @@ void limitrate(void)
     /* this is a no-op in SDL. It was for buggy VGA cards in DOS. */
 } /* limitrate */
 
+static Uint64 timer_start, timer_calls;
+
 static Uint32 _timer_catcher(Uint32 interval, void *bleh)
 {
-    timerhandler();
+    /*
+     * Fix: SDL timers tick in whole milliseconds and drift late, so one
+     *  call per callback ran the clock slow. Call timerhandler() once for
+     *  every 1/PLATFORM_TIMER_HZ second that has passed instead.
+     */
+    Uint64 due = (SDL_GetPerformanceCounter() - timer_start) * PLATFORM_TIMER_HZ /
+                 SDL_GetPerformanceFrequency();
+
+    while (timer_calls < due)
+    {
+        timer_calls++;
+        timerhandler();
+    }
     /*
      * SDL 1.2 rounded the old "return(1)" up to its 10ms granularity;
      *  SDL2 honors it literally, which would run the game 10x too fast.
@@ -2444,6 +2458,8 @@ static Uint32 _timer_catcher(Uint32 interval, void *bleh)
 void inittimer(void)
 {
     SDL_ClearError();
+    timer_start = SDL_GetPerformanceCounter();
+    timer_calls = 0;
     primary_timer = SDL_AddTimer(1000 / PLATFORM_TIMER_HZ, _timer_catcher, NULL);
     if (primary_timer == 0)
     {
