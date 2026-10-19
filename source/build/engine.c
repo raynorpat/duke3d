@@ -6888,7 +6888,9 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 				templong2 = dmulscale6(clipit[j].x2-clipit[j].x1,oxvect,clipit[j].y2-clipit[j].y1,oyvect);
 				if ((templong1^templong2) < 0)
 				{
+#if (BUILD_ENGINEREV >= 19961112L)
 					updatesector(*x,*y,sectnum);
+#endif
 					return(retval);
 				}
 			}
