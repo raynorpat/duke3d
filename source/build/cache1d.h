@@ -18,8 +18,8 @@
 #define _INCLUDE_CACHE1D_H_
 #include <stdint.h>
 
-void initcache(int32_t dacachestart, int32_t dacachesize);
-void allocache (int32_t *newhandle, int32_t newbytes, unsigned char *newlockptr);
+void initcache(intptr_t dacachestart, int32_t dacachesize);
+void allocache (intptr_t *newhandle, int32_t newbytes, unsigned char *newlockptr);
 void suckcache (int32_t *suckptr);
 void agecache(void);
 void reportandexit(char *errormessage);

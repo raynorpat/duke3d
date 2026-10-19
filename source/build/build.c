@@ -104,7 +104,8 @@ extern char vgacompatible;
 extern char picsiz[MAXTILES];
 extern int32_t startposx, startposy, startposz;
 extern short startang, startsectnum;
-extern int32_t frameplace, pageoffset, ydim16;
+extern intptr_t frameplace;
+extern int32_t pageoffset, ydim16;
 
 extern int32_t cachesize, artsize;
 
@@ -1012,7 +1013,7 @@ int getfilenames(char kind[6])
                 {
                     /* need to expand support if this assertion ever fails. */
                     assert(stricmp(kind, "*.MAP") == 0);
-                    len = strlen(dent->d_name);
+                    len = (int) strlen(dent->d_name);
                     if (len >= 5)
                     {
                         ptr = ((char *) dent->d_name) + len;
@@ -1690,7 +1691,8 @@ void getclosestpointonwall(int32_t x, int32_t y, int32_t dawall, int32_t *nx, in
 
 int drawtilescreen(int32_t pictopleft, int32_t picbox)
 {
-	int32_t i, j, vidpos, vidpos2, wallnum, xdime, ydime, cnt, pinc;
+	int32_t i, j, wallnum, xdime, ydime, cnt, pinc;
+	intptr_t vidpos, vidpos2;
 	int32_t dax, day, scaledown, xtiles, ytiles, tottiles;
 	char *picptr, snotbuf[80];
 
@@ -1773,7 +1775,7 @@ int drawtilescreen(int32_t pictopleft, int32_t picbox)
 	i = localartlookup[picbox];
 	sprintf(snotbuf,"%ld",i);
 	printext256(0L,ydim-8,whitecol,-1,snotbuf,0);
-	printext256(xdim-(strlen(names[i])<<3),ydim-8,whitecol,-1,names[i],0);
+	printext256(xdim-(int32_t)(strlen(names[i])<<3),ydim-8,whitecol,-1,names[i],0);
 
 	return(0);
 }
@@ -2358,9 +2360,9 @@ void overheadeditor(void)
 					dax = mulscale14(dax-posx,zoom);
 					day = mulscale14(day-posy,zoom);
 
-					x1 = 320+dax-(strlen(dabuffer)<<1);
+					x1 = 320+dax-(int32_t)(strlen(dabuffer)<<1);
 					y1 = 200+day-4;
-					x2 = x1 + (strlen(dabuffer)<<2)+2;
+					x2 = x1 + (int32_t)(strlen(dabuffer)<<2)+2;
 					y2 = y1 + 7;
 					if ((x1 >= 0) && (x2 < 640) && (y1 >= 0) && (y2 < ydim16))
                     {
@@ -2390,9 +2392,9 @@ void overheadeditor(void)
 					{
 						dax = mulscale14(dax-posx,zoom);
 						day = mulscale14(day-posy,zoom);
-						x1 = 320+dax-(strlen(dabuffer)<<1);
+						x1 = 320+dax-(int32_t)(strlen(dabuffer)<<1);
 						y1 = 200+day-4;
-						x2 = x1 + (strlen(dabuffer)<<2)+2;
+						x2 = x1 + (int32_t)(strlen(dabuffer)<<2)+2;
 						y2 = y1 + 7;
 						if ((x1 >= 0) && (x2 < 640) && (y1 >= 0) && (y2 < ydim16))
                         {
@@ -2421,9 +2423,9 @@ void overheadeditor(void)
 						dax = mulscale14(dax-posx,zoom);
 						day = mulscale14(day-posy,zoom);
 
-						x1 = 320+dax-(strlen(dabuffer)<<1);
+						x1 = 320+dax-(int32_t)(strlen(dabuffer)<<1);
 						y1 = 200+day-4;
-						x2 = x1 + (strlen(dabuffer)<<2)+2;
+						x2 = x1 + (int32_t)(strlen(dabuffer)<<2)+2;
 						y2 = y1 + 7;
 						if ((x1 >= 0) && (x2 < 640) && (y1 >= 0) && (y2 < ydim16))
 						{

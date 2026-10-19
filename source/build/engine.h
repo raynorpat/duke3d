@@ -704,7 +704,7 @@ int rintersect(int32_t x1, int32_t y1, int32_t z1, int32_t vx, int32_t vy, int32
  * function so I would recommend calling this function
  * right after loadpics.
  */
-int allocatepermanenttile(short tilenume, int32_t xsiz, int32_t ysiz);
+intptr_t allocatepermanenttile(short tilenume, int32_t xsiz, int32_t ysiz);
 
 /**@brief Draw a line.
  *

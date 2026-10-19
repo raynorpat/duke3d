@@ -94,7 +94,7 @@ int _kinp_handler(int port, char *source_file, int source_line);
 #undef FP_OFF
 #endif
 
-#define FP_OFF(x) ((int32_t) (x))
+#define FP_OFF(x) ((intptr_t)(x))
 
 /* !!! This might be temporary. */
 #define printext16 printext256

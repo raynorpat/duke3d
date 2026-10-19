@@ -667,7 +667,7 @@ static int send_udp_packet(int ip, short port, void *pkt, size_t pktsize)
 	addr.sin_addr.s_addr = htonl(ip);
 	addr.sin_port = htons(port);
 
-    rc = sendto(udpsocket, pkt, pktsize, 0,
+    rc = (int) sendto(udpsocket, pkt, pktsize, 0,
                 (struct sockaddr *) &addr, sizeof (addr));
 
     if (rc != (int) pktsize)
@@ -700,7 +700,7 @@ static int get_udp_packet(int *ip, short *_port, void *pkt, size_t pktsize)
     int i;
 
     /* FIXME: Will this ever receive a partial packet? */
-    int rc = recvfrom(udpsocket, pkt, pktsize, 0,
+    int rc = (int) recvfrom(udpsocket, pkt, pktsize, 0,
                       (struct sockaddr *) &addr, &fromlen);
 
     if (rc == -1)
@@ -1378,7 +1378,7 @@ gcomtype *init_network_transport(char **ARGV, int argpos)
     if (!initialize_sockets())
         return(NULL);
 
-    srand(time(NULL));
+    srand((unsigned int) time(NULL));
 
     retval = (gcomtype *)malloc(sizeof (gcomtype));
     if (retval != NULL)

@@ -85,7 +85,12 @@ int _kinp_handler(int port, char *source_file, int source_line);
 #define kkmalloc(x) malloc(x)
 #define kfree(x) free(x)
 #define kkfree(x) free(x)
-#define FP_OFF(x) ((int32_t) (x))
+
+#ifdef FP_OFF
+#undef FP_OFF
+#endif
+
+#define FP_OFF(x) ((intptr_t)(x))
 
 #ifndef O_BINARY
 #define O_BINARY 0

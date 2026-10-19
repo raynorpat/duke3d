@@ -141,6 +141,10 @@ typedef struct
 #pragma pack()
 #endif
 
+_Static_assert(sizeof(sectortype) == 40, "sectortype must match the on-disk size");
+_Static_assert(sizeof(walltype) == 32, "walltype must match the on-disk size");
+_Static_assert(sizeof(spritetype) == 44, "spritetype must match the on-disk size");
+
 EXTERN sectortype sector[MAXSECTORS];
 EXTERN walltype wall[MAXWALLS];
 EXTERN spritetype sprite[MAXSPRITES];
@@ -178,7 +182,8 @@ EXTERN short nextspritesect[MAXSPRITES], nextspritestat[MAXSPRITES];
 
 EXTERN short tilesizx[MAXTILES], tilesizy[MAXTILES];
 EXTERN char walock[MAXTILES];
-EXTERN int32_t numtiles, picanm[MAXTILES], waloff[MAXTILES];
+EXTERN int32_t numtiles, picanm[MAXTILES];
+EXTERN intptr_t waloff[MAXTILES];
 
     /*
 	 * These variables are for auto-mapping with the draw2dscreen function.

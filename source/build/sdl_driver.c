@@ -146,7 +146,8 @@ int _argc = 0;
 char **_argv = NULL;
 
     /* !!! move these elsewhere? */
-int32_t xres, yres, bytesperline, frameplace, imageSize, maxpages;
+int32_t xres, yres, bytesperline, imageSize, maxpages;
+intptr_t frameplace;
 char *screen, vesachecked;
 int32_t buffermode, origbuffermode, linearmode;
 char permanentupdate = 0, vgacompatible;
@@ -399,9 +400,9 @@ static void init_new_res_vars(int davidoption)
     horizlookup = horizlookup2 = NULL;
 
     if (renderer == RENDERER_OPENGL3D)
-        frameplace = (int32_t) NULL;
+        frameplace = (intptr_t) NULL;
     else
-        frameplace = (int32_t) ( ((Uint8 *) surface->pixels) );
+        frameplace = (intptr_t) ( ((Uint8 *) surface->pixels) );
 
   	if (screen != NULL)
    	{
@@ -424,14 +425,14 @@ static void init_new_res_vars(int davidoption)
     	screenalloctype = 0;
 	    if ((screen = (char *)kkmalloc(i+(j<<1))) == NULL)
     	{
-	    	 allocache((int32_t *)&screen,i+(j<<1),&permanentlock);
+	    	 allocache((intptr_t *)&screen,i+(j<<1),&permanentlock);
     		 screenalloctype = 1;
     	}
 
         /* !!! FIXME: Should screen get allocated above if in opengl3d mode? */
 
         if (renderer == RENDERER_OPENGL3D)
-            frameplace = (int32_t) NULL;
+            frameplace = (intptr_t) NULL;
         else
         {
             frameplace = FP_OFF(screen);
@@ -1616,12 +1617,12 @@ static int get_dimensions_from_str(const char *str, int32_t *_w, int32_t *_h)
     if (xptr == NULL)
         return(0);
 
-    w = strtol(str, &ptr, 10);
+    w = (int32_t) strtol(str, &ptr, 10);
     if (ptr != xptr)
         return(0);
 
     xptr++;
-    h = strtol(xptr, &ptr, 10);
+    h = (int32_t) strtol(xptr, &ptr, 10);
     if ( (*xptr == '\0') || (*ptr != '\0') )
         return(0);
 
@@ -2067,12 +2068,12 @@ void _nextpage(void)
 } /* _nextpage */
 
 
-unsigned char readpixel(int32_t offset)
+unsigned char readpixel(intptr_t offset)
 {
     return( *((unsigned char *) offset) );
 } /* readpixel */
 
-void drawpixel(int32_t offset, unsigned char pixel)
+void drawpixel(intptr_t offset, unsigned char pixel)
 {
     *((unsigned char *) offset) = pixel;
 } /* drawpixel */
@@ -2129,7 +2130,7 @@ void setcolor16(int col)
 
 void drawpixel16(int32_t offset)
 {
-    drawpixel(((int32_t) surface->pixels + offset), drawpixel_color);
+    drawpixel(((intptr_t) surface->pixels + offset), drawpixel_color);
 } /* drawpixel16 */
 
 
@@ -2165,7 +2166,7 @@ void fillscreen16(int32_t offset, int32_t color, int32_t blocksize)
         offset = 0;
 
     if (wanted_end > surface_end)
-        blocksize = ((uint32_t) surface_end) - ((uint32_t) pixels + offset);
+        blocksize = (int32_t) (surface_end - (pixels + offset));
 
     memset(pixels + offset, (int) color, blocksize);
 

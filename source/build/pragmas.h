@@ -2503,7 +2503,7 @@ static __inline void swapchar2(unsigned char *p1, unsigned char *p2, int xsiz)
 }
 
 
-uint32_t getkensmessagecrc(int32_t param);
+uint32_t getkensmessagecrc(intptr_t param);
 int32_t msqrtasm(int i1);
 
 void vlin16first (int32_t i1, int32_t i2);
@@ -2517,23 +2517,23 @@ static __inline __int64 mul32_64(int i1,int i2)
 }
 static __inline int scale (int input1, int input2, int input3)
 {
-	return mul32_64(input1,input2)/input3;
+	return (int)(mul32_64(input1,input2)/input3);
 }
 static __inline int mulscale (int input1, int input2, int input3)
 {
-	return mul32_64(input1,input2)>>input3;
+	return (int)(mul32_64(input1,input2)>>input3);
 }
 static __inline int dmulscale  (int input1, int input2, int input3,int input4,int input5)
 {
-	return (mul32_64(input1,input2) + mul32_64(input3,input4))>>input5;
+	return (int)((mul32_64(input1,input2) + mul32_64(input3,input4))>>input5);
 }
 static __inline int tmulscale(int i1, int i2, int i3, int i4, int i5, int i6,int shift)
 {
-	return (mul32_64(i1,i2) + mul32_64(i3,i4) + mul32_64(i5,i6))>>shift;
+	return (int)((mul32_64(i1,i2) + mul32_64(i3,i4) + mul32_64(i5,i6))>>shift);
 }
 static __inline int divscale(int i1, int i2, int i3)
 {
-	return ((__int64)i1<<i3)/i2;
+	return (int)(((__int64)i1<<i3)/i2);
 }
 
 #define DEFFUNCS \

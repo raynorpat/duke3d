@@ -87,8 +87,8 @@ extern void waitforeverybody(void);
 #endif
 
 /* cache1d.c */
-extern void initcache(int32_t dacachestart, int32_t dacachesize);
-extern void allocache(int32_t *newhandle, int32_t newbytes, unsigned char *newlockptr);
+extern void initcache(intptr_t dacachestart, int32_t dacachesize);
+extern void allocache(intptr_t *newhandle, int32_t newbytes, unsigned char *newlockptr);
 extern void suckcache(int32_t *suckptr);
 extern void agecache(void);
 extern void reportandexit(char *errormessage);
@@ -140,8 +140,8 @@ extern void readmousexy(short *x, short *y);
 extern void readmousebstatus(short *bstatus);
 extern void _updateScreenRect(int32_t x, int32_t y, int32_t w, int32_t h);
 extern void _nextpage(void);
-extern unsigned char readpixel(int32_t offset);
-extern void drawpixel(int32_t offset, unsigned char pixel);
+extern unsigned char readpixel(intptr_t offset);
+extern void drawpixel(intptr_t offset, unsigned char pixel);
 extern void drawpixels(int32_t offset, unsigned short pixels);
 extern void drawpixelses(int32_t offset, unsigned int pixelses);
 extern void setcolor16(int col);
@@ -191,7 +191,7 @@ extern void initengine(void);
 extern void uninitengine(void);
 extern void nextpage(void);
 extern void loadtile(short tilenume);
-extern int allocatepermanenttile(short tilenume, int32_t xsiz, int32_t ysiz);
+extern intptr_t allocatepermanenttile(short tilenume, int32_t xsiz, int32_t ysiz);
 extern int loadpics(char *filename);
 extern void qloadkvx(int32_t voxindex, char *filename);
 extern int clipinsidebox(int32_t x, int32_t y, short wallnum, int32_t walldist);
