@@ -31,7 +31,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
+#ifdef PLAT_DOS
 #include <dos.h>
+#endif
 #include <string.h>
 #include "sndcards.h"
 #include "interrup.h"
@@ -44,6 +46,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include "_midi.h"
 #include "midi.h"
 #include "debugio.h"
+#include "util.h"
 
 extern int MUSIC_SoundDevice;
 
@@ -552,7 +555,7 @@ static void test
    _MIDI_ServiceRoutine( Task );
    }
 */
-static void _MIDI_ServiceRoutine
+void _MIDI_ServiceRoutine
    (
    task *Task
    )
@@ -948,11 +951,14 @@ int MIDI_Reset
 
    {
    int channel;
+#ifdef PLAT_DOS
    int32_t time;
    unsigned flags;
+#endif
 
    MIDI_AllNotesOff();
 
+#ifdef PLAT_DOS
    flags = DisableInterrupts();
    _enable();
    time = clock() + CLOCKS_PER_SEC/24;
@@ -960,6 +966,7 @@ int MIDI_Reset
       ;
 
    RestoreInterrupts( flags );
+#endif
 
    for( channel = 0; channel < NUM_MIDI_CHANNELS; channel++ )
       {

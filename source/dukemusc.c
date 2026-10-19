@@ -38,6 +38,9 @@
 #include "rt_util.h"     // ROTT music hack
 #endif
 #include "music.h"
+#include "audiolib/midi.h"
+#include "audiolib/al_midi.h"
+#include "audiolib/oplemu.h"
 
 #define __FX_TRUE  (1 == 1)
 #define __FX_FALSE (!__FX_TRUE)
@@ -176,14 +179,71 @@ char *MUSIC_ErrorString(int ErrorNumber)
 } // MUSIC_ErrorString
 
 
+
+
+// The music is Jim Dose's MIDI and AL_MIDI (FM) code, as DOS played it on
+// a Sound Blaster 16, writing to an emulated OPL3 that SDL_mixer pulls
+// samples from through Mix_HookMusic. The hook runs on the audio thread,
+// so every call into MIDI and AL_MIDI holds music_lock.
+
+// MIDI picks each song's EMIDI arrangement for this card.
+int MUSIC_SoundDevice = -1;
+
 static int music_initialized = 0;
-static int music_context = 0;
-static int music_loopflag = MUSIC_PlayOnce;
-static char *music_songdata = NULL;
-static Mix_Music *music_musicchunk = NULL;
+static int music_hooked = 0;
+static int music_format = AUDIO_S16SYS;
+static int music_channels = 2;
+static unsigned char *music_songdata = NULL;
+static SDL_mutex *music_lock = NULL;
+static midifuncs music_midifuncs;
+
+static void music_mixer(void *udata, Uint8 *stream, int len)
+{
+    int16_t buf[1024 * 2];
+    int frames, count, i, c;
+    int bytes = (music_format == AUDIO_U8) ? 1 : 2;
+
+    frames = len / (bytes * music_channels);
+
+    SDL_LockMutex(music_lock);
+    while (frames > 0)
+    {
+        count = min(frames, 1024);
+        OPLEMU_Render(buf, count, (music_channels == 1) ? 1 : 2);
+
+        for (i = 0; i < count; i++)
+        {
+            for (c = 0; c < music_channels; c++)
+            {
+                int16_t s = 0;
+                if (music_channels == 1)
+                    s = buf[i];
+                else if (c < 2)
+                    s = buf[i * 2 + c];
+
+                if (bytes == 1)
+                    *stream++ = (Uint8) ((s >> 8) + 128);
+                else
+                {
+                    *(int16_t *) stream = s;
+                    stream += 2;
+                }
+            }
+        }
+
+        frames -= count;
+    }
+    SDL_UnlockMutex(music_lock);
+} // music_mixer
+
 
 int MUSIC_Init(int SoundCard, int Address)
 {
+    int i;
+    int freq = 44100;
+    Uint16 format = AUDIO_S16SYS;
+    int channels = 2;
+
     init_debugging();
 
     musdebug("INIT! card=>%d, address=>%d...", SoundCard, Address);
@@ -201,6 +261,39 @@ int MUSIC_Init(int SoundCard, int Address)
         return(MUSIC_Error);
     } // if
 
+    // Without sound effects there is no mixer to play through; the song
+    //  is still sequenced, just never heard.
+    music_hooked = Mix_QuerySpec(&freq, &format, &channels);
+    music_format = format;
+    music_channels = channels;
+
+    music_lock = SDL_CreateMutex();
+
+    for (i = 0; i < 128; i++)
+        MIDI_PatchMap[i] = i;
+
+    MUSIC_SoundDevice = SoundBlaster;
+    OPLEMU_Init(freq);
+    AL_Init(MUSIC_SoundDevice);
+
+    music_midifuncs.NoteOff           = AL_NoteOff;
+    music_midifuncs.NoteOn            = AL_NoteOn;
+    music_midifuncs.PolyAftertouch    = NULL;
+    music_midifuncs.ControlChange     = AL_ControlChange;
+    music_midifuncs.ProgramChange     = AL_ProgramChange;
+    music_midifuncs.ChannelAftertouch = NULL;
+    music_midifuncs.PitchBend         = AL_SetPitchBend;
+    music_midifuncs.ReleasePatches    = NULL;
+    music_midifuncs.LoadPatch         = NULL;
+    // As on a Sound Blaster with a mixer: the music volume is the card's
+    //  FM volume, and the notes themselves play at full level.
+    music_midifuncs.SetVolume         = OPLEMU_SetVolume;
+    music_midifuncs.GetVolume         = OPLEMU_GetVolume;
+    MIDI_SetMidiFuncs(&music_midifuncs);
+
+    if (music_hooked)
+        Mix_HookMusic(music_mixer, NULL);
+
     music_initialized = 1;
     return(MUSIC_Ok);
 } // MUSIC_Init
@@ -217,9 +310,17 @@ int MUSIC_Shutdown(void)
     } // if
 
     MUSIC_StopSong();
-    music_context = 0;
+
+    if (music_hooked && Mix_QuerySpec(NULL, NULL, NULL))
+        Mix_HookMusic(NULL, NULL);
+    music_hooked = 0;
+
+    AL_Shutdown();
+
+    SDL_DestroyMutex(music_lock);
+    music_lock = NULL;
+    MUSIC_SoundDevice = -1;
     music_initialized = 0;
-    music_loopflag = MUSIC_PlayOnce;
 
     return(MUSIC_Ok);
 } // MUSIC_Shutdown
@@ -227,129 +328,118 @@ int MUSIC_Shutdown(void)
 
 void MUSIC_SetMaxFMMidiChannel(int channel)
 {
-    musdebug("STUB ... MUSIC_SetMaxFMMidiChannel(%d).\n", channel);
+    SDL_LockMutex(music_lock);
+    AL_SetMaxMidiChannel(channel);
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_SetMaxFMMidiChannel
 
 
 void MUSIC_SetVolume(int volume)
 {
-    Mix_VolumeMusic(volume >> 1);  // convert 0-255 to 0-128.
+    volume = max(0, volume);
+    volume = min(volume, 255);
+
+    SDL_LockMutex(music_lock);
+    MIDI_SetVolume(volume);
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_SetVolume
 
 
 void MUSIC_SetMidiChannelVolume(int channel, int volume)
 {
-    musdebug("STUB ... MUSIC_SetMidiChannelVolume(%d, %d).\n", channel, volume);
+    SDL_LockMutex(music_lock);
+    MIDI_SetUserChannelVolume(channel, volume);
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_SetMidiChannelVolume
 
 
 void MUSIC_ResetMidiChannelVolumes(void)
 {
-    musdebug("STUB ... MUSIC_ResetMidiChannelVolumes().\n");
+    SDL_LockMutex(music_lock);
+    MIDI_ResetUserChannelVolume();
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_ResetMidiChannelVolumes
 
 
 int MUSIC_GetVolume(void)
 {
-    return(Mix_VolumeMusic(-1) << 1);  // convert 0-128 to 0-255.
+    return(MIDI_GetVolume());
 } // MUSIC_GetVolume
 
 
 void MUSIC_SetLoopFlag(int loopflag)
 {
-    music_loopflag = loopflag;
+    SDL_LockMutex(music_lock);
+    MIDI_SetLoopFlag(loopflag);
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_SetLoopFlag
 
 
 int MUSIC_SongPlaying(void)
 {
-    return((Mix_PlayingMusic()) ? __FX_TRUE : __FX_FALSE);
+    return(MIDI_SongPlaying());
 } // MUSIC_SongPlaying
 
 
 void MUSIC_Continue(void)
 {
-    if (Mix_PausedMusic())
-        Mix_ResumeMusic();
-    else if (music_songdata)
-        MUSIC_PlaySong(music_songdata, MUSIC_PlayOnce);
+    SDL_LockMutex(music_lock);
+    MIDI_ContinueSong();
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_Continue
 
 
 void MUSIC_Pause(void)
 {
-    Mix_PauseMusic();
+    SDL_LockMutex(music_lock);
+    MIDI_PauseSong();
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_Pause
 
 
 int MUSIC_StopSong(void)
 {
-    //if (!fx_initialized)
-    if (!Mix_QuerySpec(NULL, NULL, NULL))
-    {
-        setErrorMessage("Need FX system initialized, too. Sorry.");
-        return(MUSIC_Error);
-    } // if
+    SDL_LockMutex(music_lock);
+    MIDI_StopSong();
+    SDL_UnlockMutex(music_lock);
 
-    if ( (Mix_PlayingMusic()) || (Mix_PausedMusic()) )
-        Mix_HaltMusic();
-
-    if (music_musicchunk)
-        Mix_FreeMusic(music_musicchunk);
-
+    // PlayMusic's copy; MUSIC_PlaySong's caller owns its own.
+    free(music_songdata);
     music_songdata = NULL;
-    music_musicchunk = NULL;
     return(MUSIC_Ok);
 } // MUSIC_StopSong
 
 
 int MUSIC_PlaySong(unsigned char *song, int loopflag)
 {
-    //SDL_RWops *rw;
+    int status;
 
     MUSIC_StopSong();
 
-    music_songdata = song;
+    SDL_LockMutex(music_lock);
+    status = MIDI_PlaySong(song, loopflag);
+    SDL_UnlockMutex(music_lock);
 
-    // !!! FIXME: This could be a problem...SDL/SDL_mixer wants a RWops, which
-    // !!! FIXME:  is an i/o abstraction. Since we already have the MIDI data
-    // !!! FIXME:  in memory, we fake it with a memory-based RWops. None of
-    // !!! FIXME:  this is a problem, except the RWops wants to know how big
-    // !!! FIXME:  its memory block is (so it can do things like seek on an
-    // !!! FIXME:  offset from the end of the block), and since we don't have
-    // !!! FIXME:  this information, we have to give it SOMETHING.
-
-    /* !!! ARGH! There's no LoadMUS_RW  ?!
-    rw = SDL_RWFromMem((void *) song, (10 * 1024) * 1024);  // yikes.
-    music_musicchunk = Mix_LoadMUS_RW(rw);
-    Mix_PlayMusic(music_musicchunk, (loopflag == MUSIC_PlayOnce) ? 0 : -1);
-    */
-
-STUBBED("Need to use PlaySongROTT.  :(");
+    if (status != MIDI_Ok)
+    {
+        setErrorMessage("Error playing MIDI file.");
+        return(MUSIC_Warning);
+    } // if
 
     return(MUSIC_Ok);
 } // MUSIC_PlaySong
 
 
-extern char ApogeePath[256];
-
 // Duke3D-specific.  --ryan.
 void PlayMusic(char *_filename)
 {
-    //char filename[MAX_PATH];
-    //strcpy(filename, _filename);
-    //FixFilePath(filename);
-
-    char filename[MAX_PATH];
     int32_t handle;
     int32_t size;
-    void *song;
+    unsigned char *song;
     int32_t rc;
 
     MUSIC_StopSong();
 
-    // Read from a groupfile, write it to disk so SDL_mixer can read it.
-    //   Lame.  --ryan.
     handle = kopen4load(_filename, 0);
     if (handle == -1)
         return;
@@ -376,127 +466,106 @@ void PlayMusic(char *_filename)
         return;
     } // if
 
-    // save the file somewhere, so SDL_mixer can load it
-    GetPathFromEnvironment(filename, MAX_PATH, "tmpsong.mid");
-    handle = SafeOpenWrite(filename, filetype_binary);
-    
-    SafeWrite(handle, song, size);
-    close(handle);
-    free(song);
-    
-    //music_songdata = song;
-
-    music_musicchunk = Mix_LoadMUS(filename);
-    if (music_musicchunk != NULL)
+    // MIDI plays straight out of the buffer, so it is kept until the song
+    //  is stopped.
+    if (MUSIC_PlaySong(song, MUSIC_LoopSong) != MUSIC_Ok)
     {
-        // !!! FIXME: I set the music to loop. Hope that's okay. --ryan.
-        Mix_PlayMusic(music_musicchunk, -1);
+        free(song);
+        return;
     } // if
-}
 
-
-#if ROTT
-// ROTT Special - SBF
-int MUSIC_PlaySongROTT(unsigned char *song, int size, int loopflag)
-{
-    char filename[MAX_PATH];
-    int handle;
-    
-    MUSIC_StopSong();
-
-    // save the file somewhere, so SDL_mixer can load it
-    GetPathFromEnvironment(filename, MAX_PATH, "tmpsong.mid");
-    handle = SafeOpenWrite(filename);
-    
-    SafeWrite(handle, song, size);
-    close(handle);
-    
     music_songdata = song;
-
-    // finally, we can load it with SDL_mixer
-    music_musicchunk = Mix_LoadMUS(filename);
-    if (music_musicchunk == NULL) {
-        return MUSIC_Error;
-    }
-    
-    Mix_PlayMusic(music_musicchunk, (loopflag == MUSIC_PlayOnce) ? 0 : -1);
-
-    return(MUSIC_Ok);
-} // MUSIC_PlaySongROTT
-#endif
+}
 
 
 void MUSIC_SetContext(int context)
 {
-    musdebug("STUB ... MUSIC_SetContext().\n");
-    music_context = context;
+    SDL_LockMutex(music_lock);
+    MIDI_SetContext(context);
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_SetContext
 
 
 int MUSIC_GetContext(void)
 {
-    return(music_context);
+    return(MIDI_GetContext());
 } // MUSIC_GetContext
 
 
 void MUSIC_SetSongTick(uint32_t PositionInTicks)
 {
-    musdebug("STUB ... MUSIC_SetSongTick().\n");
+    SDL_LockMutex(music_lock);
+    MIDI_SetSongTick(PositionInTicks);
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_SetSongTick
 
 
 void MUSIC_SetSongTime(uint32_t milliseconds)
 {
-    musdebug("STUB ... MUSIC_SetSongTime().\n");
+    SDL_LockMutex(music_lock);
+    MIDI_SetSongTime(milliseconds);
+    SDL_UnlockMutex(music_lock);
 }// MUSIC_SetSongTime
 
 
 void MUSIC_SetSongPosition(int measure, int beat, int tick)
 {
-    musdebug("STUB ... MUSIC_SetSongPosition().\n");
+    SDL_LockMutex(music_lock);
+    MIDI_SetSongPosition(measure, beat, tick);
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_SetSongPosition
 
 
 void MUSIC_GetSongPosition(songposition *pos)
 {
-    musdebug("STUB ... MUSIC_GetSongPosition().\n");
+    SDL_LockMutex(music_lock);
+    MIDI_GetSongPosition(pos);
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_GetSongPosition
 
 
 void MUSIC_GetSongLength(songposition *pos)
 {
-    musdebug("STUB ... MUSIC_GetSongLength().\n");
+    SDL_LockMutex(music_lock);
+    MIDI_GetSongLength(pos);
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_GetSongLength
 
 
+// MUSIC.C fades with a second TASK_MAN task, which OPLEMU doesn't run.
+//  Nothing in Duke fades, so this just jumps to the new volume.
 int MUSIC_FadeVolume(int tovolume, int milliseconds)
 {
-    Mix_FadeOutMusic(milliseconds);
+    MUSIC_SetVolume(tovolume);
     return(MUSIC_Ok);
 } // MUSIC_FadeVolume
 
 
 int MUSIC_FadeActive(void)
 {
-    return((Mix_FadingMusic() == MIX_FADING_OUT) ? __FX_TRUE : __FX_FALSE);
+    return(__FX_FALSE);
 } // MUSIC_FadeActive
 
 
 void MUSIC_StopFade(void)
 {
-    musdebug("STUB ... MUSIC_StopFade().\n");
 } // MUSIC_StopFade
 
 
 void MUSIC_RerouteMidiChannel(int channel, int cdecl (*function)( int event, int c1, int c2 ))
 {
-    musdebug("STUB ... MUSIC_RerouteMidiChannel().\n");
+    SDL_LockMutex(music_lock);
+    MIDI_RerouteMidiChannel(channel, function);
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_RerouteMidiChannel
 
 
+// Duke's own FM instruments, D3DTIMBR.TMB, loaded by loadtmb().
 void MUSIC_RegisterTimbreBank(unsigned char *timbres)
 {
-    musdebug("STUB ... MUSIC_RegisterTimbreBank().\n");
+    SDL_LockMutex(music_lock);
+    AL_RegisterTimbreBank(timbres);
+    SDL_UnlockMutex(music_lock);
 } // MUSIC_RegisterTimbreBank
 
 

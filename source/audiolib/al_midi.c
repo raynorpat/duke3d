@@ -30,19 +30,26 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 **********************************************************************/
 
 #include <stdint.h>
+#ifdef PLAT_DOS
 #include <conio.h>
 #include <dos.h>
+#endif
 #include <stddef.h>
 #include <stdlib.h>
 //#include <math.h>
 #include "dpmi.h"
 #include "interrup.h"
 #include "sndcards.h"
+#ifdef PLAT_DOS
 #include "blaster.h"
+#else
+#include "oplemu.h"
+#endif
 #include "user.h"
 #include "al_midi.h"
 #include "_al_midi.h"
 #include "ll_man.h"
+#include "util.h"
 
 #define TRUE  ( 1 == 1 )
 #define FALSE ( !TRUE )
@@ -171,6 +178,7 @@ void AL_SendOutputToPort
    )
 
    {
+#ifdef PLAT_DOS
    int delay;
 
    outp( port, reg );
@@ -189,6 +197,10 @@ void AL_SendOutputToPort
       {
       inp( port );
       }
+#else
+   // The right port is the OPL3's second register bank.
+   OPLEMU_WriteReg( ( port == AL_RightPort ) ? ( reg | 0x100 ) : reg, data );
+#endif
    }
 
 
@@ -1247,6 +1259,7 @@ int AL_DetectFM
    )
 
    {
+#ifdef PLAT_DOS
    int status1;
    int status2;
    int i;
@@ -1275,6 +1288,10 @@ int AL_DetectFM
    AL_SendOutputToPort( ADLIB_PORT, 4, 0x80 );
 
    return( ( ( status1 & 0xe0 ) == 0x00 ) && ( ( status2 & 0xe0 ) == 0xc0 ) );
+#else
+   // The emulated chip is always there.
+   return( TRUE );
+#endif
    }
 
 
@@ -1360,7 +1377,9 @@ int AL_Init
    )
 
    {
+#ifdef PLAT_DOS
    BLASTER_CONFIG Blaster;
+#endif
    int status;
 
    status  = DPMI_LockMemoryRegion( AL_LockStart, AL_LockEnd );
@@ -1393,6 +1412,12 @@ int AL_Init
    AL_LeftPort = 0x388;
    AL_RightPort = 0x388;
 
+#ifndef PLAT_DOS
+   // The emulated chip is an OPL3, set up as on a Sound Blaster 16.
+   AL_OPL3 = TRUE;
+   AL_LeftPort  = 0x388;
+   AL_RightPort = 0x38A;
+#else
    switch( soundcard )
       {
       case ProAudioSpectrum :
@@ -1424,6 +1449,7 @@ int AL_Init
             }
          break;
       }
+#endif
 // Temporarally commented out for ROTT.
 // Stereo FM seems to take too long on some computers and
 // causes the mouse driver to miss interrupts.

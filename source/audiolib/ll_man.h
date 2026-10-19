@@ -30,6 +30,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 #ifndef __LL_MAN_H
 #define __LL_MAN_H
+#include <stddef.h>
 
 enum LL_Errors
    {
@@ -53,22 +54,22 @@ int  LL_LockMemory( void );
     LL_AddNode( ( char * )( node ),                  \
                 ( char ** )&( ( listhead )->start ), \
                 ( char ** )&( ( listhead )->end ),   \
-                ( int )&( ( type * ) 0 )->next,      \
-                ( int )&( ( type * ) 0 )->prev )
+                ( int )offsetof( type, next ),       \
+                ( int )offsetof( type, prev ) )
 
 #define LL_AddToTail( type, listhead, node )         \
     LL_AddNode( ( char * )( node ),                  \
                 ( char ** )&( ( listhead )->end ),   \
                 ( char ** )&( ( listhead )->start ), \
-                ( int )&( ( type * ) 0 )->prev,      \
-                ( int )&( ( type * ) 0 )->next )
+                ( int )offsetof( type, prev ),       \
+                ( int )offsetof( type, next ) )
 
 #define LL_Remove( type, listhead, node )               \
     LL_RemoveNode( ( char * )( node ),                  \
                    ( char ** )&( ( listhead )->start ), \
                    ( char ** )&( ( listhead )->end ),   \
-                   ( int )&( ( type * ) 0 )->next,      \
-                   ( int )&( ( type * ) 0 )->prev )
+                   ( int )offsetof( type, next ),       \
+                   ( int )offsetof( type, prev ) )
 
 #define LL_NextNode( node )     ( ( node )->next )
 #define LL_PreviousNode( node ) ( ( node )->prev )

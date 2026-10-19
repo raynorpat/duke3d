@@ -55,6 +55,14 @@ target_link_libraries(lzw_roundtrip PRIVATE buildengine)
 add_test(NAME lzw_roundtrip COMMAND lzw_roundtrip
          WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 
+# Plays a MIDI song through the FM driver and the emulated OPL3 without an
+# audio device, and checks the note sounds and keeps the song's tempo.
+add_executable(opl_music opl_music.c)
+target_include_directories(opl_music PRIVATE "${PROJECT_SOURCE_DIR}/source")
+target_link_libraries(opl_music PRIVATE audiolib)
+add_test(NAME opl_music COMMAND opl_music)
+set_tests_properties(opl_music PROPERTIES TIMEOUT 30)
+
 # Bad DUKE3D_VERSION values must stop the configure step.
 add_test(NAME version_config_rejects
   COMMAND "${CMAKE_COMMAND}" "-DSRC=${PROJECT_SOURCE_DIR}"

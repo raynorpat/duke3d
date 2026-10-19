@@ -3,13 +3,18 @@
 # directory is exported: audiolib/assert.h would shadow <assert.h>.
 
 add_library(audiolib STATIC
+  al_midi.c
+  dbopl.c
   dsl.c
   fx_man.c
+  gmtimbre.c
   ll_man.c
+  midi.c
   multivoc.c
   mv_mix.c
   mvreverb.c
   nodpmi.c
+  oplemu.c
   pitch.c
   user.c)
 
