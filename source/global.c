@@ -36,6 +36,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #endif
 
 #include "duke3d.h"
+#if PLATFORM_WIN32
+#include "win32_savedir.h"
+#endif
 
 char *mymembuf;
 char MusicPtr[72000];
@@ -852,6 +855,29 @@ char *ultoa(uint32_t value, char *string, int radix)
 #endif
 
 
+#if PLATFORM_WIN32
+/* Copies name from the working directory into ApogeePath unless it's
+   already there. A failed write leaves no partial copy behind. */
+static void carry_over(const char *name)
+{
+    char dst[MAX_PATH], buf[4096];
+    FILE *in, *out;
+    size_t n;
+    int bad = 0;
+
+    GetPathFromEnvironment(dst, sizeof(dst), name);
+    if (_access(dst, 0) == 0) return;
+    if ((in = fopen(name, "rb")) == NULL) return;
+    if ((out = fopen(dst, "wb")) == NULL) { fclose(in); return; }
+    while ((n = fread(buf, 1, sizeof(buf), in)) > 0)
+        if (fwrite(buf, 1, n, out) != n) { bad = 1; break; }
+    if (ferror(in)) bad = 1;
+    fclose(in);
+    if (fclose(out) != 0) bad = 1;
+    if (bad) remove(dst);
+}
+#endif
+
 int setup_homedir (void)
 {
 #ifdef DC
@@ -897,6 +923,37 @@ int setup_homedir (void)
             }
             fclose(in);
         }
+    }
+#elif PLATFORM_WIN32
+    /* Saved Games\Duke Nukem 3D. DUKE3D_SAVE_DIR overrides the Saved Games
+       folder so the tests keep their files out of the real profile. */
+    static const char *carry[] =
+    {
+        SETUPFILENAME, "game0.sav", "game1.sav", "game2.sav", "game3.sav",
+        "game4.sav", "game5.sav", "game6.sav", "game7.sav", "game8.sav", "game9.sav"
+    };
+    char base[MAX_PATH], dir[MAX_PATH];
+    const char *env = getenv("DUKE3D_SAVE_DIR");
+    int i;
+
+    if (env != NULL && env[0] != '\0')
+        snprintf(base, sizeof(base), "%s", env);
+    else if (win32_savedgames_dir(base, sizeof(base)) != 0)
+        base[0] = '\0';
+
+    sprintf(ApogeePath, ".%s", PATH_SEP_STR);
+    if (base[0] != '\0' && strlen(base) + sizeof("\\Duke Nukem 3D\\") <= sizeof(ApogeePath))
+    {
+        _mkdir(base);
+        snprintf(dir, sizeof(dir), "%s\\Duke Nukem 3D", base);
+        if (_mkdir(dir) == 0 || errno == EEXIST)
+        {
+            snprintf(ApogeePath, sizeof(ApogeePath), "%s\\", dir);
+            for (i = 0; i < (int)(sizeof(carry)/sizeof(carry[0])); i++)
+                carry_over(carry[i]);
+        }
+        else
+            fprintf(stderr, "Couldn't create the save folder %s; using the game folder.\n", dir);
     }
 #else
     sprintf(ApogeePath, ".%s", PATH_SEP_STR);

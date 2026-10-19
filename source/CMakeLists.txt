@@ -23,6 +23,12 @@ target_include_directories(duke3d_game PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(duke3d_game PUBLIC
   duke3d_game_options buildengine audiolib duke3d::SDL2_mixer)
 
+# The Windows Saved Games folder (SHGetKnownFolderPath, CoTaskMemFree).
+if(WIN32)
+  target_sources(duke3d_game PRIVATE win32_savedir.c)
+  target_link_libraries(duke3d_game PUBLIC shell32 ole32)
+endif()
+
 add_executable(duke3d game.c)
 target_link_libraries(duke3d PRIVATE duke3d_game duke3d::SDL2main)
 
