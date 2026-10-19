@@ -206,10 +206,15 @@ int loadplayer(signed char spot)
 
      if(spot < 0)
      {
+#if DUKE3D_GAMEVER < GAMEVER_14
+        // 1.3D loads locally in a network game too; it has no load request.
+        spot = -spot-1;
+#else
         multiflag = 1;
         multiwhat = 0;
         multipos = -spot-1;
         return -1;
+#endif
      }
 
      if( multiflag == 2 && multiwho != myconnectindex )
@@ -556,13 +561,20 @@ int saveplayer(signed char spot)
 
      if(spot < 0)
      {
+#if DUKE3D_GAMEVER < GAMEVER_14
+        // 1.3D saves locally in a network game too; it has no save request.
+        spot = -spot-1;
+#else
         multiflag = 1;
         multiwhat = 1;
         multipos = -spot-1;
         return -1;
+#endif
      }
 
+#if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D's saveplayer doesn't wait for the other players
      waitforeverybody();
+#endif
 
      if( multiflag == 2 && multiwho != myconnectindex )
      {
@@ -712,7 +724,9 @@ int saveplayerfile(char *fnptr, signed char spot)
 
      ready2send = 1;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
      waitforeverybody();
+#endif
 
      ototalclock = totalclock;
 

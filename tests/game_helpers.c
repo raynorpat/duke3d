@@ -4,7 +4,13 @@
  *  the 1.3D executable has built in. Needs no game data.
  */
 #define SDL_MAIN_HANDLED  /* game.c's main() is renamed; this one is ours. */
+#include <sys/stat.h>
 #include "duke3d.h"
+#if PLATFORM_WIN32
+#include <direct.h>
+#define mkdir(d, m) _mkdir(d)
+#define rmdir _rmdir
+#endif
 
 static int failures;
 
@@ -44,6 +50,19 @@ int main(void)
     check_str("skill_names[1]", skill_names[1], "LET'S ROCK");
     check_str("skill_names[2]", skill_names[2], "COME GET SOME");
     check_str("skill_names[3]", skill_names[3], "DAMN I'M GOOD");
+
+    /* 1.3D saves and loads locally even in a network game: a negative slot
+       (the menu's multiplayer request) must not queue a request that 1.3D
+       has no handler for. A directory named game0.sav makes the save's fopen
+       fail, and there is no game1.sav, so neither call touches game state. */
+    mkdir("game0.sav", 0755);
+    multiflag = 0;
+    saveplayer(-1);
+    check("multiflag after saveplayer(-1)", multiflag, 0);
+    multiflag = 0;
+    loadplayer(-2);
+    check("multiflag after loadplayer(-2)", multiflag, 0);
+    rmdir("game0.sav");
 #endif
 
     if (failures) {
