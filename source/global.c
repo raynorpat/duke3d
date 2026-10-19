@@ -80,8 +80,14 @@ char betaname[80];
 
 char level_names[44][33],level_file_names[44][128];
 int32_t partime[44],designertime[44];
+#if DUKE3D_GAMEVER < GAMEVER_14
+// 1.3D CONs can't name episodes or skills; the 1.3D executable has these built in.
+char volume_names[4][33] = { "L.A. MELTDOWN", "LUNAR APOCALYPSE", "SHRAPNEL CITY" };
+char skill_names[5][33] = { "PIECE OF CAKE", "LET'S ROCK", "COME GET SOME", "DAMN I'M GOOD" };
+#else
 char volume_names[4][33];
 char skill_names[5][33];
+#endif
 
 volatile int32_t checksume;
 int32_t soundsiz[NUM_SOUNDS];
