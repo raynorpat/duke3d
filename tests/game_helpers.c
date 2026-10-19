@@ -80,12 +80,16 @@ int main(void)
     check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
 #endif
     check("Atomic GRP", grpmismatch(44356548, 0xFD3DCFF1) != NULL, 1);
-#elif DUKE3D_GAMEVER >= GAMEVER_15 && !defined(VOLUMEONE)
-    check("Atomic GRP", grpmismatch(44356548, 0xFD3DCFF1) != NULL, 0);
-    check("1.3D full GRP", grpmismatch(26524524, 0xBBC9CE44) != NULL, 1);
+    check("1.4 GRP", grpmismatch(44348015, 0xF514A6AC) != NULL, 1);
+#elif DUKE3D_GAMEVER < GAMEVER_15
+    check("1.4 GRP", grpmismatch(44348015, 0xF514A6AC) != NULL, 0);
+    check("Atomic GRP", grpmismatch(44356548, 0xFD3DCFF1) != NULL, 1);
 #else
+    check("Atomic GRP", grpmismatch(44356548, 0xFD3DCFF1) != NULL, 0);
+    check("1.4 GRP", grpmismatch(44348015, 0xF514A6AC) != NULL, 1);
     check("1.3D full GRP", grpmismatch(26524524, 0xBBC9CE44) != NULL, 1);
 #endif
+    check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
 
     if (failures) {
         printf("%d failures\n", failures);

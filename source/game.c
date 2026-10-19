@@ -7770,25 +7770,33 @@ void copyprotect(void)
 }
 
 
-// The release GRPs, by size and CRC-32, measured from the original files.
-static const struct { int32_t size; uint32_t crc; const char *name; } knowngrps[] =
+// Which build plays a GRP: none, 1.3D full, 1.3D shareware, 1.4 or 1.5.
+enum { GRP_NONE, GRP_13D, GRP_13DSW, GRP_14, GRP_15 };
+
+// The release DUKE3D.GRPs, by size and CRC-32 (the EDuke32 wiki FAQ's table;
+// the 1.3D and Atomic values were also measured from the original files).
+static const struct { int32_t size; uint32_t crc; int build; const char *name; } knowngrps[] =
 {
-    { 26524524, 0xBBC9CE44, "the 1.3D full release" },
-    { 11035779, 0x983AD923, "the 1.3D shareware release" },
-    { 44356548, 0xFD3DCFF1, "the 1.5 Atomic Edition" },
+    {  9690241, 0x02F18900, GRP_NONE,  "the 0.99 shareware release" },
+    { 10429258, 0xA28AA589, GRP_NONE,  "the 1.0 shareware release" },
+    { 10442980, 0x912E1E8D, GRP_NONE,  "the 1.1 shareware release" },
+    { 11035779, 0x983AD923, GRP_13DSW, "the 1.3D shareware release" },
+    { 10444391, 0xC5F71561, GRP_NONE,  "the 1.5 Mac shareware release" },
+    { 26524524, 0xBBC9CE44, GRP_13D,   "the 1.3D full release" },
+    { 44348015, 0xF514A6AC, GRP_14,    "the 1.4 Plutonium Pak" },
+    { 44356548, 0xFD3DCFF1, GRP_15,    "the 1.5 Atomic Edition" },
 };
 
-// The entry for the data this build plays, or -1 if its GRP isn't in the table.
 #if DUKE3D_GAMEVER < GAMEVER_14
 #ifdef VOLUMEONE
-#define OWNGRP 1
+#define OWNGRP GRP_13DSW
 #else
-#define OWNGRP 0
+#define OWNGRP GRP_13D
 #endif
-#elif DUKE3D_GAMEVER >= GAMEVER_15 && !defined(VOLUMEONE)
-#define OWNGRP 2
+#elif DUKE3D_GAMEVER < GAMEVER_15
+#define OWNGRP GRP_14
 #else
-#define OWNGRP -1
+#define OWNGRP GRP_15
 #endif
 
 uint32_t grpcrc32(uint32_t crc, const unsigned char *buf, size_t n)
@@ -7815,7 +7823,7 @@ const char *grpmismatch(int32_t size, uint32_t crc)
 
     for (i = 0; i < (int)(sizeof(knowngrps)/sizeof(knowngrps[0])); i++)
         if (knowngrps[i].size == size && knowngrps[i].crc == crc)
-            return (i == OWNGRP) ? NULL : knowngrps[i].name;
+            return (knowngrps[i].build == OWNGRP) ? NULL : knowngrps[i].name;
     return NULL;
 }
 
