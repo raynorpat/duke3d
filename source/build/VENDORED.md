@@ -41,3 +41,13 @@ BUILDLIC.TXT LICENSE.md
   - `VBE_setPalette`: pass `&fmt_swap[start]` to `SDL_SetPaletteColors`
     (upstream passed `fmt_swap`, handing uninitialized colors to SDL when
     `start != 0`); deliberate upstream bug fix
+  - `cleanup_vesa_modelist`: drop modes whose width isn't a multiple of 4
+    (SDL pads 8-bit surface rows to 4 bytes, but the engine assumes
+    `bytesperline == width`)
+  - `sdl_mouse_wheel_filter`: negate `y` for `SDL_MOUSEWHEEL_FLIPPED`
+  - `go_to_new_vid_mode`: set the window size even while fullscreen, so
+    leaving fullscreen restores the new mode's size
+  - `go_to_new_vid_mode`: call `SDL_InitSubSystem(SDL_INIT_VIDEO)` only when
+    `SDL_WasInit(SDL_INIT_VIDEO)` is 0
+- `cache1d.c`: `suckcache` passes `copybuf` a count of 4-byte words (it
+  passed a byte count, copying 4x too much); pre-existing upstream bug

@@ -175,12 +175,12 @@ void suckcache (int32_t *suckptr)
 			if ((i > 0) && (*cac[i-1].lock == 0))
 			{
 				cac[i-1].leng += cac[i].leng;
-				cacnum--; copybuf(&cac[i+1],&cac[i],(cacnum-i)*sizeof(cactype));
+				cacnum--; copybuf(&cac[i+1],&cac[i],(cacnum-i)*(int32_t)(sizeof(cactype)>>2));
 			}
 			else if ((i < cacnum-1) && (*cac[i+1].lock == 0))
 			{
 				cac[i+1].leng += cac[i].leng;
-				cacnum--; copybuf(&cac[i+1],&cac[i],(cacnum-i)*sizeof(cactype));
+				cacnum--; copybuf(&cac[i+1],&cac[i],(cacnum-i)*(int32_t)(sizeof(cactype)>>2));
 			}
 		}
 }

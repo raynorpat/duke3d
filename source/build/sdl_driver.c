@@ -474,7 +474,7 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
     getvalidvesamodes();
     SDL_ClearError();
 
-    if ((sdl_window == NULL) && (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0))
+    if ((SDL_WasInit(SDL_INIT_VIDEO) == 0) && (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0))
         goto vidmode_failed;
 
     free_video_surfaces();
@@ -499,12 +499,14 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
         if (sdl_renderer == NULL)
             goto vidmode_failed;
     } /* if */
-    else if (!sdl_fullscreen)
+    else
     {
+        /* set the size even when fullscreen, so going windowed restores it. */
         SDL_SetWindowSize(sdl_window, w * scale, h * scale);
-        SDL_SetWindowPosition(sdl_window, SDL_WINDOWPOS_CENTERED,
-                              SDL_WINDOWPOS_CENTERED);
-    } /* else if */
+        if (!sdl_fullscreen)
+            SDL_SetWindowPosition(sdl_window, SDL_WINDOWPOS_CENTERED,
+                                  SDL_WINDOWPOS_CENTERED);
+    } /* else */
 
     SDL_RenderSetLogicalSize(sdl_renderer, w, h);
 
@@ -575,9 +577,14 @@ static __inline int sdl_mouse_button_filter(SDL_MouseButtonEvent const *event)
 static int sdl_mouse_wheel_filter(SDL_MouseWheelEvent const *event)
 {
     /* bits 3 and 4 are wheel up/down; readmousebstatus() clears them. */
-    if (event->y > 0)
+    Sint32 y = event->y;
+
+    if (event->direction == SDL_MOUSEWHEEL_FLIPPED)
+        y = -y;
+
+    if (y > 0)
         mouse_buttons |= 8;
-    else if (event->y < 0)
+    else if (y < 0)
         mouse_buttons |= 16;
     return(0);
 } /* sdl_mouse_wheel_filter */
@@ -1796,8 +1803,25 @@ static __inline void sort_vesa_modelist(void)
 } /* sort_vesa_modelist */
 
 
+/* the engine assumes bytesperline == width, but SDL pads surface rows to 4. */
+static __inline void cull_unaligned_vesa_modes(void)
+{
+    int i;
+
+    for (i = 0; i < validmodecnt; i++)
+    {
+        if (validmodexdim[i] & 3)
+        {
+            remove_vesa_mode(i, "width not a multiple of 4");
+            i--;  /* list shrinks. */
+        } /* if */
+    } /* for */
+} /* cull_unaligned_vesa_modes */
+
+
 static __inline void cleanup_vesa_modelist(void)
 {
+    cull_unaligned_vesa_modes();
     cull_large_vesa_modes();
     cull_duplicate_vesa_modes();
     sort_vesa_modelist();
