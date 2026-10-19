@@ -39,10 +39,24 @@ Options (pass with `-D` when configuring):
 | `DUKE3D_FETCH_SDL` | `AUTO` | `ON` always builds SDL2 from source, `OFF` never does |
 
 **64-bit:** the game runs as a native 64-bit binary. That's verified on macOS
-arm64; Linux and Windows are built and tested in CI. Saves from this build can't
-be loaded by the original DOS game, and original DOS saves can't be loaded yet.
-Demo recording and playback and the editor's map saving are verified on 64-bit.
-Network play builds but hasn't been verified on 64-bit.
+arm64; Linux and Windows are built and tested in CI. Original DOS 1.5 (Atomic
+Edition) saves load, on any OS and CPU, and this build writes its saves in the
+same layout. The original DOS game can't load them back, though, and 1.3D saves
+aren't supported. Demo recording and playback and the editor's map saving are
+verified on 64-bit. Network play builds but hasn't been verified on 64-bit.
+
+### DOS save tests
+
+The DOS save tests need the Atomic Edition data and some DOS 1.5 saves. Copy
+the GRP and CON files off the Atomic CD image (the image is only read):
+
+    python3 tools/extract_iso_files.py "<Track 1>.bin" ~/duke3d-data/atomic15 \
+        ATOMINST/DUKE3D.GRP ATOMINST/GAME.CON ATOMINST/DEFS.CON ATOMINST/USER.CON
+
+Then configure with `-DDUKE3D_ATOMIC_GRP=$HOME/duke3d-data/atomic15/DUKE3D.GRP`
+and `-DDUKE3D_DOS_SAVES_DIR=<folder of .sav files>`. Each save gets a
+`dos_save_load_*` test, which compares the game's headless `-loadverify` output
+with an independent decoder (`tests/dos_save_decode.py`, needs Python 3).
 
 Without a `duke3d.cfg`, the game starts with default settings and writes one:
 to `~/Library/Application Support/Duke Nukem 3D/` on macOS, `~/.duke3d/` on
