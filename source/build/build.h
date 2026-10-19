@@ -141,9 +141,13 @@ typedef struct
 #pragma pack()
 #endif
 
-_Static_assert(sizeof(sectortype) == 40, "sectortype must match the on-disk size");
-_Static_assert(sizeof(walltype) == 32, "walltype must match the on-disk size");
-_Static_assert(sizeof(spritetype) == 44, "spritetype must match the on-disk size");
+/* A C99 compile-time check: the array size is negative when c is false. */
+#define BUILD_STATIC_ASSERT(c, name) typedef char build_static_assert_##name[(c) ? 1 : -1]
+
+/* These must match the on-disk sizes. */
+BUILD_STATIC_ASSERT(sizeof(sectortype) == 40, sectortype_size);
+BUILD_STATIC_ASSERT(sizeof(walltype) == 32, walltype_size);
+BUILD_STATIC_ASSERT(sizeof(spritetype) == 44, spritetype_size);
 
 EXTERN sectortype sector[MAXSECTORS];
 EXTERN walltype wall[MAXWALLS];

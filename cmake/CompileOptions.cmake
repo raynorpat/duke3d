@@ -25,8 +25,10 @@ endif()
 if(MSVC)
   target_compile_definitions(duke3d_compile_options INTERFACE
     _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE)
-  # /J: char is unsigned, which the game logic assumes.
-  target_compile_options(duke3d_compile_options INTERFACE /J /W3 /wd4996)
+  # /J: char is unsigned, which the game logic assumes. /we4311 /we4312
+  # /we4302: pointer truncation and widening casts are errors.
+  target_compile_options(duke3d_compile_options INTERFACE
+    /J /W3 /wd4996 /we4311 /we4312 /we4302)
 else()
   # The game logic assumes unsigned char, and the code relies on
   # type-punning that breaks under strict aliasing.
@@ -46,6 +48,18 @@ else()
     if(${_var})
       target_compile_options(duke3d_compile_options INTERFACE
         "-Wno-error=${_flag}")
+    endif()
+  endforeach()
+
+  # Casts that truncate or widen an address are errors on 64-bit targets.
+  foreach(_flag
+      pointer-to-int-cast
+      int-to-pointer-cast)
+    string(MAKE_C_IDENTIFIER "DUKE3D_HAS_WERROR_${_flag}" _var)
+    check_c_compiler_flag("-Werror=${_flag}" ${_var})
+    if(${_var})
+      target_compile_options(duke3d_compile_options INTERFACE
+        "-Werror=${_flag}")
     endif()
   endforeach()
 endif()
