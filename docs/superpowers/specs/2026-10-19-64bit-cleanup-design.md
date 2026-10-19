@@ -31,7 +31,7 @@ In scope:
 5. A default configuration when `duke3d.cfg` is missing.
 6. The four SDL driver fixes deferred from the previous spec that become reachable once
    the game boots.
-7. Tests: `script_offsets`, `game_boot`, and the existing `sdl_driver_smoke` (now also on
+7. Tests: `con_compile`, `game_boot`, and the existing `sdl_driver_smoke` (now also on
    Windows).
 
 Out of scope:
@@ -180,11 +180,13 @@ guard is removed.
 
 1. **Compile-time:** the `-Werror` flags and `_Static_assert` checks from section 4.
 2. **`sdl_driver_smoke`** (existing): passes on all three OSes.
-3. **`script_offsets`** (new CTest, no game data needed):
-   - checks that `SCRIPT_OFF(SCRIPT_PTR(x)) == x` for representative offsets;
-   - checks that offsets survive storage in `int32_t` and in a `struct weaponhit`
-     `temp_data` slot;
-   - links only the minimum needed to define `script`.
+3. **`con_compile`** (new CTest, no game data needed, runs in CI):
+   - compiles the in-repo `testdata/game.con`, `defs.con` and `user.con` with the game's
+     real CON compiler (`gamedef.c`);
+   - asserts every stored script address is a byte offset inside the compiled script
+     `[0, scriptsize * 4)`: jump and label targets in `script[]`, `labelcode[]`, and every
+     non-zero `actorscrptr[]`;
+   - asserts that at least one actor got a script, so the test can't pass vacuously.
 4. **`game_boot`** (new CTest, CMake `-P` script):
    - Registered only when the configure-time cache variable `DUKE3D_GRP` names an
      existing GRP; otherwise not registered, which is the case in CI.
@@ -216,7 +218,7 @@ guard is removed.
 1. macOS arm64: `cmake --preset default && cmake --build --preset default` builds with zero
    errors, including the new `-Werror` flags and static asserts.
 2. `ctest --preset default` passes locally with `-DDUKE3D_GRP=<path to DUKE3D.GRP>`:
-   `sdl_driver_smoke`, `script_offsets` and `game_boot`.
+   `sdl_driver_smoke`, `con_compile` and `game_boot`.
 3. The manual checklist in Testing step 5 passes.
 4. When the user pushes, all three CI jobs build and pass `ctest`. `game_boot` is not
    registered in CI.
