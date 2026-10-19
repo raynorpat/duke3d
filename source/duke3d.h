@@ -11,7 +11,7 @@ of the License, or (at your option) any later version.
 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 See the GNU General Public License for more details.
 
@@ -146,7 +146,6 @@ struct player_struct;
 #include "_rts.h"
 #include "rts.h"
 #include "soundefs.h"
-
 
 #include "task_man.h"
 #include "audiolib/music.h"
@@ -642,5 +641,4 @@ extern int32_t myaimmode, myaimstat, omyaimstat;
 
 extern int32 dukever13; // indicate old version
 
-#endif  // include-once header.
-
+#endif
