@@ -129,6 +129,25 @@ int _kinp_handler(int port, char *source_file, int source_line);
 #define S_IREAD _S_IREAD
 #define S_IWRITE _S_IWRITE
 #define S_IRDWR _S_IRDWR
+
+#ifndef S_IRWXU
+#define S_IRWXU (_S_IREAD | _S_IWRITE | _S_IEXEC)
+#endif
+#ifndef S_IRUSR
+#define S_IRUSR _S_IREAD
+#endif
+#ifndef S_IWUSR
+#define S_IWUSR _S_IWRITE
+#endif
+#ifndef S_IRGRP
+#define S_IRGRP 0
+#endif
+#ifndef S_IWGRP
+#define S_IWGRP 0
+#endif
+#ifndef S_IROTH
+#define S_IROTH 0
+#endif
 #endif /* defined _MSC_VER */
 
 #if ((defined _MSC_VER) && (_MSC_VER < 1900))

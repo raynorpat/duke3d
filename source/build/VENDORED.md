@@ -22,7 +22,9 @@ BUILDLIC.TXT LICENSE.md
   `_kinp_handler()` for Windows; upstream only defines them in
   `unix_compat.c`, which refuses to build without `PLATFORM_UNIX`.
 - `win32_compat.h`: don't include `<dos.h>` under MSVC (it no longer ships
-  one); only map `snprintf` to `_snprintf` before VS2015.
+  one); only map `snprintf` to `_snprintf` before VS2015; under MSVC, define
+  `S_IRWXU`, `S_IRUSR`, `S_IWUSR`, `S_IRGRP`, `S_IWGRP` and `S_IROTH` (the
+  game uses them for `mkdir` and `savetemp`).
 - `sdl_driver.c`: ported from SDL 1.2 to SDL2:
   - window + renderer + streaming ARGB texture; the 8-bit surface is
     blitted through its palette on every present
@@ -34,3 +36,8 @@ BUILDLIC.TXT LICENSE.md
   - `VBE_setPalette` presents immediately, because Duke's fades
     (`palto()`) never call `nextpage()`
   - `splash.bmp` support and the PowerPC/Gestalt AltiVec probe removed
+  - `screencapture`: include `<malloc.h>` for `alloca` on Win32 and fall
+    back for the `S_IRUSR`-style permission macros
+  - `VBE_setPalette`: pass `&fmt_swap[start]` to `SDL_SetPaletteColors`
+    (upstream passed `fmt_swap`, handing uninitialized colors to SDL when
+    `start != 0`); deliberate upstream bug fix
