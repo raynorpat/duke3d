@@ -1,6 +1,7 @@
 # Compiles the 1.3D CONs from a data folder with the game's compiler and
 # compares the bytecode with the script stored in a DOS save made by the
-# original executable.
+# original executable. Then it does the same with copies converted to LF line
+# endings (as git or a package may leave them), which must compile the same.
 #
 #   cmake -DDATA=<data dir> -DEDITION=<full|sw> -DCON_COMPILE=<exe>
 #         -DPYTHON=<python3> -DDECODER=<v13d_save_decode.py> -DWORK=<scratch>
@@ -39,4 +40,16 @@ execute_process(COMMAND "${CON_COMPILE}" "${WORK}" "${WORK}/ref.txt"
                 RESULT_VARIABLE _r)
 if(NOT _r EQUAL 0)
   message(FATAL_ERROR "the compiled script doesn't match the DOS executable's")
+endif()
+
+file(MAKE_DIRECTORY "${WORK}/lf")
+foreach(_con game.con DEFS.CON USER.CON)
+  file(READ "${WORK}/${_con}" _text)
+  string(REPLACE "\r\n" "\n" _text "${_text}")
+  file(WRITE "${WORK}/lf/${_con}" "${_text}")
+endforeach()
+execute_process(COMMAND "${CON_COMPILE}" "${WORK}/lf" "${WORK}/ref.txt"
+                RESULT_VARIABLE _r)
+if(NOT _r EQUAL 0)
+  message(FATAL_ERROR "with LF line endings, the compiled script doesn't match the DOS executable's")
 endif()

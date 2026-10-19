@@ -1574,7 +1574,14 @@ void loadefs(char *filenam,char *mptr)
         kclose(fp);
     }
 
-#if defined(PLATFORM_UNIX) && DUKE3D_GAMEVER >= GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_14
+    // Fix: 1.3D cut the last two bytes, its CRLF; with LF line endings that
+    // dropped a real character. Cut only the line ending (the same as 1.3D
+    // for CRLF files, so the bytecode still matches).
+    if (fs > 0 && textptr[fs - 1] == '\n') fs--;
+    if (fs > 0 && textptr[fs - 1] == '\r') fs--;
+    textptr[fs] = 0;
+#elif defined(PLATFORM_UNIX)
     textptr[fs - 1] = 0;
 #else
     textptr[fs - 2] = 0;
