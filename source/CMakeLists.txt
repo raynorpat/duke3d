@@ -5,7 +5,6 @@ add_library(duke3d_game OBJECT
   animlib.c
   config.c
   control.c
-  dukemusc.c
   gamedef.c
   global.c
   keyboard.c

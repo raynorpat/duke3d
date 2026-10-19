@@ -11,6 +11,7 @@ add_library(audiolib STATIC
   ll_man.c
   midi.c
   multivoc.c
+  music.c
   mv_mix.c
   mvreverb.c
   nodpmi.c

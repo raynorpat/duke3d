@@ -261,7 +261,6 @@ void intomenusounds(void)
 
 void playmusic(char *fn)
 {
-#if PLATFORM_DOS
     short      fp;
     int32_t        l;
 
@@ -283,13 +282,6 @@ void playmusic(char *fn)
     kread( fp, MusicPtr, l);
     kclose( fp );
     MUSIC_PlaySong( MusicPtr, MUSIC_LoopSong );
-#else
-    if(MusicToggle == 0) return;
-    if(MusicDevice == NumSoundCards) return;
-
-    // the SDL_mixer version does more or less this same thing.  --ryan.
-    PlayMusic(fn);
-#endif
 }
 
 char loadsound(unsigned short num)

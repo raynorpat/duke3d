@@ -127,7 +127,6 @@ int FX_StartDemandFeedPlayback( void ( *function )( char **ptr, uint32_t *length
        int priority, uint32_t callbackval );
 int  FX_StartRecording( int MixRate, void ( *function )( char *ptr, int length ) );
 void FX_StopRecord( void );
-void PlayMusic(char *_filename);
 
 // API addition: Call this when you reload/ditch a pile of sound effects.
 //  (mapchange? Dunno if duke3d blindly loads all sounds at startup).

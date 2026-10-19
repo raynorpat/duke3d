@@ -1,10 +1,9 @@
 /*
  * Jim Dose's MUSIC_* routines over his MIDI and AL_MIDI code and an
- *   emulated OPL3, played through DSL (SDL audio).
- *   Whee. FX_MAN is also known as the "Apogee Sound System", or "ASS" for
- *   short. How strangely appropriate that seems.
+ *   emulated OPL3, played through DSL (SDL audio). This takes the place of
+ *   his MUSIC.C, which drove the DOS sound cards.
  *
- * Written by Ryan C. Gordon. (icculus@clutteredmind.org)
+ * Based on Ryan C. Gordon's SDL_mixer version. (icculus@clutteredmind.org)
  */
 
 #include <stdint.h>
@@ -13,9 +12,6 @@
 #include <stdarg.h>
 #include <string.h>
 #include <assert.h>
-
-#include "duke3d.h"
-#include "build/cache1d.h"
 
 #if PLATFORM_DOS
 // Use the original Apogee Sound System libs instead.  --ryan.
@@ -38,11 +34,11 @@
 #include "rt_util.h"     // ROTT music hack
 #endif
 #include "music.h"
-#include "audiolib/midi.h"
-#include "audiolib/al_midi.h"
-#include "audiolib/oplemu.h"
-#include "audiolib/dsl.h"
-#include "audiolib/interrup.h"
+#include "midi.h"
+#include "al_midi.h"
+#include "oplemu.h"
+#include "dsl.h"
+#include "interrup.h"
 
 #define __FX_TRUE  (1 == 1)
 #define __FX_FALSE (!__FX_TRUE)
@@ -194,7 +190,6 @@ static int music_initialized = 0;
 static int music_hooked = 0;
 static int music_bits = 16;
 static int music_channels = 2;
-static unsigned char *music_songdata = NULL;
 static midifuncs music_midifuncs;
 
 static void music_mixer(unsigned char *stream, int len)
@@ -413,9 +408,6 @@ int MUSIC_StopSong(void)
     MIDI_StopSong();
     RestoreInterrupts(flags);
 
-    // PlayMusic's copy; MUSIC_PlaySong's caller owns its own.
-    free(music_songdata);
-    music_songdata = NULL;
     return(MUSIC_Ok);
 } // MUSIC_StopSong
 
@@ -423,7 +415,6 @@ int MUSIC_StopSong(void)
 int MUSIC_PlaySong(unsigned char *song, int loopflag)
 {
     uint32_t flags;
-
     int status;
 
     MUSIC_StopSong();
@@ -440,54 +431,6 @@ int MUSIC_PlaySong(unsigned char *song, int loopflag)
 
     return(MUSIC_Ok);
 } // MUSIC_PlaySong
-
-
-// Duke3D-specific.  --ryan.
-void PlayMusic(char *_filename)
-{
-    int32_t handle;
-    int32_t size;
-    unsigned char *song;
-    int32_t rc;
-
-    MUSIC_StopSong();
-
-    handle = kopen4load(_filename, 0);
-    if (handle == -1)
-        return;
-
-    size = kfilelength(handle);
-    if (size == -1)
-    {
-        kclose(handle);
-        return;
-    } // if
-
-    song = malloc(size);
-    if (song == NULL)
-    {
-        kclose(handle);
-        return;
-    } // if
-
-    rc = kread(handle, song, size);
-    kclose(handle);
-    if (rc != size)
-    {
-        free(song);
-        return;
-    } // if
-
-    // MIDI plays straight out of the buffer, so it is kept until the song
-    //  is stopped.
-    if (MUSIC_PlaySong(song, MUSIC_LoopSong) != MUSIC_Ok)
-    {
-        free(song);
-        return;
-    } // if
-
-    music_songdata = song;
-}
 
 
 void MUSIC_SetContext(int context)
