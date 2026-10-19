@@ -67,6 +67,44 @@ int main(int argc, char **argv)
         }
     }
 
+    /* A partial update must land at its own offset and leave the rest alone. */
+    for (i = 0; i < 16; i++)
+    {
+        pal[i*4+0] = (char) (63 - i);          /* blue */
+        pal[i*4+1] = (char) (i * 3);           /* green */
+        pal[i*4+2] = (char) (32 + i);          /* red */
+        pal[i*4+3] = 0;
+    }
+    if (VBE_setPalette(16, 16, pal) != 1)
+    {
+        fprintf(stderr, "FAIL: VBE_setPalette(16, 16)\n");
+        return 1;
+    }
+
+    memset(readback, 0, sizeof (readback));
+    VBE_getPalette(0, 256, readback);
+    for (i = 0; i < 256 * 4; i++)
+    {
+        int entry = i / 4;
+        int diff;
+        if (i % 4 == 3)
+            continue;
+        if ((entry >= 16) && (entry < 32))
+            diff = (int) readback[i] - (int) pal[(entry - 16) * 4 + (i % 4)];
+        else
+        {
+            int orig = (i % 4 == 0) ? (entry >> 2) :
+                       (i % 4 == 1) ? (63 - (entry >> 2)) : ((entry * 7) & 63);
+            diff = (int) readback[i] - orig;
+        }
+        if ((diff < -1) || (diff > 1))
+        {
+            fprintf(stderr, "FAIL: after partial update, palette entry %d channel %d: read %d\n",
+                    entry, i % 4, (int) readback[i]);
+            return 1;
+        }
+    }
+
     for (i = 0; i < 30; i++)
     {
         memset((void *) frameplace, i * 8, xdim * ydim);
