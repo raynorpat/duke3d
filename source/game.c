@@ -8290,6 +8290,11 @@ char opendemoread(char which_demo) // 0 = mine
          kread32(recfilep,(int32 *)&ud.m_respawn_inventory);
      }
 
+     // Fix: 1.3D kept the player's cheats (god mode, noclip) into the demo, which then desynced; clear them as 1.4 does.
+     ud.god = ud.cashman = ud.eog = ud.showallmap = 0;
+     ud.clipping = ud.scrollmode = ud.overhead_on = 0;
+     ud.showweapons =  ud.pause_on = ud.auto_run = 0;
+
      newgame(ud.volume_number,ud.level_number,ud.player_skill);
      return(1);
 #else
