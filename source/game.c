@@ -704,9 +704,14 @@ void faketimerhandler()
           if (ud.multimode > 1) for(i=connecthead;i>=0;i=connectpoint2[i])
               if(i != myconnectindex)
               {
+#if DUKE3D_GAMEVER < GAMEVER_14
+                  // 1.3D's fake players stand still.
+                  clearbufbyte(&inputfifo[movefifoend[i]&(MOVEFIFOSIZ-1)][i],sizeof(input),0L);
+#else
                   //clearbufbyte(&inputfifo[movefifoend[i]&(MOVEFIFOSIZ-1)][i],sizeof(input),0L);
                   if(ud.playerai)
                       computergetinput(i,&inputfifo[movefifoend[i]&(MOVEFIFOSIZ-1)][i]);
+#endif
                   movefifoend[i]++;
               }
           return;
@@ -2394,7 +2399,9 @@ void displayrest(int32_t smoothratio)
                 if(pp->over_shoulder_on == 0 )
                     displaymasks(screenpeek);
             }
+#if DUKE3D_GAMEVER >= GAMEVER_14
             moveclouds();
+#endif
         }
 
         if( ud.overhead_on > 0 )
@@ -2852,6 +2859,11 @@ void displayrooms(short snum,int32_t smoothratio)
 
 //    if(screencapt == 0 && (p->gm&MODE_MENU) && ( (current_menu/100) == 3 ) || (current_menu >= 1000 && current_menu < 2999 ) )
   //      return;
+#if DUKE3D_GAMEVER < GAMEVER_14
+    // 1.3D draws nothing (and runs no camera timer) behind the load/save menus.
+    if(screencapt == 0 && (p->gm&MODE_MENU) && (current_menu/100) == 3)
+        return;
+#endif
 
     if(pub > 0)
     {
@@ -3465,7 +3477,9 @@ short spawn( short j, short pn )
                 sp->xvel = 64-(TRAND&127);
                 changespritestat(i,4);
                 break;
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case NATURALLIGHTNING:
+#endif
                 sp->cstat &= ~257;
                 sp->cstat |= 32768;
                 break;
@@ -3582,7 +3596,9 @@ short spawn( short j, short pn )
                changespritestat(i,5);
                break;
             case BLOODPOOL:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case PUKE:
+#endif
                 {
                     short s1;
                     s1 = sp->sectnum;
@@ -3728,7 +3744,9 @@ short spawn( short j, short pn )
             case MONK:
             case INDY:
             case LUKE:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case JURYGUY:
+#endif
             case SCALE:
             case VACUUM:
             case FANSPRITE:
@@ -3743,7 +3761,9 @@ short spawn( short j, short pn )
             case POT1:
             case POT2:
             case POT3:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case TRIPODCAMERA:
+#endif
             case SUSHIPLATE1:
             case SUSHIPLATE2:
             case SUSHIPLATE3:
@@ -3767,9 +3787,11 @@ short spawn( short j, short pn )
                 sp->cstat &= ~257;
                 changespritestat(i,0);
                 break;
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case DUKETAG:
             case SIGN1:
             case SIGN2:
+#endif
                 if(ud.multimode < 2 && sp->pal)
                 {
                     sp->xrepeat = sp->yrepeat = 0;
@@ -3845,11 +3867,15 @@ short spawn( short j, short pn )
             case FEM7:
             case FEM8:
             case FEM9:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case FEM10:
+#endif
             case PODFEM1:
             case NAKED1:
             case STATUE:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case TOUGHGAL:
+#endif
                 sp->yvel = sp->hitag;
                 sp->hitag = -1;
                 if(sp->picnum == PODFEM1) sp->extra <<= 1;
@@ -3907,7 +3933,9 @@ short spawn( short j, short pn )
             case MIKE:
                 if(sp->picnum == MIKE)
                     sp->yvel = sp->hitag;
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case WEATHERWARN:
+#endif
                 changespritestat(i,1);
                 break;
 
@@ -3924,8 +3952,10 @@ short spawn( short j, short pn )
 #endif
                 insertspriteq(i);
             case MONEY:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case MAIL:
             case PAPER:
+#endif
                 if( sp->picnum == MONEY || sp->picnum == MAIL || sp->picnum == PAPER )
                 {
                     hittype[i].temp_data[0] = TRAND&2047;
@@ -4186,10 +4216,12 @@ short spawn( short j, short pn )
             case BOLT1+1:
             case BOLT1+2:
             case BOLT1+3:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case SIDEBOLT1:
             case SIDEBOLT1+1:
             case SIDEBOLT1+2:
             case SIDEBOLT1+3:
+#endif
                 T1 = sp->xrepeat;
                 T2 = sp->yrepeat;
             case MASTERSWITCH:
@@ -4198,9 +4230,11 @@ short spawn( short j, short pn )
                 sp->yvel = 0;
                 changespritestat(i,6);
                 break;
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case TARGET:
             case DUCK:
             case LETTER:
+#endif
                 sp->extra = 1;
                 sp->cstat |= 257;
                 changespritestat(i,1);
@@ -4212,12 +4246,16 @@ short spawn( short j, short pn )
             case BOSS1STAYPUT:
             case PIGCOPDIVE:
             case COMMANDERSTAYPUT:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case BOSS4STAYPUT:
+#endif
                 hittype[i].actorstayput = sp->sectnum;
             case BOSS1:
             case BOSS2:
             case BOSS3:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case BOSS4:
+#endif
             case ROTATEGUN:
             case GREENSLIME:
                 if(sp->picnum == GREENSLIME)
@@ -4378,7 +4416,9 @@ short spawn( short j, short pn )
                 break;
 
             case OOZ:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case OOZ2:
+#endif
                 sp->shade = -12;
 
                 if(j >= 0)
@@ -4475,7 +4515,9 @@ short spawn( short j, short pn )
             case FREEZEAMMO:
             case HBOMBAMMO:
             case CRYSTALAMMO:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case GROWAMMO:
+#endif
             case BATTERYAMMO:
             case DEVISTATORAMMO:
             case RPGAMMO:
@@ -5136,9 +5178,11 @@ short spawn( short j, short pn )
                 sp->owner = i;
                 break;
             case CANWITHSOMETHING:
+#if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case CANWITHSOMETHING2:
             case CANWITHSOMETHING3:
             case CANWITHSOMETHING4:
+#endif
             case RUBBERCAN:
                 sp->extra = 0;
             case EXPLODINGBARREL:
@@ -5896,6 +5940,13 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
 
 
 
+// The weapons the give-all cheats hand out: 1.3D has no expander.
+#if DUKE3D_GAMEVER < GAMEVER_14
+#define CHEAT_WEAPONS 11
+#else
+#define CHEAT_WEAPONS MAX_WEAPONS
+#endif
+
 #define NUMCHEATCODES 26
 char cheatquotes[NUMCHEATCODES][14] = {
     {"cornholio"},
@@ -5907,7 +5958,11 @@ char cheatquotes[NUMCHEATCODES][14] = {
 #endif
     {"coords"},
     {"view"},
+#if DUKE3D_GAMEVER < GAMEVER_14
+    {"<RESERVED>"},
+#else
     {"time"},
+#endif
 #ifndef VOLUMEONE
     {"unlock"},
 #else
@@ -6002,7 +6057,7 @@ void cheats(void)
                         j = 0;
 #endif
 
-                        for ( weapon = PISTOL_WEAPON;weapon < MAX_WEAPONS-j;weapon++ )
+                        for ( weapon = PISTOL_WEAPON;weapon < CHEAT_WEAPONS-j;weapon++ )
                         {
                             addammo( weapon, &ps[myconnectindex], max_ammo_amount[weapon] );
                             ps[myconnectindex].gotweapon[weapon]  = 1;
@@ -6103,15 +6158,17 @@ void cheats(void)
 #else
                         j = 0;
 #endif
-                        for ( weapon = PISTOL_WEAPON;weapon < MAX_WEAPONS-j;weapon++ )
+                        for ( weapon = PISTOL_WEAPON;weapon < CHEAT_WEAPONS-j;weapon++ )
                            ps[myconnectindex].gotweapon[weapon]  = 1;
 
                         for ( weapon = PISTOL_WEAPON;
-                              weapon < (MAX_WEAPONS-j);
+                              weapon < (CHEAT_WEAPONS-j);
                               weapon++ )
                             addammo( weapon, &ps[myconnectindex], max_ammo_amount[weapon] );
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
                         ps[myconnectindex].ammo_amount[GROW_WEAPON] = 50;
+#endif
 
                         ps[myconnectindex].steroids_amount =         400;
                         ps[myconnectindex].heat_amount     =        1200;
@@ -6163,6 +6220,14 @@ void cheats(void)
 #endif
 #ifdef PLUTOPAK
                             if(volnume > 4)
+                            {
+                                ps[myconnectindex].cheat_phase = 0;
+                                KB_FlushKeyboardQueue();
+                                return;
+                            }
+                            else
+#elif DUKE3D_GAMEVER < GAMEVER_14
+                            if(volnume > 2)
                             {
                                 ps[myconnectindex].cheat_phase = 0;
                                 KB_FlushKeyboardQueue();
@@ -6887,7 +6952,9 @@ void checkcommandline(int argc,char **argv)
     ud.m_respawn_inventory = 0;
     ud.warp_on = 0;
     ud.cashman = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_14
     ud.m_player_skill = ud.player_skill = 2;
+#endif
 
 #ifdef BETA
     return;
@@ -6995,8 +7062,13 @@ void checkcommandline(int argc,char **argv)
                     case 'c':
                     case 'C':
                         c++;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        if(*c == '0' || *c == '1' || *c == '2' )
+                            ud.m_coop = *c - '0';
+#else
                         if(*c == '1' || *c == '2' || *c == '3' )
                             ud.m_coop = *c - '0' - 1;
+#endif
                         else ud.m_coop = 0;
 
                         switch(ud.m_coop)
@@ -7061,12 +7133,17 @@ void checkcommandline(int argc,char **argv)
                     case 'Q':
                         puts("Fake multiplayer mode.");
                         if( *(++c) == 0) ud.multimode = 1;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        else ud.multimode = atol(c)%16;
+                        ud.m_coop = ud.coop = 0;
+#else
                         else ud.multimode = atol(c)%17;
                         ud.m_coop = ud.coop = 0;
                         ud.m_marker = ud.marker = 1;
                         ud.m_respawn_monsters = ud.respawn_monsters = 1;
                         ud.m_respawn_items = ud.respawn_items = 1;
                         ud.m_respawn_inventory = ud.respawn_inventory = 1;
+#endif
 
                         break;
                     case 'r':
@@ -7087,6 +7164,9 @@ void checkcommandline(int argc,char **argv)
                         ud.warp_on = 1;
                         c++;
                         ud.m_level_number = ud.level_number = (atol(c)-1)%11;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        ud.m_player_skill = ud.player_skill = 1; // 1.3D: /l also picks skill 1
+#endif
                         break;
                     case 'j':
                     case 'J':
@@ -7110,14 +7190,20 @@ void checkcommandline(int argc,char **argv)
                     case 'V':
                         c++;
                         ud.warp_on = 1;
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        ud.m_volume_number = ud.volume_number = (int32_t)(atol(c)&3)-1;
+#else
                         ud.m_volume_number = ud.volume_number = (int32_t)atol(c)-1;
+#endif
                         break;
                     case 's':
                     case 'S':
                         c++;
                         ud.m_player_skill = ud.player_skill = (atol(c)%5);
+#if DUKE3D_GAMEVER >= GAMEVER_14
                         if(ud.m_player_skill == 4)
                             ud.m_respawn_monsters = ud.respawn_monsters = 1;
+#endif
                         break;
                     case '0':
                     case '1':
@@ -7294,6 +7380,7 @@ void Logo(void)
         else if( totalclock >= (220+30) )
             rotatesprite(160<<16,(129)<<16,30<<11,0,THREEDEE,0,0,2+8,0,0,xdim-1,ydim-1);
 
+#if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D's title has no Plutonium Pak logo
         if( totalclock >= 280 && totalclock < 395 )
         {
             rotatesprite(160<<16,(151)<<16,(410-totalclock)<<12,0,PLUTOPAKSPRITE+1,0,0,2+8,0,0,xdim-1,ydim-1);
@@ -7312,6 +7399,7 @@ void Logo(void)
             }
             rotatesprite(160<<16,(151)<<16,30<<11,0,PLUTOPAKSPRITE+1,0,0,2+8,0,0,xdim-1,ydim-1);
         }
+#endif
 
         getpackets();
         nextpage();
@@ -7323,7 +7411,9 @@ void Logo(void)
 
         rotatesprite(160<<16,(104)<<16,60<<10,0,DUKENUKEM,0,0,2+8,0,0,xdim-1,ydim-1);
         rotatesprite(160<<16,(129)<<16,30<<11,0,THREEDEE,0,0,2+8,0,0,xdim-1,ydim-1);
+#if DUKE3D_GAMEVER >= GAMEVER_14
         rotatesprite(160<<16,(151)<<16,30<<11,0,PLUTOPAKSPRITE+1,0,0,2+8,0,0,xdim-1,ydim-1);
+#endif
 
         gametext(160,190,"WAITING FOR PLAYERS",14,2);
         nextpage();
@@ -8887,6 +8977,7 @@ char domovethings(void)
     short i, j;
     char ch;
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
     for(i=connecthead;i>=0;i=connectpoint2[i])
         if( sync[i].bits&(1<<17) )
     {
@@ -8938,6 +9029,7 @@ char domovethings(void)
             }
         }
     }
+#endif
 
     ud.camerasprite = -1;
     lockclock += TICSPERFRAME;
@@ -8979,7 +9071,9 @@ char domovethings(void)
      {
           if ((sync[i].bits&(1<<26)) == 0) { j = i; continue; }
 
+#if DUKE3D_GAMEVER >= GAMEVER_14
           closedemowrite();
+#endif
 
           if (i == myconnectindex) gameexit(" ");
           if (screenpeek == i)
@@ -9371,7 +9465,9 @@ void dobonus(char bonusonly)
 
         rotatesprite(0,0,65536L,0,MENUSCREEN,16,0,2+8+16+64,0,0,xdim-1,ydim-1);
         rotatesprite(160<<16,34<<16,65536L,0,INGAMEDUKETHREEDEE,0,0,10,0,0,xdim-1,ydim-1);
+#if DUKE3D_GAMEVER >= GAMEVER_14
         rotatesprite((260)<<16,36<<16,65536L,0,PLUTOPAKSPRITE+2,0,0,2+8,0,0,xdim-1,ydim-1);
+#endif
         gametext(160,58+2,"MULTIPLAYER TOTALS",0,2+8+16);
         gametext(160,58+10,level_names[(ud.volume_number*11)+ud.last_level-1],0,2+8+16);
 

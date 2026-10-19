@@ -2166,7 +2166,9 @@ void menus(void)
         case 0:
             c = (320>>1);
             rotatesprite(c<<16,(28<<16)-5,65536L,0,INGAMEDUKETHREEDEE,0,0,10,0,0,xdim-1,ydim-1);
+#if DUKE3D_GAMEVER >= GAMEVER_14 // no Plutonium Pak logo in 1.3D's menus
             rotatesprite((c+100)<<16,(36<<16)-5,65536L,0,PLUTOPAKSPRITE+2,(sintable[(totalclock<<4)&2047]>>11),0,2+8,0,0,xdim-1,ydim-1);
+#endif
 // CTW - MODIFICATION
 //          x = probe(c,67-3,16,7);
             count = 6;
@@ -2304,7 +2306,9 @@ void menus(void)
         case 50:
             c = (320>>1);
             rotatesprite(c<<16,32<<16,65536L,0,INGAMEDUKETHREEDEE,0,0,10,0,0,xdim-1,ydim-1);
+#if DUKE3D_GAMEVER >= GAMEVER_14 // no Plutonium Pak logo in 1.3D's menus
             rotatesprite((c+100)<<16,36<<16,65536L,0,PLUTOPAKSPRITE+2,(sintable[(totalclock<<4)&2047]>>11),0,2+8,0,0,xdim-1,ydim-1);
+#endif
             x = probe(c,67,16,7);
             switch(x)
             {
