@@ -552,7 +552,14 @@ void getpackets(void)
                 break;
             case 6:
                 if (packbuf[1] != BYTEVERSION)
+                {
+                    // Fix: a peer that refused before sending its own name packet left the other one waiting forever; send our version first.
+                    char ver[3];
+
+                    ver[0] = 6; ver[1] = BYTEVERSION; ver[2] = 0;
+                    sendpacket(other,ver,3);
                     gameexit("\nYou cannot play Duke with different versions.");
+                }
                 for (i=2;packbuf[i];i++)
                     ud.user_name[other][i-2] = packbuf[i];
                 ud.user_name[other][i-2] = 0;
@@ -7554,7 +7561,10 @@ void Startup(void)
    initmultiplayers(0,0,0);
 
    if(numplayers > 1)
+   {
     puts("Multiplayer initialized.");
+    fflush(stdout);  // Fix: so a log redirected to a file shows it even if the game is killed later.
+   }
 
    ps[myconnectindex].palette = (char *) &palette[0];
    SetupGameButtons();

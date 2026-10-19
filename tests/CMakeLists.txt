@@ -285,6 +285,40 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
       COMMAND lzw_roundtrip "${_v13d_data}/refsaves/e1l1start.SAV"
       WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
   endif()
+  if(_v13d_data)
+    # Two copies of this build must meet over UDP on localhost, and both
+    # peers must refuse any other version or edition. Each DUKE3D_NET_PEERS
+    # entry is "<duke3d executable>=<folder with its GRP and CONs>".
+    set(DUKE3D_NET_PEERS "" CACHE STRING "Other duke3d builds to test multiplayer refusal against")
+    if(_v13d_edition STREQUAL "full")
+      set(_net_port 23600)
+    else()
+      set(_net_port 23700)
+    endif()
+    add_test(NAME net_connect_v13d_${_v13d_edition}
+      COMMAND "${CMAKE_COMMAND}"
+              "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_v13d_data}"
+              "-DB=$<TARGET_FILE:duke3d>" "-DB_DATA=${_v13d_data}"
+              -DPORT=${_net_port} -DMODE=connect
+              "-DWORK=${CMAKE_BINARY_DIR}/nc13"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
+    set_tests_properties(net_connect_v13d_${_v13d_edition} PROPERTIES TIMEOUT 90)
+    set(_net_n 0)
+    foreach(_peer IN LISTS DUKE3D_NET_PEERS)
+      string(REGEX REPLACE "=.*" "" _peer_exe "${_peer}")
+      string(REGEX REPLACE "^[^=]*=" "" _peer_data "${_peer}")
+      math(EXPR _net_n "${_net_n} + 1")
+      math(EXPR _net_port "${_net_port} + 2")
+      add_test(NAME net_refuse_v13d_${_v13d_edition}_${_net_n}
+        COMMAND "${CMAKE_COMMAND}"
+                "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_v13d_data}"
+                "-DB=${_peer_exe}" "-DB_DATA=${_peer_data}"
+                -DPORT=${_net_port} -DMODE=refuse
+                "-DWORK=${CMAKE_BINARY_DIR}/nr13_${_net_n}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
+      set_tests_properties(net_refuse_v13d_${_v13d_edition}_${_net_n} PROPERTIES TIMEOUT 90)
+    endforeach()
+  endif()
   # The edition check must name a wrong edition, not fail some other way.
   if(DUKE3D_V13D_DATA_DIR)
     add_test(NAME v13d_edition_mismatch
