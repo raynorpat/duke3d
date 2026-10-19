@@ -187,6 +187,30 @@ little-endian:
    codec unit test checks byte output against literals, which a big-endian host would also
    need to match. Running the suite on a big-endian host isn't part of this work.
 
+## Changes since approval
+
+Found while writing the plan:
+
+1. **Tile counts.** The engine's `MAXTILES` is 9216, but DOS Duke's is 6144. So
+   `actortype` (1 byte per tile) and `actorscrptr` (4 bytes per tile) are 6144 entries in
+   the file. On load, entries from 6144 up are cleared; on save, only the first 6144 are
+   written. Duke's art and CONs never use tile numbers that high.
+2. **Layout check placement.** `loadplayer` reads walls, sectors and sprites before it
+   reaches `ps[]`, so a peek at that point would be too late. Instead, right after the
+   version check, `sg_playerblocksize()` in `source/savegame.c` skips the 47 LZW blocks
+   that precede `ps[]` (their count follows from `dfwrite`'s chunking of the fixed-size
+   fields before it), reads that block's uncompressed length, and seeks back. No engine
+   change is needed, so there is no `kdfpeekleng` in `cache1d.c`.
+3. **`-saveverify` argument.** It takes a file name, not a slot, matching `-loadverify`.
+   Both names must be relative: the game's own switch parser treats an argument starting
+   with `/` as a switch.
+4. **Round-trip mask.** The round trip also ignores `ps[0].gm`. `loadplayer` sets it to
+   `MODE_GAME`, and DOS saves are written from the menu, so the menu bit is set in the
+   file.
+5. **Thumbnail.** `saveplayer` writes the screenshot tile (`MAXTILES-1`), which only the
+   menu fills. Before saving, `-saveverify` copies in the thumbnail that the load just
+   read (`MAXTILES-3`), so the thumbnail takes part in the round trip.
+
 ## Out of scope
 
 - The original DOS game loading saves from this build. That would need correct
