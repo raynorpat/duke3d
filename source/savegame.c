@@ -188,6 +188,19 @@ void sg_read16s(int32_t fil, short *a, int32_t dasizeof, int32_t count)
     for (i = 0; i < n; i++) a[i] = (short)get16(sgbuf+i*2);
 }
 
+void sg_read16sn(int32_t fil, short *a, int32_t n, int32_t dasizeof, int32_t count)
+{
+    int32_t i, m;
+
+    if (count < 0) count = 0;
+    if (count > (int32_t)sizeof(sgbuf)/dasizeof) count = sizeof(sgbuf)/dasizeof;
+    m = dasizeof*count/2;
+    if (m > n) m = n;
+
+    kdfread(sgbuf,dasizeof,count,fil);
+    for (i = 0; i < m; i++) a[i] = (short)get16(sgbuf+i*2);
+}
+
 void sg_write32s(FILE *fil, int32_t *a, int32_t dasizeof, int32_t count)
 {
     int32_t i, n = dasizeof*count/4;

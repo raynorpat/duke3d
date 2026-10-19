@@ -231,6 +231,11 @@ int loadplayer(signed char spot)
      return loadplayerfile(fullname,spot);
 }
 
+static int32_t clampcount(int32_t v, int32_t hi)
+{
+     return v < 0 ? 0 : (v > hi ? hi : v);
+}
+
 int loadplayerfile(char *fnptr, signed char spot)
 {
      short k,music_changed;
@@ -310,9 +315,9 @@ int loadplayerfile(char *fnptr, signed char spot)
      tilesizx[MAXTILES-3] = 100; tilesizy[MAXTILES-3] = 160;
      kdfread((char *)waloff[MAXTILES-3],160,100,fil);
 
-     numwalls = sg_read16(fil);
+     numwalls = clampcount(sg_read16(fil),MAXWALLS);
      sg_readrecs(fil,wall,sizeof(walltype),sg_wall,MAXWALLS,SG_WALL_SIZE,MAXWALLS);
-     numsectors = sg_read16(fil);
+     numsectors = clampcount(sg_read16(fil),MAXSECTORS);
      sg_readrecs(fil,sector,sizeof(sectortype),sg_sector,MAXSECTORS,SG_SECTOR_SIZE,MAXSECTORS);
      sg_readrecs(fil,sprite,sizeof(spritetype),sg_sprite,MAXSPRITES,SG_SPRITE_SIZE,MAXSPRITES);
      sg_read16s(fil,headspritesect,2,MAXSECTORS+1);
@@ -321,19 +326,20 @@ int loadplayerfile(char *fnptr, signed char spot)
      sg_read16s(fil,headspritestat,2,MAXSTATUS+1);
      sg_read16s(fil,prevspritestat,2,MAXSPRITES);
      sg_read16s(fil,nextspritestat,2,MAXSPRITES);
-     numcyclers = sg_read16(fil);
+     numcyclers = clampcount(sg_read16(fil),MAXCYCLERS);
      sg_read16s(fil,&cyclers[0][0],12,MAXCYCLERS);
      sg_readrecs(fil,ps,sizeof(struct player_struct),sg_player,MAXPLAYERS,SG_PLAYER_SIZE*MAXPLAYERS,1);
      for(i=0;i<MAXPLAYERS;i++) ps[i].palette = (char *) &palette[0];
      sg_readrecs(fil,po,sizeof(struct player_orig),sg_playerorig,MAXPLAYERS,SG_PLAYERORIG_SIZE*MAXPLAYERS,1);
-     numanimwalls = sg_read16(fil);
+     numanimwalls = clampcount(sg_read16(fil),MAXANIMWALLS);
      sg_readrecs(fil,animwall,sizeof(struct animwalltype),sg_animwall,MAXANIMWALLS,SG_ANIMWALL_SIZE*MAXANIMWALLS,1);
      sg_read32s(fil,msx,4,sizeof(msx)/sizeof(msx[0]));
      sg_read32s(fil,msy,4,sizeof(msy)/sizeof(msy[0]));
      spriteqloc = sg_read16(fil);
      spriteqamount = sg_read16(fil);
-     sg_read16s(fil,spriteq,2,spriteqamount);
-     mirrorcnt = sg_read16(fil);
+     sg_read16sn(fil,spriteq,1024,2,spriteqamount);
+     spriteqamount = clampcount(spriteqamount,1024);
+     mirrorcnt = clampcount(sg_read16(fil),64);
      sg_read16s(fil,mirrorwall,2,64);
      sg_read16s(fil,mirrorsector,2,64);
      kdfread(&show2dsector[0],sizeof(char),MAXSECTORS>>3,fil);
@@ -341,7 +347,7 @@ int loadplayerfile(char *fnptr, signed char spot)
      kdfread(&actortype[0],sizeof(char),SG_DOS_MAXTILES,fil);
      kdfread(&boardfilename[0],sizeof(boardfilename),1,fil);
 
-     numclouds = sg_read16(fil);
+     numclouds = clampcount(sg_read16(fil),128);
      sg_read16s(fil,clouds,sizeof(short)<<7,1);
      sg_read16s(fil,cloudx,sizeof(short)<<7,1);
      sg_read16s(fil,cloudy,sizeof(short)<<7,1);
@@ -359,7 +365,7 @@ int loadplayerfile(char *fnptr, signed char spot)
      pskybits = sg_read16(fil);
      sg_read16s(fil,pskyoff,2,MAXPSKYTILES);
 
-     animatecnt = sg_read32(fil);
+     animatecnt = clampcount(sg_read32(fil),MAXANIMATES);
      sg_read16s(fil,animatesect,2,MAXANIMATES);
      sg_read32s(fil,animoffs,4,MAXANIMATES);
      for(i = animatecnt-1;i>=0;i--) animateptr[i] = (int32_t *)((char *)&sector[0]+animoffs[i]);

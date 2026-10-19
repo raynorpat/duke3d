@@ -37,6 +37,9 @@ int32_t sg_read32(int32_t fil);
 /* dasizeof * count bytes of shorts or int32s, as one dfwrite/kdfread call. */
 void sg_write16s(FILE *fil, short *a, int32_t dasizeof, int32_t count);
 void sg_read16s(int32_t fil, short *a, int32_t dasizeof, int32_t count);
+/* Like sg_read16s, but stores at most n shorts, and clamps count so the read
+   can't overflow the codec's buffer. */
+void sg_read16sn(int32_t fil, short *a, int32_t n, int32_t dasizeof, int32_t count);
 void sg_write32s(FILE *fil, int32_t *a, int32_t dasizeof, int32_t count);
 void sg_read32s(int32_t fil, int32_t *a, int32_t dasizeof, int32_t count);
 
