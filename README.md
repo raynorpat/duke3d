@@ -80,6 +80,20 @@ cmake --build build-v13dsw
 `DUKE3D_VERSION=1.4` with `DUKE3D_SHAREWARE=ON` is rejected at configure time,
 since 1.4 has no shareware release.
 
+### Playing 1.3D
+
+A 1.3D build needs the files from the original 1.3D release in its working
+directory: the full release for a full build, the shareware release for a
+shareware build. None of them ship with this repository. Besides `DUKE3D.GRP` and
+the three CON files, copy `DUKE.RTS` and the demos: 1.3D keeps `DEMO1.DMO` and
+the other demos next to the GRP rather than inside it, and the title screen
+only plays the ones it finds.
+
+A 1.3D build plays the original 1.3D demos, compiles 1.3D CON scripts, and
+loads saves made by the DOS 1.3D executable of the same
+edition (copy them into the save folder as `game0.sav` to `game9.sav`). Its
+own saves use the same DOS 1.3D layout.
+
 ## Build options
 
 Pass these with `-D` when configuring.
@@ -115,7 +129,8 @@ folder can be moved with the `DUKE3D_SAVE_DIR` environment variable (a
 
 Original DOS 1.5 (Atomic Edition) saves load on any OS and CPU, and this build
 writes saves in the same layout. The original DOS game can't load them back,
-though, and 1.3D saves aren't supported. A 1.4 or 1.5 build reading 1.3D CON
+though. A 1.3D build loads DOS 1.3D saves instead (see
+[Playing 1.3D](#playing-13d)). A 1.4 or 1.5 build reading 1.3D CON
 files needs `UseOldVersion = 1` under `[Misc]` in `duke3d.cfg`; a 1.3D build
 doesn't.
 
@@ -202,7 +217,7 @@ Tests that need game data are only registered when you point CMake at it:
 |---|---|
 | `DUKE3D_GRP` | `render_e1l1` (frame checksum, compared with `DUKE3D_E1L1_CHECKSUM`) and `game_boot` (not in 1.3D builds) |
 | `DUKE3D_ATOMIC_GRP` and `DUKE3D_DOS_SAVES_DIR` | `dos_save_*`: loads original DOS 1.5 saves and compares with an independent decoder (`tests/dos_save_decode.py`). 1.5 non-shareware builds only; needs Python 3 |
-| `DUKE3D_V13D_DATA_DIR` | In 1.3D builds: CON compile, game boot, demo playback, multiplayer and edition checks against the 1.3D full release |
+| `DUKE3D_V13D_DATA_DIR` | In 1.3D builds: CON compile, game boot, demo playback, multiplayer and edition checks against the 1.3D full release. With DOS reference saves in its `refsaves/` folder (listed in `tests/data/v13d_save_refs.cmake`), also `dos_save_v13d_*` and `save_refuse_v13d_*`; needs Python 3 |
 | `DUKE3D_V13D_SW_DATA_DIR` | The same for a 1.3D shareware build |
 | `DUKE3D_NET_PEERS` | 1.3D builds: other builds, as `<exe>=<data folder>` entries, to check that multiplayer refuses mismatched versions |
 
