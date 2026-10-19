@@ -7150,9 +7150,15 @@ void checkcommandline(int argc,char **argv)
                         if( *(++c) == 0) ud.multimode = 1;
 #if DUKE3D_GAMEVER < GAMEVER_14
                         else ud.multimode = atol(c)%16;
+                        // Fix: /q0 and /q16 gave 0 players, which the game later divides by.
+                        ud.multimode = min(max(ud.multimode,1),MAXPLAYERS);
+                        if( atol(c) >= MAXPLAYERS ) ud.multimode = MAXPLAYERS;
                         ud.m_coop = ud.coop = 0;
 #else
                         else ud.multimode = atol(c)%17;
+                        // Fix: /q0 and /q17 gave 0 players, which the game later divides by.
+                        ud.multimode = min(max(ud.multimode,1),MAXPLAYERS);
+                        if( atol(c) >= MAXPLAYERS ) ud.multimode = MAXPLAYERS;
                         ud.m_coop = ud.coop = 0;
                         ud.m_marker = ud.marker = 1;
                         ud.m_respawn_monsters = ud.respawn_monsters = 1;
@@ -7209,6 +7215,14 @@ void checkcommandline(int argc,char **argv)
                         ud.m_volume_number = ud.volume_number = (int32_t)(atol(c)&3)-1;
 #else
                         ud.m_volume_number = ud.volume_number = (int32_t)atol(c)-1;
+#endif
+                        // Fix: /v0 and episodes past the last one gave a volume the game indexes arrays with.
+#ifdef VOLUMEONE
+                        ud.m_volume_number = ud.volume_number = 0;
+#elif defined(PLUTOPAK)
+                        ud.m_volume_number = ud.volume_number = min(max(ud.volume_number,0),3);
+#else
+                        ud.m_volume_number = ud.volume_number = min(max(ud.volume_number,0),2);
 #endif
                         break;
                     case 's':

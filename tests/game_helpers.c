@@ -65,6 +65,29 @@ int main(void)
     rmdir("game0.sav");
 #endif
 
+    /* Command-line switches must not leave an episode or player count the
+       game can't use: /v0 and /v4 gave episode -1, /q16 gave 0 players. */
+    {
+        static char *v0[] = { "duke3d", "/v0" }, *v9[] = { "duke3d", "/v9" };
+        static char *q16[] = { "duke3d", "/q16" }, *q0[] = { "duke3d", "/q0" };
+#ifdef VOLUMEONE
+        int vols = 1;
+#elif defined(PLUTOPAK)
+        int vols = 4;
+#else
+        int vols = 3;
+#endif
+        checkcommandline(2, v0);
+        check("/v0 episode in range", ud.m_volume_number >= 0 && ud.m_volume_number < vols, 1);
+        checkcommandline(2, v9);
+        check("/v9 episode in range", ud.m_volume_number >= 0 && ud.m_volume_number < vols, 1);
+        checkcommandline(2, q16);
+        check("/q16 players", ud.multimode, MAXPLAYERS);
+        checkcommandline(2, q0);
+        check("/q0 players", ud.multimode, 1);
+        ud.multimode = 1;
+    }
+
     /* The GRP check: a known release GRP that isn't this build's release
        gets a warning; this build's own GRP, a modded one and an unknown one
        don't. CRC-32 is the standard (zlib) one. */
