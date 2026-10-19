@@ -1,77 +1,246 @@
-
 # duke3d
 
-This is the icculus.org port of 3DRealms' Duke Nukem 3D. The first Linux/Mac/Windows port!
+A portable C port of 3D Realms' Duke Nukem 3D, built on Ken Silverman's Build engine. It
+started as the icculus.org port (the first Linux/Mac/Windows one) and now builds
+with CMake for 64-bit Windows, macOS and Linux. Video, input and audio go
+through SDL2; music is played by an emulated OPL3, so no MIDI device or
+SDL_mixer is needed. The same source builds the 1.5 (Atomic Edition) game, 1.4,
+and 1.3D, in full or shareware form.
 
-Below is the original 3DRealms README, unchanged beyond some Markdown formatting cleanup.
+No game data is included. You need your own copy of the game (see
+[Game data](#game-data)).
 
---ryan. (icculus@icculus.org)
+The original 3D Realms README is below.
 
-## Building
+## Quick start
 
-The build uses CMake (3.24 or newer) and SDL2, and produces
-64-bit binaries for Windows, macOS and Linux.
+Requirements: a C99 compiler and CMake 3.24 or newer. SDL2 is used if CMake
+finds it, and otherwise downloaded and built from source (needs network access).
 
-Prerequisites:
+| OS | Setup |
+|---|---|
+| macOS | `brew install cmake sdl2` |
+| Linux (Debian/Ubuntu) | `sudo apt install cmake build-essential libsdl2-dev` |
+| Windows | Visual Studio 2022 with "Desktop development with C++", and CMake. SDL2 is fetched automatically. |
 
-- **macOS:** `brew install cmake sdl2`
-- **Linux (Debian/Ubuntu):** `sudo apt install cmake build-essential libsdl2-dev`
-- **Windows:** Visual Studio 2022 with "Desktop development with C++", and CMake. SDL2 is
-  downloaded and built automatically if it isn't installed.
-
-Then, from the repository root:
+From the repository root:
 
 ```
 cmake --preset default
 cmake --build --preset default
 ```
 
-This produces `build/bin/duke3d` (the game) and `build/bin/build` (the map
-editor); on Windows they're in `build/bin/RelWithDebInfo/`. Run `ctest
---preset default` to run the SDL driver smoke test.
+This builds `build/bin/duke3d` (the game) and `build/bin/build` (the map
+editor). With Visual Studio they are in `build/bin/RelWithDebInfo/`. The
+`debug` preset does the same in `build-debug/` with a Debug build.
 
-Options (pass with `-D` when configuring):
+To run, put the game data in a folder and start the game from it:
+
+```
+cd /path/to/your/duke3d-data
+/path/to/repo/build/bin/duke3d
+```
+
+## Game data
+
+The game reads its data from the working directory:
+
+- `DUKE3D.GRP`
+- `GAME.CON`, `DEFS.CON` and `USER.CON`
+- optionally `DUKE.RTS` and demo files (`*.DMO`)
+
+Lookups fall back to a case-insensitive match, so the filename case doesn't
+matter. The data must match the version you built:
+
+| Build | Data needed |
+|---|---|
+| default (1.5) | 1.5 / Atomic Edition |
+| `DUKE3D_VERSION=1.4` | 1.4 |
+| `DUKE3D_VERSION=1.3D` | 1.3D full release |
+| `DUKE3D_VERSION=1.3D` with `DUKE3D_SHAREWARE=ON` | 1.3D shareware |
+| `DUKE3D_SHAREWARE=ON` (1.5) | 1.5 shareware |
+
+## Choosing a game version
+
+`DUKE3D_VERSION` selects which release's game logic and file formats are built.
+It affects saves, demos and multiplayer: a build only plays with peers of the
+same version and edition, and refuses others. Details of the 1.3D and 1.4
+variants are in [docs/v13d/reference.md](docs/v13d/reference.md).
+
+Use a separate build directory for each variant:
+
+```
+cmake -S . -B build-v13d -DDUKE3D_VERSION=1.3D
+cmake --build build-v13d
+
+cmake -S . -B build-v13dsw -DDUKE3D_VERSION=1.3D -DDUKE3D_SHAREWARE=ON
+cmake --build build-v13dsw
+```
+
+`DUKE3D_VERSION=1.4` with `DUKE3D_SHAREWARE=ON` is rejected at configure time,
+since 1.4 has no shareware release.
+
+## Build options
+
+Pass these with `-D` when configuring.
 
 | Option | Default | Effect |
 |---|---|---|
+| `DUKE3D_VERSION` | `1.5` | Game version: `1.3D`, `1.4` or `1.5` |
 | `DUKE3D_SHAREWARE` | `OFF` | Build the shareware version (`VOLUMEONE`) |
 | `DUKE3D_CONTROLS_MENU` | `ON` | In-game controls configuration menu |
-| `DUKE3D_FETCH_SDL` | `AUTO` | `ON` always builds SDL2 from source, `OFF` never does |
+| `DUKE3D_FETCH_SDL` | `AUTO` | `AUTO` uses installed SDL2 and fetches it if missing; `ON` always builds SDL2 2.32.10 from source; `OFF` fails if SDL2 isn't installed |
 
-**64-bit:** the game runs as a native 64-bit binary. That's verified on macOS
-arm64; Linux and Windows are built and tested in CI. Original DOS 1.5 (Atomic
-Edition) saves load, on any OS and CPU, and this build writes its saves in the
-same layout. The original DOS game can't load them back, though, and 1.3D saves
-aren't supported. Demo recording and playback and the editor's map saving are
-verified on 64-bit. Network play builds but hasn't been verified on 64-bit.
+The default build type is `RelWithDebInfo`. The Watcom/DOS makefiles
+(`source/makefile.dos`, `source/makefile.lnk`) are kept for reference only.
 
-Without a `duke3d.cfg`, the game starts with default settings and writes one:
-to `~/Library/Application Support/Duke Nukem 3D/` on macOS, `~/.duke3d/` on
-Linux, and `Saved Games\Duke Nukem 3D\` on Windows. Saves go to the same
-folder. On Windows, an existing `duke3d.cfg` and `game*.sav` in the game folder
-are copied there on first run. If your game data is version 1.3D, set
-`UseOldVersion = 1` under `[Misc]` in that file.
+## Running
 
-To run the boot test against your own game data, configure with
-`-DDUKE3D_GRP=/path/to/DUKE3D.GRP`. That registers `render_e1l1` and
-`game_boot`, which need the GRP and so never run in CI.
+### Config and saves
 
-The original DOS/Watcom makefiles (`source/makefile.dos`,
-`source/makefile.lnk`) are kept for reference only.
+Without a `duke3d.cfg` the game starts with default settings and writes one.
+Config, saves and screenshots go to:
 
-### DOS save tests
+| OS | Folder |
+|---|---|
+| macOS | `~/Library/Application Support/Duke Nukem 3D/` |
+| Linux | `~/.duke3d/` |
+| Windows | `Saved Games\Duke Nukem 3D\` |
 
-The DOS save tests need the Atomic Edition data and some DOS 1.5 saves. Copy
-the GRP and CON files off the Atomic CD image (the image is only read):
+On macOS and Linux, a `duke3d.cfg` in the working directory is copied there if
+the folder has none. On Windows, an existing `duke3d.cfg` and `game0.sav` to
+`game9.sav` in the game folder are copied there on first run. The Windows
+folder can be moved with the `DUKE3D_SAVE_DIR` environment variable (a
+`Duke Nukem 3D` folder is created inside it).
 
-    python3 tools/extract_iso_files.py "<Track 1>.bin" ~/duke3d-data/atomic15 \
-        ATOMINST/DUKE3D.GRP ATOMINST/GAME.CON ATOMINST/DEFS.CON ATOMINST/USER.CON
+Original DOS 1.5 (Atomic Edition) saves load on any OS and CPU, and this build
+writes saves in the same layout. The original DOS game can't load them back,
+though, and 1.3D saves aren't supported. A 1.4 or 1.5 build reading 1.3D CON
+files needs `UseOldVersion = 1` under `[Misc]` in `duke3d.cfg`; a 1.3D build
+doesn't.
 
-Then configure with `-DDUKE3D_ATOMIC_GRP=$HOME/duke3d-data/atomic15/DUKE3D.GRP`
-and `-DDUKE3D_DOS_SAVES_DIR=<folder of .sav files>`. Each save gets a
-`dos_save_load_*` test, which compares the game's headless `-loadverify` output
-with an independent decoder (`tests/dos_save_decode.py`, needs Python 3).
+64-bit status: the game runs as a native 64-bit binary. That's verified on
+macOS arm64; Linux and Windows are built and tested in CI. Demo recording and
+playback and the editor's map saving are verified on 64-bit. Network play
+builds but hasn't been verified on 64-bit.
 
+### Command-line switches
+
+Switches start with `/`, not `-`. Arguments starting with `-` are skipped,
+except `-net <file>` (below). Unknown `/` switches print the help
+text. Run with `/?` for the full list.
+
+| Switch | Effect |
+|---|---|
+| `/v#` `/l##` `/s#` | Warp to volume, level and skill |
+| `/#` | Load a saved game from slot 0-9 |
+| `/m` | No monsters |
+| `/ns` `/nm` | No sound, no music |
+| `/r` | Record a demo |
+| `/dFILE` | Play demo FILE (`.dmo` is added if there's no extension) |
+| `/t#` | Respawn: 1 monsters, 2 items, 3 inventory, other value for all |
+| `/c#` | Multiplayer mode: 1 DukeMatch (spawn), 2 co-op, 3 DukeMatch (no spawn); in 1.3D builds 0, 1 and 2 |
+| `/q#` | Fake multiplayer with 2-8 players; `/a` adds player AI |
+| `/xFILE` | Compile FILE instead of `GAME.CON` |
+| `/gFILE` | Add a group file; must be last on the command line |
+| `/u#########` | Favorite weapon order |
+| `/z` | Skip memory check |
+
+For example, to start Episode 1, Level 1 on skill 2:
+
+```
+./build/bin/duke3d /v1 /l1 /s2
+```
+
+### Multiplayer
+
+Network play is peer to peer over UDP. Every player starts the game with a
+config file, using the same game version and data:
+
+```
+duke3d -net net.cfg
+```
+
+`net.cfg` is a list of keywords:
+
+| Keyword | Meaning |
+|---|---|
+| `interface <ip>[:<port>]` | Local address and UDP port to bind. The default port is 1635; `:any` picks one |
+| `mode peer` | Peer to peer, the default. `server` and `client` are accepted but not implemented |
+| `allow <ip>[:<port>]` | Another player's address. Repeat for each other player |
+| `broadcast <n>` | Find `n` other players by LAN broadcast instead of `allow`; can't be combined with `allow` |
+
+Two players on one machine:
+
+```
+# A: net.cfg
+interface 127.0.0.1:23600
+mode peer
+allow 127.0.0.1:23601
+
+# B: net.cfg
+interface 127.0.0.1:23601
+mode peer
+allow 127.0.0.1:23600
+```
+
+## Tests
+
+```
+ctest --preset default
+```
+
+Most tests need no game data: the SDL driver smoke test, version macros,
+fixed-point and drawing helpers, LZW, the OPL3 music path, audio shutdown,
+the CON compiler, game helpers, the save codec, and version-option rejection.
+They run headless with SDL's dummy video and audio drivers. On Windows a
+`save_dir` test checks the Saved Games folder logic.
+
+Tests that need game data are only registered when you point CMake at it:
+
+| Cache variable | Enables |
+|---|---|
+| `DUKE3D_GRP` | `render_e1l1` (frame checksum, compared with `DUKE3D_E1L1_CHECKSUM`) and `game_boot` (not in 1.3D builds) |
+| `DUKE3D_ATOMIC_GRP` and `DUKE3D_DOS_SAVES_DIR` | `dos_save_*`: loads original DOS 1.5 saves and compares with an independent decoder (`tests/dos_save_decode.py`). 1.5 non-shareware builds only; needs Python 3 |
+| `DUKE3D_V13D_DATA_DIR` | In 1.3D builds: CON compile, game boot, demo playback, multiplayer and edition checks against the 1.3D full release |
+| `DUKE3D_V13D_SW_DATA_DIR` | The same for a 1.3D shareware build |
+| `DUKE3D_NET_PEERS` | 1.3D builds: other builds, as `<exe>=<data folder>` entries, to check that multiplayer refuses mismatched versions |
+
+For example:
+
+```
+cmake --preset default -DDUKE3D_GRP=/path/to/DUKE3D.GRP
+cmake --build --preset default
+ctest --preset default
+```
+
+The DOS save tests need the Atomic Edition files. `tools/extract_iso_files.py`
+copies them off an Atomic CD image (the image is only read):
+
+```
+python3 tools/extract_iso_files.py "<Track 1>.bin" ~/duke3d-data/atomic15 \
+    ATOMINST/DUKE3D.GRP ATOMINST/GAME.CON ATOMINST/DEFS.CON ATOMINST/USER.CON
+cmake --preset default \
+    -DDUKE3D_ATOMIC_GRP=$HOME/duke3d-data/atomic15/DUKE3D.GRP \
+    -DDUKE3D_DOS_SAVES_DIR=<folder of .sav files>
+```
+
+CI (`.github/workflows/build.yml`) builds and tests 1.5 on Ubuntu, macOS and
+Windows, and 1.4, 1.3D and 1.3D shareware on Ubuntu. It has no game data, so
+only the data-free tests run there.
+
+## Project layout
+
+| Path | Contents |
+|---|---|
+| `source/` | Game code, the map editor (`astub.c`) and the CMake target for both |
+| `source/build/` | The Build engine (icculus port, SDL2 video); see `VENDORED.md` there |
+| `source/audiolib/` | Jim Dose's audio library over SDL audio, with a DOS-style MIDI driver and emulated OPL3 (DBOPL) |
+| `cmake/` | SDL2 lookup and fetch, compiler flags and version definitions |
+| `tests/` | CTest tests and their helpers |
+| `testdata/` | The 1.5 CON scripts used by tests |
+| `tools/` | Save extraction and 1.3D reference scripts |
+| `docs/v13d/` | Notes on the 1.3D and 1.4 variants |
 
 # Duke Nukem 3D (v1.5 CD Version) Source Code Release - April 1, 2003
 
@@ -179,4 +348,3 @@ This should be enough to get you started. Unfortunately nobody at 3D Realms will
 Charlie Wiederhold
 
 3D Realms
-
