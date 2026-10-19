@@ -155,6 +155,8 @@ Tools outside the tree, under `~/Projects/ref/`:
 | kopen4load | cache1d | `0x767e5` | `0x76505` | strings / call graph; sw match: order |
 | kread | cache1d | `0x768d5` | `0x765f5` | strings / call graph; sw match: order |
 | fakedomovethingscorrect | game | `0x20ff0` | `0x212b0` | source order; called from domovethings |
+| FindDistance2D | MACT386.LIB | `0x9a3a0` | | shift pattern (`>>5`, `>>7`, `>>2`, `>>6`), decompiled |
+| FindDistance3D | MACT386.LIB | `0x9a3fc` | | shift pattern (`>>4`, `>>2`, `>>3`), decompiled |
 | timerhandler | game | `0x101d0` | `0x101d0` | `inc [totalclock]; ret`, installed by inittimer |
 
 `getzsofslope` exists in 1.3D, at `0x7431a`.
