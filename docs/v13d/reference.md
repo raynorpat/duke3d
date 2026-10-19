@@ -348,6 +348,18 @@ wanted. Save into these slots, then copy `GAME<n>.SAV` to `<data dir>/refsaves/`
 | sw | 3 | `e1late` | a later E1 level (E1L4 or after) |
 | full | 3 | `e2` | any E2 level |
 | full | 4 | `e3` | any E3 level |
+| full | — | `e1l1played` | extra: E1L1 after shooting, a barrel explosion and a broken wall (changed sector state) |
+
+Made so far (MD5 of the copy in `refsaves/`; status-bar values in
+`tests/data/v13d_save_refs.cmake`). The decode of all three matched the status bar on every
+field, which confirms the F-007 `ps[]` offsets for health (via `ps.i`), `shield_amount`
++0x500, `curr_weapon`, `ammo_amount` and `steroids_amount` +0x4fe:
+
+| Name | Level | MD5 |
+|---|---|---|
+| `e1l1played` | E1L1 | `1ef574835d951d675d16045f34af5899` |
+| `e2` | E2L1 | `a4e4203a280398d8160eb0355d082735` |
+| `e3` | E3L1 | `2c0ee5ca19b0a38f279c725406b7d032` |
 
 The expected values in `tests/data/v13d_save_refs.cmake` must be observed
 **independently of the save layout**. Otherwise a layout mistake would be repeated in
