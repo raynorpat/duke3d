@@ -5,7 +5,7 @@ started as the icculus.org port (the first Linux/Mac/Windows one) and now builds
 with CMake for 64-bit Windows, macOS and Linux. Video, input and audio go
 through SDL2; music is played by an emulated OPL3, so no MIDI device or
 SDL_mixer is needed. The same source builds the 1.5 (Atomic Edition) game, 1.4,
-and 1.3D, in full or shareware form.
+and 1.3D, plus the 1.3D shareware release.
 
 No game data is included. You need your own copy of the game (see
 [Game data](#game-data)).
@@ -58,11 +58,11 @@ matter. The data must match the version you built:
 | `DUKE3D_VERSION=1.4` | 1.4 |
 | `DUKE3D_VERSION=1.3D` | 1.3D full release |
 | `DUKE3D_VERSION=1.3D` with `DUKE3D_SHAREWARE=ON` | 1.3D shareware |
-| `DUKE3D_SHAREWARE=ON` (1.5) | 1.5 shareware |
 
-At startup the game recognizes the 1.3D full, 1.3D shareware and 1.5 Atomic
-Edition GRPs, and prints a warning if `DUKE3D.GRP` is one of those but not the
-one the build expects. Other GRPs, such as modified ones, aren't checked.
+At startup the game checks `DUKE3D.GRP` against the release GRPs (1.3D, 1.4,
+1.5 Atomic Edition and the shareware releases, by size and CRC-32) and prints a
+warning if it's one of those but not the one the build expects. Other GRPs,
+such as modified ones, aren't checked.
 
 ## Choosing a game version
 
@@ -81,8 +81,8 @@ cmake -S . -B build-v13dsw -DDUKE3D_VERSION=1.3D -DDUKE3D_SHAREWARE=ON
 cmake --build build-v13dsw
 ```
 
-`DUKE3D_VERSION=1.4` with `DUKE3D_SHAREWARE=ON` is rejected at configure time,
-since 1.4 has no shareware release.
+`DUKE3D_SHAREWARE=ON` with 1.4 or 1.5 is rejected at configure time: only 1.3D
+had a shareware release.
 
 ### Playing 1.3D
 
@@ -105,7 +105,7 @@ Pass these with `-D` when configuring.
 | Option | Default | Effect |
 |---|---|---|
 | `DUKE3D_VERSION` | `1.5` | Game version: `1.3D`, `1.4` or `1.5` |
-| `DUKE3D_SHAREWARE` | `OFF` | Build the shareware version (`VOLUMEONE`) |
+| `DUKE3D_SHAREWARE` | `OFF` | Build the 1.3D shareware version (`VOLUMEONE`); needs `DUKE3D_VERSION=1.3D` |
 | `DUKE3D_CONTROLS_MENU` | `ON` | In-game controls configuration menu |
 | `DUKE3D_FETCH_SDL` | `AUTO` | `AUTO` uses installed SDL2 and fetches it if missing; `ON` always builds SDL2 2.32.10 from source; `OFF` fails if SDL2 isn't installed |
 
@@ -220,7 +220,7 @@ Tests that need game data are only registered when you point CMake at it:
 | Cache variable | Enables |
 |---|---|
 | `DUKE3D_GRP` | `render_e1l1` (frame checksum, compared with `DUKE3D_E1L1_CHECKSUM`) and `game_boot` (not in 1.3D builds) |
-| `DUKE3D_ATOMIC_GRP` and `DUKE3D_DOS_SAVES_DIR` | `dos_save_*`: loads original DOS 1.5 saves and compares with an independent decoder (`tests/dos_save_decode.py`). 1.5 non-shareware builds only; needs Python 3 |
+| `DUKE3D_ATOMIC_GRP` and `DUKE3D_DOS_SAVES_DIR` | `dos_save_*`: loads original DOS 1.5 saves and compares with an independent decoder (`tests/dos_save_decode.py`). 1.5 builds only; needs Python 3 |
 | `DUKE3D_V13D_DATA_DIR` | In 1.3D builds: CON compile, game boot, demo playback, multiplayer and edition checks against the 1.3D full release. With DOS reference saves in its `refsaves/` folder (listed in `tests/data/v13d_save_refs.cmake`), also `dos_save_v13d_*` and `save_refuse_v13d_*`; needs Python 3 |
 | `DUKE3D_V13D_SW_DATA_DIR` | The same for a 1.3D shareware build |
 | `DUKE3D_NET_PEERS` | 1.3D builds: other builds, as `<exe>=<data folder>` entries, to check that multiplayer refuses mismatched versions |
