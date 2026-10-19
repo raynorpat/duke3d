@@ -3964,7 +3964,9 @@ void endanimvol43(int32_t fr)
 }
 
 
+#if DUKE3D_GAMEVER >= GAMEVER_15
 int32_t lastanimhack=0;
+#endif
 void playanm(char *fn,char t)
 {
         char *animbuf, *palptr;
@@ -3988,12 +3990,16 @@ void playanm(char *fn,char t)
 
     walock[MAXTILES-3-t] = 219+t;
 
+#if DUKE3D_GAMEVER >= GAMEVER_15
     if(anim == 0 || lastanimhack != (MAXTILES-3-t))
+#endif
         allocache((intptr_t *)&anim,length+sizeof(anim_t),&walock[MAXTILES-3-t]);
 
     animbuf = (char *)(FP_OFF(anim)+sizeof(anim_t));
 
+#if DUKE3D_GAMEVER >= GAMEVER_15
     lastanimhack = (MAXTILES-3-t);
+#endif
 
     tilesizx[MAXTILES-3-t] = 200;
     tilesizy[MAXTILES-3-t] = 320;

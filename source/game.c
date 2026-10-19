@@ -2196,8 +2196,11 @@ void typemode(void)
           {
                 j = 50;
                 gametext(320>>1,j,"SEND MESSAGE TO...",0,2+8+16); j += 8;
+#if DUKE3D_GAMEVER >= GAMEVER_15
                 for(i=connecthead;i>=0;i=connectpoint2[i])
-//                for(i=0;i<ud.multimode;i++)
+#else
+                for(i=0;i<ud.multimode;i++)
+#endif
                 {
                      if (i == myconnectindex)
                      {
@@ -2653,6 +2656,7 @@ void drawbackground(void)
 }
 
 
+#if DUKE3D_GAMEVER >= GAMEVER_15 // 1.4 has no floor-over-floor
 // Floor Over Floor
 
 // If standing in sector with SE42
@@ -2812,6 +2816,7 @@ static void se40code(int32_t x,int32_t y,int32_t z,int32_t a,int32_t h, int32_t 
         i = nextspritestat[i];
     }
 }
+#endif
 
 static int32_t oyrepeat=-1;
 
@@ -2861,7 +2866,9 @@ void displayrooms(short snum,int32_t smoothratio)
 
         cang = hittype[ud.camerasprite].tempang+mulscale16((int32_t)(((s->ang+1024-hittype[ud.camerasprite].tempang)&2047)-1024),smoothratio);
 
+#if DUKE3D_GAMEVER >= GAMEVER_15
         se40code(s->x,s->y,s->z,cang,s->yvel,smoothratio);
+#endif
 
         drawrooms(s->x,s->y,s->z-(4<<8),cang,s->yvel,s->sectnum);
         animatesprites(s->x,s->y,cang,smoothratio);
@@ -2878,7 +2885,11 @@ void displayrooms(short snum,int32_t smoothratio)
 
         if(screencapt)
         {
+#if DUKE3D_GAMEVER < GAMEVER_15
+            walock[MAXTILES-1] = 255;
+#else
             walock[MAXTILES-1] = 254;
+#endif
             if (waloff[MAXTILES-1] == 0)
                 allocache(&waloff[MAXTILES-1],100*160,&walock[MAXTILES-1]);
             setviewtotile(MAXTILES-1,100L,160L);
@@ -2972,7 +2983,9 @@ void displayrooms(short snum,int32_t smoothratio)
         if(choriz > 299) choriz = 299;
         else if(choriz < -99) choriz = -99;
 
+#if DUKE3D_GAMEVER >= GAMEVER_15
         se40code(cposx,cposy,cposz,cang,choriz,smoothratio);
+#endif
 
         if ((gotpic[MIRROR>>3]&(1<<(MIRROR&7))) > 0)
         {
@@ -3011,7 +3024,11 @@ void displayrooms(short snum,int32_t smoothratio)
         if(screencapt == 1)
         {
             setviewback();
+#if DUKE3D_GAMEVER < GAMEVER_15
+            walock[MAXTILES-1] = 190;
+#else
             walock[MAXTILES-1] = 1;
+#endif
             screencapt = 0;
         }
         else if( ( ud.screen_tilting && p->rotscrnang) || ud.detail==0 )
@@ -3326,10 +3343,12 @@ short spawn( short j, short pn )
                         sp->ang = sprite[j].ang;
                 }
                 break;
+#if DUKE3D_GAMEVER >= GAMEVER_15
             case FOF:
                 sp->xrepeat = sp->yrepeat = 0;
                 changespritestat(i,5);
                 break;
+#endif
             case WATERSPLASH2:
                 if(j >= 0)
                 {
@@ -4867,6 +4886,9 @@ short spawn( short j, short pn )
                         break;
                 }
 
+#if DUKE3D_GAMEVER < GAMEVER_15
+                changespritestat(i,3);
+#else
                 switch(sprite[i].lotag)
                 {
                     case 40:
@@ -4880,6 +4902,7 @@ short spawn( short j, short pn )
                         changespritestat(i,3);
                         break;
                 }
+#endif
 
                 break;
 
@@ -5468,7 +5491,11 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
                 break;
         }
 
+#if DUKE3D_GAMEVER < GAMEVER_15
+        if( actorscrptr[s->picnum] && ((t->cstat & 48) != 48) )
+#else
         if( actorscrptr[s->picnum] )
+#endif
         {
             if(t4)
             {
@@ -5533,7 +5560,11 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
         }
 
         if( s->statnum == 13 || badguy(s) || (s->picnum == APLAYER && s->owner >= 0) )
+#if DUKE3D_GAMEVER < GAMEVER_15
+            if(!(s->cstat & 48) && t->statnum != 99 && s->picnum != EXPLOSION2 && s->picnum != HANGLIGHT && s->picnum != DOMELITE)
+#else
             if(t->statnum != 99 && s->picnum != EXPLOSION2 && s->picnum != HANGLIGHT && s->picnum != DOMELITE)
+#endif
                 if(s->picnum != HOTMEAT)
         {
             if( hittype[i].dispicnum < 0 )
@@ -6406,7 +6437,11 @@ void nonsharedkeys(void)
                 FX_StopAllSounds();
                 clearsoundlocks();
 
+#if DUKE3D_GAMEVER < GAMEVER_15
+                setview(0,0,xdim-1,ydim-1);
+#else
 //                setview(0,0,xdim-1,ydim-1);
+#endif
                 ps[myconnectindex].gm |= MODE_MENU;
 
                 if(ud.multimode < 2)

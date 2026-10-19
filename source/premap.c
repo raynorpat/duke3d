@@ -245,7 +245,11 @@ char getsound(unsigned short num)
     soundsiz[num] = l;
 
     if( (ud.level_number == 0 && ud.volume_number == 0 && (num == 189 || num == 232 || num == 99 || num == 233 || num == 17 ) ) ||
+#if DUKE3D_GAMEVER < GAMEVER_15
+        ( l < 12800 ) )
+#else
         ( l < 12288 ) )
+#endif
     {
         Sound[num].lock = 2;
         allocache((intptr_t *)&Sound[num].ptr,l,(unsigned char *)&Sound[num].lock);
@@ -266,9 +270,11 @@ void precachenecessarysounds(void)
     for(i=0;i<NUM_SOUNDS;i++)
         if(Sound[i].ptr == 0)
         {
+#if DUKE3D_GAMEVER >= GAMEVER_15
             j++;
             if( (j&7) == 0 )
                 getpackets();
+#endif
             getsound(i);
         }
 }
@@ -1370,9 +1376,11 @@ void enterlevel(char g)
     if( (g&MODE_DEMO) == 0 && ud.recstat == 2)
         ud.recstat = 0;
 
+#if DUKE3D_GAMEVER >= GAMEVER_15
     FX_StopAllSounds();
     clearsoundlocks();
     FX_SetReverb(0);
+#endif
 
     i = ud.screen_size;
     ud.screen_size = 0;
@@ -1430,6 +1438,10 @@ void enterlevel(char g)
         music_select = (ud.volume_number*11) + ud.level_number;
         playmusic(&music_fn[0][(int)music_select][0]);
     }
+#if DUKE3D_GAMEVER < GAMEVER_15
+    clearsoundlocks();
+    FX_SetReverb(0);
+#endif
 
     if( (g&MODE_GAME) || (g&MODE_EOL) )
         ps[myconnectindex].gm = MODE_GAME;
@@ -1483,6 +1495,9 @@ void enterlevel(char g)
 
      restorepalette = 1;
 
+#if DUKE3D_GAMEVER < GAMEVER_15
+     FX_StopAllSounds();
+#endif
      flushpackets();
      waitforeverybody();
 
