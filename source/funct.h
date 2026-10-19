@@ -262,6 +262,8 @@ extern void drawbackground(void);
 extern void displayrooms(short snum, int32_t smoothratio);
 extern short LocateTheLocator(short n, short sn);
 extern void randomscrap(spritetype *s, short i);
+extern uint32_t grpcrc32(uint32_t crc, const unsigned char *buf, size_t n);
+extern const char *grpmismatch(int32_t size, uint32_t crc);
 extern short EGS(short whatsect, int32_t s_x, int32_t s_y, int32_t s_z, short s_pn, signed char s_s, signed char s_xr, signed char s_yr, short s_a, short s_ve, int32_t s_zv, short s_ow, signed char s_ss);
 extern char wallswitchcheck(short i);
 extern short spawn(short j, short pn);

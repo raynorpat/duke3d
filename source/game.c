@@ -7770,11 +7770,95 @@ void copyprotect(void)
 }
 
 
+// The release GRPs, by size and CRC-32, measured from the original files.
+static const struct { int32_t size; uint32_t crc; const char *name; } knowngrps[] =
+{
+    { 26524524, 0xBBC9CE44, "the 1.3D full release" },
+    { 11035779, 0x983AD923, "the 1.3D shareware release" },
+    { 44356548, 0xFD3DCFF1, "the 1.5 Atomic Edition" },
+};
+
+// The entry for the data this build plays, or -1 if its GRP isn't in the table.
+#if DUKE3D_GAMEVER < GAMEVER_14
+#ifdef VOLUMEONE
+#define OWNGRP 1
+#else
+#define OWNGRP 0
+#endif
+#elif DUKE3D_GAMEVER >= GAMEVER_15 && !defined(VOLUMEONE)
+#define OWNGRP 2
+#else
+#define OWNGRP -1
+#endif
+
+uint32_t grpcrc32(uint32_t crc, const unsigned char *buf, size_t n)
+{
+    static uint32_t table[256];
+    uint32_t c;
+    int i, j;
+
+    if (table[1] == 0)
+        for (i = 0; i < 256; i++)
+        {
+            for (c = i, j = 0; j < 8; j++) c = (c & 1) ? 0xEDB88320 ^ (c >> 1) : c >> 1;
+            table[i] = c;
+        }
+    crc = ~crc;
+    while (n--) crc = table[(crc ^ *buf++) & 255] ^ (crc >> 8);
+    return ~crc;
+}
+
+// Names the release a GRP comes from when it's a known one other than this build's.
+const char *grpmismatch(int32_t size, uint32_t crc)
+{
+    int i;
+
+    for (i = 0; i < (int)(sizeof(knowngrps)/sizeof(knowngrps[0])); i++)
+        if (knowngrps[i].size == size && knowngrps[i].crc == crc)
+            return (i == OWNGRP) ? NULL : knowngrps[i].name;
+    return NULL;
+}
+
+// Warns when the GRP is another release's: that shows up later as CON errors or desyncs.
+static void checkgrp(const char *path)
+{
+    static unsigned char buf[65536];
+    FILE *fp = fopen(path, "rb");
+    int32_t size;
+    uint32_t crc = 0;
+    size_t n;
+    const char *other;
+    int i;
+
+    if (fp == NULL) return;
+    fseek(fp, 0, SEEK_END);
+    size = (int32_t) ftell(fp);
+    for (i = 0; i < (int)(sizeof(knowngrps)/sizeof(knowngrps[0])); i++)
+        if (knowngrps[i].size == size) break;
+    if (i == (int)(sizeof(knowngrps)/sizeof(knowngrps[0]))) { fclose(fp); return; }
+
+    fseek(fp, 0, SEEK_SET);
+    while ((n = fread(buf, 1, sizeof(buf), fp)) > 0) crc = grpcrc32(crc, buf, n);
+    fclose(fp);
+
+    if ((other = grpmismatch(size, crc)) != NULL)
+    {
+#ifdef VOLUMEONE
+        printf("\nWARNING: %s is from %s, but this is a Duke Nukem 3D %s shareware build.\n", path, other, VERSION);
+#else
+        printf("\nWARNING: %s is from %s, but this is a Duke Nukem 3D %s build.\n", path, other, VERSION);
+#endif
+        printf("Use the data from the matching release.\n\n");
+    }
+}
+
 static int load_duke3d_groupfile(void)
 {
     char groupfile[] = "duke3d.grp";
     FixFilePath(groupfile);
-    return(initgroupfile(groupfile) != -1);
+    if (initgroupfile(groupfile) == -1) return 0;
+    checkgrp(groupfile);
+    return 1;
 }
 
 

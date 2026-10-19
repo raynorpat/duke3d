@@ -60,6 +60,10 @@ matter. The data must match the version you built:
 | `DUKE3D_VERSION=1.3D` with `DUKE3D_SHAREWARE=ON` | 1.3D shareware |
 | `DUKE3D_SHAREWARE=ON` (1.5) | 1.5 shareware |
 
+At startup the game recognizes the 1.3D full, 1.3D shareware and 1.5 Atomic
+Edition GRPs, and prints a warning if `DUKE3D.GRP` is one of those but not the
+one the build expects. Other GRPs, such as modified ones, aren't checked.
+
 ## Choosing a game version
 
 `DUKE3D_VERSION` selects which release's game logic and file formats are built.
