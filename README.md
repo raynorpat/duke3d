@@ -46,7 +46,7 @@ been verified on 64-bit. Those are the next steps.
 
 Without a `duke3d.cfg`, the game starts with default settings and writes one:
 to `~/Library/Application Support/Duke Nukem 3D/` on macOS, `~/.duke3d/` on
-Linux, and the game's folder on Windows. If your game data is version 1.3D,
+Linux, and the working directory on Windows. If your game data is version 1.3D,
 set `UseOldVersion = 1` under `[Misc]` in that file.
 
 To run the boot test against your own game data, configure with
