@@ -27,6 +27,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <stdint.h>
 #include "duke3d.h"
 #include "mouse.h"
+#include "savegame.h"
 #include "animlib.h"
 
 /* this should be a proper prototype included from a header file */
@@ -168,7 +169,7 @@ static int loadpheader(char spot,int32 *vn,int32 *ln,int32 *psk,int32 *nump)
 
      walock[MAXTILES-3] = 255;
 
-     kdfread(&bv,4,1,fil);
+     bv = sg_read32(fil);
      if(bv != BYTEVERSION)
      {
         FTA(114,&ps[myconnectindex]);
@@ -176,12 +177,12 @@ static int loadpheader(char spot,int32 *vn,int32 *ln,int32 *psk,int32 *nump)
         return 1;
      }
 
-     kdfread(nump,4,1,fil);
+     *nump = sg_read32(fil);
 
      kdfread(tempbuf,19,1,fil);
-         kdfread(vn,4,1,fil);
-         kdfread(ln,4,1,fil);
-     kdfread(psk,4,1,fil);
+     *vn = sg_read32(fil);
+     *ln = sg_read32(fil);
+     *psk = sg_read32(fil);
 
      if (waloff[MAXTILES-3] == 0) allocache(&waloff[MAXTILES-3],160*100,&walock[MAXTILES-3]);
      tilesizx[MAXTILES-3] = 100; tilesizy[MAXTILES-3] = 160;
@@ -241,7 +242,7 @@ int loadplayerfile(char *fnptr, signed char spot)
 
      ready2send = 0;
 
-     kdfread(&bv,4,1,fil);
+     bv = sg_read32(fil);
      if(bv != BYTEVERSION)
      {
         printf("%s is a version %d save, not %d.\n",fnptr,bv,BYTEVERSION);
@@ -251,8 +252,18 @@ int loadplayerfile(char *fnptr, signed char spot)
         ready2send = 1;
         return 1;
      }
+     i = sg_playerblocksize(fil);
+     if(i != SG_PLAYER_SIZE*MAXPLAYERS)
+     {
+        printf("%s is not a DOS 1.5 save (player block is %d bytes).\n",fnptr,i);
+        FTA(114,&ps[myconnectindex]);
+        kclose(fil);
+        ototalclock = totalclock;
+        ready2send = 1;
+        return 1;
+     }
 
-     kdfread(&nump,4,1,fil);
+     nump = sg_read32(fil);
      if(nump != numplayers)
      {
         kclose(fil);
@@ -285,9 +296,9 @@ int loadplayerfile(char *fnptr, signed char spot)
 
      music_changed = (music_select != (ud.volume_number*11) + ud.level_number);
 
-         kdfread(&ud.volume_number,4,1,fil);
-         kdfread(&ud.level_number,4,1,fil);
-         kdfread(&ud.player_skill,4,1,fil);
+         ud.volume_number = sg_read32(fil);
+     ud.level_number = sg_read32(fil);
+         ud.player_skill = sg_read32(fil);
 
          ud.m_level_number = ud.level_number;
          ud.m_volume_number = ud.volume_number;
@@ -299,93 +310,96 @@ int loadplayerfile(char *fnptr, signed char spot)
      tilesizx[MAXTILES-3] = 100; tilesizy[MAXTILES-3] = 160;
      kdfread((char *)waloff[MAXTILES-3],160,100,fil);
 
-         kdfread(&numwalls,2,1,fil);
-     kdfread(&wall[0],sizeof(walltype),MAXWALLS,fil);
-         kdfread(&numsectors,2,1,fil);
-     kdfread(&sector[0],sizeof(sectortype),MAXSECTORS,fil);
-         kdfread(&sprite[0],sizeof(spritetype),MAXSPRITES,fil);
-         kdfread(&headspritesect[0],2,MAXSECTORS+1,fil);
-         kdfread(&prevspritesect[0],2,MAXSPRITES,fil);
-         kdfread(&nextspritesect[0],2,MAXSPRITES,fil);
-         kdfread(&headspritestat[0],2,MAXSTATUS+1,fil);
-         kdfread(&prevspritestat[0],2,MAXSPRITES,fil);
-         kdfread(&nextspritestat[0],2,MAXSPRITES,fil);
-         kdfread(&numcyclers,sizeof(numcyclers),1,fil);
-         kdfread(&cyclers[0][0],12,MAXCYCLERS,fil);
-     kdfread(ps,sizeof(ps),1,fil);
-     kdfread(po,sizeof(po),1,fil);
-         kdfread(&numanimwalls,sizeof(numanimwalls),1,fil);
-         kdfread(&animwall,sizeof(animwall),1,fil);
-         kdfread(&msx[0],sizeof(int32_t),sizeof(msx)/sizeof(int32_t),fil);
-         kdfread(&msy[0],sizeof(int32_t),sizeof(msy)/sizeof(int32_t),fil);
-     kdfread((short *)&spriteqloc,sizeof(short),1,fil);
-     kdfread((short *)&spriteqamount,sizeof(short),1,fil);
-     kdfread((short *)&spriteq[0],sizeof(short),spriteqamount,fil);
-         kdfread(&mirrorcnt,sizeof(short),1,fil);
-         kdfread(&mirrorwall[0],sizeof(short),64,fil);
-     kdfread(&mirrorsector[0],sizeof(short),64,fil);
+     numwalls = sg_read16(fil);
+     sg_readrecs(fil,wall,sizeof(walltype),sg_wall,MAXWALLS,SG_WALL_SIZE,MAXWALLS);
+     numsectors = sg_read16(fil);
+     sg_readrecs(fil,sector,sizeof(sectortype),sg_sector,MAXSECTORS,SG_SECTOR_SIZE,MAXSECTORS);
+     sg_readrecs(fil,sprite,sizeof(spritetype),sg_sprite,MAXSPRITES,SG_SPRITE_SIZE,MAXSPRITES);
+     sg_read16s(fil,headspritesect,2,MAXSECTORS+1);
+     sg_read16s(fil,prevspritesect,2,MAXSPRITES);
+     sg_read16s(fil,nextspritesect,2,MAXSPRITES);
+     sg_read16s(fil,headspritestat,2,MAXSTATUS+1);
+     sg_read16s(fil,prevspritestat,2,MAXSPRITES);
+     sg_read16s(fil,nextspritestat,2,MAXSPRITES);
+     numcyclers = sg_read16(fil);
+     sg_read16s(fil,&cyclers[0][0],12,MAXCYCLERS);
+     sg_readrecs(fil,ps,sizeof(struct player_struct),sg_player,MAXPLAYERS,SG_PLAYER_SIZE*MAXPLAYERS,1);
+     for(i=0;i<MAXPLAYERS;i++) ps[i].palette = (char *) &palette[0];
+     sg_readrecs(fil,po,sizeof(struct player_orig),sg_playerorig,MAXPLAYERS,SG_PLAYERORIG_SIZE*MAXPLAYERS,1);
+     numanimwalls = sg_read16(fil);
+     sg_readrecs(fil,animwall,sizeof(struct animwalltype),sg_animwall,MAXANIMWALLS,SG_ANIMWALL_SIZE*MAXANIMWALLS,1);
+     sg_read32s(fil,msx,4,sizeof(msx)/sizeof(msx[0]));
+     sg_read32s(fil,msy,4,sizeof(msy)/sizeof(msy[0]));
+     spriteqloc = sg_read16(fil);
+     spriteqamount = sg_read16(fil);
+     sg_read16s(fil,spriteq,2,spriteqamount);
+     mirrorcnt = sg_read16(fil);
+     sg_read16s(fil,mirrorwall,2,64);
+     sg_read16s(fil,mirrorsector,2,64);
      kdfread(&show2dsector[0],sizeof(char),MAXSECTORS>>3,fil);
-     kdfread(&actortype[0],sizeof(char),MAXTILES,fil);
+     clearbufbyte(actortype,MAXTILES,0L);
+     kdfread(&actortype[0],sizeof(char),SG_DOS_MAXTILES,fil);
      kdfread(&boardfilename[0],sizeof(boardfilename),1,fil);
 
-     kdfread(&numclouds,sizeof(numclouds),1,fil);
-     kdfread(&clouds[0],sizeof(short)<<7,1,fil);
-     kdfread(&cloudx[0],sizeof(short)<<7,1,fil);
-     kdfread(&cloudy[0],sizeof(short)<<7,1,fil);
+     numclouds = sg_read16(fil);
+     sg_read16s(fil,clouds,sizeof(short)<<7,1);
+     sg_read16s(fil,cloudx,sizeof(short)<<7,1);
+     sg_read16s(fil,cloudy,sizeof(short)<<7,1);
 
      kdfread(&scriptptrs[0],1,MAXSCRIPTSIZE,fil);
-     kdfread(&script[0],4,MAXSCRIPTSIZE,fil);
+     sg_read32s(fil,script,4,MAXSCRIPTSIZE);
 
-     kdfread(&actorscrptr[0],4,MAXTILES,fil);
+     clearbuf(actorscrptr,MAXTILES,0L);
+     sg_read32s(fil,actorscrptr,4,SG_DOS_MAXTILES);
 
      kdfread(&scriptptrs[0],1,MAXSPRITES,fil);
-     kdfread(&hittype[0],sizeof(struct weaponhit),MAXSPRITES,fil);
+     sg_readrecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,MAXSPRITES,SG_WEAPONHIT_SIZE,MAXSPRITES);
 
-         kdfread(&lockclock,sizeof(lockclock),1,fil);
-     kdfread(&pskybits,sizeof(pskybits),1,fil);
-     kdfread(&pskyoff[0],sizeof(pskyoff[0]),MAXPSKYTILES,fil);
+     lockclock = sg_read32(fil);
+     pskybits = sg_read16(fil);
+     sg_read16s(fil,pskyoff,2,MAXPSKYTILES);
 
-         kdfread(&animatecnt,sizeof(animatecnt),1,fil);
-         kdfread(&animatesect[0],2,MAXANIMATES,fil);
-         kdfread(&animoffs[0],4,MAXANIMATES,fil);
+     animatecnt = sg_read32(fil);
+     sg_read16s(fil,animatesect,2,MAXANIMATES);
+     sg_read32s(fil,animoffs,4,MAXANIMATES);
      for(i = animatecnt-1;i>=0;i--) animateptr[i] = (int32_t *)((char *)&sector[0]+animoffs[i]);
-         kdfread(&animategoal[0],4,MAXANIMATES,fil);
-         kdfread(&animatevel[0],4,MAXANIMATES,fil);
+     sg_read32s(fil,animategoal,4,MAXANIMATES);
+     sg_read32s(fil,animatevel,4,MAXANIMATES);
 
-         kdfread(&earthquaketime,sizeof(earthquaketime),1,fil);
-     kdfread(&ud.from_bonus,sizeof(ud.from_bonus),1,fil);
-     kdfread(&ud.secretlevel,sizeof(ud.secretlevel),1,fil);
-     kdfread(&ud.respawn_monsters,sizeof(ud.respawn_monsters),1,fil);
+     earthquaketime = sg_read8(fil);
+     ud.from_bonus = sg_read16(fil);
+     ud.secretlevel = sg_read16(fil);
+     ud.respawn_monsters = sg_read32(fil);
      ud.m_respawn_monsters = ud.respawn_monsters;
-     kdfread(&ud.respawn_items,sizeof(ud.respawn_items),1,fil);
+     ud.respawn_items = sg_read32(fil);
      ud.m_respawn_items = ud.respawn_items;
-     kdfread(&ud.respawn_inventory,sizeof(ud.respawn_inventory),1,fil);
+     ud.respawn_inventory = sg_read32(fil);
      ud.m_respawn_inventory = ud.respawn_inventory;
 
-     kdfread(&ud.god,sizeof(ud.god),1,fil);
-     kdfread(&ud.auto_run,sizeof(ud.auto_run),1,fil);
-     kdfread(&ud.crosshair,sizeof(ud.crosshair),1,fil);
-     kdfread(&ud.monsters_off,sizeof(ud.monsters_off),1,fil);
+     ud.god = sg_read8(fil);
+     ud.auto_run = sg_read32(fil);
+     ud.crosshair = sg_read32(fil);
+     ud.monsters_off = sg_read32(fil);
      ud.m_monsters_off = ud.monsters_off;
-     kdfread(&ud.last_level,sizeof(ud.last_level),1,fil);
-     kdfread(&ud.eog,sizeof(ud.eog),1,fil);
+     ud.last_level = sg_read16(fil);
+     ud.eog = sg_read8(fil);
 
-     kdfread(&ud.coop,sizeof(ud.coop),1,fil);
+     ud.coop = sg_read32(fil);
      ud.m_coop = ud.coop;
-     kdfread(&ud.marker,sizeof(ud.marker),1,fil);
+     ud.marker = sg_read32(fil);
      ud.m_marker = ud.marker;
-     kdfread(&ud.ffire,sizeof(ud.ffire),1,fil);
+     ud.ffire = sg_read32(fil);
      ud.m_ffire = ud.ffire;
 
-     kdfread(&camsprite,sizeof(camsprite),1,fil);
-     kdfread(&connecthead,sizeof(connecthead),1,fil);
-     kdfread(connectpoint2,sizeof(connectpoint2),1,fil);
-     kdfread(&numplayersprites,sizeof(numplayersprites),1,fil);
-     kdfread((short *)&frags[0][0],sizeof(frags),1,fil);
+     camsprite = sg_read16(fil);
+     connecthead = sg_read16(fil);
+     sg_read16s(fil,connectpoint2,sizeof(connectpoint2),1);
+     numplayersprites = sg_read8(fil);
+     sg_read16s(fil,&frags[0][0],sizeof(frags),1);
 
-     kdfread(&randomseed,sizeof(randomseed),1,fil);
-     kdfread(&global_random,sizeof(global_random),1,fil);
-     kdfread(&parallaxyscale,sizeof(parallaxyscale),1,fil);
+     randomseed = sg_read32(fil);
+     global_random = sg_read16(fil);
+     parallaxyscale = sg_read32(fil);
 
      kclose(fil);
 
@@ -544,101 +558,100 @@ int saveplayerfile(char *fnptr, signed char spot)
      int32_t i, j, animoffs[MAXANIMATES];
      char scriptptrs[MAXSCRIPTSIZE];
      FILE *fil;
-     int32_t bv = BYTEVERSION;
 
      if ((fil = fopen(fnptr,"wb")) == 0) return(-1);
 
      ready2send = 0;
 
-     dfwrite(&bv,4,1,fil);
-     dfwrite(&ud.multimode,sizeof(ud.multimode),1,fil);
+     sg_write32(fil,BYTEVERSION);
+     sg_write32(fil,ud.multimode);
 
-         dfwrite(&ud.savegame[spot][0],19,1,fil);
-         dfwrite(&ud.volume_number,sizeof(ud.volume_number),1,fil);
-     dfwrite(&ud.level_number,sizeof(ud.level_number),1,fil);
-         dfwrite(&ud.player_skill,sizeof(ud.player_skill),1,fil);
+     dfwrite(&ud.savegame[spot][0],19,1,fil);
+     sg_write32(fil,ud.volume_number);
+     sg_write32(fil,ud.level_number);
+     sg_write32(fil,ud.player_skill);
      dfwrite((char *)waloff[MAXTILES-1],160,100,fil);
 
-         dfwrite(&numwalls,2,1,fil);
-     dfwrite(&wall[0],sizeof(walltype),MAXWALLS,fil);
-         dfwrite(&numsectors,2,1,fil);
-     dfwrite(&sector[0],sizeof(sectortype),MAXSECTORS,fil);
-         dfwrite(&sprite[0],sizeof(spritetype),MAXSPRITES,fil);
-         dfwrite(&headspritesect[0],2,MAXSECTORS+1,fil);
-         dfwrite(&prevspritesect[0],2,MAXSPRITES,fil);
-         dfwrite(&nextspritesect[0],2,MAXSPRITES,fil);
-         dfwrite(&headspritestat[0],2,MAXSTATUS+1,fil);
-         dfwrite(&prevspritestat[0],2,MAXSPRITES,fil);
-         dfwrite(&nextspritestat[0],2,MAXSPRITES,fil);
-         dfwrite(&numcyclers,sizeof(numcyclers),1,fil);
-         dfwrite(&cyclers[0][0],12,MAXCYCLERS,fil);
-     dfwrite(ps,sizeof(ps),1,fil);
-     dfwrite(po,sizeof(po),1,fil);
-         dfwrite(&numanimwalls,sizeof(numanimwalls),1,fil);
-         dfwrite(&animwall,sizeof(animwall),1,fil);
-         dfwrite(&msx[0],sizeof(int32_t),sizeof(msx)/sizeof(int32_t),fil);
-         dfwrite(&msy[0],sizeof(int32_t),sizeof(msy)/sizeof(int32_t),fil);
-     dfwrite(&spriteqloc,sizeof(short),1,fil);
-     dfwrite(&spriteqamount,sizeof(short),1,fil);
-     dfwrite(&spriteq[0],sizeof(short),spriteqamount,fil);
-         dfwrite(&mirrorcnt,sizeof(short),1,fil);
-         dfwrite(&mirrorwall[0],sizeof(short),64,fil);
-         dfwrite(&mirrorsector[0],sizeof(short),64,fil);
+     sg_write16(fil,numwalls);
+     sg_writerecs(fil,wall,sizeof(walltype),sg_wall,MAXWALLS,SG_WALL_SIZE,MAXWALLS);
+     sg_write16(fil,numsectors);
+     sg_writerecs(fil,sector,sizeof(sectortype),sg_sector,MAXSECTORS,SG_SECTOR_SIZE,MAXSECTORS);
+     sg_writerecs(fil,sprite,sizeof(spritetype),sg_sprite,MAXSPRITES,SG_SPRITE_SIZE,MAXSPRITES);
+     sg_write16s(fil,headspritesect,2,MAXSECTORS+1);
+     sg_write16s(fil,prevspritesect,2,MAXSPRITES);
+     sg_write16s(fil,nextspritesect,2,MAXSPRITES);
+     sg_write16s(fil,headspritestat,2,MAXSTATUS+1);
+     sg_write16s(fil,prevspritestat,2,MAXSPRITES);
+     sg_write16s(fil,nextspritestat,2,MAXSPRITES);
+     sg_write16(fil,numcyclers);
+     sg_write16s(fil,&cyclers[0][0],12,MAXCYCLERS);
+     sg_writerecs(fil,ps,sizeof(struct player_struct),sg_player,MAXPLAYERS,SG_PLAYER_SIZE*MAXPLAYERS,1);
+     sg_writerecs(fil,po,sizeof(struct player_orig),sg_playerorig,MAXPLAYERS,SG_PLAYERORIG_SIZE*MAXPLAYERS,1);
+     sg_write16(fil,numanimwalls);
+     sg_writerecs(fil,animwall,sizeof(struct animwalltype),sg_animwall,MAXANIMWALLS,SG_ANIMWALL_SIZE*MAXANIMWALLS,1);
+     sg_write32s(fil,msx,4,sizeof(msx)/sizeof(msx[0]));
+     sg_write32s(fil,msy,4,sizeof(msy)/sizeof(msy[0]));
+     sg_write16(fil,spriteqloc);
+     sg_write16(fil,spriteqamount);
+     sg_write16s(fil,spriteq,2,spriteqamount);
+     sg_write16(fil,mirrorcnt);
+     sg_write16s(fil,mirrorwall,2,64);
+     sg_write16s(fil,mirrorsector,2,64);
      dfwrite(&show2dsector[0],sizeof(char),MAXSECTORS>>3,fil);
-     dfwrite(&actortype[0],sizeof(char),MAXTILES,fil);
+     dfwrite(&actortype[0],sizeof(char),SG_DOS_MAXTILES,fil);
      dfwrite(&boardfilename[0],sizeof(boardfilename),1,fil);
 
-     dfwrite(&numclouds,sizeof(numclouds),1,fil);
-     dfwrite(&clouds[0],sizeof(short)<<7,1,fil);
-     dfwrite(&cloudx[0],sizeof(short)<<7,1,fil);
-     dfwrite(&cloudy[0],sizeof(short)<<7,1,fil);
+     sg_write16(fil,numclouds);
+     sg_write16s(fil,clouds,sizeof(short)<<7,1);
+     sg_write16s(fil,cloudx,sizeof(short)<<7,1);
+     sg_write16s(fil,cloudy,sizeof(short)<<7,1);
 
      // Script values are already offsets; the pointer flag blocks are kept zeroed.
      clearbufbyte(scriptptrs,MAXSCRIPTSIZE,0L);
 
      dfwrite(&scriptptrs[0],1,MAXSCRIPTSIZE,fil);
-     dfwrite(&script[0],4,MAXSCRIPTSIZE,fil);
+     sg_write32s(fil,script,4,MAXSCRIPTSIZE);
 
-     dfwrite(&actorscrptr[0],4,MAXTILES,fil);
+     sg_write32s(fil,actorscrptr,4,SG_DOS_MAXTILES);
 
-    dfwrite(&scriptptrs[0],1,MAXSPRITES,fil);
-    dfwrite(&hittype[0],sizeof(struct weaponhit),MAXSPRITES,fil);
+     dfwrite(&scriptptrs[0],1,MAXSPRITES,fil);
+     sg_writerecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,MAXSPRITES,SG_WEAPONHIT_SIZE,MAXSPRITES);
 
-         dfwrite(&lockclock,sizeof(lockclock),1,fil);
-     dfwrite(&pskybits,sizeof(pskybits),1,fil);
-     dfwrite(&pskyoff[0],sizeof(pskyoff[0]),MAXPSKYTILES,fil);
-         dfwrite(&animatecnt,sizeof(animatecnt),1,fil);
-         dfwrite(&animatesect[0],2,MAXANIMATES,fil);
-         clearbuf(animoffs,MAXANIMATES,0L);
-         for(i = animatecnt-1;i>=0;i--) animoffs[i] = (int32_t)((char *)animateptr[i]-(char *)&sector[0]);
-         dfwrite(&animoffs[0],4,MAXANIMATES,fil);
-         dfwrite(&animategoal[0],4,MAXANIMATES,fil);
-         dfwrite(&animatevel[0],4,MAXANIMATES,fil);
+     sg_write32(fil,lockclock);
+     sg_write16(fil,pskybits);
+     sg_write16s(fil,pskyoff,2,MAXPSKYTILES);
+     sg_write32(fil,animatecnt);
+     sg_write16s(fil,animatesect,2,MAXANIMATES);
+     clearbuf(animoffs,MAXANIMATES,0L);
+     for(i = animatecnt-1;i>=0;i--) animoffs[i] = (int32_t)((char *)animateptr[i]-(char *)&sector[0]);
+     sg_write32s(fil,animoffs,4,MAXANIMATES);
+     sg_write32s(fil,animategoal,4,MAXANIMATES);
+     sg_write32s(fil,animatevel,4,MAXANIMATES);
 
-         dfwrite(&earthquaketime,sizeof(earthquaketime),1,fil);
-         dfwrite(&ud.from_bonus,sizeof(ud.from_bonus),1,fil);
-     dfwrite(&ud.secretlevel,sizeof(ud.secretlevel),1,fil);
-     dfwrite(&ud.respawn_monsters,sizeof(ud.respawn_monsters),1,fil);
-     dfwrite(&ud.respawn_items,sizeof(ud.respawn_items),1,fil);
-     dfwrite(&ud.respawn_inventory,sizeof(ud.respawn_inventory),1,fil);
-     dfwrite(&ud.god,sizeof(ud.god),1,fil);
-     dfwrite(&ud.auto_run,sizeof(ud.auto_run),1,fil);
-     dfwrite(&ud.crosshair,sizeof(ud.crosshair),1,fil);
-     dfwrite(&ud.monsters_off,sizeof(ud.monsters_off),1,fil);
-     dfwrite(&ud.last_level,sizeof(ud.last_level),1,fil);
-     dfwrite(&ud.eog,sizeof(ud.eog),1,fil);
-     dfwrite(&ud.coop,sizeof(ud.coop),1,fil);
-     dfwrite(&ud.marker,sizeof(ud.marker),1,fil);
-     dfwrite(&ud.ffire,sizeof(ud.ffire),1,fil);
-     dfwrite(&camsprite,sizeof(camsprite),1,fil);
-     dfwrite(&connecthead,sizeof(connecthead),1,fil);
-     dfwrite(connectpoint2,sizeof(connectpoint2),1,fil);
-     dfwrite(&numplayersprites,sizeof(numplayersprites),1,fil);
-     dfwrite((short *)&frags[0][0],sizeof(frags),1,fil);
+     sg_write8(fil,earthquaketime);
+     sg_write16(fil,ud.from_bonus);
+     sg_write16(fil,ud.secretlevel);
+     sg_write32(fil,ud.respawn_monsters);
+     sg_write32(fil,ud.respawn_items);
+     sg_write32(fil,ud.respawn_inventory);
+     sg_write8(fil,ud.god);
+     sg_write32(fil,ud.auto_run);
+     sg_write32(fil,ud.crosshair);
+     sg_write32(fil,ud.monsters_off);
+     sg_write16(fil,ud.last_level);
+     sg_write8(fil,ud.eog);
+     sg_write32(fil,ud.coop);
+     sg_write32(fil,ud.marker);
+     sg_write32(fil,ud.ffire);
+     sg_write16(fil,camsprite);
+     sg_write16(fil,connecthead);
+     sg_write16s(fil,connectpoint2,sizeof(connectpoint2),1);
+     sg_write8(fil,numplayersprites);
+     sg_write16s(fil,&frags[0][0],sizeof(frags),1);
 
-     dfwrite(&randomseed,sizeof(randomseed),1,fil);
-     dfwrite(&global_random,sizeof(global_random),1,fil);
-     dfwrite(&parallaxyscale,sizeof(parallaxyscale),1,fil);
+     sg_write32(fil,randomseed);
+     sg_write16(fil,global_random);
+     sg_write32(fil,parallaxyscale);
 
          fclose(fil);
 

@@ -331,8 +331,6 @@ struct animwalltype
         short wallnum;
         int32_t tag;
 };
-/* Saved to disk: keep the 32-bit sizes. */
-BUILD_STATIC_ASSERT(sizeof(struct animwalltype) == 8, animwalltype_size);
 extern struct animwalltype animwall[MAXANIMWALLS];
 extern short numanimwalls,probey,lastprobey;
 
@@ -502,8 +500,6 @@ struct weaponhit
     int32_t floorz,ceilingz,lastvx,lastvy,bposx,bposy,bposz;
     int32_t temp_data[6];
 };
-/* Saved to disk: keep the 32-bit sizes. */
-BUILD_STATIC_ASSERT(sizeof(struct weaponhit) == 72, weaponhit_size);
 
 extern struct weaponhit hittype[MAXSPRITES];
 
