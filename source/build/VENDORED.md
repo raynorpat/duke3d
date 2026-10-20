@@ -383,6 +383,19 @@ Ported from later JFBuild commits, retyped as above:
 - `_setgamemode` (8-bit) still clamps modes over 1600x1200 to 1600x1200,
   now with literals, so the larger `MAXXDIM`/`MAXYDIM` only reach GL. The
   size asked for is kept for renderer 3's window.
+- `glext.c`/`glext.h` (ours, not JFBuild's): renderer 3's draw paths
+  (`GLPATH_AUTO`, `IMMEDIATE`, `VBO`, `SHADER`) and their setting names,
+  the pure `gl_choosepath`, and the GL entry points past 1.1 as `bgl…`
+  pointers from `SDL_GL_GetProcAddress` (vertex buffers at GL 1.5 or
+  `GL_ARB_vertex_buffer_object`; GLSL at GL 2.0; FBOs from
+  `GL_ARB_framebuffer_object` or `GL_EXT_framebuffer_object`), each group
+  all loaded or all NULL, so the binary runs on a 1.1 driver.
+  `gl_has_extension` moved there from `sdl_driver.c`. `setgamemode_gl` calls
+  `gl_initdrawpath`, which sets `glinfo.vbo`/`glsl`/`fbo`, picks `gldrawpath`
+  from `gldrawpathrequest` (the game's `GLDrawPath`, the editor's
+  `gldrawpath`) and prints it. `gl_forcefail` (a test hook) makes GLSL and
+  FBOs unavailable. `glinternalwidth`/`glinternalheight` are set from the
+  settings but not used yet; every path still draws as JFBuild does.
 
 ## Renderer 3: 2D, clears, palette, fades, screenshots
 

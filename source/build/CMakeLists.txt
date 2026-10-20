@@ -4,6 +4,7 @@ add_library(buildengine STATIC
   a.c
   cache1d.c
   engine.c
+  glext.c
   mmulti.c
   pragmas.c
   sdl_driver.c)

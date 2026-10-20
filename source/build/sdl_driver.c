@@ -38,6 +38,7 @@
 #include "engine.h"
 #ifdef USE_OPENGL
 #include "SDL_opengl.h"
+#include "glext.h"
 #endif
 
 /* need VirtualProtect() from win32 API... */
@@ -570,23 +571,6 @@ vidmode_failed:
 
 
 #ifdef USE_OPENGL
-/* Whole-word match in a GL_EXTENSIONS string. */
-static int gl_has_extension(const char *exts, const char *name)
-{
-    size_t len = strlen(name);
-    const char *p = exts;
-
-    while ((p = strstr(p, name)) != NULL)
-    {
-        if (((p == exts) || (p[-1] == ' ')) && ((p[len] == ' ') || (p[len] == '\0')))
-            return(1);
-        p += len;
-    } /* while */
-
-    return(0);
-} /* gl_has_extension */
-
-
 /*
  * The texture that keeps the last frame, for fades over a frame that isn't
  *  being redrawn. GL 1.1 has no non-power-of-two textures, so without
@@ -869,9 +853,11 @@ int setgamemode_gl(char davidoption)
                           gl_has_extension(exts, "GL_SGIS_texture_edge_clamp"));
     glinfo.texcompr = gl_has_extension(exts, "GL_ARB_texture_compression");
     glinfo.texnpot = gl_has_extension(exts, "GL_ARB_texture_non_power_of_two");
-    sdldebug("OpenGL %s on %s: bgra %d, clamptoedge %d, texcompr %d, texnpot %d, maxanisotropy %g.",
+    gl_initdrawpath(exts);
+    sdldebug("OpenGL %s on %s: bgra %d, clamptoedge %d, texcompr %d, texnpot %d, maxanisotropy %g, vbo %d, glsl %d, fbo %d.",
              (const char *) glGetString(GL_VERSION), (const char *) glGetString(GL_RENDERER),
-             glinfo.bgra, glinfo.clamptoedge, glinfo.texcompr, glinfo.texnpot, glinfo.maxanisotropy);
+             glinfo.bgra, glinfo.clamptoedge, glinfo.texcompr, glinfo.texnpot, glinfo.maxanisotropy,
+             glinfo.vbo, glinfo.glsl, glinfo.fbo);
 
     bpp = 32;
     numpages = 2;  /* as JFBuild: permanent rotatesprites go on both pages. */

@@ -57,6 +57,13 @@ target_include_directories(pragmas_semantics PRIVATE "${PROJECT_SOURCE_DIR}/sour
 target_link_libraries(pragmas_semantics PRIVATE buildengine)
 add_test(NAME pragmas_semantics COMMAND pragmas_semantics)
 
+# Renderer 3's draw path from what the driver has, and the setting's names.
+# Built without the engine (and OpenGL), as the settings readers use it.
+add_executable(gl_path gl_path.c "${PROJECT_SOURCE_DIR}/source/build/glext.c")
+target_include_directories(gl_path PRIVATE "${PROJECT_SOURCE_DIR}/source/build")
+target_link_libraries(gl_path PRIVATE duke3d_compile_options)
+add_test(NAME gl_path COMMAND gl_path)
+
 add_executable(vline_counts vline_counts.c)
 target_link_libraries(vline_counts PRIVATE buildengine)
 add_test(NAME vline_counts COMMAND vline_counts)
