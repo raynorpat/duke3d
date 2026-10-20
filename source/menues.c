@@ -3675,23 +3675,26 @@ static char *glgamepalette;
 static int32_t glgamebrightness;
 
 /*
- * Renderer 3 bakes the palette into textures as it draws, so a new
- *  ps[myconnectindex].palette must reach the engine before the next draw, not
- *  at the next palto. Applies it only when it changed, keeping any fade.
+ * Renderer 3 bakes the palette into textures as it draws, so a new player
+ *  palette must reach the engine before the next draw, not at the next
+ *  palto. Applies it only when it changed, keeping any fade. In a game or
+ *  demo it's the viewed player's (screenpeek), as restorepalette sets;
+ *  elsewhere (title, bonus and ending screens) the game sets
+ *  myconnectindex's.
  */
 void glsetgamepalette(void)
 {
 #ifdef POLYMOST
     palette_t fadergb;
     unsigned char fadedelta;
+    char *pal = ps[(ps[myconnectindex].gm&(MODE_GAME|MODE_DEMO)) ? screenpeek : myconnectindex].palette;
 #ifdef USE_OPENGL
-    char *pal = ps[myconnectindex].palette;
     /* Lights glow in the game's palettes, not in the title, ending or 3DR ones. */
     int32_t fullbright = (pal == (char *)palette || pal == waterpal || pal == slimepal) ? 240 : 256;
 #endif
 
     if (getrendermode() != 3) return;
-    if (ps[myconnectindex].palette == glgamepalette && ud.brightness == glgamebrightness
+    if (pal == glgamepalette && ud.brightness == glgamebrightness
 #ifdef USE_OPENGL
         && fullbright == polymosttexfullbright
 #endif
@@ -3703,7 +3706,7 @@ void glsetgamepalette(void)
     if (fullbright != polymosttexfullbright) gltexinvalidateall();
     polymosttexfullbright = fullbright;
 #endif
-    glgamepalette = ps[myconnectindex].palette;
+    glgamepalette = pal;
     glgamebrightness = ud.brightness;
     fadergb = palfadergb;  /* setbrightness clears the fade. */
     fadedelta = palfadedelta;
