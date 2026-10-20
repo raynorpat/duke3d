@@ -244,7 +244,7 @@ int main(int argc, char **argv)
     palette_t savedpal[256], savedfade;
     unsigned char savedfadedelta;
     int32_t oldxdim, oldydim;
-    int lfnpot, lfpot, resized, palkept, palsame;
+    int lfnpot, lfpot, resized, palkept, palsame, winw, winh;
     double palwater;
     Uint32 t0;
 
@@ -507,8 +507,6 @@ int main(int argc, char **argv)
            lfnpot ? "yes" : "no", lfpot ? "yes" : "no");
     if (err == GL_NO_ERROR) err = glGetError();
 
-    uninitengine();
-
     if (err != GL_NO_ERROR) { fprintf(stderr, "FAIL: glGetError 0x%x\n", (unsigned) err); return 1; }
     if ((r1 < r0 + 64) || (g1 > g0 + 1)) { fprintf(stderr, "FAIL: the fade isn't red\n"); return 1; }
     if ((still[1] < still[0] + 8) || (still[2] < still[1] + 8))
@@ -541,6 +539,16 @@ int main(int argc, char **argv)
     if (!resized) { fprintf(stderr, "FAIL: the window didn't resize\n"); return 1; }
     if (!palkept) { fprintf(stderr, "FAIL: the resize lost the palette or fade\n"); return 1; }
     if ((!lfnpot) || (!lfpot)) { fprintf(stderr, "FAIL: the last frame shows differently\n"); return 1; }
+
+    /* A mode over the 8-bit 1600x1200 limit (it changes xdim and ydim, so
+     * after the checks above): the OpenGL window still gets the size asked
+     * for. */
+    if ((_setgamemode(1, 1680, 900) != 0) || (setgamemode_gl(1) != 0))
+        { fprintf(stderr, "FAIL: the 1680x900 mode\n"); return 1; }
+    SDL_GetWindowSize(SDL_GL_GetCurrentWindow(), &winw, &winh);
+    printf("1680x900 mode: window %dx%d\n", winw, winh);
+    uninitengine();
+    if ((winw != 1680) || (winh != 900)) { fprintf(stderr, "FAIL: the window isn't 1680x900\n"); return 1; }
     printf("PASS: render_gl\n");
     return 0;
 }

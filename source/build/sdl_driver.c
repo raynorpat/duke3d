@@ -145,7 +145,7 @@ extern void polymost_glreset(void);
 extern void gltexinvalidateall(void);
 static SDL_GLContext sdl_glcontext = NULL;  /* non-NULL while in renderer 3 */
 static char gl_davidoption = 1;
-static int gl_window_w = 640;  /* windowed size: the last 8-bit window's */
+static int gl_window_w = 640;  /* windowed size: the last 8-bit mode's, unclamped */
 static int gl_window_h = 480;
 static int framedrawn = 0;  /* something was drawn since the last swap */
 static GLuint lastframe = 0;  /* the last swapped frame, before its fade */
@@ -1854,6 +1854,10 @@ void setvmode(int mode)
 
 int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim)
 {
+#ifdef USE_OPENGL
+    int32_t glw = daxdim, glh = daydim;
+#endif
+
     /* 8-bit modes keep the original limit; MAXXDIM/MAXYDIM grew for OpenGL. */
     if (daxdim > 1600 || daydim > 1200)
     {
@@ -1862,9 +1866,17 @@ int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim)
     }
 
     if (in_egapalette)
-        restore256_palette();	    
+        restore256_palette();
 
     go_to_new_vid_mode((int) davidoption, daxdim, daydim);
+#ifdef USE_OPENGL
+    /* but renderer 3's window gets the size asked for. */
+    if ((glw != daxdim) || (glh != daydim))
+    {
+        gl_window_w = glw;
+        gl_window_h = glh;
+    } /* if */
+#endif
 
     qsetmode = 200;
     last_render_ticks = SDL_GetTicks();
