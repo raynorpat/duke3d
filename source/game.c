@@ -1585,16 +1585,31 @@ void displayinventory(struct player_struct *p)
 
 
 
+// The row drawbackground starts tiling from: below the fragbar in a network game.
+static int32_t backgroundtop(void)
+{
+    int32_t y1 = 0;
+
+    if( ( ready2send || ud.recstat == 2 ) && ud.coop != 1 )
+    {
+        if (ud.multimode > 1) y1 += scale(ydim,8,200);
+        if (ud.multimode > 4) y1 += scale(ydim,8,200);
+    }
+    return y1;
+}
+
 // Widescreen: tile the view background into rows y1..y2-1 left and right
-// of the 4:3 HUD (the status bar and fragbar don't reach there).
+// of the 4:3 HUD (the status bar and fragbar don't reach there), lined up
+// with drawbackground's tiles.
 static void drawwidesides(int32_t y1, int32_t y2)
 {
-    int32_t x, y, cl, cr;
+    int32_t x, y, cl, cr, th;
 
     if (!widescreen) return;
 
     cl = sbarx(0); cr = sbarx(320)-1;
-    for(y=y1-(y1%tilesizy[BIGHOLE]);y<y2;y+=tilesizy[BIGHOLE])
+    th = tilesizy[BIGHOLE];
+    for(y=y1-((y1-backgroundtop())%th+th)%th;y<y2;y+=th)
         for(x=0;x<xdim;x+=tilesizx[BIGHOLE])
         {
             if (x < cl)
@@ -2721,14 +2736,9 @@ void drawbackground(void)
           case 2:dapicnum = BIGHOLE;break;
      }
 
-     y1 = 0; y2 = ydim;
+     y1 = backgroundtop(); y2 = ydim;
      if( ready2send || ud.recstat == 2 )
      {
-        if(ud.coop != 1)
-        {
-            if (ud.multimode > 1) y1 += scale(ydim,8,200);
-            if (ud.multimode > 4) y1 += scale(ydim,8,200);
-        }
         if (ud.screen_size >= 8) y2 = scale(ydim,200-34,200);
      }
 
