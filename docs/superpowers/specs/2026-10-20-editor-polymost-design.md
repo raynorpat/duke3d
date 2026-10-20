@@ -1,7 +1,7 @@
 # Polymost in the Build Editor — Design
 
 Date: 2026-10-20
-Status: Draft
+Status: Approved
 
 ## Intent
 
@@ -45,7 +45,17 @@ is in the session scratchpad (`jfbuild-editor-recon.md`); its findings are summa
      2D and 3D and scaled so 1.0 is exactly today's speed, i.e. today's `>>1` stays the base)
    - Missing file: the editor starts with the defaults and writes `build.cfg` on exit. Values
      out of range are clamped on read and written back clamped. Unknown keys are ignored.
-   - `setup.dat` is still read for keys and options, unchanged.
+   - **Key bindings** *(user's decision: `build.cfg` replaces `setup.dat`)*: the 19 editor keys
+     that `setup.dat` held, under JFBuild's names and hex format (`keyforward`, `keybackward`,
+     `keyturnleft`, `keyturnright`, `keyrun`, `keystrafe`, `keyfire`, `keyuse`, `keystandhigh`,
+     `keystandlow`, `keylookup`, `keylookdown`, `keystrafeleft`, `keystraferight`, `key2dmode`,
+     `keyviewcycle`, `key2dzoomin`, `key2dzoomout`, `keychat`, e.g. `keyforward = c8`), with
+     today's defaults (`keys[]` in `astub.c`). No `keyconsole` (no OSD).
+   - **`setup.dat` is phased out.** The editor only ever used its keys; its `option[]` bytes are
+     read and ignored today. One-time migration *(my call)*: when `build.cfg` doesn't exist but
+     `setup.dat` does, its keys become the starting bindings and are written to `build.cfg` on
+     exit. After that `setup.dat` is never read. The editor never deletes or writes `setup.dat`.
+     The unused `option[]`/`vesares` code goes.
 3. **Command line:** `-renderer N` overrides `build.cfg` for that run, as in the game. It is not
    written back to `build.cfg` *(my call; the game's `-renderer` also doesn't persist)*.
 4. **Renderer kept across 2D↔3D.** Going to 2D and back returns to the same renderer and 3D size.
@@ -73,6 +83,9 @@ is in the session scratchpad (`jfbuild-editor-recon.md`); its findings are summa
      new renderer's name. The cycled renderer is what gets written to `build.cfg` on exit.
    - The 3D cursor drawn with `drawline256` (as JFBuild 2025) so it's visible at high resolution.
 
+7. **README** documents `build.cfg` (keys, defaults, the `setup.dat` migration), `-renderer` for the
+   editor and Alt+K.
+
 ## Non-goals
 
 - Drawing the 2D map in OpenGL, or a resizable/256-colour 2D mode.
@@ -87,7 +100,7 @@ is in the session scratchpad (`jfbuild-editor-recon.md`); its findings are summa
   and look/turn speed now scales with time. Maps saved must be byte-identical to what the editor
   saves today for the same edits.
 - The game (`duke3d`) changing in any way.
-- Losing a user's `setup.dat` key setup.
+- Losing a user's `setup.dat` key setup (the one-time migration carries it over).
 
 ## Constraints
 
@@ -102,7 +115,8 @@ is in the session scratchpad (`jfbuild-editor-recon.md`); its findings are summa
 
 The user opens E1L1 in the editor with `renderer = 3` and flies around in 3D, opens the tile
 browser, goes to 2D and back, presses F5–F7, cycles renderers with Alt+K, saves and quits, and
-checks that `build.cfg` kept the settings. *(User's decision.)* Automated tests cover what can be
+checks that `build.cfg` kept the settings (including key bindings carried over from an existing
+`setup.dat`). *(User's decision.)* Automated tests cover what can be
 tested headless (config read/write/clamp, renderer fallback, mode helper) in the existing test
 style.
 
