@@ -512,3 +512,8 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
       PASS_REGULAR_EXPRESSION "wrong edition: expected sw")
   endif()
 endif()
+
+# The editor build.cfg reader and writer; engine-free, so it runs everywhere.
+add_executable(build_cfg build_cfg.c "${PROJECT_SOURCE_DIR}/source/buildcfg.c")
+target_include_directories(build_cfg PRIVATE "${PROJECT_SOURCE_DIR}/source")
+add_test(NAME build_cfg COMMAND build_cfg)
