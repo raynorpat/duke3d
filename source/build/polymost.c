@@ -298,6 +298,7 @@ void polymost_glreset ()
 			} while (gltexcacnum > 0);
 		}
 	}
+	gltexmaxsize = 0; //a new context may have another GL_MAX_TEXTURE_SIZE
 	glox1 = -1;
 }
 
