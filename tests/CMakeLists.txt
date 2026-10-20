@@ -123,10 +123,12 @@ set(DUKE3D_E1L1_CHECKSUM "e0517697" CACHE STRING
 set(DUKE3D_E1L1_POLYMOST_CHECKSUM "" CACHE STRING
     "Expected render_e1l1_polymost (renderer 2) frame checksum (hex); empty just prints it")
 # render_classic2d's HUD and map view checksums (hex) for the 1.3D GRP;
-# empty just prints them. They are the same in 1.3D and 1.5 builds.
+# empty just prints them. They are the same in 1.3D and 1.5 builds. The
+# wide modes only print: the widescreen port will change them. Tall modes
+# must stay the same, so 480x640 is pinned.
 foreach(_pin "320x200;9f03fd16;763b8c56" "640x400;c6b6b632;7282abe5"
              "640x480;92082500;dfe0efbe" "1280x1024;43229c16;441cd127"
-             "1920x1080;;")
+             "480x640;6a4e30ce;28839020" "1280x720;;" "1600x900;;")
   list(GET _pin 0 _size)
   list(GET _pin 1 _hud)
   list(GET _pin 2 _map)
@@ -145,9 +147,8 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
     TIMEOUT 30)
 
   # Classic renderer HUD rotatesprites and textured map view at several
-  # 8-bit modes, pinned before the widescreen 2D ports. 1920x1080 only
-  # prints: the 8-bit modes stop at 1600x1200.
-  foreach(_size 320x200 640x400 640x480 1280x1024 1920x1080)
+  # 8-bit modes, pinned before the widescreen 2D ports.
+  foreach(_size 320x200 640x400 640x480 1280x1024 480x640 1280x720 1600x900)
     string(REPLACE "x" ";" _wh "${_size}")
     add_test(NAME render_classic2d_${_size}
       COMMAND render_classic2d "${DUKE3D_GRP}"
