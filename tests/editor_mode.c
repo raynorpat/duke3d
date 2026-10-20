@@ -9,6 +9,7 @@
 #include "build.h"
 #include "display.h"
 #include "engine.h"
+#include "glext.h"
 #include "editormode.h"
 
 /* Callbacks the game normally provides to the engine. */
@@ -18,7 +19,7 @@ void faketimerhandler(void) { }
 
 int main(int argc, char **argv)
 {
-    editormode_t m = { 3, 640, 480, 2 };
+    editormode_t m = { 3, 640, 480, 2, GLPATH_VBO, 320, 200 };
 #ifdef POLYMOST
     int polymost = 1;
 #else
@@ -45,6 +46,12 @@ int main(int argc, char **argv)
     if (gltexmiplevel != 2)
     {
         fprintf(stderr, "FAIL: gltexmiplevel=%d (expected 2)\n", (int) gltexmiplevel);
+        return 1;
+    }
+    if ((gldrawpathrequest != GLPATH_VBO) || (glinternalwidth != 320) || (glinternalheight != 200))
+    {
+        fprintf(stderr, "FAIL: gldrawpathrequest=%d glinternal %dx%d\n", (int) gldrawpathrequest,
+                (int) glinternalwidth, (int) glinternalheight);
         return 1;
     }
 

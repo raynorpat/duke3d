@@ -15,6 +15,7 @@
 #endif
 
 #include "buildcfg.h"
+#include "build/glext.h"
 
 static int fails;
 
@@ -36,6 +37,8 @@ static int same(const buildcfg_t *a, const buildcfg_t *b)
     return a->renderer == b->renderer && a->xdim3d == b->xdim3d &&
            a->ydim3d == b->ydim3d && a->fullscreen == b->fullscreen &&
            a->gltexmiplevel == b->gltexmiplevel &&
+           a->gldrawpath == b->gldrawpath && a->glinternalwidth == b->glinternalwidth &&
+           a->glinternalheight == b->glinternalheight &&
            a->mousesensitivity == b->mousesensitivity &&
            !memcmp(a->keys, b->keys, sizeof(a->keys));
 }
@@ -73,12 +76,29 @@ int main(void)
     CHECK(strstr(text, "xdim3d = 640"));
     CHECK(strstr(text, "fullscreen = 1"));
     CHECK(strstr(text, "keyforward = c8"));
+    CHECK(strstr(text, "gldrawpath = auto"));
+    CHECK(strstr(text, "glinternalwidth = 0"));
+    CHECK(d.gldrawpath == GLPATH_AUTO && d.glinternalwidth == 0 && d.glinternalheight == 0);
+
+    /* draw path in any case, written back lowercase */
+    putstr(cfg, "gldrawpath = Shader\nglinternalwidth = 320\nglinternalheight = 200\n");
+    CHECK(buildcfg_read(&c, cfg) == 0);
+    CHECK(c.gldrawpath == GLPATH_SHADER && c.glinternalwidth == 320 && c.glinternalheight == 200);
+    CHECK(buildcfg_write(&c, cfg) == 0);
+    f = fopen(cfg, "r");
+    n = f ? fread(text, 1, sizeof(text) - 1, f) : 0;
+    if (f) fclose(f);
+    text[n] = '\0';
+    CHECK(strstr(text, "gldrawpath = shader"));
+    CHECK(strstr(text, "glinternalheight = 200"));
 
     /* clamping */
     putstr(cfg, "renderer = 9\nxdim3d = 99999\ngltexmiplevel = -3\n"
-                "mousesensitivity = 50\nkeyfire = 0\n");
+                "mousesensitivity = 50\nkeyfire = 0\ngldrawpath = bogus\n"
+                "glinternalwidth = -5\nglinternalheight = 99999\n");
     CHECK(buildcfg_read(&c, cfg) == 0);
     CHECK(c.renderer == 3 && c.xdim3d == 7680 && c.gltexmiplevel == 0);
+    CHECK(c.gldrawpath == GLPATH_AUTO && c.glinternalwidth == 0 && c.glinternalheight == 4320);
     CHECK(c.mousesensitivity == 10.0 && c.keys[6] == 0x1d);
 
     /* garbage */

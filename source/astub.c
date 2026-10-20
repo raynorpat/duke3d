@@ -1900,6 +1900,9 @@ void ExtInit(void)
     editormode.xdim3d = buildcfg.xdim3d;
     editormode.ydim3d = buildcfg.ydim3d;
     editormode.gltexmiplevel = buildcfg.gltexmiplevel;
+    editormode.gldrawpath = buildcfg.gldrawpath;
+    editormode.glinternalwidth = buildcfg.glinternalwidth;
+    editormode.glinternalheight = buildcfg.glinternalheight;
     editormousesensitivity = (int32_t)(buildcfg.mousesensitivity*65536.0+0.5);
     setvideofullscreen(buildcfg.fullscreen);
 

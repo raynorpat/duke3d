@@ -1,6 +1,7 @@
 /* Reader and writer for the map editor's build.cfg. Engine-free. */
 
 #include "buildcfg.h"
+#include "build/glext.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -37,6 +38,9 @@ void buildcfg_defaults(buildcfg_t *c)
     c->gltexmiplevel = 0;
     c->mousesensitivity = 1.0;
     memcpy(c->keys, default_keys, sizeof(c->keys));
+    c->gldrawpath = GLPATH_AUTO;
+    c->glinternalwidth = 0;
+    c->glinternalheight = 0;
 }
 
 static int32_t clamp_int(long v, long lo, long hi)
@@ -66,6 +70,10 @@ static void apply(buildcfg_t *c, const char *name, const char *val)
         c->mousesensitivity = d < 0.1 ? 0.1 : d > 10.0 ? 10.0 : d;
         return;
     }
+    if (!strcmp(name, "gldrawpath")) {
+        c->gldrawpath = gl_pathfromname(val);
+        return;
+    }
     for (i = 0; i < BUILDCFG_NUMKEYS; i++) {
         if (!strcmp(name, key_names[i])) {
             if (!parse_long(val, 16, &v))
@@ -81,6 +89,8 @@ static void apply(buildcfg_t *c, const char *name, const char *val)
     else if (!strcmp(name, "ydim3d")) c->ydim3d = clamp_int(v, 200, 4320);
     else if (!strcmp(name, "fullscreen")) c->fullscreen = v != 0;
     else if (!strcmp(name, "gltexmiplevel")) c->gltexmiplevel = clamp_int(v, 0, 15);
+    else if (!strcmp(name, "glinternalwidth")) c->glinternalwidth = clamp_int(v, 0, 7680);
+    else if (!strcmp(name, "glinternalheight")) c->glinternalheight = clamp_int(v, 0, 4320);
 }
 
 static char *trim(char *s)
@@ -134,6 +144,9 @@ int buildcfg_write(const buildcfg_t *c, const char *path)
     fprintf(f, "ydim3d = %d\n", (int)c->ydim3d);
     fprintf(f, "fullscreen = %d\n", (int)c->fullscreen);
     fprintf(f, "gltexmiplevel = %d\n", (int)c->gltexmiplevel);
+    fprintf(f, "gldrawpath = %s\n", gl_pathname(c->gldrawpath));
+    fprintf(f, "glinternalwidth = %d\n", (int)c->glinternalwidth);
+    fprintf(f, "glinternalheight = %d\n", (int)c->glinternalheight);
     fprintf(f, "mousesensitivity = %g\n", c->mousesensitivity);
     for (i = 0; i < BUILDCFG_NUMKEYS; i++)
         fprintf(f, "%s = %02x\n", key_names[i], c->keys[i]);

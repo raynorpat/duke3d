@@ -10,6 +10,7 @@ typedef struct {
     int32_t renderer, xdim3d, ydim3d, fullscreen, gltexmiplevel;
     double mousesensitivity;
     unsigned char keys[BUILDCFG_NUMKEYS];
+    int32_t gldrawpath, glinternalwidth, glinternalheight;  /* GLPATH_*; 0: the window's */
 } buildcfg_t;
 
 /* Fills c with the defaults; keys are build.c's buildkeys[] initializer. */
