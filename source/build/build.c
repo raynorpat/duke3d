@@ -4973,7 +4973,6 @@ static void cyclerenderer(void)
 	sprintf(renderermessage,"Renderer %d: %s",(int)editormode.renderer,names[editormode.renderer]);
 	if (editormode.renderer != previous)
 	{
-		editorrendererpicked = 1;
 		if (editorsetgamemode(&editormode) < 0)
 		{
 			ExtUnInit();
@@ -4988,6 +4987,8 @@ static void cyclerenderer(void)
 			editormode.renderer = previous;
 			editorsetgamemode(&editormode);
 		}
+		else
+			editorrendererpicked = 1;
 		searchx = scale(searchx,xdim,oxdim);
 		searchy = scale(searchy,ydim,oydim);
 		lockclock = totalclock;  /* the mode change isn't a frame */
