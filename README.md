@@ -106,11 +106,51 @@ Pass these with `-D` when configuring.
 |---|---|---|
 | `DUKE3D_VERSION` | `1.5` | Game version: `1.3D`, `1.4` or `1.5` |
 | `DUKE3D_SHAREWARE` | `OFF` | Build the 1.3D shareware version (`VOLUMEONE`); needs `DUKE3D_VERSION=1.3D` |
+| `DUKE3D_POLYMOST` | `ON` | Build the Polymost renderers (see [Renderers](#renderers)); needs OpenGL. `OFF` builds the classic renderer only |
 | `DUKE3D_CONTROLS_MENU` | `ON` | In-game controls configuration menu |
 | `DUKE3D_FETCH_SDL` | `AUTO` | `AUTO` uses installed SDL2 and fetches it if missing; `ON` always builds SDL2 2.32.10 from source; `OFF` fails if SDL2 isn't installed |
 
 The default build type is `RelWithDebInfo`. The Watcom/DOS makefiles
 (`source/makefile.dos`, `source/makefile.lnk`) are kept for reference only.
+
+## Renderers
+
+The game has four renderers, from Ken Silverman's Polymost as ported in
+JFBuild:
+
+| Number | Renderer |
+|---|---|
+| 0 | Classic Build software renderer (default) |
+| 1 | Polymost solid colour (Ken's debug view) |
+| 2 | Polymost software (polygons into the 8-bit framebuffer) |
+| 3 | Polymost OpenGL |
+
+Set `Renderer` under `[Screen Setup]` in `duke3d.cfg`, or use `-renderer N`
+for one run (the config keeps its own value). Renderer 3 draws at the
+window's real pixel size and uses a legacy (fixed-function) OpenGL context.
+If OpenGL isn't available, the game prints a message and uses renderer 0. The
+map editor is classic only.
+
+Other settings, all under `[Screen Setup]`:
+
+- Widescreen and tallscreen: modes wider than 4:3 get a wider view and a 4:3
+  status bar and HUD with the sides left empty. This applies to every
+  renderer. 320x200, 640x400 and other 4:3 modes draw as before.
+- `GLTextureMipLevel` (default 0): in renderer 3, drop this many mipmap
+  levels from every texture. Over 0 looks blocky.
+- `ScreenshotFormat`: `png` (default), `jpg` or `bmp`. Screenshots are named
+  `duke0000.png` and so on, and go to the folder under
+  [Config and saves](#config-and-saves).
+
+Known gaps:
+
+- Renderer 3 shades with fog instead of the palette ramps, so lighting
+  differs from classic (it matches JFBuild's 2004 Polymost).
+- Palette changes (fades, flashes) rebuild the textures in renderer 3, so
+  they are slow.
+- No `.md2` models or hi-res texture replacement.
+- Polymost's own todo list applies (sprite sorting, the hall of mirrors near
+  the zenith, ...).
 
 ## Running
 
@@ -253,7 +293,7 @@ only the data-free tests run there.
 | Path | Contents |
 |---|---|
 | `source/` | Game code, the map editor (`astub.c`) and the CMake target for both |
-| `source/build/` | The Build engine (icculus port, SDL2 video); see `VENDORED.md` there |
+| `source/build/` | The Build engine (icculus port, SDL2 video), JFBuild's Polymost and stb_image_write (public domain or MIT); see `VENDORED.md` there |
 | `source/audiolib/` | Jim Dose's audio library over SDL audio, with a DOS-style MIDI driver and emulated OPL3 (DBOPL) |
 | `cmake/` | SDL2 lookup and fetch, compiler flags and version definitions |
 | `tests/` | CTest tests and their helpers |
