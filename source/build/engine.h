@@ -373,10 +373,11 @@ void setpalettefade(unsigned char r, unsigned char g, unsigned char b, unsigned 
  * This function will dump a picture of the current screen
  * to a file. \n
  * Set \a inverseit to 1 if you want the colors inverted.
+ * The format is the extension: ".png", ".jpg" or ".bmp".
  * @param *filename The filename to write to.
  * @param inverseit Set to 1 if you want the colors inverted.
  * @remark Notes on \a filename:
- * \n If you use "captxxxx.pcx" as your filename,
+ * \n If you use "captxxxx.png" as your filename,
  * Build will automatically replace the x's with
  * an automatically incrementing number, starting
  * from 0000.

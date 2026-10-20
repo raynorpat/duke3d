@@ -6597,7 +6597,7 @@ void nonsharedkeys(void)
     if( KB_KeyPressed( sc_F12 ) )
     {
         KB_ClearKeyDown( sc_F12 );
-        dukescreencapture("duke0000.pcx",0);
+        dukescreencapture("duke0000.png",0);
         FTA(103,&ps[myconnectindex]);
     }
 
@@ -9977,7 +9977,7 @@ void dobonus(char bonusonly)
         if( KB_KeyPressed( sc_F12 ) )
         {
             KB_ClearKeyDown( sc_F12 );
-            dukescreencapture("duke0000.pcx",0);
+            dukescreencapture("duke0000.png",0);
         }
 
         if(bonusonly || ud.multimode > 1) return;
@@ -10173,7 +10173,7 @@ void dobonus(char bonusonly)
                 if( KB_KeyPressed( sc_F12 ) )
                 {
                     KB_ClearKeyDown( sc_F12 );
-                    dukescreencapture("duke0000.pcx",0);
+                    dukescreencapture("duke0000.png",0);
                 }
 
                 if( totalclock < (60*13) )

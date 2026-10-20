@@ -4,6 +4,7 @@
  *  game data. Run with SDL_VIDEODRIVER=dummy for headless CI.
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #if !PLATFORM_WIN32
 #include <signal.h>
@@ -132,6 +133,119 @@ static int palette_fade(int argc, char **argv)
     return 0;
 }
 
+static int file_head(const char *name, unsigned char *buf, int n)
+{
+    FILE *f = fopen(name, "rb");
+    int got;
+    if (f == NULL)
+        return 0;
+    got = (int) fread(buf, 1, n, f);
+    fclose(f);
+    return got;
+}
+
+#define LE32(p) ((p)[0] | ((p)[1] << 8) | ((p)[2] << 16) | ((p)[3] << 24))
+#define BE32(p) (((p)[0] << 24) | ((p)[1] << 16) | ((p)[2] << 8) | (p)[3])
+
+/*
+ * screencapture writes PNG, JPEG or BMP by the file name's extension, from
+ *  the 8-bit frame through the palette on screen. The BMP is uncompressed,
+ *  so its pixels are checked against the palette.
+ */
+static int screencapture_formats(int argc, char **argv)
+{
+    static const unsigned char pngsig[8] = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+    unsigned char head[64], *bmp;
+    char pal[256 * 4];
+    int i, w, h, stride, n;
+    FILE *f;
+
+    _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
+    if (setgamemode(2, 320, 200) != 0)
+    {
+        fprintf(stderr, "FAIL: setgamemode(2,320,200)\n");
+        return 1;
+    }
+
+    memset(pal, 0, sizeof (pal));
+    pal[5*4+0] = 10; pal[5*4+1] = 20; pal[5*4+2] = 30;  /* BGR, 0-63 */
+    pal[9*4+0] = 63; pal[9*4+1] = 0;  pal[9*4+2] = 33;
+    VBE_setPalette(0, 256, pal);
+    memset((void *) frameplace, 5, xdim * ydim);
+    ((unsigned char *) frameplace)[0] = 9;  /* top left */
+
+    remove("smoke0000.png"); remove("smoke0000.jpg"); remove("smoke0000.bmp");
+    if ((screencapture("smokexxxx.png", 0) != 0) ||
+        (screencapture("smokexxxx.jpg", 0) != 0) ||
+        (screencapture("smokexxxx.bmp", 0) != 0))
+    {
+        fprintf(stderr, "FAIL: screencapture returned an error\n");
+        return 1;
+    }
+
+    n = file_head("smoke0000.png", head, 64);
+    if ((n < 24) || (memcmp(head, pngsig, 8) != 0) ||
+        (BE32(head + 16) != xdim) || (BE32(head + 20) != ydim))
+    {
+        fprintf(stderr, "FAIL: smoke0000.png isn't a %ldx%ld PNG\n", (long) xdim, (long) ydim);
+        return 1;
+    }
+
+    n = file_head("smoke0000.jpg", head, 64);
+    if ((n < 3) || (head[0] != 0xFF) || (head[1] != 0xD8) || (head[2] != 0xFF))
+    {
+        fprintf(stderr, "FAIL: smoke0000.jpg doesn't start with FF D8 FF\n");
+        return 1;
+    }
+
+    n = file_head("smoke0000.bmp", head, 64);
+    if ((n < 54) || (head[0] != 'B') || (head[1] != 'M'))
+    {
+        fprintf(stderr, "FAIL: smoke0000.bmp doesn't start with BM\n");
+        return 1;
+    }
+    w = LE32(head + 18);
+    h = LE32(head + 22);
+    if ((w != xdim) || (h != ydim))
+    {
+        fprintf(stderr, "FAIL: smoke0000.bmp is %dx%d\n", w, h);
+        return 1;
+    }
+
+    stride = (w * 3 + 3) & ~3;
+    bmp = (unsigned char *) malloc(54 + stride * h);
+    f = fopen("smoke0000.bmp", "rb");
+    if ((bmp == NULL) || (f == NULL) || (fread(bmp, 1, 54 + stride * h, f) != (size_t) (54 + stride * h)))
+    {
+        fprintf(stderr, "FAIL: smoke0000.bmp is short\n");
+        return 1;
+    }
+    fclose(f);
+
+    /* VBE_setPalette scales 0-63 to 0-255 as v/63*255; BMP rows run bottom-up, pixels BGR. */
+    {
+        const unsigned char *top = bmp + 54 + (h - 1) * stride;
+        const unsigned char *next = top + 3;
+        const unsigned char want0[3] = { 255, 0, (unsigned char) (33 / 63.0 * 255.0) };
+        const unsigned char want1[3] = { (unsigned char) (10 / 63.0 * 255.0),
+                                         (unsigned char) (20 / 63.0 * 255.0),
+                                         (unsigned char) (30 / 63.0 * 255.0) };
+        if ((memcmp(top, want0, 3) != 0) || (memcmp(next, want1, 3) != 0))
+        {
+            fprintf(stderr, "FAIL: BMP pixels %d,%d,%d / %d,%d,%d\n",
+                    top[0], top[1], top[2], next[0], next[1], next[2]);
+            return 1;
+        }
+    }
+    free(bmp);
+
+    for (i = 0; i < 3; i++)
+        remove(i == 0 ? "smoke0000.png" : i == 1 ? "smoke0000.jpg" : "smoke0000.bmp");
+    _uninitengine();
+    printf("PASS: screencapture_formats\n");
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     char pal[256 * 4];
@@ -143,6 +257,8 @@ int main(int argc, char **argv)
         return gl_fallback(argc, argv);
     if ((argc > 1) && (strcmp(argv[1], "palette_fade") == 0))
         return palette_fade(argc, argv);
+    if ((argc > 1) && (strcmp(argv[1], "screencapture_formats") == 0))
+        return screencapture_formats(argc, argv);
 
     _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
     if (_setgamemode(1, 320, 200) != 0)

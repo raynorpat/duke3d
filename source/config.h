@@ -46,6 +46,7 @@ extern int32 MouseAiming;
 extern int32 ScreenMode;
 extern int32 RendererSetting;
 extern int32 GLTextureMipLevel;
+extern char ScreenshotFormat[4];
 extern int32 ScreenWidth;
 extern int32 ScreenHeight;
 

@@ -2,7 +2,7 @@
  * Renders E1L1's start view in renderer 3 (OpenGL) in a real window, with
  *  a HUD tile, printext256 text, a drawline256 line and a plotpixel, and
  *  writes, for checking by eye:
- *   <dir>/gl0000.pcx   screencapture of that frame (24-bit PCX)
+ *   <dir>/gl0000.png   screencapture of that frame (PNG)
  *   <dir>/fade.bmp     the screen after setpalettefade(63,0,0,32) over a
  *                      frame that isn't redrawn, as a title screen's
  *   <dir>/unfade.bmp   the screen after setpalettefade(0,0,0,0)
@@ -254,7 +254,7 @@ int main(int argc, char **argv)
     drawline256(16<<12, 48<<12, (xdim-16)<<12, (ydim-16)<<12, 31);
     plotpixel(8, 8, 31);
     nextpage();
-    snprintf(path, sizeof (path), "%s/gl0000.pcx", argv[2]);
+    snprintf(path, sizeof (path), "%s/gl0000.png", argv[2]);
     if (screencapture(path, 0) != 0) { fprintf(stderr, "FAIL: screencapture\n"); return 1; }
 
     setpalettefade(63, 0, 0, 32);

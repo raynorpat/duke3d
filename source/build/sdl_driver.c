@@ -68,6 +68,9 @@ extern int32_t setvlinebpl(int32_t);
 
 #include "cache1d.h"
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
 
 /*
  * !!! I'd like this to be temporary. --ryan.
@@ -114,23 +117,6 @@ extern int32_t setvlinebpl(int32_t);
 
 
 #define UNLOCK_SURFACE_AND_RETURN  if (SDL_MUSTLOCK(surface)) SDL_UnlockSurface(surface); return;
-
-static unsigned char tempbuf[MAXWALLS];
-static char pcxheader[128] =
-{
-        0xa,0x5,0x1,0x8,0x0,0x0,0x0,0x0,0x3f,0x1,0xc7,0x0,
-        0x40,0x1,0xc8,0x0,0x0,0x0,0x0,0x8,0x8,0x8,0x10,0x10,
-        0x10,0x18,0x18,0x18,0x20,0x20,0x20,0x28,0x28,0x28,0x30,0x30,
-        0x30,0x38,0x38,0x38,0x40,0x40,0x40,0x48,0x48,0x48,0x50,0x50,
-        0x50,0x58,0x58,0x58,0x60,0x60,0x60,0x68,0x68,0x68,0x70,0x70,
-        0x70,0x78,0x78,0x78,0x0,0x1,0x40,0x1,0x0,0x0,0x0,0x0,
-        0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-        0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-        0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-        0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-        0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-};
-
 
 static char vgapal16[48] =
 {
@@ -1658,59 +1644,26 @@ int setvesa(int32_t x, int32_t y)
 } /* setvesa */
 
 #ifdef USE_OPENGL
-/* Writes one run-length encoded PCX scanline plane; step skips the others. */
-static void write_pcx_plane(const unsigned char *src, int n, int step,
-                           unsigned char *out, int *outlen)
-{
-    int i = 0, leng;
-    unsigned char col;
-
-    while (i < n)
-    {
-        col = src[i * step];
-        leng = 1;
-        while ((i + leng < n) && (leng < 63) && (src[(i + leng) * step] == col))
-            leng++;
-        if ((leng > 1) || (col >= 0xc0))
-            out[(*outlen)++] = (leng | 0xc0);
-        out[(*outlen)++] = col;
-        i += leng;
-    } /* while */
-
-    if (n & 1)  /* PCX lines are an even number of bytes. */
-        out[(*outlen)++] = 0;
-} /* write_pcx_plane */
-
-
 /*
- * 24-bit PCX of the frame (JFBuild's GL branch): three planes per line.
- *  A frame being drawn is read from the back buffer; otherwise it's the
- *  last swapped frame, as the back buffer is undefined after a swap.
+ * RGB of the frame (JFBuild's GL branch), top row first, in a malloc'd
+ *  buffer, or NULL. A frame being drawn is read from the back buffer;
+ *  otherwise it's the last swapped frame, as the back buffer is undefined
+ *  after a swap. The size is the drawable's, not the window's.
  */
-static int gl_screencapture(int fil)
+static unsigned char *gl_screencapture(int *w, int *h)
 {
-    unsigned char head[128];
-    unsigned char *pix, *line, *row;
-    int w = xdim, h = ydim, bpl = xdim + (xdim & 1);
-    int y, outlen, rowbytes, ok = 1;
+    unsigned char *pix, *rgb;
+    int rowbytes, y;
 
-    memcpy(head, pcxheader, sizeof (head));
-    head[8] = ((w-1)&255); head[9] = (((w-1)>>8)&255);
-    head[10] = ((h-1)&255); head[11] = (((h-1)>>8)&255);
-    head[12] = (w&255); head[13] = ((w>>8)&255);
-    head[14] = (h&255); head[15] = ((h>>8)&255);
-    head[65] = 3;
-    head[66] = (bpl&255); head[67] = ((bpl>>8)&255);
-    if (write(fil, head, 128) < 128)
-        return(-1);
-
+    *w = xdim;
+    *h = ydim;
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     if ((framedrawn) || (!lastframe_set))
     {
-        rowbytes = w * 3;
-        pix = (unsigned char *) malloc(rowbytes * h);
+        rowbytes = *w * 3;
+        pix = (unsigned char *) malloc(rowbytes * *h);
         if (pix != NULL)
-            glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pix);
+            glReadPixels(0, 0, *w, *h, GL_RGB, GL_UNSIGNED_BYTE, pix);
     } /* if */
     else
     {
@@ -1723,39 +1676,92 @@ static int gl_screencapture(int fil)
         } /* if */
     } /* else */
 
-    line = (unsigned char *) malloc((bpl * 2 + 2) * 3);
-    if ((pix == NULL) || (line == NULL))
+    rgb = (unsigned char *) malloc(*w * 3 * *h);
+    if ((pix != NULL) && (rgb != NULL))
+        for (y = 0; y < *h; y++)  /* GL rows are bottom-up. */
+            memcpy(rgb + y * *w * 3, pix + (*h - 1 - y) * rowbytes, *w * 3);
+    else
     {
-        free(pix);
-        free(line);
-        return(-1);
-    } /* if */
-
-    for (y = h - 1; (y >= 0) && (ok); y--)  /* GL rows are bottom-up. */
-    {
-        row = pix + y * rowbytes;
-        outlen = 0;
-        write_pcx_plane(row + 0, w, 3, line, &outlen);
-        write_pcx_plane(row + 1, w, 3, line, &outlen);
-        write_pcx_plane(row + 2, w, 3, line, &outlen);
-        ok = (write(fil, line, outlen) == outlen);
-    } /* for */
+        free(rgb);
+        rgb = NULL;
+    } /* else */
 
     free(pix);
-    free(line);
-    return(ok ? 0 : -1);
+    return(rgb);
 } /* gl_screencapture */
 #endif
 
 
+/* RGB of the 8-bit frame through the palette on screen (the faded one), as
+ *  the SDL surface holds it, so the picture is what's presented. */
+static unsigned char *classic_screencapture(int *w, int *h, char inverseit)
+{
+    const SDL_Color *pal = surface->format->palette->colors;
+    unsigned char *rgb, *out;
+    int32_t i, p, numbytes;
+    int col;
+
+    if (qsetmode == 200)
+    {
+        *w = xdim;
+        *h = ydim;
+    } /* if */
+    else  /* the editor's 2D mode: 640 wide, qsetmode high, 16 colors. */
+    {
+        *w = 640;
+        *h = qsetmode;
+    } /* else */
+
+    numbytes = *w * *h;
+    rgb = (unsigned char *) malloc(numbytes * 3);
+    if (rgb == NULL)
+        return(NULL);
+
+    for (p = 0, out = rgb; p < numbytes; p++)
+    {
+        if (qsetmode == 200)
+            col = ((unsigned char *) frameplace)[p];
+        else
+        {
+            col = readpixel(p);
+            if ((inverseit == 1) && (((col&7) == 0) || ((col&7) == 7))) col ^= 15;
+            i = (col & 15) * 3;
+            *out++ = vgapal16[i+0] << 2;
+            *out++ = vgapal16[i+1] << 2;
+            *out++ = vgapal16[i+2] << 2;
+            continue;
+        } /* else */
+
+        *out++ = pal[col].r;
+        *out++ = pal[col].g;
+        *out++ = pal[col].b;
+    } /* for */
+
+    return(rgb);
+} /* classic_screencapture */
+
+
+static void screencapture_write(void *context, void *data, int size)
+{
+    int *ok = (int *) context;
+    if ((*ok) && (write(ok[1], data, size) != size))
+        *ok = 0;
+} /* screencapture_write */
+
+
+/*
+ * The format is the file name's extension: .jpg, .bmp, or else PNG.
+ *  The NNNN before it is replaced by the first number not yet taken.
+ */
 int screencapture(char *_filename, char inverseit)
 {
-	char *ptr = NULL;
-	int fil = -1;
-    int32_t i, bufplc, p, col, ncol, leng, numbytes, xres;
+    unsigned char *rgb;
+    int fil = -1;
+    int w, h, ok[2];
     int captcnt;
     size_t flen = strlen(_filename);
     char *filename = alloca(flen + 1);
+    const char *ext;
     strcpy(filename, _filename);
 
     for (captcnt = 0; (captcnt <= 9999) && (fil == -1); captcnt++)
@@ -1773,124 +1779,30 @@ int screencapture(char *_filename, char inverseit)
 
 #ifdef USE_OPENGL
     if (sdl_glcontext != NULL)
-    {
-        i = gl_screencapture(fil);
-        close(fil);
-        return(i);
-    } /* if */
+        rgb = gl_screencapture(&w, &h);
+    else
 #endif
+        rgb = classic_screencapture(&w, &h, inverseit);
 
-	if (qsetmode == 200)
-	{
-		pcxheader[8] = ((xdim-1)&255); pcxheader[9] = (((xdim-1)>>8)&255);
-		pcxheader[10] = ((ydim-1)&255); pcxheader[11] = (((ydim-1)>>8)&255);
-		pcxheader[12] = (xdim&255); pcxheader[13] = ((xdim>>8)&255);
-		pcxheader[14] = (ydim&255); pcxheader[15] = ((ydim>>8)&255);
-		pcxheader[66] = (xdim&255); pcxheader[67] = ((xdim>>8)&255);
-	}
-	else
-	{
-		pcxheader[8] = ((640-1)&255); pcxheader[9] = (((640-1)>>8)&255);
-		pcxheader[10] = ((qsetmode-1)&255); pcxheader[11] = (((qsetmode-1)>>8)&255);
-		pcxheader[12] = (640&255); pcxheader[13] = ((640>>8)&255);
-		pcxheader[14] = (qsetmode&255); pcxheader[15] = ((qsetmode>>8)&255);
-		pcxheader[66] = (640&255); pcxheader[67] = ((640>>8)&255);
-	}
+    if (rgb == NULL)
+    {
+        close(fil);
+        return(-1);
+    } /* if */
 
-	write(fil,&pcxheader[0],128);
+    ok[0] = 1;
+    ok[1] = fil;
+    ext = filename + flen - 3;
+    if (SDL_strcasecmp(ext, "jpg") == 0)
+        stbi_write_jpg_to_func(screencapture_write, ok, w, h, 3, rgb, 90);
+    else if (SDL_strcasecmp(ext, "bmp") == 0)
+        stbi_write_bmp_to_func(screencapture_write, ok, w, h, 3, rgb);
+    else
+        stbi_write_png_to_func(screencapture_write, ok, w, h, 3, rgb, w * 3);
 
-	if (qsetmode == 200)
-	{
-		ptr = (char *)frameplace;
-		numbytes = xdim*ydim;
-		xres = xdim;
-	}
-	else
-	{
-		numbytes = (mul5(qsetmode)<<7);
-		xres = 640;
-	}
-
-	bufplc = 0; p = 0;
-	while (p < numbytes)
-	{
-//		koutp(97,kinp(97)|3);
-
-		if (qsetmode == 200) { col = *ptr; p++; ptr++; }
-		else
-		{
-			col = readpixel(p);
-			p++;
-			if ((inverseit == 1) && (((col&7) == 0) || ((col&7) == 7))) col ^= 15;
-		}
-
-		leng = 1;
-
-		if (qsetmode == 200) ncol = *ptr;
-		else
-		{
-			ncol = readpixel(p);
-			if ((inverseit == 1) && (((ncol&7) == 0) || ((ncol&7) == 7))) ncol ^= 15;
-		}
-
-		while ((ncol == col) && (p < numbytes) && (leng < 63) && ((p%xres) != 0))
-		{
-			leng++;
-
-			if (qsetmode == 200) { p++; ptr++; ncol = *ptr; }
-			else
-			{
-				p++;
-				ncol = readpixel(p);
-				if ((inverseit == 1) && (((ncol&7) == 0) || ((ncol&7) == 7))) ncol ^= 15;
-			}
-		}
-
-		//koutp(97,kinp(97)&252);
-
-		if ((leng > 1) || (col >= 0xc0))
-		{
-			tempbuf[bufplc++] = (leng|0xc0);
-			if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-		}
-		tempbuf[bufplc++] = col;
-		if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-	}
-
-	tempbuf[bufplc++] = 0xc;
-	if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-
-	if (qsetmode == 200)
-	{
-		VBE_getPalette(0,256,&tempbuf[4096]);
-		for(i=0;i<256;i++)
-		{
-			tempbuf[bufplc++] = (tempbuf[(i<<2)+4096+2]<<2);
-			if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-			tempbuf[bufplc++] = (tempbuf[(i<<2)+4096+1]<<2);
-			if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-			tempbuf[bufplc++] = (tempbuf[(i<<2)+4096+0]<<2);
-			if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-		}
-	}
-	else
-	{
-		for(i=0;i<768;i++)
-		{
-			if (i < 48)
-				tempbuf[bufplc++] = (vgapal16[i]<<2);
-			else
-				tempbuf[bufplc++] = 0;
-			if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-		}
-
-	}
-
-	if (bufplc > 0)
-		if (write(fil,&tempbuf[0],bufplc) < bufplc) { close(fil); return(-1); }
-
-	close(fil);
-	return(0);
+    free(rgb);
+    close(fil);
+    return(ok[0] ? 0 : -1);
 } /* screencapture */
 
 

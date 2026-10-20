@@ -975,7 +975,16 @@ int setup_homedir (void)
 
 int dukescreencapture(char *str, char inverseit)
 {
-// dos screencapture wants string to be in NAME0000.pcx format.
+// screencapture wants string to be in NAME0000.ext format; the extension
+// is replaced with the configured ScreenshotFormat.
+    char named[64];
+    size_t nlen = strlen(str);
+    if (nlen >= 3 && nlen < sizeof (named))
+    {
+        strcpy(named, str);
+        strcpy(named + nlen - 3, ScreenshotFormat);
+        str = named;
+    }
 #ifndef PLATFORM_DOS
     // respect prefpath...
     const char *SCREENSHOTDIR = "Screenshots";

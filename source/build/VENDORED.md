@@ -406,12 +406,27 @@ Ported from later JFBuild commits, retyped as above:
     before any `drawrooms`, such as E1's ending screen) doesn't count as
     drawing: `nextpage` calls `_glframereplayed()` (prototyped in
     `display.h`) after it, which clears `framedrawn`.
-  - `screencapture` writes a 24-bit PCX (three planes per line, as JFBuild's
-    PCX writer): from the back buffer if a frame is being drawn, otherwise
-    from `lastframe`, as the back buffer is undefined after a swap. The
-    fade isn't in it.
+  - `screencapture`'s RGB comes from the back buffer if a frame is being
+    drawn, otherwise from `lastframe`, as the back buffer is undefined after
+    a swap (see the stb_image_write section). The fade isn't in it.
   - `numpages` is 2, as in JFBuild's GL mode, and back to 0 on leaving GL.
   - `glredrawlastframe()` (not in JFBuild; prototyped in `display.h` and
     `engine_protos.h`) draws `lastframe`, without the fade, into the frame
     being drawn. Duke's 1.3D load/save menus draw over the previous frame,
     which renderer 3 doesn't keep after a swap.
+
+# Vendored: stb_image_write.h
+
+- Upstream: <https://github.com/nothings/stb>, `stb_image_write.h`
+- Commit: `a7d4c2175630e1ea5b6f8dd00ab96fed0b97b96d` (2026-10-19), v1.16
+- License: public domain / MIT (the file's choice), unchanged.
+
+Unmodified. `sdl_driver.c` defines `STB_IMAGE_WRITE_IMPLEMENTATION` and
+includes it. `screencapture` replaces the icculus port's PCX writer (the
+`pcxheader`, `write_pcx_plane` and the run-length loop are gone): it builds
+top-down 24-bit RGB, and the file name's extension picks `stbi_write_jpg`
+(quality 90), `stbi_write_bmp` or, for anything else, `stbi_write_png`, all
+through `_to_func` onto the file it opened with `O_EXCL`. The 8-bit modes use
+the surface's palette (the faded one on screen); the editor's 640-wide 2D
+mode uses the 16-colour `vgapal16` and still honours `inverseit`. `build.c`'s
+editor captures are named `captxxxx.png`.
