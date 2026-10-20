@@ -175,6 +175,9 @@ Ported from later JFBuild commits, retyped as above:
   0 keeps the `xb1`/`xb2` test.
   `dxb1`/`dxb2` stay static, as `engine.c` `#include`s this file; the
   commit's `polymosttex` changes aren't taken.
+- `fd5d5b6a1c90fc3d582818412742d9f6dccb1d31`: `drawpoly` skips its
+  non-power-of-two wall split when the texture is 0 wide (`1.0/tsizx` is
+  infinite), which looped over every `int`.
 
 ## Engine hooks
 
