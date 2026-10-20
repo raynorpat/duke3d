@@ -125,12 +125,12 @@ extern char nofog;
 
 static inline void ftol (float f, int32_t *a)
 {
-	*a = (int32_t)f;
+	*a = (int32_t)lrintf(f); //rounds to nearest, as the x87 fistp it replaces
 }
 
 static inline void dtol (double d, int32_t *a)
 {
-	*a = (int32_t)d;
+	*a = (int32_t)lrint(d);
 }
 
 static inline int32_t imod (int32_t a, int32_t b)

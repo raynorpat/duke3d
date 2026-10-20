@@ -118,7 +118,7 @@ target_link_libraries(render_classic2d PRIVATE buildengine duke3d::SDL2main)
 set(DUKE3D_GRP "" CACHE FILEPATH "DUKE3D.GRP for tests that need game data")
 set(DUKE3D_E1L1_CHECKSUM "e0517697" CACHE STRING
     "Expected render_e1l1 frame checksum (hex); empty just prints it")
-# arm64 macOS gives 71717c09 in 1.3D builds and a145a252 in 1.4/1.5 ones
+# arm64 macOS gives 0d60cca6 in 1.3D builds and d64ef539 in 1.4/1.5 ones
 # (Polymost takes slope heights from getzsofslope, whose maths changed
 # between engine revisions). Not the default: Polymost is floating point, so
 # other platforms and compilers may round differently.
