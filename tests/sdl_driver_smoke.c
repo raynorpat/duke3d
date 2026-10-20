@@ -64,6 +64,74 @@ static int gl_fallback(int argc, char **argv)
     return 0;
 }
 
+/*
+ * Outside renderer 3, setpalettefade blends the last setbrightness palette
+ *  toward a colour exactly as the game's palto does, then applies the
+ *  brightness table.
+ */
+extern char britable[16][64];
+
+static int palette_fade(int argc, char **argv)
+{
+    unsigned char pal[768], want[768];
+    char plain[1024], expect[1024], got[1024];
+    int i, k;
+
+    _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
+    if (setgamemode(2, 320, 200) != 0)
+    {
+        fprintf(stderr, "FAIL: setgamemode(2,320,200)\n");
+        return 1;
+    }
+
+    /* no TABLES.DAT here: a brightness table that isn't the identity. */
+    for (i = 0; i < 64; i++)
+        britable[5][i] = (char) ((i * 3 / 4) + 8);
+
+    for (i = 0; i < 256; i++)
+    {
+        pal[i*3+0] = (unsigned char) (i & 63);
+        pal[i*3+1] = (unsigned char) ((i * 3) & 63);
+        pal[i*3+2] = (unsigned char) ((i * 7) & 63);
+    }
+    for (k = 0; k < 768; k++)
+    {
+        int t = ((k % 3) == 0) ? 63 : 0;
+        want[k] = (unsigned char) (pal[k] + (((t - (int) pal[k]) * 32) >> 6));
+    }
+
+    setbrightness(5, want);
+    VBE_getPalette(0, 256, expect);
+
+    setbrightness(5, pal);
+    VBE_getPalette(0, 256, plain);
+    setpalettefade(63, 0, 0, 32);
+    VBE_getPalette(0, 256, got);
+
+    if (memcmp(expect, got, sizeof (got)) != 0)
+    {
+        fprintf(stderr, "FAIL: setpalettefade(63,0,0,32) differs from palto's blend\n");
+        return 1;
+    }
+    if (memcmp(plain, got, sizeof (got)) == 0)
+    {
+        fprintf(stderr, "FAIL: setpalettefade(63,0,0,32) left the palette unchanged\n");
+        return 1;
+    }
+
+    setpalettefade(0, 0, 0, 0);
+    VBE_getPalette(0, 256, got);
+    if (memcmp(plain, got, sizeof (got)) != 0)
+    {
+        fprintf(stderr, "FAIL: setpalettefade(0,0,0,0) isn't the unfaded palette\n");
+        return 1;
+    }
+
+    _uninitengine();
+    printf("PASS: palette_fade\n");
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     char pal[256 * 4];
@@ -73,6 +141,8 @@ int main(int argc, char **argv)
 
     if ((argc > 1) && (strcmp(argv[1], "gl_fallback") == 0))
         return gl_fallback(argc, argv);
+    if ((argc > 1) && (strcmp(argv[1], "palette_fade") == 0))
+        return palette_fade(argc, argv);
 
     _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
     if (_setgamemode(1, 320, 200) != 0)

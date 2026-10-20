@@ -364,6 +364,10 @@ unsigned char getpixel(int32_t x, int32_t y);
  */
 void setbrightness(char dabrightness, unsigned char *dapal);
 
+/* Fades the screen toward (r,g,b), 0-63 each, by offset (0-64) / 64.
+ * setbrightness cancels it. */
+void setpalettefade(unsigned char r, unsigned char g, unsigned char b, unsigned char offset);
+
 /**@brief Take a screenshot.
  *
  * This function will dump a picture of the current screen
@@ -948,6 +952,8 @@ int setrendermode(int renderer);
 int getrendermode(void);
 void setrollangle(int32_t rolla);
 void invalidatetile(short tilenume, int32_t pal, int32_t how);
+/* Sets OpenGL up for 2D drawing in renderer 3; does nothing otherwise. */
+void setpolymost2dview(void);
 
 /**@brief Check if a clipping box intersects a wall
  *

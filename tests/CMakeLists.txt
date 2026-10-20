@@ -9,7 +9,8 @@ set_tests_properties(sdl_driver_smoke PROPERTIES
   TIMEOUT 30)
 
 add_test(NAME sdl_driver_smoke_gl_fallback COMMAND sdl_driver_smoke gl_fallback)
-set_tests_properties(sdl_driver_smoke_gl_fallback PROPERTIES
+add_test(NAME sdl_driver_smoke_palette_fade COMMAND sdl_driver_smoke palette_fade)
+set_tests_properties(sdl_driver_smoke_gl_fallback sdl_driver_smoke_palette_fade PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
   TIMEOUT 30)
 
@@ -142,6 +143,22 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
     set_tests_properties(render_e1l1_polymost render_e1l1_polymost_solid
       PROPERTIES
       ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+      TIMEOUT 30)
+  endif()
+
+  # Renderer 3 in a real OpenGL window: 2D drawing, screencapture and a
+  # fade, with images left in the build tree to check by eye. It opens a
+  # window, so it's opt-in; with no OpenGL (the dummy driver) it's skipped.
+  option(DUKE3D_GL_TESTS "Run the renderer 3 test, which opens a window" OFF)
+  if(DUKE3D_POLYMOST AND DUKE3D_GL_TESTS)
+    add_executable(render_gl render_gl.c)
+    target_link_libraries(render_gl PRIVATE buildengine duke3d::SDL2main)
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/render_gl")
+    add_test(NAME render_gl
+      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl")
+    set_tests_properties(render_gl PROPERTIES
+      ENVIRONMENT "BUILD_WINDOWED=1"
+      SKIP_RETURN_CODE 77
       TIMEOUT 30)
   endif()
 

@@ -213,3 +213,44 @@ unchanged.
   changed, call `polymost_glreset()` and redo the mode variables.
   `setupmouse`, the mouse motion clamp and `_idle` check `sdl_window`
   instead of `surface`, and the clamp uses `xres`/`yres`.
+- `_setgamemode` (8-bit) still clamps modes over 1600x1200 to 1600x1200,
+  now with literals, so the larger `MAXXDIM`/`MAXYDIM` only reach GL.
+
+## Renderer 3: 2D, clears, palette, fades, screenshots
+
+- `engine.c`: JFBuild's renderer 3 branches, under `rendmode == 3` (not
+  `qsetmode == 200`): `clearview` and `clearallviews` clear the whole back
+  buffer to the palette colour; `plotpixel`, `drawline256` and
+  `printext256`/`printext256_noupdate` (through `__printext256`) draw GL
+  points and lines; `getpixel` returns 0; `drawmapview` returns at once.
+  Changes from upstream: `glClearColor` gets the colour over 255 (upstream
+  passes 0-255, which clamps to white); points are placed on pixel centres
+  (upstream uses integer corners, plus a "+2 hack" row offset for text).
+- `engine.c`: `setpolymost2dview()` from JFBuild, prototyped in `engine.h`
+  and `engine_protos.h`.
+- `engine.c`: `setbrightness` keeps the palette it's given (`basepal`) and
+  clears `palfadergb`/`palfadedelta`, as JFBuild's does. New
+  `setpalettefade(r, g, b, offset)` (0-63, offset 0-64): it stores
+  `palfadergb = {r<<2, g<<2, b<<2}` and `palfadedelta = min(offset<<2,
+  255)`; outside renderer 3 it blends `basepal` the way the game's `palto`
+  does and applies the brightness table; in renderer 3 it calls the
+  driver's `_glpalettefade()`. Without `POLYMOST` only the blend is built.
+- `polymost.c`: `polymost_drawrooms` and `polymost_dorotatesprite` call
+  `_glframedrawn()` in renderer 3. So do `clearview`, `clearallviews` and
+  `setpolymost2dview`.
+- `sdl_driver.c`, in GL:
+  - `VBE_setPalette` turns the 6-bit BGR0 entries into 8-bit `curpalette`
+    (`v<<2 | v>>4`) and calls `gltexinvalidateall()`; `VBE_getPalette`
+    reads `curpalette` back.
+  - `_nextpage` copies a drawn frame into a `lastframe` texture (power-of-two
+    size, made per mode, none if over `GL_MAX_TEXTURE_SIZE`), draws the
+    `palfadergb` quad at `palfadedelta`/256 when it's set (JFBuild's
+    `showframe`), swaps and clears `framedrawn`.
+  - `_glpalettefade()`: with nothing drawn since the swap it draws
+    `lastframe` and the fade quad and swaps, so a still title screen can
+    fade; otherwise the next `_nextpage` applies the fade.
+  - `screencapture` writes a 24-bit PCX (three planes per line, as JFBuild's
+    PCX writer): from the back buffer if a frame is being drawn, otherwise
+    from `lastframe`, as the back buffer is undefined after a swap. The
+    fade isn't in it.
+  - `numpages` is 2, as in JFBuild's GL mode, and back to 0 on leaving GL.

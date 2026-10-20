@@ -2105,6 +2105,7 @@ void polymost_drawrooms ()
 	if (rendmode == 3)
 	{
 		resizeglcheck();
+		_glframedrawn();
 
 		//glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 		//glEnable(GL_TEXTURE_2D);
@@ -2811,6 +2812,7 @@ void polymost_dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short 
 	if (rendmode == 3)
 	{
 		resizeglcheck();
+		_glframedrawn();
 		if (1) //dastat&(2+8))
 		{
 			float m[4][4];

@@ -4284,6 +4284,19 @@ void drawline256 (int32_t x1, int32_t y1, int32_t x2, int32_t y2, unsigned char 
 
 	col = palookup[0][col];
 
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3)
+	{
+		setpolymost2dview();
+		glBegin(GL_LINES);
+		glColor4ub(curpalette[col].r,curpalette[col].g,curpalette[col].b,255);
+		glVertex2f((float)x1/4096.0,(float)y1/4096.0);
+		glVertex2f((float)x2/4096.0,(float)y2/4096.0);
+		glEnd();
+		return;
+	}
+#endif
+
 	dx = x2-x1; dy = y2-y1;
 	if (dx >= 0)
 	{
@@ -7541,6 +7554,46 @@ static void __printext256(int32_t xpos, int32_t ypos, short col, short backcol, 
 	if (fontsize) { fontptr = smalltextfont; charxsiz = 4; }
 				else { fontptr = textfont; charxsiz = 8; }
 
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3)
+	{
+		int32_t xx, yy, lc = -1;
+
+		setpolymost2dview();
+		glBegin(GL_POINTS);
+		for(i=0;name[i];i++)
+		{
+			letptr = &fontptr[name[i]<<3];
+			xx = stx-fontsize;
+			yy = ypos+7;
+			for(y=7;y>=0;y--)
+			{
+				for(x=charxsiz-1;x>=0;x--)
+				{
+					if (letptr[y]&pow2char[7-fontsize-x])
+					{
+						if (lc != col)
+							glColor4ub(curpalette[col].r,curpalette[col].g,curpalette[col].b,255);
+						lc = col;
+						glVertex2f((float)(xx+x)+0.5f,(float)yy+0.5f);
+					}
+					else if (backcol >= 0)
+					{
+						if (lc != backcol)
+							glColor4ub(curpalette[backcol].r,curpalette[backcol].g,curpalette[backcol].b,255);
+						lc = backcol;
+						glVertex2f((float)(xx+x)+0.5f,(float)yy+0.5f);
+					}
+				}
+				yy--;
+			}
+			stx += charxsiz;
+		}
+		glEnd();
+		return;
+	}
+#endif
+
 	for(i=0;name[i];i++)
 	{
 		letptr = &fontptr[name[i]<<3];
@@ -8006,11 +8059,12 @@ void makepalookup(int32_t palnum, char *remapbuf, signed char r,
 }
 
 
-void setbrightness(char dabrightness, unsigned char *dapal)
+	/* the last palette passed to setbrightness, which setpalettefade blends. */
+static unsigned char basepal[768];
+
+static void applybrightness(unsigned char *dapal)
 {
 	int32_t i, j, k;
-
-	curbrightness = min(max((int32_t)dabrightness,0),15);
 
 	k = 0;
 	if (vidoption == 6)
@@ -8036,6 +8090,46 @@ void setbrightness(char dabrightness, unsigned char *dapal)
 	}
 
 	VBE_setPalette(0, 256, (char *) tempbuf);
+}
+
+
+void setbrightness(char dabrightness, unsigned char *dapal)
+{
+	curbrightness = min(max((int32_t)dabrightness,0),15);
+	if (dapal != basepal) memcpy(basepal, dapal, sizeof(basepal));
+#ifdef POLYMOST
+	palfadergb.r = palfadergb.g = palfadergb.b = 0;
+	palfadedelta = 0;
+#endif
+	applybrightness(basepal);
+}
+
+
+/*
+ * setpalettefade
+ *  Fades toward (r,g,b), 0-63 each, by offset/64. Renderer 3 draws it as a
+ *  quad over the frame; the others blend the palette as the game's palto does.
+ */
+void setpalettefade(unsigned char r, unsigned char g, unsigned char b, unsigned char offset)
+{
+	unsigned char fadepal[768];
+	int32_t i;
+
+#ifdef POLYMOST
+	palfadergb.r = r<<2; palfadergb.g = g<<2; palfadergb.b = b<<2;
+	palfadedelta = (unsigned char)min(offset<<2,255);
+#ifdef USE_OPENGL
+	if (rendmode == 3) { _glpalettefade(); return; }
+#endif
+#endif
+
+	for(i=0;i<768;i+=3)
+	{
+		fadepal[i+0] = basepal[i+0]+((((int32_t)r-(int32_t)basepal[i+0])*(int32_t)offset)>>6);
+		fadepal[i+1] = basepal[i+1]+((((int32_t)g-(int32_t)basepal[i+1])*(int32_t)offset)>>6);
+		fadepal[i+2] = basepal[i+2]+((((int32_t)b-(int32_t)basepal[i+2])*(int32_t)offset)>>6);
+	}
+	applybrightness(fadepal);
 }
 
 
@@ -8357,6 +8451,10 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 	int32_t bakgxvect, bakgyvect, sortnum, gap, npoints;
 	int32_t xvect, yvect, xvect2, yvect2, daslope;
 
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3) return;
+#endif
+
 	beforedrawrooms = 0;
 	totalarea += (windowx2+1-windowx1)*(windowy2+1-windowy1);
 
@@ -8610,6 +8708,16 @@ void clearview(int32_t dacol)
 
 	if (qsetmode != 200) return;
 
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3)
+	{
+		glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
+		glClear(GL_COLOR_BUFFER_BIT);
+		_glframedrawn();
+		return;
+	}
+#endif
+
 	dx = windowx2-windowx1+1;
 	dacol += (dacol<<8); dacol += (dacol<<16);
 	if (vidoption == 6)
@@ -8636,6 +8744,18 @@ void clearallviews(int32_t dacol)
 	int32_t i;
 
 	if (qsetmode != 200) return;
+
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3)
+	{
+		glViewport(0,0,xdim,ydim); glox1 = -1;
+		glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
+		glClear(GL_COLOR_BUFFER_BIT);
+		_glframedrawn();
+		return;
+	}
+#endif
+
 	dacol += (dacol<<8); dacol += (dacol<<16);
 
 	switch(vidoption)
@@ -8660,12 +8780,26 @@ void clearallviews(int32_t dacol)
 
 void plotpixel(int32_t x, int32_t y, char col)
 {
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3)
+	{
+		setpolymost2dview();
+		glBegin(GL_POINTS);
+		glColor4ub(curpalette[(unsigned char)col].r,curpalette[(unsigned char)col].g,curpalette[(unsigned char)col].b,255);
+		glVertex2f((float)x+0.5f,(float)y+0.5f);
+		glEnd();
+		return;
+	}
+#endif
 	drawpixel(ylookup[y]+x+frameplace,(int32_t)col);
 }
 
 
 unsigned char getpixel(int32_t x, int32_t y)
 {
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3) return 0;
+#endif
 	return(readpixel(ylookup[y]+x+frameplace));
 }
 
@@ -9089,6 +9223,34 @@ void invalidatetile(short tilenume, int32_t pal, int32_t how)
 			gltexinvalidate(tilenume, np, hp);
 		}
 	}
+#endif
+}
+
+/*
+ * setpolymost2dview
+ *  Sets OpenGL up for 2D drawing in drawable pixels.
+ */
+void setpolymost2dview(void)
+{
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode < 3) return;
+
+	if (gloy1 != -1)
+	{
+		glViewport(0,0,xres,yres);
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		glOrtho(0,xres,yres,0,-1,1);
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+	}
+
+	gloy1 = -1;
+
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_TEXTURE_2D);
+	glDisable(GL_BLEND);
+	_glframedrawn();
 #endif
 }
 

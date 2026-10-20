@@ -156,10 +156,15 @@ int32_t bpp = 8;
 struct glinfo_t glinfo;
 char nofog = 0;
 extern void polymost_glreset(void);
+extern void gltexinvalidateall(void);
 static SDL_GLContext sdl_glcontext = NULL;  /* non-NULL while in renderer 3 */
 static char gl_davidoption = 1;
 static int gl_window_w = 640;  /* windowed size: the last 8-bit window's */
 static int gl_window_h = 480;
+static int framedrawn = 0;  /* something was drawn since the last swap */
+static GLuint lastframe = 0;  /* the last swapped frame, before its fade */
+static int lastframe_set = 0;  /* lastframe holds a frame yet */
+static int lastframe_w, lastframe_h;  /* its power-of-two texture size */
 #endif
 
 SDL_Surface *surface = NULL; /* This isn't static so that we can use it elsewhere AH */
@@ -328,11 +333,16 @@ static void destroy_gl_window(void)
         return;
 
     polymost_glreset();
+    if (lastframe != 0)
+        glDeleteTextures(1, &lastframe);
+    lastframe = 0;
+    framedrawn = 0;
     SDL_GL_DeleteContext(sdl_glcontext);
     sdl_glcontext = NULL;
     SDL_DestroyWindow(sdl_window);
     sdl_window = NULL;
     bpp = 8;
+    numpages = 0;
     setrendermode(0);
 } /* destroy_gl_window */
 #endif
@@ -575,6 +585,117 @@ static int gl_has_extension(const char *exts, const char *name)
 } /* gl_has_extension */
 
 
+/*
+ * The texture that keeps the last frame, for fades over a frame that isn't
+ *  being redrawn. GL 1.1 has no non-power-of-two textures.
+ */
+static void gl_alloc_lastframe(void)
+{
+    GLint maxsize = 0;
+
+    if (lastframe != 0)
+        glDeleteTextures(1, &lastframe);
+    lastframe = 0;
+    lastframe_set = 0;
+
+    for (lastframe_w = 1; lastframe_w < xres; lastframe_w <<= 1) ;
+    for (lastframe_h = 1; lastframe_h < yres; lastframe_h <<= 1) ;
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxsize);
+    if ((lastframe_w > maxsize) || (lastframe_h > maxsize))
+    {
+        sdldebug("No last-frame texture: %dx%d is over GL_MAX_TEXTURE_SIZE %d.",
+                 lastframe_w, lastframe_h, (int) maxsize);
+        return;
+    } /* if */
+
+    glGenTextures(1, &lastframe);
+    glBindTexture(GL_TEXTURE_2D, lastframe);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, lastframe_w, lastframe_h, 0,
+                 GL_RGB, GL_UNSIGNED_BYTE, NULL);
+} /* gl_alloc_lastframe */
+
+
+/* A full-screen quad of palfadergb at palfadedelta/256 (JFBuild's showframe). */
+static void gl_draw_fade(void)
+{
+    setpolymost2dview();
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4ub(palfadergb.r, palfadergb.g, palfadergb.b, palfadedelta);
+    glBegin(GL_QUADS);
+    glVertex2i(0, 0);
+    glVertex2i(xres, 0);
+    glVertex2i(xres, yres);
+    glVertex2i(0, yres);
+    glEnd();
+    glDisable(GL_BLEND);
+} /* gl_draw_fade */
+
+
+/* Fills the back buffer with the last frame. Its rows are bottom-up. */
+static void gl_draw_lastframe(void)
+{
+    float u = (float) xres / (float) lastframe_w;
+    float v = (float) yres / (float) lastframe_h;
+
+    setpolymost2dview();
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, lastframe);
+    glColor4f(1, 1, 1, 1);
+    glBegin(GL_QUADS);
+    glTexCoord2f(0, v); glVertex2i(0, 0);
+    glTexCoord2f(u, v); glVertex2i(xres, 0);
+    glTexCoord2f(u, 0); glVertex2i(xres, yres);
+    glTexCoord2f(0, 0); glVertex2i(0, yres);
+    glEnd();
+    glDisable(GL_TEXTURE_2D);
+} /* gl_draw_lastframe */
+
+
+/* Shows the back buffer: keeps it in lastframe, fades it, swaps. */
+static void gl_swap(void)
+{
+    if ((framedrawn) && (lastframe != 0))
+    {
+        glBindTexture(GL_TEXTURE_2D, lastframe);
+        glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, xres, yres);
+        lastframe_set = 1;
+    } /* if */
+
+    if (palfadedelta)
+        gl_draw_fade();
+
+    SDL_GL_SwapWindow(sdl_window);
+    framedrawn = 0;
+} /* gl_swap */
+
+
+void _glframedrawn(void)
+{
+    framedrawn = 1;
+} /* _glframedrawn */
+
+
+/*
+ * setpalettefade in renderer 3. A frame being drawn gets the fade when it's
+ *  shown; otherwise the last frame is shown again with the new fade, as a
+ *  title screen fading in or out isn't redrawn.
+ */
+void _glpalettefade(void)
+{
+    if ((sdl_glcontext == NULL) || (framedrawn) || (!lastframe_set))
+        return;
+
+    gl_draw_lastframe();
+    if (palfadedelta)
+        gl_draw_fade();
+    SDL_GL_SwapWindow(sdl_window);
+    framedrawn = 0;
+} /* _glpalettefade */
+
+
 /* xdim/ydim are the drawable size, clamped to what the engine's arrays hold. */
 static void init_gl_res_vars(void)
 {
@@ -593,6 +714,7 @@ static void init_gl_res_vars(void)
 
     SDL_SetWindowTitle(sdl_window, titlelong);
     setupmouse();
+    gl_alloc_lastframe();
     init_res_lookups(gl_davidoption, 0);
 } /* init_gl_res_vars */
 
@@ -688,6 +810,7 @@ int setgamemode_gl(char davidoption)
              glinfo.bgra, glinfo.clamptoedge, glinfo.texcompr, glinfo.maxanisotropy);
 
     bpp = 32;
+    numpages = 2;  /* as JFBuild: permanent rotatesprites go on both pages. */
     gl_davidoption = davidoption;
     init_gl_res_vars();
     setrendermode(3);
@@ -1507,6 +1630,97 @@ int setvesa(int32_t x, int32_t y)
     return(0);
 } /* setvesa */
 
+#ifdef USE_OPENGL
+/* Writes one run-length encoded PCX scanline plane; step skips the others. */
+static void write_pcx_plane(const unsigned char *src, int n, int step,
+                           unsigned char *out, int *outlen)
+{
+    int i = 0, leng;
+    unsigned char col;
+
+    while (i < n)
+    {
+        col = src[i * step];
+        leng = 1;
+        while ((i + leng < n) && (leng < 63) && (src[(i + leng) * step] == col))
+            leng++;
+        if ((leng > 1) || (col >= 0xc0))
+            out[(*outlen)++] = (leng | 0xc0);
+        out[(*outlen)++] = col;
+        i += leng;
+    } /* while */
+
+    if (n & 1)  /* PCX lines are an even number of bytes. */
+        out[(*outlen)++] = 0;
+} /* write_pcx_plane */
+
+
+/*
+ * 24-bit PCX of the frame (JFBuild's GL branch): three planes per line.
+ *  A frame being drawn is read from the back buffer; otherwise it's the
+ *  last swapped frame, as the back buffer is undefined after a swap.
+ */
+static int gl_screencapture(int fil)
+{
+    unsigned char head[128];
+    unsigned char *pix, *line, *row;
+    int w = xdim, h = ydim, bpl = xdim + (xdim & 1);
+    int y, outlen, rowbytes, ok = 1;
+
+    memcpy(head, pcxheader, sizeof (head));
+    head[8] = ((w-1)&255); head[9] = (((w-1)>>8)&255);
+    head[10] = ((h-1)&255); head[11] = (((h-1)>>8)&255);
+    head[12] = (w&255); head[13] = ((w>>8)&255);
+    head[14] = (h&255); head[15] = ((h>>8)&255);
+    head[65] = 3;
+    head[66] = (bpl&255); head[67] = ((bpl>>8)&255);
+    if (write(fil, head, 128) < 128)
+        return(-1);
+
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    if ((framedrawn) || (!lastframe_set))
+    {
+        rowbytes = w * 3;
+        pix = (unsigned char *) malloc(rowbytes * h);
+        if (pix != NULL)
+            glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pix);
+    } /* if */
+    else
+    {
+        rowbytes = lastframe_w * 3;
+        pix = (unsigned char *) malloc(rowbytes * lastframe_h);
+        if (pix != NULL)
+        {
+            glBindTexture(GL_TEXTURE_2D, lastframe);
+            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, pix);
+        } /* if */
+    } /* else */
+
+    line = (unsigned char *) malloc((bpl * 2 + 2) * 3);
+    if ((pix == NULL) || (line == NULL))
+    {
+        free(pix);
+        free(line);
+        return(-1);
+    } /* if */
+
+    for (y = h - 1; (y >= 0) && (ok); y--)  /* GL rows are bottom-up. */
+    {
+        row = pix + y * rowbytes;
+        outlen = 0;
+        write_pcx_plane(row + 0, w, 3, line, &outlen);
+        write_pcx_plane(row + 1, w, 3, line, &outlen);
+        write_pcx_plane(row + 2, w, 3, line, &outlen);
+        ok = (write(fil, line, outlen) == outlen);
+    } /* for */
+
+    free(pix);
+    free(line);
+    return(ok ? 0 : -1);
+} /* gl_screencapture */
+#endif
+
+
 int screencapture(char *_filename, char inverseit)
 {
 	char *ptr = NULL;
@@ -1529,6 +1743,15 @@ int screencapture(char *_filename, char inverseit)
 
     if (fil == -1)
         return -1;
+
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+    {
+        i = gl_screencapture(fil);
+        close(fil);
+        return(i);
+    } /* if */
+#endif
 
 	if (qsetmode == 200)
 	{
@@ -1676,7 +1899,8 @@ void setvmode(int mode)
 
 int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim)
 {
-    if (daxdim > MAXXDIM || daydim > MAXYDIM)
+    /* 8-bit modes keep the original limit; MAXXDIM/MAXYDIM grew for OpenGL. */
+    if (daxdim > 1600 || daydim > 1200)
     {
 	    daxdim = 1600;
 	    daydim = 1200;
@@ -2012,6 +2236,21 @@ int VBE_setPalette(int32_t start, int32_t num, char *palettebuffer)
 
     assert( (start + num) <= (sizeof (fmt_swap) / sizeof (SDL_Color)) );
 
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)  /* 6-bit BGR0 to 8-bit, then retexture. */
+    {
+        for (i = 0; i < num; i++, p += 4)
+        {
+            curpalette[start+i].b = (p[0] << 2) | (p[0] >> 4);
+            curpalette[start+i].g = (p[1] << 2) | (p[1] >> 4);
+            curpalette[start+i].r = (p[2] << 2) | (p[2] >> 4);
+            curpalette[start+i].f = 0;
+        } /* for */
+        gltexinvalidateall();
+        return(1);
+    } /* if */
+#endif
+
     for (i = 0; i < num; i++)
     {
         sdlp->b = (Uint8) ((((float) *p++) / 63.0) * 255.0);
@@ -2038,9 +2277,25 @@ int VBE_setPalette(int32_t start, int32_t num, char *palettebuffer)
 
 int VBE_getPalette(int32_t start, int32_t num, char *palettebuffer)
 {
-    SDL_Color *sdlp = surface->format->palette->colors + start;
+    SDL_Color *sdlp;
     char *p = palettebuffer + (start * 4);
     int i;
+
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+    {
+        for (i = start; i < start + num; i++)
+        {
+            *p++ = curpalette[i].b >> 2;
+            *p++ = curpalette[i].g >> 2;
+            *p++ = curpalette[i].r >> 2;
+            *p++ = 0;
+        } /* for */
+        return(1);
+    } /* if */
+#endif
+
+    sdlp = surface->format->palette->colors + start;
 
     for (i = 0; i < num; i++)
     {
@@ -2128,7 +2383,7 @@ void _nextpage(void)
 
 #ifdef USE_OPENGL
     if (sdl_glcontext != NULL)
-        SDL_GL_SwapWindow(sdl_window);
+        gl_swap();
     else
 #endif
     if (renderer == RENDERER_SOFTWARE)
