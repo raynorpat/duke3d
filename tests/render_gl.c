@@ -378,13 +378,13 @@ static int lastframe_same(void)
 #define CMPW 640
 #define CMPH 480
 static const struct { const char *name; int32_t x, y, z; short ang; double maxdiff; } cmpview[] = {
-    { "distance", 13824, 50350, -2048, 1024, 12.7 },
-    { "closeup", 13824, 43118, -2048, 1536, 2.7 },
-    { "dark-lit", 13824, 50350, -2048, 512, 6.5 },
-    { "sprites", 24767, 46541, -2048, 1409, 13.5 },
-    { "sprites-mid", 14107, 44964, -2048, 1793, 7.2 },
-    { "sky", -31243, 7160, -181472, 1446, 6.3 },
-    { "translucent", 14938, 44309, -2048, 300, 10.2 },
+    { "distance", 13824, 50350, -2048, 1024, 5.8 },
+    { "closeup", 13824, 43118, -2048, 1536, 2.41 },
+    { "dark-lit", 13824, 50350, -2048, 512, 3.3 },
+    { "sprites", 24767, 46541, -2048, 1409, 3.7 },
+    { "sprites-mid", 14107, 44964, -2048, 1793, 4.6 },
+    { "sky", -31243, 7160, -181472, 1446, 5.7 },
+    { "translucent", 14938, 44309, -2048, 300, 6.0 },
 };
 #define NCMPVIEWS ((int) (sizeof (cmpview) / sizeof (cmpview[0])))
 
@@ -393,8 +393,8 @@ static const struct { const char *name; int32_t x, y, z; short ang; double maxdi
  *  distance shading alone. Each has the most |renderer 3 - renderer 0| of
  *  its mean may be. */
 static const struct { const char *name; int view, x0, y0, x1, y1; double maxdiff; } cmpregion[] = {
-    { "back room", 3, 240, 60, 460, 180, 21.7 },
-    { "far street", 0, 0, 180, 350, 270, 20.0 },
+    { "back room", 3, 240, 60, 460, 180, 1.5 },
+    { "far street", 0, 0, 180, 350, 270, 3.0 },
 };
 #define NCMPREGIONS ((int) (sizeof (cmpregion) / sizeof (cmpregion[0])))
 
