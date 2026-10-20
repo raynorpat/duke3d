@@ -161,6 +161,19 @@ static SDL_Texture *sdl_texture = NULL;
 static SDL_Surface *sdl_rgbsurface = NULL;  /* 32-bit staging copy of surface */
 static int debug_hall_of_mirrors = 0;
 static int sdl_fullscreen = 0;
+static int sdl_fullscreen_wanted = 1;  /* default: fullscreen unless BUILD_WINDOWED */
+
+void setvideofullscreen(int on)
+{
+    sdl_fullscreen_wanted = (on != 0);
+    sdl_fullscreen = sdl_fullscreen_wanted && (getenv(BUILD_WINDOWED) == NULL);
+} /* setvideofullscreen */
+
+
+int getvideofullscreen(void)
+{
+    return sdl_fullscreen;
+} /* getvideofullscreen */
 static int32_t mouse_x = 0;
 static int32_t mouse_y = 0;
 static int32_t mouse_relative_x = 0;
@@ -963,6 +976,12 @@ static void mouse_area(int *w, int *h)
 } /* mouse_area */
 
 
+void getmousearea(int *w, int *h)
+{
+    mouse_area(w, h);
+} /* getmousearea */
+
+
 static int sdl_mouse_motion_filter(SDL_Event const *event)
 {
     int w, h;
@@ -1586,7 +1605,7 @@ void _platform_init(int argc, char **argv, const char *title, const char *icon)
     else
         mouse_grabbed = 0;
 
-    sdl_fullscreen = (getenv(BUILD_WINDOWED) == NULL);
+    sdl_fullscreen = sdl_fullscreen_wanted && (getenv(BUILD_WINDOWED) == NULL);
 
     set_sdl_renderer();
 
@@ -1826,7 +1845,7 @@ static unsigned char *classic_screencapture(int *w, int *h, char inverseit)
             col = ((unsigned char *) frameplace)[p];
         else
         {
-            col = readpixel(p);
+            col = readpixel((intptr_t) surface->pixels + p);  /* as drawpixel16 writes it */
             if ((inverseit == 1) && (((col&7) == 0) || ((col&7) == 7))) col ^= 15;
             i = (col & 15) * 3;
             *out++ = vgapal16[i+0] << 2;

@@ -962,6 +962,11 @@ void setrollangle(int32_t rolla);
 void invalidatetile(short tilenume, int32_t pal, int32_t how);
 /* Sets OpenGL up for 2D drawing in renderer 3; does nothing otherwise. */
 void setpolymost2dview(void);
+#ifdef POLYMOST
+/* Renderer 3: draws a tile scaled into a dimen-pixel cell at tilex,tiley of
+ * the tile screen. Returns -1 when it didn't draw (any other renderer). */
+int32_t polymost_drawtilescreen(int32_t tilex, int32_t tiley, int32_t wallnum, int32_t dimen);
+#endif
 
 /**@brief Check if a clipping box intersects a wall
  *

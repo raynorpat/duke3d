@@ -130,8 +130,8 @@ for one run (the config keeps its own value). A number outside 0-3 is taken
 as the nearest one. Renderer 3 draws at the window's real pixel size and
 uses a legacy (fixed-function) OpenGL context. Windowed, it opens at the size
 asked for, even over the 1600x1200 the 8-bit modes stop at. If OpenGL isn't
-available, the game prints a message and uses renderer 0. The map editor is
-classic only.
+available, the game prints a message and uses renderer 0. The map editor has
+its own settings (see [Map editor](#map-editor)).
 
 A `DUKE3D_POLYMOST=OFF` build has renderer 0 only: 1 and 2 draw with it
 without a message, and 3 prints `OpenGL renderer unavailable (this build has
@@ -160,6 +160,43 @@ Known gaps:
 - No `.md2` models or hi-res texture replacement.
 - Polymost's own todo list applies (sprite sorting, the hall of mirrors near
   the zenith, ...).
+
+### Map editor
+
+The editor (`build`) draws its 3D mode in the same four renderers; the 2D mode
+is unchanged. A `DUKE3D_POLYMOST=OFF` build's editor is renderer 0 only and
+Alt+K stays on it. Its settings are in `build.cfg`, which replaces
+`setup.dat`. It is in the config folder under [Config and saves](#config-and-saves) (macOS and
+Linux) or the working directory (Windows), is written when the editor exits,
+and is read with each value clamped. The editor reads `duke3d.grp` from the
+working directory.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `renderer` | 0 | 3D renderer, 0-3 as in the table above |
+| `xdim3d`, `ydim3d` | 640, 480 | 3D mode size; 320-7680 by 200-4320. Renderers 0-2 stop at 1600x1200, so a larger size only applies in renderer 3 |
+| `fullscreen` | 1 | Fullscreen or window |
+| `gltexmiplevel` | 0 | Mipmap levels dropped in renderer 3, 0-15 |
+| `mousesensitivity` | 1 | Mouse speed, 0.1-10 |
+| `keyforward` ... `keychat` | see below | Keys, as two-digit hex scancodes |
+
+The 19 keys, in order, with their defaults: `keyforward` c8 (Up),
+`keybackward` d0 (Down), `keyturnleft` cb, `keyturnright` cd, `keyrun` 2a (L.Shift),
+`keystrafe` 9d (R.Ctrl), `keyfire` 1d (L.Ctrl), `keyuse` 39 (Space),
+`keystandhigh` 1e (A), `keystandlow` 2c (Z), `keylookup` d1 (PgDn),
+`keylookdown` c9 (PgUp), `keystrafeleft` 33 (,), `keystraferight` 34 (.),
+`key2dmode` 9c (keypad Enter), `keyviewcycle` 1c (Enter), `key2dzoomin` 0d (=),
+`key2dzoomout` 0c (-), `keychat` 0f (Tab). A value outside 01-ff gets
+its default.
+
+- Without a `build.cfg`, the keys of a `setup.dat` in the working directory are
+  taken once; the other settings keep their defaults.
+- `-renderer N` (or `/renderer N`) picks the renderer for one run. It isn't
+  saved.
+- Alt+K cycles to the next renderer in the 3D view, skipping OpenGL when it
+  isn't available. The choice is saved on exit.
+- Setting the environment variable `BUILD_WINDOWED` forces a window for that
+  run. It doesn't change `fullscreen` in `build.cfg`.
 
 ## Running
 

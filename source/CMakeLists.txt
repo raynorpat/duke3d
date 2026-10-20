@@ -38,7 +38,7 @@ endif()
 
 # The map editor. The target isn't called "build", so it can't clash with
 # the build/ binary directory; the executable still is.
-add_executable(buildeditor astub.c build/build.c)
+add_executable(buildeditor astub.c build/build.c buildcfg.c editormode.c)
 set_target_properties(buildeditor PROPERTIES OUTPUT_NAME build)
 target_include_directories(buildeditor PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(buildeditor PRIVATE

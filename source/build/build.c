@@ -29,6 +29,7 @@
 #include "display.h"
 
 #include "bstub.h"
+#include "editormode.h"
 
 /*
 #if !defined (getch) && defined(PLATFORM_UNIX)
@@ -97,6 +98,7 @@ short cursectnum; /* The sector the camera is in currently. */
 int32_t hvel; /* The Z velocity of the camera, used for jumping in gravity mode. */
            /* -512 is the starting value when you jump in gravity mode.       */
 static int32_t synctics = 0, lockclock = 0;
+static int32_t mousexrem = 0, mouseyrem = 0;  /* cursor motion under a pixel */
 
 extern volatile int32_t stereomode;
 extern char vgacompatible;
@@ -148,10 +150,12 @@ char tempshade, temppal, tempvis, tempxrepeat, tempyrepeat;
 char somethingintab = 255;
 static char boardfilename[13], oboardfilename[13];
 
+editormode_t editormode = { 0, 640, 480, 0 };  /* the stub fills it from its config */
+
 static int32_t repeatcountx, repeatcounty;
 
 #define BUILD_MAXPATH 255
-static char menuname[MAXMENUFILES][BUILD_MAXPATH+1], curpath[80], menupath[80];
+static char menuname[MAXMENUFILES][BUILD_MAXPATH+1], curpath[BUILD_MAXPATH+1], menupath[BUILD_MAXPATH+1];
 static int32_t menunamecnt, menuhighlight;
 
 static int32_t fillist[640];
@@ -383,9 +387,10 @@ void initmenupaths(char *filename)
 {
 	int32_t i;
 
-	strcpy(curpath,filename);
+	strncpy(curpath,filename,sizeof(curpath)-1);
+	curpath[sizeof(curpath)-1] = 0;
 	i = 0;
-	while ((i < 80) && (curpath[i] != 0)) i++;
+	while ((i < (int32_t)sizeof(curpath)) && (curpath[i] != 0)) i++;
 	while ((i > 0) && (curpath[i] != 92)) i--;
 	curpath[i] = 0;
 	strcpy(menupath,curpath);
@@ -400,15 +405,14 @@ void initmenupaths(char *filename)
  */
 void showmouse(void)
 {
-	int32_t i;
+	int w, h, k;
 
-	for(i=1;i<=4;i++)
-	{
-		plotpixel(searchx+i,searchy,whitecol);
-		plotpixel(searchx-i,searchy,whitecol);
-		plotpixel(searchx,searchy-i,whitecol);
-		plotpixel(searchx,searchy+i,whitecol);
-	}
+	getmousearea(&w,&h);
+	k = max(1,(xdim+(w>>1))/w);  /* 2 on a 2x (high-DPI) OpenGL drawable */
+	drawline256((searchx+k)<<12, (searchy  )<<12, (searchx+5*k)<<12, (searchy    )<<12, whitecol);
+	drawline256((searchx  )<<12, (searchy+k)<<12, (searchx    )<<12, (searchy+5*k)<<12, whitecol);
+	drawline256((searchx-5*k+1)<<12, (searchy    )<<12, (searchx-k+1)<<12, (searchy  )<<12, whitecol);
+	drawline256((searchx    )<<12, (searchy-5*k+1)<<12, (searchx  )<<12, (searchy-k+1)<<12, whitecol);
 }
 
 
@@ -1170,11 +1174,12 @@ int menuselect(void)
 			if ((menuname[newhighlight][0] == '.') && (menuname[newhighlight][1] == '.'))
 			{
 				i = 0;
-				while ((i < 80) && (menupath[i] != 0)) i++;
+				while ((i < (int32_t)sizeof(menupath)) && (menupath[i] != 0)) i++;
 				while ((i > 0) && (menupath[i] != 92)) i--;
 				menupath[i] = 0;
+				chdir(menuname[newhighlight]);
 			}
-			else
+			else if (strlen(menupath)+1+strlen(menuname[newhighlight]) < sizeof(menupath))
 			{
                 #if ((defined PLATFORM_DOS) || (defined PLATFORM_WIN32))
     				strcat(menupath,"\\");
@@ -1184,8 +1189,8 @@ int menuselect(void)
                     #error Define your platform!
                 #endif
 				strcat(menupath,menuname[newhighlight]);
+				chdir(menuname[newhighlight]);
 			}
-			chdir(menuname[newhighlight]);
 			menunamecnt = 0;
 			getfilenames("SUBD");
 			getfilenames("*.MAP");
@@ -1698,6 +1703,8 @@ int drawtilescreen(int32_t pictopleft, int32_t picbox)
 
 	xtiles = (xdim>>6); ytiles = (ydim>>6); tottiles = xtiles*ytiles;
 
+	setpolymost2dview();  /* renderer 3: draw in 2D */
+
 	pinc = ylookup[1];
 	clearview(0L);
 	for(cnt=0;cnt<(tottiles<<(gettilezoom<<1));cnt++)         /* draw the 5*3 grid of tiles */
@@ -1716,6 +1723,11 @@ int drawtilescreen(int32_t pictopleft, int32_t picbox)
 				dax = ((cnt%(xtiles<<gettilezoom))<<(6-gettilezoom));
 				day = ((cnt/(xtiles<<gettilezoom))<<(6-gettilezoom));
 				vidpos = ylookup[day]+dax+frameplace;
+#ifdef POLYMOST
+				if (polymost_drawtilescreen(dax,day,wallnum,64>>gettilezoom) != -1)
+					;  /* renderer 3 drew it: there is no frameplace to blit to */
+				else
+#endif
 				if ((xdime <= (64>>gettilezoom)) && (ydime <= (64>>gettilezoom)))
 				{
 					for(i=0;i<xdime;i++)
@@ -2260,8 +2272,8 @@ void overheadeditor(void)
 
 		oldmousebstatus = bstatus;
 		getmousevalues(&mousx,&mousy,&bstatus);
-		searchx += (mousx>>1);
-		searchy += (mousy>>1);
+		searchx += editormousemove(mousx,1,1,&mousexrem);
+		searchy += editormousemove(mousy,1,1,&mouseyrem);
 		if (searchx < 8) searchx = 8;
 		if (searchx > 631) searchx = 631;
 		if (searchy < 8) searchy = 8;
@@ -4935,18 +4947,65 @@ void overheadeditor(void)
 
 	fixspritesectors();
 
-	if (setgamemode(vidoption,xdim,ydim) < 0)
+	if (editorsetgamemode(&editormode) < 0)
 	{
 		ExtUnInit();
 		uninitkeys();
 		uninittimer();
-		printf("%d * %d not supported in this graphics mode\n",xdim,ydim);
+		printf("%d * %d not supported in this graphics mode\n",editormode.xdim3d,editormode.ydim3d);
 		exit(0);
 	}
 
 	posz = oposz;
 	searchx = scale(searchx,xdim,640);
 	searchy = scale(searchy,ydim,480);
+}
+
+
+static char renderermessage[82];
+static int32_t renderermessageclock;  /* totalclock when it stops showing */
+
+/* Alt+K: the next renderer in the 3D view, and in build.cfg on exit. */
+static void cyclerenderer(void)
+{
+	static const char *names[4] = { "classic", "Polymost solid", "Polymost software", "Polymost OpenGL" };
+	int32_t previous = editorrendermode, oxdim = xdim, oydim = ydim, glavailable = 0;
+
+#ifdef USE_OPENGL
+	glavailable = !editorglfailed;
+#endif
+	editormode.renderer = editorcyclerenderer(previous,glavailable);
+	sprintf(renderermessage,"Renderer %d: %s",(int)editormode.renderer,names[editormode.renderer]);
+	if (editormode.renderer != previous)
+	{
+		if (editorsetgamemode(&editormode) < 0)
+		{
+			ExtUnInit();
+			uninitkeys();
+			uninittimer();
+			printf("%d * %d not supported in this graphics mode\n",editormode.xdim3d,editormode.ydim3d);
+			exit(0);
+		}
+		if (editorrendermode != editormode.renderer)  /* OpenGL failed: back to the last one */
+		{
+			sprintf(renderermessage,"OpenGL unavailable");
+			editormode.renderer = previous;
+			if (editorsetgamemode(&editormode) < 0)
+			{
+				ExtUnInit();
+				uninitkeys();
+				uninittimer();
+				printf("%d * %d not supported in this graphics mode\n",editormode.xdim3d,editormode.ydim3d);
+				exit(0);
+			}
+		}
+		else
+			editorrendererpicked = 1;
+		searchx = scale(searchx,xdim,oxdim);
+		searchy = scale(searchy,ydim,oydim);
+		lockclock = totalclock;  /* the mode change isn't a frame */
+	}
+	renderermessageclock = totalclock+2*PLATFORM_TIMER_HZ;
 }
 
 
@@ -4959,6 +5018,7 @@ void editinput(void)
 	int32_t dashade[2], goalz, xvect, yvect, hiz, loz;
 	short hitsect, hitwall, hitsprite;
 	int32_t hitx, hity, hitz, dax, day, hihit, lohit;
+	int mousew, mouseh;
 
 	if (keystatus[0x57] > 0)  /* F11 - brightness */
 	{
@@ -4972,16 +5032,24 @@ void editinput(void)
 		screencapture("captxxxx.png",keystatus[0x2a]|keystatus[0x36]);
 		keystatus[88] = 0;
 	}
+	if (((keystatus[0x38]|keystatus[0xb8]) > 0) && (keystatus[0x25] > 0))  /* ALT-K */
+	{
+		keystatus[0x25] = 0;
+		cyclerenderer();
+	}
 
 	mousz = 0;
 	getmousevalues(&mousx,&mousy,&bstatus);
-	searchx += (mousx>>1);
-	searchy += (mousy>>1);
+	getmousearea(&mousew,&mouseh);  /* in OpenGL, window points to drawable pixels */
+	searchx += editormousemove(mousx,xdim,mousew,&mousexrem);
+	searchy += editormousemove(mousy,ydim,mouseh,&mouseyrem);
 	if (searchx < 4) searchx = 4;
 	if (searchy < 4) searchy = 4;
 	if (searchx > xdim-5) searchx = xdim-5;
 	if (searchy > ydim-5) searchy = ydim-5;
 	showmouse();
+	if (totalclock < renderermessageclock)
+		printmessage256(renderermessage);
 
 	if (keystatus[0x3b] > 0) posx--;
 	if (keystatus[0x3c] > 0) posx++;
@@ -5035,7 +5103,7 @@ void editinput(void)
 		if (keystatus[buildkeys[8]] > 0)                            /* A (stand high) */
 		{
 			if (keystatus[0x1d] > 0)
-				horiz = max(-100,horiz-((keystatus[buildkeys[4]]+1)<<2));
+				horiz = max(-100,horiz-((keystatus[buildkeys[4]]+1)*synctics*2));
 			else
 			{
 				goalz -= (16<<8);
@@ -5046,7 +5114,7 @@ void editinput(void)
 		if (keystatus[buildkeys[9]] > 0)                            /* Z (stand low) */
 		{
 			if (keystatus[0x1d] > 0)
-				horiz = min(300,horiz+((keystatus[buildkeys[4]]+1)<<2));
+				horiz = min(300,horiz+((keystatus[buildkeys[4]]+1)*synctics*2));
 			else
 			{
 				goalz += (12<<8);
@@ -5071,7 +5139,7 @@ void editinput(void)
 		if (keystatus[buildkeys[8]] > 0)                            /* A */
 		{
 			if (keystatus[0x1d] > 0)
-				horiz = max(-100,horiz-((keystatus[buildkeys[4]]+1)<<2));
+				horiz = max(-100,horiz-((keystatus[buildkeys[4]]+1)*synctics*2));
 			else
 			{
 				if (zmode != 1)
@@ -5086,7 +5154,7 @@ void editinput(void)
 		if (keystatus[buildkeys[9]] > 0)                            /* Z (stand low) */
 		{
 			if (keystatus[0x1d] > 0)
-				horiz = min(300,horiz+((keystatus[buildkeys[4]]+1)<<2));
+				horiz = min(300,horiz+((keystatus[buildkeys[4]]+1)*synctics*2));
 			else
 			{
 				if (zmode != 1)
@@ -6741,6 +6809,8 @@ void editinput(void)
 
 		if ((keystatus[0x3f]|keystatus[0x40]) > 0)  /* F5,F6 */
 		{
+			/* F5-F8: the stub draws on the 2D status bar, which renderer 3 doesn't have */
+			if (getrendermode() != 3)
 			switch(searchstat)
 			{
 				case 1: case 2: ExtShowSectorData(searchsector); break;
@@ -6751,6 +6821,7 @@ void editinput(void)
 		}
 		if ((keystatus[0x41]|keystatus[0x42]) > 0)  /* F7,F8 */
 		{
+			if (getrendermode() != 3)
 			switch(searchstat)
 			{
 				case 1: case 2: ExtEditSectorData(searchsector); break;
@@ -6773,6 +6844,7 @@ int main(int argc,char **argv)
 {
 	char ch, quitflag;
 	int32_t i, j, k;
+	int32_t rendererarg = -1;
 
     _platform_init(argc, argv, "BUILD editor by Ken Silverman", "BUILD");
 
@@ -6780,16 +6852,23 @@ int main(int argc,char **argv)
         setmmxoverlay(0);
 
 	editstatus = 1;
-	if (argc >= 2)
+	strcpy(boardfilename,"newboard.map");
+	for(i=1,j=0;i<argc;i++)
 	{
-		strcpy(boardfilename,argv[1]);
-		if (strchr(boardfilename,'.') == 0)
-			strcat(boardfilename,".map");
+		/* -renderer N picks the renderer for this run only; build.cfg keeps its own. */
+		if ((stricmp(argv[i],"-renderer") == 0) || (stricmp(argv[i],"/renderer") == 0))
+			rendererarg = editorclamprenderer((i+1 < argc) ? atoi(argv[++i]) : 0);
+		else if (j++ == 0)
+		{
+			strcpy(boardfilename,argv[i]);
+			if (strchr(boardfilename,'.') == 0)
+				strcat(boardfilename,".map");
+		}
 	}
-	else
-		strcpy(boardfilename,"newboard.map");
 
 	ExtInit();
+	if (rendererarg >= 0)
+		editormode.renderer = rendererarg;
 	_initkeys();
 	inittimer();
 
@@ -6799,12 +6878,12 @@ int main(int argc,char **argv)
 	strcpy(kensig,"BUILD by Ken Silverman");
 	initcrc();
 
-	if (setgamemode(vidoption,xdim,ydim) < 0)
+	if (editorsetgamemode(&editormode) < 0)
 	{
 		ExtUnInit();
 		uninitkeys();
 		uninittimer();
-		printf("%d * %d not supported in this graphics mode\n",xdim,ydim);
+		printf("%d * %d not supported in this graphics mode\n",editormode.xdim3d,editormode.ydim3d);
 		exit(0);
 	}
 
@@ -6869,6 +6948,7 @@ int main(int argc,char **argv)
 		if (keystatus[1] > 0)
 		{
 			keystatus[1] = 0;
+			if (getrendermode() == 3) glredrawlastframe();  /* no lasting back buffer */
 			printext256(0,0,whitecol,0,"Really want to quit?",0);
 			nextpage();
 			synctics = totalclock-lockclock;
@@ -6889,6 +6969,7 @@ int main(int argc,char **argv)
                     if (asksave)
                     {
                         asksave = 0;
+                        if (getrendermode() == 3) glredrawlastframe();
             			printext256(0,0,whitecol,0,"Save changes?       ",0);
             			nextpage();
 
