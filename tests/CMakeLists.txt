@@ -115,6 +115,9 @@ target_link_libraries(render_e1l1 PRIVATE buildengine duke3d::SDL2main)
 add_executable(render_classic2d render_classic2d.c)
 target_link_libraries(render_classic2d PRIVATE buildengine duke3d::SDL2main)
 
+add_executable(render_maskorder render_maskorder.c)
+target_link_libraries(render_maskorder PRIVATE buildengine duke3d::SDL2main)
+
 set(DUKE3D_GRP "" CACHE FILEPATH "DUKE3D.GRP for tests that need game data")
 set(DUKE3D_E1L1_CHECKSUM "e0517697" CACHE STRING
     "Expected render_e1l1 frame checksum (hex); empty just prints it")
@@ -195,8 +198,13 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
       COMMAND render_e1l1 "${DUKE3D_GRP}"
               "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost_tilt.bmp"
               "" 2 tilt)
+    # A sprite behind a masked wall (JFBuild 61483f0). Renderer 1 first, so
+    # renderer 0's xb1/xb2 aren't left to stand in for dxb1/dxb2.
+    add_test(NAME render_maskorder
+      COMMAND render_maskorder "${DUKE3D_GRP}" 1 2 0)
     set_tests_properties(render_e1l1_polymost render_e1l1_polymost_solid
                          render_e1l1_polymost_tile render_e1l1_polymost_tilt
+                         render_maskorder
       PROPERTIES
       ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
       TIMEOUT 30)
