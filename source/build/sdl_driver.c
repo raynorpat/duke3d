@@ -146,6 +146,7 @@ struct glinfo_t glinfo;
 char nofog = 0;
 extern void polymost_glreset(void);
 extern void gltexinvalidateall(void);
+extern void polymost_buildshaderamp(void);
 static SDL_GLContext sdl_glcontext = NULL;  /* non-NULL while in renderer 3 */
 static char gl_davidoption = 1;
 static int gl_window_w = 640;  /* windowed size: the last 8-bit mode's, unclamped */
@@ -844,6 +845,7 @@ int setgamemode_gl(char davidoption)
     glClearColor(0, 0, 0, 0.5);
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+    glHint(GL_FOG_HINT, GL_NICEST);  /* fog per pixel, as classic darkens */
     glDisable(GL_DITHER);
 
     exts = (const char *) glGetString(GL_EXTENSIONS);
@@ -2328,6 +2330,7 @@ int VBE_setPalette(int32_t start, int32_t num, char *palettebuffer)
         {
             memcpy(&curpalette[start], newpal, num * sizeof (palette_t));
             gltexinvalidateall();
+            polymost_buildshaderamp();
         } /* if */
         return(1);
     } /* if */

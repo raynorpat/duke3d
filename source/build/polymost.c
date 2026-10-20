@@ -87,7 +87,6 @@ static double dxb1[MAXWALLSB], dxb2[MAXWALLSB];
 #define USEZBUFFER 1 //1:use zbuffer (slow, nice sprite rendering), 0:no zbuffer (fast, bad sprite rendering)
 #define LINTERPSIZ 4 //log2 of interpolation size. 4:pretty fast&acceptable quality, 0:best quality/slow!
 #define DEPTHDEBUG 0 //1:render distance instead of texture, for debugging only!, 0:default
-#define FOGSCALE 0.00004
 #define PI 3.14159265358979323
 
 static double gyxscale, gxyaspect, gviewxrange, ghalfx, grhalfxdown10, grhalfxdown10x, ghoriz;
@@ -287,6 +286,99 @@ void gltexapplyprops ()
 static float glox1, gloy1, glox2, gloy2;
 static int32_t fog_is_on = 0;
 
+	//The palette's shade tables (what classic draws) as brightness against shade 0, in
+	//   the colours GL is given: a vertex colour per shade. hist weights indices 0-239 (not
+	//   the lit ones or 255). Returns the shade where a straight ramp with the same total
+	//   brightness reaches black (1-s/z summed over shades 0 to z is (z+1)/2), -1 if none.
+static float polymost_buildramp (const int32_t *hist, float *ramp, int32_t n)
+{
+	int32_t c, j, s;
+	float sum, sum0 = 0.f, zero = -1.f;
+
+	if (!palookup[0]) return(-1.f);
+	for(s=0;s<n;s++)
+	{
+		sum = 0.f;
+		for(c=0;c<240;c++)
+			if (hist[c])
+			{
+				j = (int32_t)((unsigned char)palookup[0][(s<<8)+c]);
+				sum += (float)hist[c]*(float)(curpalette[j].r+curpalette[j].g+curpalette[j].b);
+			}
+		if (!s) { sum0 = sum; if (sum0 <= 0.f) return(-1.f); }
+		ramp[s] = sum/sum0; zero += ramp[s]*2.f;
+	}
+	return(zero);
+}
+
+	//The whole palette's ramp; glshaderampn = 0: not built
+static float glshaderamp[256], glshadezero;
+static int32_t glshaderampn = 0;
+
+	//At a palette change (and on first use): the ramp of indices 0-239 alike
+void polymost_buildshaderamp ()
+{
+	int32_t i, hist[240];
+
+	for(i=0;i<240;i++) hist[i] = 1;
+	glshaderampn = min(max((int32_t)numpalookups,1),256);
+	glshadezero = polymost_buildramp(hist,glshaderamp,glshaderampn);
+	if (glshadezero < 0.f) //no palette yet: linear
+	{
+		for(i=0;i<glshaderampn;i++) glshaderamp[i] = ((float)(glshaderampn-i))/((float)glshaderampn);
+		glshadezero = (float)glshaderampn;
+	}
+}
+
+	//Each tile's own ramp, weighted by its texels (built as its texture is made): the
+	//   whole palette's is too bright for dark art, which rounds to black sooner
+#define TILERAMPN 32
+static float gltileramp[MAXTILES][TILERAMPN], gltilezero[MAXTILES]; //gltilezero <= 0: none
+
+	//The vertex colour of a shade of a tile; *zero gets its ramp's black shade
+static float polymost_shaderamp (int32_t picnum, int32_t shade, float *zero)
+{
+	if (((uint32_t)picnum < MAXTILES) && (gltilezero[picnum] > 0.f) && (numpalookups <= TILERAMPN))
+	{
+		*zero = gltilezero[picnum];
+		return(gltileramp[picnum][min(max(shade,0),numpalookups-1)]);
+	}
+	if (!glshaderampn) polymost_buildshaderamp();
+	*zero = glshadezero;
+	return(glshaderamp[min(max(shade,0),glshaderampn-1)]);
+}
+
+	//Classic's distance shading (getpalookup with drawsprite's swall and globvis)
+	//   adds (depth*viewingrange*xdimscale*globvis)>>51 shades, depth in map units,
+	//   globvis = globalvisibility*(uchar)(vis+16)/16. Polymost's eye z is
+	//   depth*viewingrange/(gxyaspect*gyxscale*2^30), so per unit of eye z it adds:
+static float glfogshades = 0.f;
+static float glfogstart = 0.f, glfogend = 1.f; //what GL has
+
+static void polymost_fogvis (int32_t vis)
+{
+	glfogshades = (float)(gxyaspect*gyxscale*((double)xdimscale)*((double)globalvisibility)*
+		((double)((unsigned char)(vis+16)))/(16.0*2097152.0));
+}
+
+	//Fogs a surface of a shade as classic darkens it, over its polymost_shaderamp
+	//   colour: linear fog to black from where its shade passes 0 (a negative shade
+	//   stays lit for a while) to where its ramp's straight line reaches black (zero)
+static void polymost_setfog (int32_t shade, float zero)
+{
+	float start, end;
+
+	if (glfogshades <= 0.f) { start = 1e9f; end = 2e9f; } //vis+16 wrapped to 0: no fog
+	else
+	{
+		start = ((float)max(-shade,0))/glfogshades;
+		end = (zero-(float)shade)/glfogshades;
+		if (end <= start) end = start+1.f/glfogshades; //black already
+	}
+	if (start != glfogstart) { glFogf(GL_FOG_START,start); glfogstart = start; }
+	if (end != glfogend) { glFogf(GL_FOG_END,end); glfogend = end; }
+}
+
 	//Use this for both initialization and uninitialization of OpenGL.
 void polymost_glreset ()
 {
@@ -342,11 +434,9 @@ void resizeglcheck ()
 		if (!nofog) {
 		glEnable(GL_FOG);
 		fog_is_on = 1;
-		glFogi(GL_FOG_MODE,GL_EXP); //GL_EXP(default),GL_EXP2,GL_LINEAR
-		//glHint(GL_FOG_HINT,GL_NICEST);
-		glFogf(GL_FOG_DENSITY,1.0); //must be > 0, default is 1
-		glFogf(GL_FOG_START,0.0); //default is 0
-		glFogf(GL_FOG_END,1.0); //default is 1
+		glFogi(GL_FOG_MODE,GL_LINEAR); //polymost_setfog sets start and end
+		glFogf(GL_FOG_START,0.0); glfogstart = 0.f;
+		glFogf(GL_FOG_END,1.0); glfogend = 1.f;
 		col[0] = 0; col[1] = 0; col[2] = 0; col[3] = 0; //range:0 to 1
 		glFogfv(GL_FOG_COLOR,col); //default is 0,0,0,0
 		}
@@ -470,6 +560,9 @@ void gloadtile (int32_t dapic, int32_t dapal, int32_t dameth, int32_t gltexind, 
 	coltype *pic, *wpptr, *fbpic;
 	int32_t j, x, y, x2, y2, xsiz, ysiz, dacol, tsizx, tsizy, hasfullbright = 0;
 	int32_t texfmt = GL_RGBA, intexfmt = GL_RGBA8;
+	int32_t hist[256];
+
+	memset(hist,0,sizeof(hist));
 
 	if (doalloc) glGenTextures(1,&glpic[gltexind]);  //# of textures (make OpenGL allocate structure)
 	glBindTexture(GL_TEXTURE_2D,glpic[gltexind]);
@@ -507,6 +600,7 @@ void gloadtile (int32_t dapic, int32_t dapal, int32_t dameth, int32_t gltexind, 
 					{ wpptr->r = wpptr->g = wpptr->b = wpptr->a = 0; continue; }
 				if (x < tsizx) x2 = x; else x2 = x-tsizx;
 				dacol = (int32_t)(*(unsigned char *)(waloff[dapic]+x2*tsizy+y2));
+				if ((x < tsizx) && (y < tsizy)) hist[dacol]++;
 				if (dacol == 255)
 				{
 					wpptr->r = curpalette[255].r;
@@ -528,6 +622,8 @@ void gloadtile (int32_t dapic, int32_t dapal, int32_t dameth, int32_t gltexind, 
 		}
 	}
 
+	if ((waloff[dapic]) && (numpalookups <= TILERAMPN))
+		gltilezero[dapic] = polymost_buildramp(hist,gltileramp[dapic],numpalookups);
 	fixtransparency(pic,tsizx,tsizy,xsiz,ysiz,dameth);
 
 	
@@ -704,7 +800,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 #ifdef USE_OPENGL
 	if (rendmode == 3)
 	{
-		float hackscx, hackscy, pc[4];
+		float hackscx, hackscy, pc[4], zero;
 		GLuint basetex, fbtex;
 
 		if (skyclamphack) method |= 4;
@@ -740,7 +836,8 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 		}
 
 		{
-		f = ((float)(numpalookups-min(max(globalshade,0),numpalookups)))/((float)numpalookups);
+		f = polymost_shaderamp(globalpicnum,globalshade,&zero);
+		if (fog_is_on) polymost_setfog(globalshade,zero);
 		pc[0] = pc[1] = pc[2] = f;
 		switch(method&3)
 		{
@@ -1541,7 +1638,7 @@ static void polymost_drawalls (int32_t bunch)
 #ifdef USE_OPENGL
 	if (!nofog) {
 	if (rendmode == 3)
-		glFogf(GL_FOG_DENSITY,((float)globalvisibility)*((float)((unsigned char)(sec->visibility+16)))*FOGSCALE);
+		polymost_fogvis(sec->visibility);
 	}
 #endif
 
@@ -2554,7 +2651,7 @@ void polymost_drawmaskwall (int32_t damaskwallcnt)
 	if (rendmode == 3)
 	{
 		glEnable(GL_FOG); fog_is_on = 1; //setpolymost2dview turns it off
-		glFogf(GL_FOG_DENSITY,((float)globalvisibility)*((float)((unsigned char)(sec->visibility+16)))*FOGSCALE);
+		polymost_fogvis(sec->visibility);
 	}
 	}
 #endif
@@ -2653,7 +2750,7 @@ void polymost_drawsprite (int32_t snum)
 	if (rendmode == 3)
 	{
 		glEnable(GL_FOG); fog_is_on = 1; //setpolymost2dview turns it off
-		glFogf(GL_FOG_DENSITY,((float)globalvisibility)*((float)((unsigned char)(sector[tspr->sectnum].visibility+16)))*FOGSCALE);
+		polymost_fogvis(sector[tspr->sectnum].visibility);
 	}
 	}
 #endif
@@ -3276,7 +3373,7 @@ static void tessectrap (float *px, float *py, int32_t *point2, int32_t numpoints
 void polymost_fillpolygon (int32_t npoints)
 {
 	static float fx[MAXWALLSB], fy[MAXWALLSB];
-	float f, a = 1.0;
+	float f, a = 1.0, zero;
 	double cx, cy;
 	int32_t i, j;
 
@@ -3322,7 +3419,7 @@ void polymost_fillpolygon (int32_t npoints)
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D,glpic[gltexcache(globalpicnum,globalpal,0)]);
 
-	f = ((float)(numpalookups-min(max(globalshade,0),numpalookups)))/((float)numpalookups);
+	f = polymost_shaderamp(globalpicnum,globalshade,&zero);
 	switch ((globalorientation>>7)&3) {
 		case 0:
 		case 1: a = 1.0; glDisable(GL_BLEND); break;

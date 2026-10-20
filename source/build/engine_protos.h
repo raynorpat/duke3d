@@ -193,6 +193,7 @@ extern void gltexinvalidateall(void);
 #endif
 #if defined(POLYMOST) && defined(USE_OPENGL)
 extern void polymost_fillpolygon(int32_t npoints);
+extern void polymost_buildshaderamp(void);
 #endif
 extern void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz, short daang, int32_t dahoriz, short dacursectnum);
 extern int loadboard(char *filename, int32_t *daposx, int32_t *daposy, int32_t *daposz, short *daang, short *dacursectnum);
