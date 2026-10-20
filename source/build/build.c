@@ -29,6 +29,7 @@
 #include "display.h"
 
 #include "bstub.h"
+#include "editormode.h"
 
 /*
 #if !defined (getch) && defined(PLATFORM_UNIX)
@@ -147,6 +148,8 @@ short temppicnum, tempcstat, templotag, temphitag, tempextra;
 char tempshade, temppal, tempvis, tempxrepeat, tempyrepeat;
 char somethingintab = 255;
 static char boardfilename[13], oboardfilename[13];
+
+editormode_t editormode = { 0, 640, 480, 0 };  /* the stub fills it from its config */
 
 static int32_t repeatcountx, repeatcounty;
 
@@ -4935,12 +4938,12 @@ void overheadeditor(void)
 
 	fixspritesectors();
 
-	if (setgamemode(vidoption,xdim,ydim) < 0)
+	if (editorsetgamemode(&editormode) < 0)
 	{
 		ExtUnInit();
 		uninitkeys();
 		uninittimer();
-		printf("%d * %d not supported in this graphics mode\n",xdim,ydim);
+		printf("%d * %d not supported in this graphics mode\n",editormode.xdim3d,editormode.ydim3d);
 		exit(0);
 	}
 
@@ -6773,6 +6776,7 @@ int main(int argc,char **argv)
 {
 	char ch, quitflag;
 	int32_t i, j, k;
+	int32_t rendererarg = -1;
 
     _platform_init(argc, argv, "BUILD editor by Ken Silverman", "BUILD");
 
@@ -6780,16 +6784,23 @@ int main(int argc,char **argv)
         setmmxoverlay(0);
 
 	editstatus = 1;
-	if (argc >= 2)
+	strcpy(boardfilename,"newboard.map");
+	for(i=1,j=0;i<argc;i++)
 	{
-		strcpy(boardfilename,argv[1]);
-		if (strchr(boardfilename,'.') == 0)
-			strcat(boardfilename,".map");
+		/* -renderer N picks the renderer for this run only; build.cfg keeps its own. */
+		if (stricmp(argv[i],"-renderer") == 0)
+			rendererarg = editorclamprenderer((i+1 < argc) ? atoi(argv[++i]) : 0);
+		else if (j++ == 0)
+		{
+			strcpy(boardfilename,argv[i]);
+			if (strchr(boardfilename,'.') == 0)
+				strcat(boardfilename,".map");
+		}
 	}
-	else
-		strcpy(boardfilename,"newboard.map");
 
 	ExtInit();
+	if (rendererarg >= 0)
+		editormode.renderer = rendererarg;
 	_initkeys();
 	inittimer();
 
@@ -6799,12 +6810,12 @@ int main(int argc,char **argv)
 	strcpy(kensig,"BUILD by Ken Silverman");
 	initcrc();
 
-	if (setgamemode(vidoption,xdim,ydim) < 0)
+	if (editorsetgamemode(&editormode) < 0)
 	{
 		ExtUnInit();
 		uninitkeys();
 		uninittimer();
-		printf("%d * %d not supported in this graphics mode\n",xdim,ydim);
+		printf("%d * %d not supported in this graphics mode\n",editormode.xdim3d,editormode.ydim3d);
 		exit(0);
 	}
 

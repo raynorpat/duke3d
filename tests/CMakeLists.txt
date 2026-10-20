@@ -519,3 +519,12 @@ endif()
 add_executable(build_cfg build_cfg.c "${PROJECT_SOURCE_DIR}/source/buildcfg.c")
 target_include_directories(build_cfg PRIVATE "${PROJECT_SOURCE_DIR}/source")
 add_test(NAME build_cfg COMMAND build_cfg)
+
+# The editor's 3D mode helper: renderer 3 falls back to classic without GL.
+add_executable(editor_mode editor_mode.c "${PROJECT_SOURCE_DIR}/source/editormode.c")
+target_include_directories(editor_mode PRIVATE "${PROJECT_SOURCE_DIR}/source")
+target_link_libraries(editor_mode PRIVATE buildengine duke3d::SDL2main)
+add_test(NAME editor_mode COMMAND editor_mode)
+set_tests_properties(editor_mode PROPERTIES
+  ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+  TIMEOUT 30)
