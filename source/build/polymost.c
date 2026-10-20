@@ -398,18 +398,20 @@ static void polymost_setfog (int32_t shade, float zero)
 	if (end != glfogend) { glFogf(GL_FOG_END,end); glfogend = end; }
 }
 
-	//The index program: classic's shade is the surface's (r) plus shades per unit of
-	//   eye z (b) times its eye z (gl_Color isn't clamped); pal is g. 255 is see-through.
+	//The index program: classic's shade is the surface's (r, a whole number) plus the
+	//   whole shades of its distance, shades per unit of eye z (b) times its eye z, as
+	//   getpalookup's shade+(davis>>8) (gl_Color isn't clamped); pal is g. 255 is see-through.
 static const char glshidxvert[] =
 	"#version 120\n"
 	"uniform float numshades;\n"
 	"varying vec2 uv;\n"
-	"varying float shade, row;\n"
+	"varying float shade, dist, row;\n"
 	"void main()\n"
 	"{\n"
 	"    gl_Position = ftransform();\n"
 	"    uv = gl_MultiTexCoord0.st;\n"
-	"    shade = gl_Color.r + abs((gl_ModelViewMatrix*gl_Vertex).z)*gl_Color.b;\n"
+	"    shade = gl_Color.r;\n"
+	"    dist = abs((gl_ModelViewMatrix*gl_Vertex).z)*gl_Color.b;\n"
 	"    row = gl_Color.g*numshades;\n"
 	"}\n";
 static const char glshidxfrag[] =
@@ -417,12 +419,12 @@ static const char glshidxfrag[] =
 	"uniform sampler2D tile, lookup;\n"
 	"uniform float numshades, rowscale;\n"
 	"varying vec2 uv;\n"
-	"varying float shade, row;\n"
+	"varying float shade, dist, row;\n"
 	"void main()\n"
 	"{\n"
 	"    float i = texture2D(tile,uv).r;\n"
 	"    if (i > 254.5/255.0) discard;\n"
-	"    float s = clamp(floor(shade),0.0,numshades-1.0);\n"
+	"    float s = clamp(floor(shade+0.5)+floor(dist),0.0,numshades-1.0);\n"
 	"    gl_FragColor = vec4(texture2D(lookup,vec2((i*255.0+0.5)/256.0,(row+s+0.5)*rowscale)).r,0.0,0.0,1.0);\n"
 	"}\n";
 	//The resolve: each index through the palette

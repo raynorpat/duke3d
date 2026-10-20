@@ -394,8 +394,9 @@ Ported from later JFBuild commits, retyped as above:
   `gl_has_extension` moved there from `sdl_driver.c`. `setgamemode_gl` calls
   `gl_initdrawpath`, which sets `glinfo.vbo`/`glsl`/`fbo`, picks `gldrawpath`
   from `gldrawpathrequest` (the game's `GLDrawPath`, the editor's
-  `gldrawpath`) and prints it. `gl_forcefail` (a test hook) makes GLSL and
-  FBOs unavailable. `glinternalwidth`/`glinternalheight` are set from the
+  `gldrawpath`) and prints it. `gl_forcefail` (a test hook): 1 makes GLSL
+  and FBOs unavailable, 2 breaks the shader path's shader, 3 leaves its
+  framebuffer incomplete. `glinternalwidth`/`glinternalheight` are set from the
   settings but not used yet.
 - `glsubmit.c`/`glsubmit.h` (ours): renderer 3's vertex submission.
   `polymost.c`'s and `engine.c`'s `glBegin`/`glTexCoord`/`glColor`/
@@ -403,14 +404,30 @@ Ported from later JFBuild commits, retyped as above:
   `drawline256`, `printext256`, `plotpixel`) are `glsub_*` calls, as floats
   (`glTexCoord2d`/`glVertex3d` and `glColor4ub` were). On the immediate path
   they become vertex arrays (`glsub_force`, a test hook, can keep
-  `glBegin`/`glEnd`); on the vbo and shader paths a vertex buffer, given new
-  storage each draw. Fans become triangles so polygons batch; `polymost.c`
+  `glBegin`/`glEnd`); on the vbo path a vertex buffer, given new storage
+  each draw; on the shader path vertex arrays again (faster than that
+  buffer on macOS's driver). `glsub_flusheach` (a test hook) draws each
+  polygon at its end. Fans become triangles so polygons batch; `polymost.c`
   and `sdl_driver.c` define `GLSUB_WRAP`, which wraps their GL state calls
   to draw the batch first (binding the bound texture or enabling an enabled
   cap is skipped while batching), and `gl_swap` draws it before the swap.
   `setgamemode_gl` calls `glsub_init`, `destroy_gl_window` `glsub_uninit`.
-  Every path draws the same pixels as JFBuild's immediate mode on the
-  drivers tested (macOS's 2.1).
+  The immediate and vbo paths draw the same pixels as JFBuild's immediate
+  mode on the drivers tested (macOS's 2.1).
+- `polymost.c` (ours): on the shader path (GL 2.1) the 3D view draws
+  classic's palette indices into a framebuffer: tiles as `GL_LUMINANCE8`
+  index textures (their own cache, `glidxtex`, kept by `gltexinvalidate`),
+  a program that looks each texel up in `palookup` (a texture of every pal
+  and shade, reloaded when `makepalookup` sets `glshlookupdirty`) at the
+  polygon's shade plus classic's distance shade for the pixel's eye z
+  (`glfogshades`; the parallaxed sky's constant `polymost_skyshade`), with
+  index 255 see-through and no glow pass. `polymost_drawrooms` (cleared),
+  `polymost_drawmaskwall` and `polymost_drawsprite` start it;
+  `polymost_resolve_shader` draws it into the view window through the
+  palette, called by `setpolymost2dview`, `polymost_dorotatesprite`, the
+  tile picker, `clearview`, `clearallviews`, `gl_swap` and screenshots, so
+  2D (still RGB) goes over it. A shader that doesn't compile or link, or an
+  incomplete framebuffer, prints why and falls back to the vbo path.
 
 ## Renderer 3: 2D, clears, palette, fades, screenshots
 
