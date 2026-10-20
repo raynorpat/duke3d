@@ -33,6 +33,10 @@ if(DUKE3D_POLYMOST)
     target_compile_definitions(buildengine PUBLIC GL_SILENCE_DEPRECATION)
   endif()
   target_link_libraries(buildengine PUBLIC OpenGL::GL)
+  # Polymost's ftol/dtol use lrintf/lrint, which become a libm call when
+  # they may have to set errno (GCC's default; Darwin's clang doesn't).
+  target_compile_options(buildengine PRIVATE
+    $<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-fno-math-errno>)
 endif()
 
 if(WIN32)
