@@ -801,13 +801,14 @@ int setgamemode_gl(char davidoption)
                     gl_window_w, gl_window_h,
                     SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI |
                     (sdl_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
-    if (window == NULL)
-        return(-1);
-
-    context = SDL_GL_CreateContext(window);
+    context = (window != NULL) ? SDL_GL_CreateContext(window) : NULL;
     if (context == NULL)
     {
-        SDL_DestroyWindow(window);
+        if (window != NULL)
+            SDL_DestroyWindow(window);
+        /* a backend may have dropped the old context in the attempt. */
+        if (sdl_glcontext != NULL)
+            SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
         return(-1);
     } /* if */
 
