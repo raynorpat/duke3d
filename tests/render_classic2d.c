@@ -68,23 +68,27 @@ static int still_tile(short picnum)
     return(1);
 }
 
-/* Saves the frame and returns its FNV-1a checksum. */
+/* Saves the frame and returns its FNV-1a checksum, row by row (a row's
+ *  pitch may be over xdim). */
 static uint32_t frame(const char *prefix, const char *name)
 {
     char path[1024];
     uint32_t hash = 2166136261u;
     const unsigned char *pix;
-    int32_t i;
+    int32_t x, y;
 
     nextpage();
     snprintf(path, sizeof (path), "%s_%s.bmp", prefix, name);
     if (SDL_SaveBMP(surface, path) != 0)
         fprintf(stderr, "WARN: SDL_SaveBMP(%s): %s\n", path, SDL_GetError());
-    pix = (const unsigned char *) surface->pixels;
-    for (i = 0; i < xdim * ydim; i++)
+    for (y = 0; y < ydim; y++)
     {
-        hash ^= pix[i];
-        hash *= 16777619u;
+        pix = (const unsigned char *) surface->pixels + y * surface->pitch;
+        for (x = 0; x < xdim; x++)
+        {
+            hash ^= pix[x];
+            hash *= 16777619u;
+        }
     }
     return(hash);
 }
