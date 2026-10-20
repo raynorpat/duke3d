@@ -281,13 +281,16 @@ static void view_shot(unsigned char *buf, int32_t x, int32_t y, int32_t z, short
 }
 
 /* The frames path_shots draws. */
-#define PATHSHOTS 7
+#define PATHSHOTS 8
 
 /* Draws the frames compared across draw paths into shots: the start view
  *  with a HUD tile, text, a line and a pixel, then turned three ways (sky,
  *  sprites), with fullbright on (glow passes over masked walls and a
  *  translucent sprite, as the caller sets them), the map view with lines and
- *  the tile picker, and a still screen. */
+ *  the tile picker, a still screen, and the start view with fullbright on
+ *  and HUD tiles opaque and translucent over it (the caller makes sprites
+ *  and masked walls opaque and translucent side by side, so only blend and
+ *  depth state changes between them). */
 static void path_shots(unsigned char **shots, int32_t x, int32_t y, int32_t z, short a,
                        short sect, short tile)
 {
@@ -328,6 +331,19 @@ static void path_shots(unsigned char **shots, int32_t x, int32_t y, int32_t z, s
     rotatesprite(0, 50<<16, 65536, 0, VICTORY1, 0, 0, 2+8+16+64+128, 0, 0, xdim-1, ydim-1);
     nextpage();
     read_front(shots[6]);
+
+    polymosttexfullbright = 240;
+    gltexinvalidateall();
+    clearallviews(0);
+    drawrooms(x, y, z, a, 100, sect);
+    drawmasks();
+    rotatesprite(100<<16, 130<<16, 65536, 0, FIRSTGUN, 0, 0, 2, 0, 0, xdim-1, ydim-1);
+    rotatesprite(160<<16, 130<<16, 65536, 0, FIRSTGUN, 0, 0, 2+1, 0, 0, xdim-1, ydim-1);
+    rotatesprite(220<<16, 130<<16, 65536, 0, FIRSTGUN, 8, 0, 2+1+32, 0, 0, xdim-1, ydim-1);
+    nextpage();
+    read_front(shots[7]);
+    polymosttexfullbright = 256;
+    gltexinvalidateall();
 }
 
 /* Shows the last frame again (setpalettefade with no frame drawn): lastframe
@@ -811,10 +827,24 @@ int main(int argc, char **argv)
 
     /* Each draw path, forced, draws the same frames byte for byte as
      * immediate mode, with the masked walls and translucent sprite of the
-     * fullbright checks; a path the driver lacks is skipped. */
+     * fullbright checks; a path the driver lacks is skipped. Sectors get
+     * different visibilities (fog densities), every other masked wall is
+     * translucent, and the lit sprite gets an opaque and a reverse
+     * translucent twin beside it, so that a batch drawn under the wrong
+     * fog, blend or depth state shows. */
+    for (i = 0; i < numsectors; i++)
+        sector[i].visibility = (unsigned char) ((i * 37) & 127);
     for (i = sector[sectnum].wallptr; i < sector[sectnum].wallptr + sector[sectnum].wallnum; i++)
-        if (wall[i].nextsector >= 0) wall[i].cstat |= 16;
+        if (wall[i].nextsector >= 0) wall[i].cstat |= (i & 1) ? 16|128 : 16;
     sprite[litspr].cstat = 2;
+    for (s = 1; s <= 2; s++)
+    {
+        i = insertsprite(sprite[litspr].sectnum, 0);
+        sprite[i] = sprite[litspr];
+        sprite[i].x += (sintable[(ang+s*512)&2047]>>6) * 3;  /* to one side, then the other */
+        sprite[i].y += (sintable[(ang+s*512+1536)&2047]>>6) * 3;
+        sprite[i].cstat = (s == 1) ? 0 : 2|512;
+    }
     for (s = 0; s < PATHSHOTS; s++)
     {
         pathshot[0][s] = malloc((size_t) xdim * ydim * 3);
