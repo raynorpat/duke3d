@@ -183,3 +183,34 @@ global Polymost reads (`curpalette`, `glinfo`, …), add the minimum needed.
   style.
 - Whether `hightile`/`md2` calls are deleted or stubbed, case by case.
 - Plan granularity and task order.
+
+## Addendum (2026-10-20): later JFBuild fixes and features
+
+*(User's request, made during execution.)* Port these JFBuild commits onto the vendored 2004
+Polymost, after the phase 1 tasks:
+
+- `1cb8deb` drawline2d fix (the `build.c` editor part stays out: phase 2)
+- `368fbfa` OpenGL non-power-of-two textures
+- `ccf7aa8` OpenGL map view, `80878af` map view translucency
+- `ef31152` texture mip level (`gltexmiplevel`)
+- `a031bac` fullbright textures (the fullbright feature only, not the 2009 refactor around it)
+- `0187a80`, `2c95ef6`, `7703ab6`, `9691f25`, `88007d9` widescreen and tallscreen 2D scaling,
+  plus the upstream commits they depend on: `6b98b22`, `5e84468`, `11d083e`, `dbee0ff`
+- `61483f0` sprite vs masked wall order
+- `fd5d5b6` drawpoly endless-loop guard
+- `2a8cfbb` square-pixel tiles for `rotatesprite`
+
+Decisions:
+
+- **Widescreen applies to every renderer** *(user's decision)*. The classic renderer changes
+  only in modes wider than 4:3. At 320x200, 640x400, every exact 4:3 mode and tallscreen modes,
+  its output stays byte-identical. This relaxes the "renderer 0 unchanged" anti-goal for wide
+  modes only. The game-side widescreen fixes from JFDuke3D (field of view in `displayrooms`,
+  status bar clip rectangles, border side fill) come with it, in every renderer.
+- **Map view translucency fix in classic** *(my call)*: `80878af` also fixes the classic map
+  view leaving the translucency table mode stale for translucent floor sprites. It's kept for
+  every renderer as an upstream bug fix and recorded in `VENDORED.md`.
+- **Mip level setting** *(my call)*: without a console, `gltexmiplevel` is read from
+  `duke3d.cfg` (`[Screen Setup] GLTextureMipLevel`, default 0).
+- **Fullbright** *(my call)*: on for the normal, water and slime palettes, as JFDuke3D does.
+- The "automap textured floors missing in renderer 3" known gap is closed by the map view port.
