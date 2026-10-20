@@ -1839,7 +1839,7 @@ static unsigned char *classic_screencapture(int *w, int *h, char inverseit)
             col = ((unsigned char *) frameplace)[p];
         else
         {
-            col = readpixel(p);
+            col = readpixel((intptr_t) surface->pixels + p);  /* as drawpixel16 writes it */
             if ((inverseit == 1) && (((col&7) == 0) || ((col&7) == 7))) col ^= 15;
             i = (col & 15) * 3;
             *out++ = vgapal16[i+0] << 2;
