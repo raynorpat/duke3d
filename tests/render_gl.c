@@ -35,6 +35,9 @@
  *                      tile, or the lit sprite translucent; fullbright off
  *                      and on
  *   <dir>/resized.bmp  the last frame shown again after a window resize
+ *   <dir>/cmp_<view>_<r0|immediate|vbo>.bmp
+ *                      E1L1 viewpoints at horiz 100, 640x480, in renderer 0
+ *                      and in renderer 3 on the immediate and vbo paths
  *  It fails on a GL error, a failed capture, a fade that doesn't redden or
  *  a screenshot without it, a still screen that doesn't brighten as it
  *  fades in, a clearview outside the view window, a miplevel 1 view
@@ -51,7 +54,9 @@
  *  mode over the 8-bit 1600x1200 limit whose window isn't the size asked
  *  for, or a draw path (immediate, vertex arrays, vbo, shader) that draws
  *  any of a set of frames differently from immediate mode or doesn't send
- *  its vertices its own way.
+ *  its vertices its own way, or renderer 3 further from renderer 0 than
+ *  pinned (each viewpoint's mean difference, and the mean of two regions
+ *  that renderer 0 darkens by distance).
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
  *
@@ -74,12 +79,15 @@
 /* The game is linked in (for render_gl_game.c), so it provides the
  * engine's callbacks. */
 int glgamepalette_check(void);  /* render_gl_game.c */
+extern SDL_Surface *surface;  /* sdl_driver.c: the 8-bit frame */
 
 #define APLAYER 1405  /* names.h: a player start */
 #define THREEDEE 2498  /* names.h */
 #define FIRSTGUN 2524  /* names.h: the pistol */
 #define VICTORY1 3260  /* names.h: E1's ending screen */
 #define LITFLOOR 966  /* a poster: the E1L1 wall tile with the most lit texels */
+#define FIRE 2271  /* names.h */
+#define FIRE2 2311  /* names.h */
 #define LITWALL 931  /* fire, from an E1L1 sprite: lit, and 112 wide */
 
 /* polymost.c, which engine.c includes: the editor's tile picker, and the
@@ -363,6 +371,171 @@ static int lastframe_same(void)
     return same;
 }
 
+/* The comparison with renderer 0: E1L1 viewpoints at horiz 100 (where the
+ *  projections line up), drawn 640x480 in both. Face sprites take their
+ *  sector's shade, and fire -127, roughly as game.c animatesprites does. Each view has the
+ *  most its mean |renderer 3 - renderer 0| per channel may be. */
+#define CMPW 640
+#define CMPH 480
+static const struct { const char *name; int32_t x, y, z; short ang; double maxdiff; } cmpview[] = {
+    { "distance", 13824, 50350, -2048, 1024, 12.7 },
+    { "closeup", 13824, 43118, -2048, 1536, 2.7 },
+    { "dark-lit", 13824, 50350, -2048, 512, 6.5 },
+    { "sprites", 24767, 46541, -2048, 1409, 13.5 },
+    { "sprites-mid", 14107, 44964, -2048, 1793, 7.2 },
+    { "sky", -31243, 7160, -181472, 1446, 6.3 },
+    { "translucent", 14938, 44309, -2048, 300, 10.2 },
+};
+#define NCMPVIEWS ((int) (sizeof (cmpview) / sizeof (cmpview[0])))
+
+/* Regions measured in both (640x480 boxes, top-down): the shaded back room
+ *  behind the Pig Cop and the far street, both dark in renderer 0 through
+ *  distance shading alone. Each has the most |renderer 3 - renderer 0| of
+ *  its mean may be. */
+static const struct { const char *name; int view, x0, y0, x1, y1; double maxdiff; } cmpregion[] = {
+    { "back room", 3, 240, 60, 460, 180, 21.7 },
+    { "far street", 0, 0, 180, 350, 270, 20.0 },
+};
+#define NCMPREGIONS ((int) (sizeof (cmpregion) / sizeof (cmpregion[0])))
+
+static void cmp_draw(int v)
+{
+    short sect = 0;
+
+    updatesector(cmpview[v].x, cmpview[v].y, &sect);
+    clearallviews(0);
+    drawrooms(cmpview[v].x, cmpview[v].y, cmpview[v].z, cmpview[v].ang, 100, sect);
+    drawmasks();
+}
+
+/* Mean of a box of a frame (w by h, RGB) given in 640x480 terms; up: rows
+ *  are bottom-up (as GL reads them). */
+static double cmp_mean(const unsigned char *buf, int w, int h, int up, int x0, int y0, int x1, int y1)
+{
+    int x, y, yy;
+    double d = 0;
+
+    x0 = x0 * w / CMPW; x1 = x1 * w / CMPW;
+    y0 = y0 * h / CMPH; y1 = y1 * h / CMPH;
+    for (y = y0; y < y1; y++)
+        for (x = x0, yy = up ? h - 1 - y : y; x < x1; x++)
+            d += buf[(yy * w + x) * 3] + buf[(yy * w + x) * 3 + 1] + buf[(yy * w + x) * 3 + 2];
+    return d / (3.0 * (x1 - x0) * (y1 - y0));
+}
+
+/* Mean absolute difference per channel of a GL frame (xdim by ydim, bottom-up)
+ *  and a renderer 0 one (640x480, top-down), nearest pixel. */
+static double cmp_diff(const unsigned char *gl, const unsigned char *classic)
+{
+    long x, y, i, d = 0;
+    for (y = 0; y < ydim; y++)
+        for (x = 0; x < xdim; x++)
+            for (i = 0; i < 3; i++)
+                d += abs((int) gl[(y * xdim + x) * 3 + i] -
+                         (int) classic[(((ydim - 1 - y) * CMPH / ydim) * CMPW + x * CMPW / xdim) * 3 + i]);
+    return (double) d / ((double) xdim * ydim * 3);
+}
+
+/* Draws the comparison views in renderer 0, then in renderer 3 on the
+ *  immediate (vertex arrays) and vbo paths, and checks them against the
+ *  limits. Captures go to <dir>/cmp_<view>_<r0|immediate|vbo>.bmp. 0: fail,
+ *  77: no OpenGL. */
+static int classic_compare(const char *dir)
+{
+    static const struct { int32_t path; const char *name; } cmppath[] = {
+        { GLPATH_IMMEDIATE, "immediate" }, { GLPATH_VBO, "vbo" },
+    };
+    static signed char savedshade[MAXSPRITES];
+    unsigned char *classic[NCMPVIEWS], *gl;
+    char path[1024];
+    double d, m0, m3, rs, gs;
+    int v, p, r, y, x, ok = 1;
+    SDL_Surface *s;
+
+    for (v = 0; v < MAXSPRITES; v++)
+    {
+        savedshade[v] = sprite[v].shade;
+        if ((sprite[v].statnum < MAXSTATUS) && !(sprite[v].cstat & 48))
+        {
+            sectortype *sc = &sector[sprite[v].sectnum];
+            sprite[v].shade = (sc->ceilingstat & 1) ? sc->ceilingshade : sc->floorshade;
+            if ((sprite[v].picnum == FIRE) || (sprite[v].picnum == FIRE2))
+                sprite[v].shade = -127;  /* as game.c animatesprites: never darkened */
+        }
+    }
+
+    if (_setgamemode(1, CMPW, CMPH) != 0) { fprintf(stderr, "FAIL: _setgamemode(640x480)\n"); return 0; }
+    setbrightness(0, palette);
+    for (v = 0; v < NCMPVIEWS; v++)
+    {
+        classic[v] = malloc(CMPW * CMPH * 3);
+        cmp_draw(v);
+        nextpage();
+        for (y = 0; y < CMPH; y++)
+            for (x = 0; x < CMPW; x++)
+            {
+                SDL_Color *c = &surface->format->palette->colors[((unsigned char *) surface->pixels)[y * surface->pitch + x]];
+                classic[v][(y * CMPW + x) * 3] = c->r;
+                classic[v][(y * CMPW + x) * 3 + 1] = c->g;
+                classic[v][(y * CMPW + x) * 3 + 2] = c->b;
+            }
+        s = SDL_CreateRGBSurfaceWithFormatFrom(classic[v], CMPW, CMPH, 24, CMPW * 3, SDL_PIXELFORMAT_RGB24);
+        snprintf(path, sizeof (path), "%s/cmp_%s_r0.bmp", dir, cmpview[v].name);
+        SDL_SaveBMP(s, path);
+        SDL_FreeSurface(s);
+    }
+
+    for (p = 0; p < (int) (sizeof (cmppath) / sizeof (cmppath[0])); p++)
+    {
+        gldrawpathrequest = cmppath[p].path;
+        if (setgamemode_gl(1) != 0)
+        {
+            printf("SKIP: no OpenGL (%s)\n", SDL_GetError());
+            return 77;
+        }
+        if (gldrawpath != cmppath[p].path)
+        {
+            printf("classic comparison, %s: not on this driver, skipped\n", cmppath[p].name);
+            continue;
+        }
+        setbrightness(0, palette);
+        polymosttexfullbright = 240;  /* as the game's palettes (menues.c glsetgamepalette) */
+        gltexinvalidateall();
+        gl = malloc((size_t) xdim * ydim * 3);
+        for (v = 0; v < NCMPVIEWS; v++)
+        {
+            cmp_draw(v);
+            nextpage();
+            snprintf(path, sizeof (path), "%s/cmp_%s_%s.bmp", dir, cmpview[v].name, cmppath[p].name);
+            save_front(path, &rs, &gs);
+            read_front(gl);
+            d = cmp_diff(gl, classic[v]);
+            printf("classic comparison, %s: %s mean |r3 - r0| %.2f (most %.2f)\n", cmppath[p].name,
+                   cmpview[v].name, d, cmpview[v].maxdiff);
+            if (d > cmpview[v].maxdiff) ok = 0;
+            for (r = 0; r < NCMPREGIONS; r++)
+            {
+                if (cmpregion[r].view != v) continue;
+                m0 = cmp_mean(classic[v], CMPW, CMPH, 0, cmpregion[r].x0, cmpregion[r].y0,
+                              cmpregion[r].x1, cmpregion[r].y1);
+                m3 = cmp_mean(gl, xdim, ydim, 1, cmpregion[r].x0, cmpregion[r].y0,
+                              cmpregion[r].x1, cmpregion[r].y1);
+                printf("classic comparison, %s: %s mean r0 %.1f, r3 %.1f (most apart %.1f)\n",
+                       cmppath[p].name, cmpregion[r].name, m0, m3, cmpregion[r].maxdiff);
+                if (fabs(m3 - m0) > cmpregion[r].maxdiff) ok = 0;
+            }
+        }
+        free(gl);
+        if (glGetError() != GL_NO_ERROR) { fprintf(stderr, "FAIL: GL error in the classic comparison\n"); return 0; }
+    }
+    gldrawpathrequest = GLPATH_AUTO;
+    polymosttexfullbright = 256;
+    for (v = 0; v < NCMPVIEWS; v++) free(classic[v]);
+    for (v = 0; v < MAXSPRITES; v++) sprite[v].shade = savedshade[v];
+    if (!ok) fprintf(stderr, "FAIL: renderer 3 is further from renderer 0 than pinned\n");
+    return ok;
+}
+
 int main(int argc, char **argv)
 {
     int32_t posx, posy, posz;
@@ -432,6 +605,8 @@ int main(int argc, char **argv)
     setup_la_backdrop();
 
     _platform_init(argc, argv, "render_gl", "render");
+    i = classic_compare(argv[2]);
+    if (i != 1) return (i == 77) ? 77 : 1;
     if (_setgamemode(1, 320, 200) != 0) { fprintf(stderr, "FAIL: _setgamemode(320x200)\n"); return 1; }
     if (setgamemode_gl(1) != 0)
     {
