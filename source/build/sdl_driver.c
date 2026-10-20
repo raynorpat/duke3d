@@ -161,6 +161,19 @@ static SDL_Texture *sdl_texture = NULL;
 static SDL_Surface *sdl_rgbsurface = NULL;  /* 32-bit staging copy of surface */
 static int debug_hall_of_mirrors = 0;
 static int sdl_fullscreen = 0;
+static int sdl_fullscreen_wanted = 1;  /* default: fullscreen unless BUILD_WINDOWED */
+
+void setvideofullscreen(int on)
+{
+    sdl_fullscreen_wanted = (on != 0);
+    sdl_fullscreen = sdl_fullscreen_wanted && (getenv(BUILD_WINDOWED) == NULL);
+} /* setvideofullscreen */
+
+
+int getvideofullscreen(void)
+{
+    return sdl_fullscreen;
+} /* getvideofullscreen */
 static int32_t mouse_x = 0;
 static int32_t mouse_y = 0;
 static int32_t mouse_relative_x = 0;
@@ -1586,7 +1599,7 @@ void _platform_init(int argc, char **argv, const char *title, const char *icon)
     else
         mouse_grabbed = 0;
 
-    sdl_fullscreen = (getenv(BUILD_WINDOWED) == NULL);
+    sdl_fullscreen = sdl_fullscreen_wanted && (getenv(BUILD_WINDOWED) == NULL);
 
     set_sdl_renderer();
 

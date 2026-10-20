@@ -72,6 +72,49 @@ static int gl_fallback(int argc, char **argv)
 }
 
 /*
+ * setvideofullscreen picks fullscreen for the next mode set; BUILD_WINDOWED
+ *  still wins over it.
+ */
+static int fullscreen_setter(int argc, char **argv)
+{
+#if !PLATFORM_WIN32
+    unsetenv(BUILD_WINDOWED);
+    setvideofullscreen(1);
+    if (getvideofullscreen() != 1)
+    {
+        fprintf(stderr, "FAIL: setvideofullscreen(1) gave %d\n", getvideofullscreen());
+        return 1;
+    }
+
+    setvideofullscreen(0);
+    _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
+    if (_setgamemode(1, 320, 200) != 0)
+    {
+        fprintf(stderr, "FAIL: _setgamemode(320x200)\n");
+        return 1;
+    }
+
+    if (getvideofullscreen() != 0)
+    {
+        fprintf(stderr, "FAIL: windowed request, fullscreen=%d\n", getvideofullscreen());
+        return 1;
+    }
+
+    setenv(BUILD_WINDOWED, "1", 1);
+    setvideofullscreen(1);
+    if (getvideofullscreen() != 0)
+    {
+        fprintf(stderr, "FAIL: BUILD_WINDOWED did not win, fullscreen=%d\n", getvideofullscreen());
+        return 1;
+    }
+
+    _uninitengine();
+#endif
+    printf("PASS: fullscreen_setter\n");
+    return 0;
+}
+
+/*
  * Outside renderer 3, setpalettefade blends the last setbrightness palette
  *  toward a colour exactly as the game's palto does, then applies the
  *  brightness table.
@@ -322,6 +365,8 @@ int main(int argc, char **argv)
 
     if ((argc > 1) && (strcmp(argv[1], "gl_fallback") == 0))
         return gl_fallback(argc, argv);
+    if ((argc > 1) && (strcmp(argv[1], "fullscreen_setter") == 0))
+        return fullscreen_setter(argc, argv);
     if ((argc > 1) && (strcmp(argv[1], "palette_fade") == 0))
         return palette_fade(argc, argv);
     if ((argc > 1) && (strcmp(argv[1], "screencapture_formats") == 0))
