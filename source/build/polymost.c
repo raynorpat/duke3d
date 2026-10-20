@@ -386,7 +386,8 @@ static void uploadtexture(int32_t doalloc, int32_t xsiz, int32_t ysiz, int32_t i
 	x2 = xsiz; y2 = ysiz;
 	for(j=1;(x2 > 1) || (y2 > 1);j++)
 	{
-		x3 = ((x2+1)>>1); y3 = ((y2+1)>>1);
+		//x3 = ((x2+1)>>1); y3 = ((y2+1)>>1);
+		x3 = max(1, x2 >> 1); y3 = max(1, y2 >> 1);		// this came from the GL_ARB_texture_non_power_of_two spec
 		for(y=0;y<y3;y++)
 		{
 			wpptr = &pic[y*x3]; rpptr = &pic[(y<<1)*x2];
@@ -431,8 +432,16 @@ void gloadtile (int32_t dapic, int32_t dapal, int32_t dameth, int32_t gltexind, 
 	if (doalloc) glGenTextures(1,&glpic[gltexind]);  //# of textures (make OpenGL allocate structure)
 	glBindTexture(GL_TEXTURE_2D,glpic[gltexind]);
 
-	tsizx = tilesizx[dapic]; for(xsiz=1;xsiz<tsizx;xsiz+=xsiz);
-	tsizy = tilesizy[dapic]; for(ysiz=1;ysiz<tsizy;ysiz+=ysiz);
+	tsizx = tilesizx[dapic];
+	tsizy = tilesizy[dapic];
+	if (!glinfo.texnpot) {
+		for(xsiz=1;xsiz<tsizx;xsiz+=xsiz);
+		for(ysiz=1;ysiz<tsizy;ysiz+=ysiz);
+	} else {
+		xsiz = max(1,tsizx);
+		ysiz = max(1,tsizy);
+	}
+
 	pic = (coltype *)malloc(xsiz*ysiz*sizeof(coltype));
 	if (!pic) return;
 
@@ -610,8 +619,13 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 
 		hackscx = 1.0; hackscy = 1.0;
 
-		for(xx=1;xx<tsizx;xx+=xx); ox2 = (double)1.0/(double)xx;
-		for(yy=1;yy<tsizy;yy+=yy); oy2 = (double)1.0/(double)yy;
+		if (!glinfo.texnpot) {
+			for(xx=1;xx<tsizx;xx+=xx); ox2 = (double)1.0/(double)xx;
+			for(yy=1;yy<tsizy;yy+=yy); oy2 = (double)1.0/(double)yy;
+		} else {
+			xx = max(1,tsizx); ox2 = (double)1.0/(double)xx;
+			yy = max(1,tsizy); oy2 = (double)1.0/(double)yy;
+		}
 
 		if (!(method&3)) glDisable(GL_BLEND); else glEnable(GL_BLEND);
 
@@ -2966,8 +2980,13 @@ int32_t polymost_drawtilescreen (int32_t tilex, int32_t tiley, int32_t wallnum, 
 
 	if ((rendmode != 3) || (qsetmode != 200)) return(-1);
 
-	i = (1<<(picsiz[wallnum]&15)); if (i < tilesizx[wallnum]) i += i; xdimepad = (float)i;
-	i = (1<<(picsiz[wallnum]>>4)); if (i < tilesizy[wallnum]) i += i; ydimepad = (float)i;
+	if (!glinfo.texnpot) {
+		i = (1<<(picsiz[wallnum]&15)); if (i < tilesizx[wallnum]) i += i; xdimepad = (float)i;
+		i = (1<<(picsiz[wallnum]>>4)); if (i < tilesizy[wallnum]) i += i; ydimepad = (float)i;
+	} else {
+		xdimepad = (float)max(1,tilesizx[wallnum]);
+		ydimepad = (float)max(1,tilesizy[wallnum]);
+	}
 	xdime = (float)tilesizx[wallnum]; xdimepad = xdime/xdimepad;
 	ydime = (float)tilesizy[wallnum]; ydimepad = ydime/ydimepad;
 

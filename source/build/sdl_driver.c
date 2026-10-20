@@ -816,9 +816,10 @@ int setgamemode_gl(char davidoption)
     glinfo.clamptoedge = (gl_has_extension(exts, "GL_EXT_texture_edge_clamp") ||
                           gl_has_extension(exts, "GL_SGIS_texture_edge_clamp"));
     glinfo.texcompr = gl_has_extension(exts, "GL_ARB_texture_compression");
-    sdldebug("OpenGL %s on %s: bgra %d, clamptoedge %d, texcompr %d, maxanisotropy %g.",
+    glinfo.texnpot = gl_has_extension(exts, "GL_ARB_texture_non_power_of_two");
+    sdldebug("OpenGL %s on %s: bgra %d, clamptoedge %d, texcompr %d, texnpot %d, maxanisotropy %g.",
              (const char *) glGetString(GL_VERSION), (const char *) glGetString(GL_RENDERER),
-             glinfo.bgra, glinfo.clamptoedge, glinfo.texcompr, glinfo.maxanisotropy);
+             glinfo.bgra, glinfo.clamptoedge, glinfo.texcompr, glinfo.texnpot, glinfo.maxanisotropy);
 
     bpp = 32;
     numpages = 2;  /* as JFBuild: permanent rotatesprites go on both pages. */

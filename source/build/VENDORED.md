@@ -152,7 +152,7 @@ unchanged.
 - OpenGL comes from `"SDL_opengl.h"` (`GL_SILENCE_DEPRECATION` on macOS).
 - `rendmode` is defined in `engine.c`, not here.
 - `glinfo` (`struct glinfo_t { float maxanisotropy; char bgra, clamptoedge,
-  texcompr; }`, which upstream got from `baselayer.h`) is declared in
+  texcompr, texnpot; }`, which upstream got from `baselayer.h`) is declared in
   `build.h` under `USE_OPENGL`, not here. `sdl_driver.c` defines it, filled in
   by `setgamemode_gl`, and `nofog` (which upstream declares but no JFBuild
   file of that commit defines), set to 0.
@@ -178,6 +178,18 @@ Ported from later JFBuild commits, retyped as above:
 - `fd5d5b6a1c90fc3d582818412742d9f6dccb1d31`: `drawpoly` skips its
   non-power-of-two wall split when the texture is 0 wide (`1.0/tsizx` is
   infinite), which looped over every `int`.
+- `368fbfa25503f9c21c366ee27ee08d556c1bf936`: non-power-of-two textures.
+  `setgamemode_gl` sets `glinfo.texnpot` from
+  `GL_ARB_texture_non_power_of_two` (and logs it). With it, `gloadtile`
+  uploads a tile at its own size instead of padding it to a power of two,
+  and `drawpoly`'s `xx`/`yy` and `polymost_drawtilescreen`'s pad use that
+  size, so `drawpoly`'s non-power-of-two wall split no longer runs. Mipmap
+  levels halve as `max(1, x>>1)`, which is what `(x+1)>>1` gave for every
+  power-of-two size. Change from upstream: each of those sizes is at least
+  1, so a 0-sized tile gets a 1x1 texture (upstream `malloc`ed 0 bytes and
+  wrote `pic[0]`) and finite texture coordinates. The commit's `build.c`
+  part (the editor's file list, `OSD_SetLogFile`) and its hightile
+  (`gloadtile_hi`) part aren't taken.
 
 ## Engine hooks
 

@@ -230,7 +230,7 @@ extern unsigned char palfadedelta;
 extern int32_t bpp;
 #ifdef USE_OPENGL
 	/* What the OpenGL driver supports, filled in by setgamemode_gl. */
-struct glinfo_t { float maxanisotropy; char bgra, clamptoedge, texcompr; };
+struct glinfo_t { float maxanisotropy; char bgra, clamptoedge, texcompr, texnpot; };
 extern struct glinfo_t glinfo;
 #endif
 #endif
