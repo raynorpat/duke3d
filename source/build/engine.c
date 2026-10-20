@@ -8152,6 +8152,10 @@ static void fillpolygon(int32_t npoints)
 	intptr_t p;
 	short *ptr, *ptr2;
 
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3) { polymost_fillpolygon(npoints); return; }
+#endif
+
 	miny = 0x7fffffff; maxy = 0x80000000;
 	for(z=npoints-1;z>=0;z--)
 		{ y = ry1[z]; miny = min(miny,y); maxy = max(maxy,y); }
@@ -8463,10 +8467,6 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 	int32_t bakgxvect, bakgyvect, sortnum, gap, npoints;
 	int32_t xvect, yvect, xvect2, yvect2, daslope;
 
-#if defined(POLYMOST) && defined(USE_OPENGL)
-	if (rendmode == 3) return;
-#endif
-
 	beforedrawrooms = 0;
 	totalarea += (windowx2+1-windowx1)*(windowy2+1-windowy1);
 
@@ -8488,6 +8488,30 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 		{
 			npoints = 0; i = 0;
 			startwall = sec->wallptr;
+#if defined(POLYMOST) && defined(USE_OPENGL)
+			if (rendmode == 3)
+			{
+				j = startwall; l = 0;
+				for(w=sec->wallnum,wal=&wall[startwall];w>0;w--,wal++,j++)
+				{
+					k = lastwall(j);
+					if ((k > j) && (npoints > 0)) { xb1[npoints-1] = l; l = npoints; } //overwrite point2
+						//wall[k].x wal->x wall[wal->point2].x
+						//wall[k].y wal->y wall[wal->point2].y
+					if (!dmulscale1(wal->x-wall[k].x,wall[wal->point2].y-wal->y,-(wal->y-wall[k].y),wall[wal->point2].x-wal->x)) continue;
+					ox = wal->x - dax; oy = wal->y - day;
+					x = dmulscale16(ox,xvect,-oy,yvect) + (xdim<<11);
+					y = dmulscale16(oy,xvect2,ox,yvect2) + (ydim<<11);
+					i |= getclipmask(x-cx1,cx2-x,y-cy1,cy2-y);
+					rx1[npoints] = x;
+					ry1[npoints] = y;
+					xb1[npoints] = npoints+1;
+					npoints++;
+				}
+				if (npoints > 0) xb1[npoints-1] = l; //overwrite point2
+			}
+			else
+#endif
 			for(w=sec->wallnum,wal=&wall[startwall];w>0;w--,wal++)
 			{
 				ox = wal->x - dax; oy = wal->y - day;
@@ -8582,6 +8606,9 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 			globalposx = (globalposx<<(20+globalxshift))+(((int32_t)sec->floorxpanning)<<24);
 			globalposy = (globalposy<<(20+globalyshift))-(((int32_t)sec->floorypanning)<<24);
 
+#if defined(POLYMOST) && defined(USE_OPENGL)
+			if (rendmode == 3) globalpal = sec->floorpal;
+#endif
 			fillpolygon(npoints);
 		}
 
@@ -8707,6 +8734,9 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 			asm1 = (globaly1<<2); globalx1 <<= 2; globalposx <<= (20+2);
 			asm2 = (globalx2<<2); globaly2 <<= 2; globalposy <<= (20+2);
 
+#if defined(POLYMOST) && defined(USE_OPENGL)
+			if (rendmode == 3) globalpal = spr->pal;
+#endif
 			fillpolygon(npoints);
 		}
 	}

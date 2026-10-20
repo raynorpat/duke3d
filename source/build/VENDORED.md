@@ -208,6 +208,32 @@ Ported from later JFBuild commits, retyped as above:
   which zeroes the alpha-test cutoff for invalid textures (E2L7's urinals
   behind the mirror), as our `drawpoly` has no alpha test; its
   `winlayer.c` part.
+- `ccf7aa8d8019a249a4592d7dd9b950afa1cbbd3c`: the GL map view.
+  `drawmapview` no longer returns at once in renderer 3, and `fillpolygon`
+  hands over to the new `polymost_fillpolygon`, which turns the classic
+  span-filler's `asm1`/`asm2`/`globalx1`/`globaly2`/`globalposx`/`globalposy`
+  into screen-space texture gradients and draws the polygon with Ken's
+  `tessectrap`/`drawtrap` trapezoids. Under `rendmode == 3` only,
+  `drawmapview` takes a sector's walls with upstream's loop: it skips
+  points collinear with their neighbours (`lastwall`) and relinks `point2`
+  over each loop; renderer 0 keeps its loop. `polymost_dorotatesprite`
+  pushes and pops the projection matrix around its own. Changes from
+  upstream: `polymost_fillpolygon` converts `rx1`/`ry1` into its own float
+  arrays (upstream overwrote them in place through a cast); it binds
+  `glpic[gltexcache(...)]` (our cache returns an index); `drawmapview` sets
+  `globalpal` to the floor's `floorpal`, or the sprite's `pal`, before each
+  fill in renderer 3 (upstream used whatever was left in it); the alpha test
+  gets `glAlphaFunc(GL_GREATER,0.32f)`, as nothing else here sets one, and
+  is turned off after the draw so the next 3D frame doesn't inherit it;
+  `_glframedrawn()` is called on every fill; the projection pop is under
+  `rendmode == 3` and goes back to `GL_MODELVIEW`. With non-power-of-two
+  textures, `polymost_fillpolygon` scales u and v by the power-of-two size
+  `gloadtile` would have padded to over the tile's size, after taking whole
+  repeats off at the polygon's middle (classic fixed point drops them,
+  which only a power-of-two texture hides), so a tile that isn't a power of
+  two draws as it does without them. Not taken: the `glpolygonmode` debug
+  variable, the `clearview`/`clearallviews` colour fix (we already divide
+  by 255), and the `winlayer.c` part.
 
 ## Engine hooks
 
@@ -270,7 +296,8 @@ Ported from later JFBuild commits, retyped as above:
   `qsetmode == 200`): `clearview` and `clearallviews` clear the whole back
   buffer to the palette colour; `plotpixel`, `drawline256` and
   `printext256`/`printext256_noupdate` (through `__printext256`) draw GL
-  points and lines; `getpixel` returns 0; `drawmapview` returns at once.
+  points and lines; `getpixel` returns 0. (`drawmapview` returned at once
+  here until the ccf7aa8 port below.)
   Changes from upstream: `glClearColor` gets the colour over 255 (upstream
   passes 0-255, which clamps to white); points are placed on pixel centres
   (upstream uses integer corners, plus a "+2 hack" row offset for text).
