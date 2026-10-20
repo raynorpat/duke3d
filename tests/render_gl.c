@@ -766,7 +766,9 @@ int main(int argc, char **argv)
     SDL_GetWindowSize(SDL_GL_GetCurrentWindow(), &winw, &winh);
     printf("1680x%d mode: window %dx%d (display usable %dx%d)\n", askh, winw, winh, usable.w, usable.h);
     uninitengine();
-    if ((winh != askh) || ((winw != 1680) && (usable.w >= 1680 + 64)))
+    /* A window manager may move a size by a few pixels; the unfixed window
+     * is at least 96 taller (1200, or the display's height). */
+    if ((abs(winh - askh) > 16) || ((abs(winw - 1680) > 16) && (usable.w >= 1680 + 64)))
         { fprintf(stderr, "FAIL: the window isn't the size asked for\n"); return 1; }
     printf("PASS: render_gl\n");
     return 0;
