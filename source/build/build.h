@@ -218,6 +218,16 @@ EXTERN char automapping;
 EXTERN char gotpic[(MAXTILES+7)>>3];
 EXTERN char gotsector[(MAXSECTORS+7)>>3];
 
+#ifdef POLYMOST
+	/* Polymost (polymost.c): rendmode 0 is the classic renderer. curpalette
+	 * is the current hardware palette as 8-bit RGB. */
+typedef struct { unsigned char r, g, b, f; } palette_t;
+extern int32_t rendmode;
+extern palette_t curpalette[256];
+extern palette_t palfadergb;
+extern unsigned char palfadedelta;
+#endif
+
 /*************************************************************************
 POSITION VARIABLES:
 

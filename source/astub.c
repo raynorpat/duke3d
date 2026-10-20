@@ -2270,35 +2270,35 @@ ActorMem(int i)
     return(total);
 }
 
-int curpalette=0;
+int curpalettenum=0;
 
 SetBOSS1Palette()
 {int x;
- if(curpalette==3) return;
- curpalette=3;
+ if(curpalettenum==3) return;
+ curpalettenum=3;
  kensetpalette(BOSS1palette);
 }
 
 
 SetSLIMEPalette()
 {int x;
- if(curpalette==2) return;
- curpalette=2;
+ if(curpalettenum==2) return;
+ curpalettenum=2;
  kensetpalette(SLIMEpalette);
 }
 
 SetWATERPalette()
 {int x;
- if(curpalette==1) return;
- curpalette=1;
+ if(curpalettenum==1) return;
+ curpalettenum=1;
  kensetpalette(WATERpalette);
 }
 
 
 SetGAMEPalette()
 {int x;
- if(curpalette==0) return;
- curpalette=0;
+ if(curpalettenum==0) return;
+ curpalettenum=0;
  kensetpalette(GAMEpalette);
 }
 

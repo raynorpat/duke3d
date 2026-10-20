@@ -163,8 +163,6 @@ uint32_t getticks();
 void drawline16(int32_t XStart, int32_t YStart, int32_t XEnd, int32_t YEnd, char Color);
 void setcolor16(int i1);
 
-int using_opengl(void);
-
 #endif  /* _INCLUDE_DISPLAY_H_ */
 
 /* end of display.h ... */

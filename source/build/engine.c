@@ -30,10 +30,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#if (defined USE_OPENGL)
-#include "buildgl.h"
-#endif
-
 #include "pragmas.h"
 
 #include "platform.h"
@@ -285,6 +281,10 @@ static int32_t numtilefiles, artfil = -1, artfilnum, artfilplc;
 
 static char inpreparemirror = 0;
 static int32_t mirrorsx1, mirrorsy1, mirrorsx2, mirrorsy2;
+
+#ifdef POLYMOST
+static int32_t hitallsprites = 0;
+#endif
 
 int32_t totalclocklock;
 
@@ -2628,6 +2628,17 @@ static int bunchfront(int32_t b1, int32_t b2)
 	for(i=b1f;xb2[i]<x1b2;i=p2[i]);
 	return(wallfront(i,b2f));
 }
+
+
+#ifdef POLYMOST
+int32_t rendmode = 0;
+palette_t curpalette[256], palfadergb = { 0,0,0,0 };
+unsigned char palfadedelta = 0;
+
+#define begindrawing()
+#define enddrawing()
+#include "polymost.c"
+#endif
 
 
 void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
@@ -6325,6 +6336,9 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 		{
 			spr = &sprite[z];
 			cstat = spr->cstat;
+#ifdef POLYMOST
+			if (!hitallsprites)
+#endif
 			if ((cstat&dasprclipmask) == 0) continue;
 
 			x1 = spr->x; y1 = spr->y; z1 = spr->z;

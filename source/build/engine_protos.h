@@ -118,7 +118,6 @@ extern int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf);
 extern int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf);
 
 /* sdl_driver.c */
-extern int using_opengl(void);
 extern void _handle_events(void);
 extern unsigned char _readlastkeyhit(void);
 extern int mprotect_align(const void *addr, size_t len, int prot);
@@ -181,6 +180,15 @@ extern void genericmultifunction(int32_t other, char *bufptr, int32_t messleng, 
 extern int setgotpic(int32_t i1);
 extern int32_t getclipmask(int i1, int i2, int i3, int i4);
 extern int wallfront(int32_t l1, int32_t l2);
+#ifdef POLYMOST
+extern void polymost_drawrooms(void);
+extern void polymost_drawmaskwall(int32_t damaskwallcnt);
+extern void polymost_drawsprite(int32_t snum);
+extern void polymost_dorotatesprite(int32_t sx, int32_t sy, int32_t z, short a, short picnum, signed char dashade, unsigned char dapalnum, unsigned char dastat, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2);
+extern void polymost_glreset(void);
+extern void gltexinvalidate(int32_t dapicnum, int32_t dapalnum, int32_t dameth);
+extern void gltexinvalidateall(void);
+#endif
 extern void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz, short daang, int32_t dahoriz, short dacursectnum);
 extern int loadboard(char *filename, int32_t *daposx, int32_t *daposy, int32_t *daposz, short *daang, short *dacursectnum);
 extern int saveboard(char *filename, int32_t *daposx, int32_t *daposy, int32_t *daposz, short *daang, short *dacursectnum);

@@ -99,3 +99,75 @@ BUILDLIC.TXT LICENSE.md
   texture position. `engine.c`'s rotated-sprite calls use JFBuild's simpler
   `spritevline` arguments. `mhlineskipmodify`, `thlineskipmodify` and
   `is_vmware_running` had no callers and are gone.
+- `engine.c`, `sdl_driver.c`, `display.h`, `engine_protos.h`: icculus's dead
+  OpenGL code is removed: every `USE_OPENGL` block (which included the missing
+  `buildgl.h` and called `dgl*` functions and `opengl_load_library`, none of
+  which exist, and didn't compile against SDL2), `sgldebug`, the
+  `RENDERER_OPENGL3D` renderer with its name and `opengl3d` environment string,
+  and `using_opengl()`. Polymost's OpenGL path replaces it (see below).
+- `engine.c`, `build.h`, `engine_protos.h`, `sdl_driver.c`: hooks for Polymost
+  (see below), all under `POLYMOST`/`USE_OPENGL`.
+
+# Vendored: JFBuild polymost.c
+
+- Upstream: https://github.com/jonof/jfbuild, `src/polymost.c`
+- Commit: `db5ed47a8b327754afb9b2ecc8c755f04e9e9f2c` (2004-09-15), the first
+  import of Ken Silverman's Polymost renderers
+- License: Ken Silverman's Build license (`BUILDLIC.TXT`), as for the rest of
+  `source/build/`. The file's header is kept.
+
+`engine.c` `#include`s it, as JFBuild's does, when `POLYMOST` is defined (the
+`DUKE3D_POLYMOST` CMake option, on by default, which also defines `USE_OPENGL`
+and links OpenGL). The first commit that adds it holds the upstream file
+unchanged.
+
+## Local changes
+
+- `long` → `int32_t`, `unsigned long` → `uint32_t` via `tools/retype_long.py`
+  (which adds `#include <stdint.h>`).
+- 64-bit addresses:
+  - the software renderer's z-buffer `zbufmem` is an `int32_t *` holding the
+    `realloc` result, indexed by the pixel's offset into the frame
+    (`vidp-(char *)frameplace`). Upstream kept the address in a `long` and
+    indexed a biased pointer (`zbufoff = zbufmem-(frameplace<<2)`) with
+    `(long)vidp`. `zbufoff` is gone.
+  - `polymost_dorotatesprite` saves `frameoffset` in an `intptr_t`.
+- `ftol`/`dtol`: only the C fallback is kept (the MSVC, Watcom and GCC x87
+  versions are gone). It truncates where x87 `fistp` rounds.
+- Removed, as out of scope (hightile, kplib, md2, defs, OSD):
+  - `#include "md2sprite.c"`, `md2tims`, `usemodels` and the `md2draw` calls
+    in `polymost_drawsprite`; the `models[]` loop in `gltexapplyprops`; the
+    `clearskins()` calls
+  - the hightile path of `gloadtile` (only the palette path is left) and its
+    `effect` parameter; `gltexcache` keys on the palette alone (no
+    `hictinting`, no `darealpalnum` parameter); `drawpoly` has no
+    `hicfindsubst`/`hicreplc` lookups or tinting, and `hackscx`/`hackscy` are
+    1.0; `polymost_precache` caches the tile with the palette it is given
+  - the OSD console commands (`gltexturemode`, `gltextureanisotropy`) and
+    `polymost_initosdfuncs`; a `DEBUGGINGAIDS` `OSD_Printf` and a commented-out
+    one
+  - the `USE_PMDBGKEYS` debug keys
+- Classic-look defaults: `gltexfiltermode = 0` (`GL_NEAREST`),
+  `glusetexcompr = 0`. `glanisotropy` stays 1.
+- OpenGL comes from `"SDL_opengl.h"` (`GL_SILENCE_DEPRECATION` on macOS).
+- `rendmode` is defined in `engine.c`, not here.
+- `glinfo` is declared here as `extern struct glinfo_t { float maxanisotropy;
+  char bgra, clamptoedge, texcompr; }` (upstream got it from `baselayer.h`).
+  `sdl_driver.c` defines it, zeroed, and `nofog` (which upstream declares but
+  no JFBuild file of that commit defines), set to 0.
+- The forward declaration of `wallfront` is gone: ours is defined, non-static,
+  before the `#include`.
+- `polymost_dorotatesprite` takes `unsigned char dapalnum, dastat`, as our
+  `dorotatesprite` does.
+
+## Engine hooks
+
+- `engine.c`: `#include "polymost.c"` after `wallfront`/`bunchfront`, so the
+  statics it uses are defined; `rendmode = 0`, `curpalette[]`, `palfadergb`,
+  `palfadedelta` and no-op `begindrawing()`/`enddrawing()` macros before it;
+  `hitallsprites`, with `hitscan` skipping its sprite clip-mask test when it's
+  set (as JFBuild does).
+- `build.h`: `palette_t`, `rendmode`, `curpalette`, `palfadergb`,
+  `palfadedelta`. `engine_protos.h`: the Polymost entry points.
+- `source/astub.c` (the editor, not vendored) had its own global `curpalette`;
+  it's renamed `curpalettenum`.
