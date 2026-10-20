@@ -121,6 +121,42 @@ int main(void)
 #endif
     check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
 
+#if PLATFORM_UNIX
+    /* duke3d.cfg values out of range, or in capitals, are read and written
+       back as the game uses them. (Elsewhere the setup file is picked from a
+       list of the folder's .cfg files.) Last, as it loads a whole setup. */
+    {
+        FILE *f = fopen("duke3d.cfg", "w");
+        char text[16384];
+        size_t n;
+
+        fputs("[Screen Setup]\nRenderer = 7\nGLTextureMipLevel = 99\n"
+              "ScreenshotFormat = \"JPG\"\n", f);
+        fclose(f);
+        CONFIG_GetSetupFilename();
+        CONFIG_ReadSetup();
+        check("cfg Renderer 7", RendererSetting, 3);
+        check("cfg GLTextureMipLevel 99", GLTextureMipLevel, 15);
+        check_str("cfg ScreenshotFormat JPG", ScreenshotFormat, "jpg");
+        CONFIG_WriteSetup();
+        f = fopen("duke3d.cfg", "r");
+        n = fread(text, 1, sizeof(text) - 1, f);
+        fclose(f);
+        text[n] = 0;
+        check("cfg writes Renderer 3", strstr(text, "Renderer = 3") != NULL, 1);
+        check("cfg writes GLTextureMipLevel 15", strstr(text, "GLTextureMipLevel = 15") != NULL, 1);
+        check("cfg writes ScreenshotFormat jpg", strstr(text, "ScreenshotFormat = \"jpg\"") != NULL, 1);
+
+        f = fopen("duke3d.cfg", "w");
+        fputs("[Screen Setup]\nRenderer = -2\nGLTextureMipLevel = -3\n", f);
+        fclose(f);
+        CONFIG_ReadSetup();
+        check("cfg Renderer -2", RendererSetting, 0);
+        check("cfg GLTextureMipLevel -3", GLTextureMipLevel, 0);
+        remove("duke3d.cfg");
+    }
+#endif
+
     if (failures) {
         printf("%d failures\n", failures);
         return 1;

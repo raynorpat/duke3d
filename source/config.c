@@ -695,11 +695,17 @@ void CONFIG_ReadSetup( void )
    SCRIPT_GetNumber( scripthandle, "Screen Setup", "ScreenHeight",&ScreenHeight);
    SCRIPT_GetNumber( scripthandle, "Screen Setup", "ScreenMode",&ScreenMode);
    SCRIPT_GetNumber( scripthandle, "Screen Setup", "Renderer",&RendererSetting);
+   RendererSetting = clamprenderer(RendererSetting);
    SCRIPT_GetNumber( scripthandle, "Screen Setup", "GLTextureMipLevel",&GLTextureMipLevel);
+   // The engine drops at most log2(GL_MAX_TEXTURE_SIZE)-1 levels (15 for the
+   // largest, 65536) and lowers this to its own GPU's limit when it uploads.
+   GLTextureMipLevel = max(0,min(15,GLTextureMipLevel));
    temp[0] = 0;
    SCRIPT_GetString( scripthandle, "Screen Setup", "ScreenshotFormat",temp);
-   if (stricmp(temp, "jpg") == 0 || stricmp(temp, "bmp") == 0)
-      strcpy(ScreenshotFormat, temp);
+   if (stricmp(temp, "jpg") == 0)
+      strcpy(ScreenshotFormat, "jpg");
+   else if (stricmp(temp, "bmp") == 0)
+      strcpy(ScreenshotFormat, "bmp");
    else
       strcpy(ScreenshotFormat, "png");
    SCRIPT_GetNumber( scripthandle, "Screen Setup", "ScreenGamma",&ud.brightness);
