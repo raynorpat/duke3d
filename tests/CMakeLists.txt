@@ -110,6 +110,9 @@ endif()
 add_executable(render_e1l1 render_e1l1.c)
 target_link_libraries(render_e1l1 PRIVATE buildengine duke3d::SDL2main)
 
+add_executable(render_classic2d render_classic2d.c)
+target_link_libraries(render_classic2d PRIVATE buildengine duke3d::SDL2main)
+
 set(DUKE3D_GRP "" CACHE FILEPATH "DUKE3D.GRP for tests that need game data")
 set(DUKE3D_E1L1_CHECKSUM "e0517697" CACHE STRING
     "Expected render_e1l1 frame checksum (hex); empty just prints it")
@@ -119,6 +122,19 @@ set(DUKE3D_E1L1_CHECKSUM "e0517697" CACHE STRING
 # other platforms and compilers may round differently.
 set(DUKE3D_E1L1_POLYMOST_CHECKSUM "" CACHE STRING
     "Expected render_e1l1_polymost (renderer 2) frame checksum (hex); empty just prints it")
+# render_classic2d's HUD and map view checksums (hex) for the 1.3D GRP;
+# empty just prints them. They are the same in 1.3D and 1.5 builds.
+foreach(_pin "320x200;9f03fd16;763b8c56" "640x400;c6b6b632;7282abe5"
+             "640x480;92082500;dfe0efbe" "1280x1024;43229c16;441cd127"
+             "1920x1080;;")
+  list(GET _pin 0 _size)
+  list(GET _pin 1 _hud)
+  list(GET _pin 2 _map)
+  set(DUKE3D_CLASSIC2D_${_size}_HUD "${_hud}" CACHE STRING
+      "Expected render_classic2d_${_size} HUD checksum (hex); empty just prints it")
+  set(DUKE3D_CLASSIC2D_${_size}_MAP "${_map}" CACHE STRING
+      "Expected render_classic2d_${_size} map view checksum (hex); empty just prints it")
+endforeach()
 if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
   add_test(NAME render_e1l1
     COMMAND render_e1l1 "${DUKE3D_GRP}"
@@ -127,6 +143,20 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
   set_tests_properties(render_e1l1 PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
     TIMEOUT 30)
+
+  # Classic renderer HUD rotatesprites and textured map view at several
+  # 8-bit modes, pinned before the widescreen 2D ports. 1920x1080 only
+  # prints: the 8-bit modes stop at 1600x1200.
+  foreach(_size 320x200 640x400 640x480 1280x1024 1920x1080)
+    string(REPLACE "x" ";" _wh "${_size}")
+    add_test(NAME render_classic2d_${_size}
+      COMMAND render_classic2d "${DUKE3D_GRP}"
+              "${CMAKE_CURRENT_BINARY_DIR}/render_classic2d_${_size}" ${_wh}
+              "${DUKE3D_CLASSIC2D_${_size}_HUD}" "${DUKE3D_CLASSIC2D_${_size}_MAP}")
+    set_tests_properties(render_classic2d_${_size} PROPERTIES
+      ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+      TIMEOUT 30)
+  endforeach()
 
   # The same view through Polymost: renderer 2 (software) and 1 (solid
   # colour). Polymost is floating point, so the checksum may differ by
