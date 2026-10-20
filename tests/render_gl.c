@@ -38,6 +38,11 @@
  *   <dir>/cmp_<view>_<r0|immediate|vbo|shader>.bmp
  *                      E1L1 viewpoints at horiz 100, 640x480, in renderer 0
  *                      and in renderer 3 on the immediate, vbo and shader paths
+ *   <dir>/shframe_<hud|water|fade|camera>_<shader|r0>.bmp
+ *                      the start view with the HUD's gun, the status bar,
+ *                      menu letters, text, a line and a pixel (in the water
+ *                      palette; faded to red; with a camera's picture over
+ *                      it) on the shader path and in renderer 0, the same size
  *  It fails on a GL error, a failed capture, a fade that doesn't redden or
  *  a screenshot without it, a still screen that doesn't brighten as it
  *  fades in, a clearview outside the view window, a miplevel 1 view
@@ -57,11 +62,18 @@
  *  vertices its own way, or renderer 3 further from renderer 0 than pinned
  *  (each viewpoint's mean difference, and the mean of two regions that
  *  renderer 0 darkens by distance), or a shader path (GL 2.1: palette
- *  indices) 3D view with a colour that isn't the palette's, whose frames
- *  change when every draw is flushed, whose 2D frames differ from immediate
+ *  indices) frame with a colour that isn't the palette's, whose frames
+ *  change when every draw is flushed, whose 2D frames are far from immediate
  *  mode's, whose view smaller than the screen isn't where vbo draws it or
  *  loses the border, whose frame doesn't fade or capture, or that doesn't fall back to
- *  vbo, drawing as vbo does, when its shader or framebuffer fails.
+ *  vbo, drawing as vbo does, when its shader or framebuffer fails; or whose
+ *  frames with the HUD, status bar, menu letters, text, the water palette,
+ *  a fade or a camera are further than 8 from renderer 0's or not all the
+ *  palette's colours, whose screenshots aren't the screen, that makes RGB
+ *  textures or retextures (palette changes, fades, glsetgamepalette,
+ *  precaching), whose holes in the level don't show what was cleared to,
+ *  whose non-masked tiles don't draw index 255, or whose frame, shown or
+ *  being drawn, a window resize loses.
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
  *
@@ -90,6 +102,8 @@ extern SDL_Surface *surface;  /* sdl_driver.c: the 8-bit frame */
 #define THREEDEE 2498  /* names.h */
 #define FIRSTGUN 2524  /* names.h: the pistol */
 #define VICTORY1 3260  /* names.h: E1's ending screen */
+#define BOTTOMSTATUSBAR 2462  /* names.h */
+#define STARTALPHANUM 2822  /* names.h: the menu font, from '!' */
 #define LITFLOOR 966  /* a poster: the E1L1 wall tile with the most lit texels */
 #define FIRE 2271  /* names.h */
 #define FIRE2 2311  /* names.h */
@@ -100,6 +114,7 @@ extern SDL_Surface *surface;  /* sdl_driver.c: the 8-bit frame */
 int32_t polymost_drawtilescreen(int32_t tilex, int32_t tiley, int32_t wallnum, int32_t dimen);
 void polymost_glreset(void);
 void gltexinvalidateall(void);
+void getfadedpalette(palette_t *pal);  /* engine.c: the palette the shader path shows */
 
 /* lookup.dat's water palette, after its palookups. */
 static unsigned char waterpal[768];
@@ -368,6 +383,10 @@ static void path_shots(unsigned char **shots, int32_t x, int32_t y, int32_t z, s
 
     clearview(0);
     rotatesprite(0, 50<<16, 65536, 0, VICTORY1, 0, 0, 2+8+16+64+128, 0, 0, xdim-1, ydim-1);
+    printext256(16, 16, 31, 0, "RENDERER 3 PRINTEXT256", 0);
+    printext256(16, 32, 159, -1, "small font", 1);
+    drawline256(16<<12, 48<<12, (xdim-16)<<12, (ydim-16)<<12, 31);
+    plotpixel(8, 8, 31);
     nextpage();
     read_front(shots[6]);
 
@@ -603,6 +622,293 @@ static int classic_compare(const char *dir)
     return ok;
 }
 
+/* The frames shader_frames draws in both renderers. */
+#define SHFRAMES 4
+static const char *const shframename[SHFRAMES] = { "hud", "water", "fade", "camera" };
+static unsigned char camerabuf[200 * 320];  /* the camera's tile, as game.c's tilt tile */
+
+/* Draws frame f of shader_frames and shows it: the start view (with a
+ *  camera's picture over it, drawn to a tile in renderer 0 as game.c's
+ *  cameras and tilt are, for "camera"), the HUD's gun, the status bar, menu
+ *  letters shaded and in another pal, and text, a line and a pixel; in the
+ *  water palette for "water", faded to red after it's shown for "fade". */
+static void shader_frame(int f, int32_t x, int32_t y, int32_t z, short a, short sect)
+{
+    int i;
+
+    setbrightness(0, (f == 1) ? waterpal : palette);
+    clearallviews(0);
+    if (f == 3)
+    {
+        waloff[MAXTILES-2] = (intptr_t) camerabuf;
+        setviewtotile(MAXTILES-2, 200, 320);
+        drawrooms(x, y, z, (short) ((a + 1024) & 2047), 100, sect);
+        drawmasks();
+        setviewback();
+    }
+    drawrooms(x, y, z, a, 100, sect);
+    drawmasks();
+    if (f == 3)
+        rotatesprite(160<<16, 80<<16, 32768, 512, MAXTILES-2, 0, 0, 4+2+64, 0, 0, xdim-1, ydim-1);
+    rotatesprite(160<<16, 130<<16, 65536, 0, FIRSTGUN, 0, 0, 2, 0, 0, xdim-1, ydim-1);
+    rotatesprite(0, (200 - tilesizy[BOTTOMSTATUSBAR])<<16, 65536, 0, BOTTOMSTATUSBAR, 4, 0,
+                 2+8+16+64, 0, 0, xdim-1, ydim-1);
+    for (i = 0; i < 4; i++)
+        rotatesprite((40 + i * 16)<<16, 30<<16, 65536, 0, STARTALPHANUM + ("DUKE"[i] - '!'),
+                     (i & 1) ? 16 : 0, (i & 2) ? 2 : 0, 2+8+16, 0, 0, xdim-1, ydim-1);
+    printext256(16, 16, 31, 0, "RENDERER 3 PRINTEXT256", 0);
+    printext256(16, 32, 159, -1, "small font", 1);
+    drawline256(16<<12, 48<<12, (xdim-16)<<12, (ydim-16)<<12, 31);
+    plotpixel(8, 8, 31);
+    nextpage();
+    if (f == 2) setpalettefade(63, 0, 0, 32);
+}
+
+/* Mean absolute difference per channel of a GL frame (gw by gh, bottom-up)
+ *  and a renderer 0 one (cw by ch, top-down), nearest pixel. */
+static double frame_diff(const unsigned char *gl, int gw, int gh, const unsigned char *classic, int cw, int ch)
+{
+    long x, y, i, d = 0;
+    for (y = 0; y < gh; y++)
+        for (x = 0; x < gw; x++)
+            for (i = 0; i < 3; i++)
+                d += abs((int) gl[(y * gw + x) * 3 + i] -
+                         (int) classic[(((gh - 1 - y) * ch / gh) * cw + x * cw / gw) * 3 + i]);
+    return (double) d / ((double) gw * gh * 3);
+}
+
+/* Pixels of a GL frame (n pixels) whose colour isn't one of pal's 256. */
+static long off_colours(const unsigned char *gl, long n, const palette_t *pal)
+{
+    static unsigned char inpal[1 << 21];  /* a bit per RGB colour */
+    long i, m = 0, c;
+
+    memset(inpal, 0, sizeof (inpal));
+    for (i = 0; i < 256; i++)
+    {
+        c = ((long) pal[i].r << 16) | (pal[i].g << 8) | pal[i].b;
+        inpal[c >> 3] |= 1 << (c & 7);
+    }
+    for (i = 0; i < n; i++)
+    {
+        c = ((long) gl[i*3] << 16) | (gl[i*3+1] << 8) | gl[i*3+2];
+        if (!(inpal[c >> 3] & (1 << (c & 7)))) m++;
+    }
+    return m;
+}
+
+/* 1 if the 24-bit BMP at path is the read_front buffer buf (xdim by ydim). */
+static int bmp_is(const char *path, const unsigned char *buf)
+{
+    SDL_Surface *b = SDL_LoadBMP(path);
+    SDL_Surface *s = (b != NULL) ? SDL_ConvertSurfaceFormat(b, SDL_PIXELFORMAT_RGB24, 0) : NULL;
+    int y, same = ((s != NULL) && (s->w == xdim) && (s->h == ydim));
+
+    for (y = 0; same && (y < ydim); y++)  /* GL rows are bottom-up. */
+        same = (memcmp((unsigned char *) s->pixels + y * s->pitch, buf + (ydim - 1 - y) * xdim * 3, xdim * 3) == 0);
+    SDL_FreeSurface(s);
+    SDL_FreeSurface(b);
+    return same;
+}
+
+/* Waits up to 3 s for the window's drawable to stop being oldw wide. */
+static void await_resize(int32_t oldw)
+{
+    Uint32 t0;
+    for (t0 = SDL_GetTicks(); (xdim == oldw) && (SDL_GetTicks() - t0 < 3000); SDL_Delay(10))
+        _handle_events();
+}
+
+/*
+ * The shader path draws everything as palette indices and shows them
+ *  through the palette, as renderer 0 does: shader_frame's frames (HUD,
+ *  status bar, menu letters, text, the water palette, a fade, a camera)
+ *  each within 8 of renderer 0's at the same size, every colour the
+ *  palette's (the faded palette's for the fade), screenshots that are the
+ *  screen, faded or not, with no RGB texture made or retextured all along
+ *  (palette changes, fades, glsetgamepalette, precaching); a hole in the
+ *  level shows what clearallviews cleared to; and a window resize keeps a
+ *  frame shown or still being drawn. 1: pass, 0: fail, 77: no shader path.
+ */
+static int shader_frames(const char *dir, int32_t x, int32_t y, int32_t z, short a, short sect, short zerotile)
+{
+    unsigned char *gl[SHFRAMES], *classic[SHFRAMES], *buf, *ref;
+    palette_t pal[256];
+    char path[1024];
+    int f, i, ok = 1, gw, gh, cw, ch, capsame[2], winw, winh;
+    int32_t oldw, oldh;
+    uint32_t loads, invals;
+    long off, offpal[SHFRAMES], n, unmasked[2];
+    double d, stilld, middrawd, refmean;
+    short floorpic, rsect, wallcstat[MAXWALLS];
+    SDL_Surface *s;
+
+    gldrawpathrequest = GLPATH_SHADER;
+    if (setgamemode_gl(1) != 0) { fprintf(stderr, "FAIL: OpenGL with draw path shader\n"); return 0; }
+    gldrawpathrequest = GLPATH_AUTO;
+    if (gldrawpath != GLPATH_SHADER) { printf("shader frames: no shader path, skipped\n"); return 77; }
+    /* The masked walls the draw paths' checks put in the start view come off
+     * (translucency, which the shader path doesn't do yet, isn't checked here). */
+    for (i = sector[sect].wallptr; i < sector[sect].wallptr + sector[sect].wallnum; i++)
+        { wallcstat[i - sector[sect].wallptr] = wall[i].cstat; wall[i].cstat &= ~(16|128); }
+    polymosttexfullbright = 240;  /* as the game's palettes: the shader path ignores it */
+    gw = xdim; gh = ydim;
+    n = (long) gw * gh;
+    loads = gl_rgbtexloads;
+    invals = gl_rgbtexinvalidations;
+    for (f = 0; f < SHFRAMES; f++)
+    {
+        gl[f] = malloc((size_t) n * 3);
+        shader_frame(f, x, y, z, a, sect);
+        snprintf(path, sizeof (path), "%s/shframe_%s_shader.bmp", dir, shframename[f]);
+        { double rs, gs; save_front(path, &rs, &gs); }
+        read_front(gl[f]);
+        getfadedpalette(pal);  /* what's on screen: the fade's palette for "fade" */
+        offpal[f] = off_colours(gl[f], n, pal);
+        if ((f == 0) || (f == 2))  /* a screenshot is the screen, faded or not */
+        {
+            snprintf(path, sizeof (path), "%s/shcap%d0000.bmp", dir, f);
+            remove(path);
+            snprintf(path, sizeof (path), "%s/shcap%dxxxx.bmp", dir, f);
+            i = screencapture(path, 0);
+            snprintf(path, sizeof (path), "%s/shcap%d0000.bmp", dir, f);
+            capsame[f >> 1] = (i == 0) && bmp_is(path, gl[f]);
+        }
+        if (f == 2) setpalettefade(0, 0, 0, 0);
+    }
+    polymost_precache(FIRSTGUN, 0, 1);
+    polymost_precache(BOTTOMSTATUSBAR, 2, 0);
+    printf("shader frames: %u RGB textures made, %u retexturings (palettes, a fade, precaching)\n",
+           (unsigned) (gl_rgbtexloads - loads), (unsigned) (gl_rgbtexinvalidations - invals));
+    if ((gl_rgbtexloads != loads) || (gl_rgbtexinvalidations != invals))
+        { fprintf(stderr, "FAIL: the shader path makes RGB textures or retextures\n"); ok = 0; }
+    loads = gl_rgbtexloads;
+    i = glgamepalette_check();
+    printf("shader frames: glsetgamepalette %s, %u RGB textures made\n", i ? "as expected" : "wrong",
+           (unsigned) (gl_rgbtexloads - loads));
+    if ((!i) || (gl_rgbtexloads != loads))
+        { fprintf(stderr, "FAIL: glsetgamepalette on the shader path\n"); ok = 0; }
+    printf("shader frames: screenshots %s unfaded, %s faded\n", capsame[0] ? "the screen" : "NOT the screen",
+           capsame[1] ? "the screen" : "NOT the screen");
+    if ((!capsame[0]) || (!capsame[1]))
+        { fprintf(stderr, "FAIL: a shader path screenshot isn't the screen\n"); ok = 0; }
+
+    /* A hole (the start floor without art) shows what was cleared to: a
+     * good part of the frame. */
+    setbrightness(0, palette);
+    floorpic = sector[sect].floorpicnum;
+    sector[sect].floorpicnum = zerotile;
+    buf = malloc((size_t) n * 3);
+    clearallviews(31);
+    drawrooms(x, y, z, a, 100, sect);
+    drawmasks();
+    nextpage();
+    read_front(buf);
+    sector[sect].floorpicnum = floorpic;
+    for (off = 0, i = 0; i < n; i++)  /* (white: nothing else in the view is) */
+        if (memcmp(&buf[i * 3], &curpalette[31], 3) == 0) off++;
+    printf("shader frames: %.1f%% of the frame is the hole's colour 31\n", 100.0 * off / n);
+    if (off < n / 50) { fprintf(stderr, "FAIL: a hole on the shader path isn't what was cleared to\n"); ok = 0; }
+
+    /* A tile drawn non-masked (dastat 64) draws its index 255 texels, as
+     * classic does: fewer pixels of what's under it than drawn masked. */
+    for (f = 0; f < 2; f++)
+    {
+        clearallviews(31);
+        rotatesprite(0, 0, 65536, 0, FIRSTGUN, 0, 0, 2+8+16+(f ? 64 : 0), 0, 0, xdim-1, ydim-1);
+        nextpage();
+        read_front(buf);
+        for (unmasked[f] = 0, i = 0; i < n; i++)
+            if (memcmp(&buf[i * 3], &curpalette[31], 3) == 0) unmasked[f]++;
+    }
+    printf("shader frames: pixels of colour 31 around a tile masked %ld, not masked %ld\n", unmasked[0], unmasked[1]);
+    if (unmasked[1] >= unmasked[0])
+        { fprintf(stderr, "FAIL: a non-masked tile on the shader path doesn't draw index 255\n"); ok = 0; }
+
+    /* A window resize keeps a frame shown (a still screen) and one still
+     * being drawn (a 3D view not yet shown, as _nextpage's events may
+     * resize before its swap). */
+    ref = malloc((size_t) n * 3);
+    rsect = 0;
+    updatesector(cmpview[1].x, cmpview[1].y, &rsect);  /* close up: bright, so a lost frame shows */
+    view_shot(ref, cmpview[1].x, cmpview[1].y, cmpview[1].z, cmpview[1].ang, rsect);
+    refmean = cmp_mean(ref, xdim, ydim, 1, 0, 0, CMPW, CMPH);
+    oldw = xdim; oldh = ydim;
+    SDL_GetWindowSize(SDL_GL_GetCurrentWindow(), &winw, &winh);
+    SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), 800, 520);
+    await_resize(oldw);
+    free(buf);
+    buf = malloc((size_t) xdim * ydim * 3);
+    read_front(buf);
+    stilld = stretch_diff(ref, oldw, oldh, buf);
+    for (i = 0; i < 2; i++)  /* both buffers: on screen if the view below is lost */
+    {
+        clearallviews(31);
+        nextpage();
+    }
+    SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), winw, winh);
+    clearallviews(0);
+    drawrooms(cmpview[1].x, cmpview[1].y, cmpview[1].z, cmpview[1].ang, 100, rsect);
+    drawmasks();
+    await_resize(xdim);
+    nextpage();
+    if ((xdim != oldw) || (ydim != oldh))
+    {
+        printf("shader frames: window not back to %dx%d (%dx%d); mid-frame resize unchecked\n",
+               (int) oldw, (int) oldh, (int) xdim, (int) ydim);
+        middrawd = 0;
+    }
+    else
+    {
+        free(buf);
+        buf = malloc((size_t) xdim * ydim * 3);
+        read_front(buf);
+        middrawd = stretch_diff(ref, oldw, oldh, buf);
+    }
+    printf("shader frames: after a resize, mean |frame - frame before| still %.2f, mid-frame %.2f (frame mean %.1f)\n",
+           stilld, middrawd, refmean);
+    if ((stilld > 4) || (middrawd > 8))  /* lost: the frame's mean, 70 */
+        { fprintf(stderr, "FAIL: a resize loses the shader path's frame\n"); ok = 0; }
+    free(ref);
+    free(buf);
+    if (glGetError() != GL_NO_ERROR) { fprintf(stderr, "FAIL: GL error in the shader frames\n"); ok = 0; }
+
+    /* Renderer 0 at the same size (as near as 8-bit goes). */
+    cw = min(gw, 1600); ch = min(gh, 1200);
+    if (_setgamemode(1, cw, ch) != 0) { fprintf(stderr, "FAIL: _setgamemode(%dx%d)\n", cw, ch); return 0; }
+    cw = xdim; ch = ydim;
+    for (f = 0; f < SHFRAMES; f++)
+    {
+        shader_frame(f, x, y, z, a, sect);
+        classic[f] = malloc((size_t) cw * ch * 3);
+        for (i = 0; i < cw * ch; i++)
+        {
+            SDL_Color *c = &surface->format->palette->colors[((unsigned char *) surface->pixels)[(i / cw) * surface->pitch + i % cw]];
+            classic[f][i * 3] = c->r; classic[f][i * 3 + 1] = c->g; classic[f][i * 3 + 2] = c->b;
+        }
+        s = SDL_CreateRGBSurfaceWithFormatFrom(classic[f], cw, ch, 24, cw * 3, SDL_PIXELFORMAT_RGB24);
+        snprintf(path, sizeof (path), "%s/shframe_%s_r0.bmp", dir, shframename[f]);
+        SDL_SaveBMP(s, path);
+        SDL_FreeSurface(s);
+        if (f == 2) setpalettefade(0, 0, 0, 0);
+    }
+    setbrightness(0, palette);
+    for (f = 0; f < SHFRAMES; f++)
+    {
+        d = frame_diff(gl[f], gw, gh, classic[f], cw, ch);
+        printf("shader frames: %s mean |shader - r0| %.2f (most 8.00), %ld pixels not of the %spalette\n",
+               shframename[f], d, offpal[f], (f == 2) ? "faded " : "");
+        if ((d > 8) || offpal[f]) ok = 0;
+        free(gl[f]);
+        free(classic[f]);
+    }
+    polymosttexfullbright = 256;
+    for (i = sector[sect].wallptr; i < sector[sect].wallptr + sector[sect].wallnum; i++)
+        wall[i].cstat = wallcstat[i - sector[sect].wallptr];
+    if (!ok) fprintf(stderr, "FAIL: the shader path's frames\n");
+    return ok;
+}
+
 int main(int argc, char **argv)
 {
     int32_t posx, posy, posz;
@@ -648,6 +954,8 @@ int main(int argc, char **argv)
     double smalld;
     double shfade[2][2];
     int p, s, pathdiffer;
+    long off;
+    double d, d2;
     uint32_t draws;
     int32_t refxdim = 0, refydim = 0;
 
@@ -1192,14 +1500,22 @@ int main(int argc, char **argv)
             fprintf(stderr, "FAIL: draw path shader: tiles without art differ with each draw flushed\n");
             return 1;
         }
-        for (s = 5; s <= 6; s++)
-            if (memcmp(shshot[0][s], pathshot[0][s], (size_t) xdim * ydim * 3) != 0)
+        for (s = 0; s < PATHSHOTS; s++)
+            if ((off = off_palette(shshot[0][s])) != 0)
             {
-                fprintf(stderr, "FAIL: draw path shader: 2D frame %d differs from immediate, mean |difference| %.4f\n",
-                        s, front_diff(shshot[0][s], pathshot[0][s]));
+                fprintf(stderr, "FAIL: draw path shader: frame %d has %ld pixels not of the palette\n", s, off);
                 return 1;
             }
-        printf("draw path shader: the same with each draw flushed; 2D frames the same as immediate\n");
+        /* Its 2D frames come out near immediate's: the map view's floors
+         * shade through the palookups (immediate's through a brightness
+         * ramp), and the still screen with text is the palette's colours
+         * exactly (immediate's are a shade ramp's 1.0, a unit or two off). */
+        d = front_diff(shshot[0][5], pathshot[0][5]);
+        d2 = front_diff(shshot[0][6], pathshot[0][6]);
+        printf("draw path shader: the same with each draw flushed; all palette colours; mean |shader - immediate| "
+               "map view %.2f, still screen %.2f\n", d, d2);
+        if ((d > 8) || (d2 > 1))
+            { fprintf(stderr, "FAIL: draw path shader: its 2D frames are far from immediate's\n"); return 1; }
 
         view_shot(NULL, posx, posy, posz, ang, sectnum);
         snprintf(path, sizeof (path), "%s/shader_unfaded.bmp", argv[2]);
@@ -1262,6 +1578,9 @@ int main(int argc, char **argv)
         free(ref);
         free(buf);
     }
+
+    i = shader_frames(argv[2], posx, posy, posz, ang, sectnum, zerotile);
+    if (i == 0) return 1;
 
     /* A mode over the 8-bit 1600x1200 limit (it changes xdim and ydim, so
      * after the checks above): the OpenGL window still gets the size asked
