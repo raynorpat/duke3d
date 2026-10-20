@@ -22,9 +22,14 @@ void timerhandler(void) { timer_calls++; }
 void keyhandler(void) { }
 void faketimerhandler(void) { }
 
-/* Room for 8K drawables in renderer 3. */
+/* Room for 8K drawables in renderer 3; without it, the original limits. */
+#ifdef POLYMOST
 typedef char maxxdim_holds_8k[(MAXXDIM >= 7680) ? 1 : -1];
 typedef char maxydim_holds_8k[(MAXYDIM >= 4320) ? 1 : -1];
+#else
+typedef char maxxdim_is_1600[(MAXXDIM == 1600) ? 1 : -1];
+typedef char maxydim_is_1200[(MAXYDIM == 1200) ? 1 : -1];
+#endif
 
 /*
  * The dummy driver has no OpenGL, so setgamemode_gl must fail without

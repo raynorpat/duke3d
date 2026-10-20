@@ -22,8 +22,13 @@
 #define MAXTILES 9216
 #define MAXSTATUS 1024
 #define MAXPLAYERS 16
+#ifdef POLYMOST  /* OpenGL draws at the window's pixel size */
 #define MAXXDIM 7680
 #define MAXYDIM 4320
+#else
+#define MAXXDIM 1600
+#define MAXYDIM 1200
+#endif
 #define MAXPALOOKUPS 256
 #define MAXPSKYTILES 256
 #define MAXSPRITESONSCREEN 1024
