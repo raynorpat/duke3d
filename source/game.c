@@ -3035,9 +3035,6 @@ void displayrooms(short snum,int32_t smoothratio)
                 if (widescreen)
                 {
                     tiltw = (scale(windowx2-windowx1+1,100*pixelaspect,(windowy2-windowy1+1)<<16)+1)<<1;
-                    // Renderers 1 and 2 address a power-of-two tile through
-                    // picsiz, which setviewtotile doesn't update.
-                    if ((tiltw&(tiltw-1)) == 0) tiltw += 2;
                     if (tiltbytes < tiltw*tiltw)
                     {
                         char *nb = realloc(tiltbuf,tiltw*tiltw);

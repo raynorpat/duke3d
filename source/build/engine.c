@@ -8926,6 +8926,11 @@ void setviewtotile(short tilenume, int32_t xsiz, int32_t ysiz)
 
 		/* DRAWROOMS TO TILE BACKUP&SET CODE */
 	tilesizx[tilenume] = xsiz; tilesizy[tilenume] = ysiz;
+		/* and its picsiz, as allocatepermanenttile, for Polymost */
+	j = 15; while ((j > 1) && (pow2long[j] > xsiz)) j--;
+	picsiz[tilenume] = ((char)j);
+	j = 15; while ((j > 1) && (pow2long[j] > ysiz)) j--;
+	picsiz[tilenume] += ((char)(j<<4));
 	bakxsiz[setviewcnt] = xsiz; bakysiz[setviewcnt] = ysiz;
 	bakvidoption[setviewcnt] = vidoption; vidoption = 2;
 	bakframeplace[setviewcnt] = frameplace; frameplace = waloff[tilenume];

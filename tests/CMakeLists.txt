@@ -174,7 +174,13 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
       COMMAND render_e1l1 "${DUKE3D_GRP}"
               "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost_solid.bmp"
               "" 1)
+    # Renderer 2 drawing a render-to-tile view with a power-of-two height.
+    add_test(NAME render_e1l1_polymost_tile
+      COMMAND render_e1l1 "${DUKE3D_GRP}"
+              "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost_tile.bmp"
+              "" 2 tile)
     set_tests_properties(render_e1l1_polymost render_e1l1_polymost_solid
+                         render_e1l1_polymost_tile
       PROPERTIES
       ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
       TIMEOUT 30)

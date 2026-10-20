@@ -2,11 +2,12 @@
  * Renders the start view of E1L1 from a real DUKE3D.GRP, headless, and
  *  checks the frame against a known checksum.
  *
- *  usage: render_e1l1 <DUKE3D.GRP> <out.bmp> [expected checksum, hex] [renderer]
+ *  usage: render_e1l1 <DUKE3D.GRP> <out.bmp> [expected checksum, hex] [renderer] [tile]
  *
  * Without an expected checksum (or with an empty one) it just prints the
  *  checksum and exits 0. The renderer is a setrendermode() number, 0 if
- *  not given.
+ *  not given. With "tile", the view goes through a tile 256 tall, as in
+ *  game.c's low detail mode, and must look like renderer 0's.
  *  Run with SDL_VIDEODRIVER=dummy.
  */
 #include <stdio.h>
@@ -63,13 +64,34 @@ static void setup_la_backdrop(void)
     pskybits = 3;
 }
 
+/*
+ * game.c's low detail and screen tilt: the view drawn into a tile whose
+ *  height (the screen's width) is a power of two, put on screen turned 90
+ *  degrees with rotatesprite.
+ */
+#define VIEWTILE (MAXTILES-2)
+static void draw_through_tile(int32_t x, int32_t y, int32_t z, short a, short sect)
+{
+    static unsigned char tilebuf[100*256];
+
+    walock[VIEWTILE] = 255;
+    waloff[VIEWTILE] = (intptr_t) tilebuf;
+    setviewtotile(VIEWTILE, 100, 256);
+    drawrooms(x, y, z, a, 100, sect);
+    drawmasks();
+    setviewback();
+    picanm[VIEWTILE] &= 0xff0000ff;
+    rotatesprite(160<<16, 100<<16, 131072, 512, VIEWTILE, 0, 0, 4+2+64,
+                 windowx1, windowy1, windowx2, windowy2);
+}
+
 int main(int argc, char **argv)
 {
     int32_t posx, posy, posz;
     short ang, sectnum;
     uint32_t hash = 2166136261u;
     const unsigned char *pix;
-    int32_t i;
+    int32_t i, same;
 
     if (argc < 3)
     {
@@ -121,12 +143,37 @@ int main(int argc, char **argv)
         return 1;
     }
     setbrightness(0, palette);
-    if (argc > 4)
-        setrendermode(atoi(argv[4]));
+    if ((argc > 5) && (strcmp(argv[5], "tile") == 0))
+    {
+        /* through a tile: the renderer's picture against renderer 0's. */
+        unsigned char *classic = (unsigned char *) malloc(xdim * ydim);
 
-    drawrooms(posx, posy, posz, ang, 100, sectnum);
-    drawmasks();
-    nextpage();
+        draw_through_tile(posx, posy, posz, ang, sectnum);
+        memcpy(classic, (void *) frameplace, xdim * ydim);
+        setrendermode(atoi(argv[4]));
+        clearview(0);
+        draw_through_tile(posx, posy, posz, ang, sectnum);
+        nextpage();
+        for (i = 0, same = 0; i < xdim * ydim; i++)
+            same += (classic[i] == ((unsigned char *) surface->pixels)[i]);
+        printf("through a tile: %d%% of pixels as in renderer 0\n", (int) (same * 100 / (xdim * ydim)));
+        free(classic);
+        /* Renderer 2 samples the tile a little differently (58% the same);
+         * a tile addressed with the wrong power of two is garbage (16%). */
+        if (same * 100 < xdim * ydim * 40)
+        {
+            fprintf(stderr, "FAIL: the view through a tile isn't renderer 0's\n");
+            return 1;
+        }
+    }
+    else
+    {
+        if (argc > 4)
+            setrendermode(atoi(argv[4]));
+        drawrooms(posx, posy, posz, ang, 100, sectnum);
+        drawmasks();
+        nextpage();
+    }
 
     if (SDL_SaveBMP(surface, argv[2]) != 0)
     {
