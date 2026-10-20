@@ -122,9 +122,10 @@ static int32_t clockval[16], clockcnt = 0;
 
 #define NUMKEYS 19
 
-extern char buildkeys[NUMKEYS];
+extern unsigned char buildkeys[NUMKEYS];
 
 static buildcfg_t buildcfg;  /* build.cfg, written back on exit */
+static char buildcfgpath[1024];  /* found once: the load menu changes the cwd */
 
 
 
@@ -1844,10 +1845,21 @@ void Keys2d(void)
 }// end key2d
 
 
+// Writes build.cfg once, from ExtUnInit or at exit (closing the window).
+static void savebuildcfg(void)
+{
+   static char saved = 0;
+
+   if (saved || (buildcfgpath[0] == 0)) return;
+   saved = 1;
+   // BUILD_WINDOWED forces a window for this run only; keep build.cfg's choice.
+   if (getenv(BUILD_WINDOWED) == NULL)
+       buildcfg.fullscreen = getvideofullscreen();
+   buildcfg_write(&buildcfg,buildcfgpath);
+}
+
 void ExtInit(void)
 {
-    char cfgpath[1024];
-
     printf("------------------------------------------------------------------------------\n");
     printf("BUILD.EXE Copyright (c) 1993 - 1996 Ken Silverman, 3D Realms Entertainment.\n");
     printf("This version of BUILD was created for Duke Nukem 3D and parts were modified\n");
@@ -1874,9 +1886,11 @@ void ExtInit(void)
 
     // build.cfg; without one, the keys of an old setup.dat carry over.
     buildcfg_defaults(&buildcfg);
-    if ((buildcfg_path(cfgpath,sizeof(cfgpath)) != 0) ||
-        (buildcfg_read(&buildcfg,cfgpath) != 0))
+    if (buildcfg_path(buildcfgpath,sizeof(buildcfgpath)) != 0)
+        buildcfgpath[0] = 0;
+    if ((buildcfgpath[0] == 0) || (buildcfg_read(&buildcfg,buildcfgpath) != 0))
         buildcfg_import_setupdat(&buildcfg,"setup.dat");
+    atexit(savebuildcfg);  // the window's close button exits without ExtUnInit
     memcpy((void *)buildkeys,(void *)buildcfg.keys,NUMKEYS);
     editormode.renderer = buildcfg.renderer;
     editormode.xdim3d = buildcfg.xdim3d;
@@ -1905,13 +1919,7 @@ void ExtInit(void)
 
 void ExtUnInit(void)
 {
-   char cfgpath[1024];
-
-   // BUILD_WINDOWED forces a window for this run only; keep build.cfg's choice.
-   if (getenv(BUILD_WINDOWED) == NULL)
-       buildcfg.fullscreen = getvideofullscreen();
-   if (buildcfg_path(cfgpath,sizeof(cfgpath)) == 0)
-       buildcfg_write(&buildcfg,cfgpath);
+   savebuildcfg();
    uninitgroupfile();
 }
 

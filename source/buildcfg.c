@@ -172,7 +172,12 @@ int buildcfg_import_setupdat(buildcfg_t *c, const char *path)
 int buildcfg_path(char *out, size_t outlen)
 {
 #ifdef _WIN32
-    return snprintf(out, outlen, "build.cfg") < (int)outlen ? 0 : -1;
+    char dir[1024];
+
+    /* absolute, so a later chdir (the editor's load menu) doesn't move it */
+    if (!_getcwd(dir, sizeof(dir)))
+        return -1;
+    return snprintf(out, outlen, "%s\\build.cfg", dir) < (int)outlen ? 0 : -1;
 #else
     const char *home = getenv("HOME");
     char dir[1024];
