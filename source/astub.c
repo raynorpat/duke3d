@@ -1858,7 +1858,8 @@ static void savebuildcfg(void)
    // Alt+K's renderer is kept; -renderer's alone isn't.
    if (editorrendererpicked)
        buildcfg.renderer = editormode.renderer;
-   buildcfg_write(&buildcfg,buildcfgpath);
+   if (buildcfg_write(&buildcfg,buildcfgpath) != 0)
+       printf("Could not write %s\n",buildcfgpath);
 }
 
 void ExtInit(void)

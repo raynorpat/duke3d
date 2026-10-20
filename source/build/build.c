@@ -411,8 +411,8 @@ void showmouse(void)
 	k = max(1,(xdim+(w>>1))/w);  /* 2 on a 2x (high-DPI) OpenGL drawable */
 	drawline256((searchx+k)<<12, (searchy  )<<12, (searchx+5*k)<<12, (searchy    )<<12, whitecol);
 	drawline256((searchx  )<<12, (searchy+k)<<12, (searchx    )<<12, (searchy+5*k)<<12, whitecol);
-	drawline256((searchx-k)<<12, (searchy  )<<12, (searchx-5*k)<<12, (searchy    )<<12, whitecol);
-	drawline256((searchx  )<<12, (searchy-k)<<12, (searchx    )<<12, (searchy-5*k)<<12, whitecol);
+	drawline256((searchx-5*k+1)<<12, (searchy    )<<12, (searchx-k+1)<<12, (searchy  )<<12, whitecol);
+	drawline256((searchx    )<<12, (searchy-5*k+1)<<12, (searchx  )<<12, (searchy-k+1)<<12, whitecol);
 }
 
 
@@ -1177,6 +1177,7 @@ int menuselect(void)
 				while ((i < (int32_t)sizeof(menupath)) && (menupath[i] != 0)) i++;
 				while ((i > 0) && (menupath[i] != 92)) i--;
 				menupath[i] = 0;
+				chdir(menuname[newhighlight]);
 			}
 			else if (strlen(menupath)+1+strlen(menuname[newhighlight]) < sizeof(menupath))
 			{
@@ -1188,8 +1189,8 @@ int menuselect(void)
                     #error Define your platform!
                 #endif
 				strcat(menupath,menuname[newhighlight]);
+				chdir(menuname[newhighlight]);
 			}
-			chdir(menuname[newhighlight]);
 			menunamecnt = 0;
 			getfilenames("SUBD");
 			getfilenames("*.MAP");
@@ -4989,7 +4990,14 @@ static void cyclerenderer(void)
 		{
 			sprintf(renderermessage,"OpenGL unavailable");
 			editormode.renderer = previous;
-			editorsetgamemode(&editormode);
+			if (editorsetgamemode(&editormode) < 0)
+			{
+				ExtUnInit();
+				uninitkeys();
+				uninittimer();
+				printf("%d * %d not supported in this graphics mode\n",editormode.xdim3d,editormode.ydim3d);
+				exit(0);
+			}
 		}
 		else
 			editorrendererpicked = 1;
