@@ -3161,7 +3161,7 @@ static void tessectrap (float *px, float *py, int32_t *point2, int32_t numpoints
 void polymost_fillpolygon (int32_t npoints)
 {
 	static float fx[MAXWALLSB], fy[MAXWALLSB];
-	float f;
+	float f, a = 1.0;
 	double cx, cy;
 	int32_t i;
 
@@ -3206,11 +3206,18 @@ void polymost_fillpolygon (int32_t npoints)
 	glBindTexture(GL_TEXTURE_2D,glpic[gltexcache(globalpicnum,globalpal,0)]);
 
 	f = ((float)(numpalookups-min(max(globalshade,0),numpalookups)))/((float)numpalookups);
-	glColor4f(f,f,f,1.0);
+	switch ((globalorientation>>7)&3) {
+		case 0:
+		case 1: a = 1.0; glDisable(GL_BLEND); break;
+		case 2: a = 0.66; glEnable(GL_BLEND); break;
+		case 3: a = 0.33; glEnable(GL_BLEND); break;
+	}
+	glColor4f(f,f,f,a);
 
 	tessectrap(fx,fy,xb1,npoints);
 
 	glDisable(GL_ALPHA_TEST);
+	glDisable(GL_BLEND);
 	_glframedrawn();
 }
 #endif

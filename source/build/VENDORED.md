@@ -234,6 +234,19 @@ Ported from later JFBuild commits, retyped as above:
   two draws as it does without them. Not taken: the `glpolygonmode` debug
   variable, the `clearview`/`clearallviews` colour fix (we already divide
   by 255), and the `winlayer.c` part.
+- `80878afe29b09f07c3ca8a4aecdc54dc7905f571`: map view translucency. In
+  every renderer, `drawmapview` sets `settransreverse()` or
+  `settransnormal()` from a translucent floor sprite's cstat 512 before
+  `tsethlineshift`, so the classic renderer no longer draws it with
+  whatever translucency the last draw left set (a classic bug fix, kept on
+  purpose), and sets `globalorientation` from cstat 2 and 512 for
+  `polymost_fillpolygon`, which draws at alpha 1, 0.66 or 0.33 from it.
+  Change from upstream, as its later form does: `GL_BLEND` is off for
+  opaque fills, and it is turned off again after every fill.
+  render_classic2d's pinned map checksums don't change, as its floor sprite
+  is translucent without cstat 512 and the classic state left before it is
+  already normal; with cstat 512 added, the 320x200 map checksum goes from
+  `763b8c56` (without the fix) to `c9790d70`.
 
 ## Engine hooks
 
