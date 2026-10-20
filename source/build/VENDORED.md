@@ -85,3 +85,17 @@ BUILDLIC.TXT LICENSE.md
 - `engine.c`, `cache1d.c`: version-guarded 1.3D engine logic, on
   `BUILD_ENGINEREV`: the 1996 logic square root, slope maths, `inside` and the
   1996 LZW format (see ledger E-001 to E-004, E-012)
+- `a.c`, `a.h`: the C line drawers are JFBuild's `src/a-c.c` (Ken Silverman's
+  own C port of `A.ASM` from `BUILDC.ZIP`, made 64-bit clean), from
+  <https://github.com/jonof/jfbuild> commit
+  `e06cbd005a8e6d5f38b5a7aa27ea597dd233c16e`, in place of the icculus port's
+  register-by-register translation. Kept from the icculus port, so the picture
+  matches `A.ASM`'s exactly: `setupslopevlin`/`slopevlin`, the one-pixel
+  shortcut in `prevlineasm1`, `tvlineasm2` and the parallax-sky `rhlineasm4`
+  family. The four-column `vlineasm4`/`mvlineasm4` loop over the one-column
+  routines. Changes to JFBuild's code: our `intptr_t` signatures; per-family
+  setup state as in `A.ASM` (JFBuild shares one set); `mhline`/`thline` draw a
+  span's last pixel, as `A.ASM` does; the one-column vlines return the final
+  texture position. `engine.c`'s rotated-sprite calls use JFBuild's simpler
+  `spritevline` arguments. `mhlineskipmodify`, `thlineskipmodify` and
+  `is_vmware_running` had no callers and are gone.

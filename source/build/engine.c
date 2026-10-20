@@ -3900,13 +3900,13 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 		if ((dastat&1) == 0)
 		{
 			if (dastat&64)
-				setupspritevline(palookupoffs,(xv>>16)*ysiz,xv<<16,ysiz,yv,0L);
+				setupspritevline(palookupoffs,xv,yv,ysiz);
 			else
-				msetupspritevline(palookupoffs,(xv>>16)*ysiz,xv<<16,ysiz,yv,0L);
+				msetupspritevline(palookupoffs,xv,yv,ysiz);
 		}
 		else
 		{
-			tsetupspritevline(palookupoffs,(xv>>16)*ysiz,xv<<16,ysiz,yv,0L);
+			tsetupspritevline(palookupoffs,xv,yv,ysiz);
 			if (dastat&32) settransreverse(); else settransnormal();
 		}
 		for(x=x1;x<x2;x++)
@@ -3934,13 +3934,13 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 			if ((dastat&1) == 0)
 			{
 				if (dastat&64)
-					spritevline(0L,by<<16,y2-y1+1,bx<<16,(bx>>16)*ysiz+(by>>16)+bufplc,p);
+					spritevline(bx&65535,by&65535,y2-y1+1,(bx>>16)*ysiz+(by>>16)+bufplc,p);
 				else
-					mspritevline(0L,by<<16,y2-y1+1,bx<<16,(bx>>16)*ysiz+(by>>16)+bufplc,p);
+					mspritevline(bx&65535,by&65535,y2-y1+1,(bx>>16)*ysiz+(by>>16)+bufplc,p);
 			}
 			else
 			{
-				tspritevline(0L,by<<16,y2-y1+1,bx<<16,(bx>>16)*ysiz+(by>>16)+bufplc,p);
+				tspritevline(bx&65535,by&65535,y2-y1+1,(bx>>16)*ysiz+(by>>16)+bufplc,p);
 				transarea += (y2-y1);
 			}
 			faketimerhandler();
