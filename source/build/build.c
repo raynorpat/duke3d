@@ -154,7 +154,7 @@ editormode_t editormode = { 0, 640, 480, 0 };  /* the stub fills it from its con
 static int32_t repeatcountx, repeatcounty;
 
 #define BUILD_MAXPATH 255
-static char menuname[MAXMENUFILES][BUILD_MAXPATH+1], curpath[80], menupath[80];
+static char menuname[MAXMENUFILES][BUILD_MAXPATH+1], curpath[BUILD_MAXPATH+1], menupath[BUILD_MAXPATH+1];
 static int32_t menunamecnt, menuhighlight;
 
 static int32_t fillist[640];
@@ -386,9 +386,10 @@ void initmenupaths(char *filename)
 {
 	int32_t i;
 
-	strcpy(curpath,filename);
+	strncpy(curpath,filename,sizeof(curpath)-1);
+	curpath[sizeof(curpath)-1] = 0;
 	i = 0;
-	while ((i < 80) && (curpath[i] != 0)) i++;
+	while ((i < (int32_t)sizeof(curpath)) && (curpath[i] != 0)) i++;
 	while ((i > 0) && (curpath[i] != 92)) i--;
 	curpath[i] = 0;
 	strcpy(menupath,curpath);
@@ -1173,11 +1174,11 @@ int menuselect(void)
 			if ((menuname[newhighlight][0] == '.') && (menuname[newhighlight][1] == '.'))
 			{
 				i = 0;
-				while ((i < 80) && (menupath[i] != 0)) i++;
+				while ((i < (int32_t)sizeof(menupath)) && (menupath[i] != 0)) i++;
 				while ((i > 0) && (menupath[i] != 92)) i--;
 				menupath[i] = 0;
 			}
-			else
+			else if (strlen(menupath)+1+strlen(menuname[newhighlight]) < sizeof(menupath))
 			{
                 #if ((defined PLATFORM_DOS) || (defined PLATFORM_WIN32))
     				strcat(menupath,"\\");
@@ -6788,7 +6789,7 @@ int main(int argc,char **argv)
 	for(i=1,j=0;i<argc;i++)
 	{
 		/* -renderer N picks the renderer for this run only; build.cfg keeps its own. */
-		if (stricmp(argv[i],"-renderer") == 0)
+		if ((stricmp(argv[i],"-renderer") == 0) || (stricmp(argv[i],"/renderer") == 0))
 			rendererarg = editorclamprenderer((i+1 < argc) ? atoi(argv[++i]) : 0);
 		else if (j++ == 0)
 		{
