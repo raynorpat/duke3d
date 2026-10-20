@@ -5,6 +5,8 @@
  *   <dir>/gl0000.png   screencapture of that frame (PNG)
  *   <dir>/fade.bmp     the screen after setpalettefade(63,0,0,32) over a
  *                      frame that isn't redrawn, as a title screen's
+ *   <dir>/capfade0000.bmp
+ *                      screencapture of the faded screen (it has the fade)
  *   <dir>/unfade.bmp   the screen after setpalettefade(0,0,0,0)
  *   <dir>/still63.bmp, still32.bmp, still00.bmp
  *                      E1's ending screen, drawn once with dastat 128 as
@@ -27,13 +29,16 @@
  *                      walls and a sprite: polymosttexfullbright 256 (off),
  *                      240 (on), then 256 again (off2), in the normal and
  *                      water (<pal>) palettes; normal only for npot 0
- *  It fails on a GL error, a failed capture, a fade that doesn't redden, a
- *  still screen that doesn't brighten as it fades in, a miplevel 1 view
+ *   <dir>/resized.bmp  the last frame shown again after a window resize
+ *  It fails on a GL error, a failed capture, a fade that doesn't redden or
+ *  a screenshot without it, a still screen that doesn't brighten as it
+ *  fades in, a clearview outside the view window, a miplevel 1 view
  *  the same as the miplevel 0 one, a 0x0 floor that isn't see-through, a
  *  blank map view, a 3D view drawn after the map view that differs from
  *  the one drawn before it (GL state left behind), a fullbright view that
- *  doesn't brighten, or a fullbright-off view that differs after a
- *  fullbright-on one (glow textures left behind).
+ *  doesn't brighten, a fullbright-off view that differs after a
+ *  fullbright-on one (glow textures left behind), a last frame lost in a
+ *  resize, or a 1680x900 mode whose window isn't 1680x900.
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
  *
