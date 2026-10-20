@@ -343,8 +343,8 @@ Ported from later JFBuild commits, retyped as above:
 ## OpenGL video mode (renderer 3)
 
 - `build.h`: `MAXXDIM` 7680 and `MAXYDIM` 4320 (were 1600 and 1200, and
-  still are without `POLYMOST`), room for 8K drawables. No array sized by them is saved, recorded in demos or
-  sent over the network.
+  still are without `POLYMOST`), room for 8K drawables. No array sized by
+  them is saved, recorded in demos or sent over the network.
 - `sdl_driver.c`: `setgamemode_gl(davidoption)`, prototyped in `display.h`
   and `engine_protos.h`. It makes a new `SDL_WINDOW_OPENGL |
   SDL_WINDOW_ALLOW_HIGHDPI` window (the last 8-bit window's windowed size,
