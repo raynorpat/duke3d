@@ -266,7 +266,11 @@ Ported from later JFBuild commits, retyped as above:
     `showframe`), swaps and clears `framedrawn`.
   - `_glpalettefade()`: with nothing drawn since the swap it draws
     `lastframe` and the fade quad and swaps, so a still title screen can
-    fade; otherwise the next `_nextpage` applies the fade.
+    fade; otherwise the next `_nextpage` applies the fade. `nextpage`'s
+    permanent-sprite replay after the swap (a dastat 128 sprite drawn
+    before any `drawrooms`, such as E1's ending screen) doesn't count as
+    drawing: `nextpage` calls `_glframereplayed()` (prototyped in
+    `display.h`) after it, which clears `framedrawn`.
   - `screencapture` writes a 24-bit PCX (three planes per line, as JFBuild's
     PCX writer): from the back buffer if a frame is being drawn, otherwise
     from `lastframe`, as the back buffer is undefined after a swap. The

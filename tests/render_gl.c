@@ -6,7 +6,12 @@
  *   <dir>/fade.bmp     the screen after setpalettefade(63,0,0,32) over a
  *                      frame that isn't redrawn, as a title screen's
  *   <dir>/unfade.bmp   the screen after setpalettefade(0,0,0,0)
- *  It fails on a GL error, a failed capture, or a fade that doesn't redden.
+ *   <dir>/still63.bmp, still32.bmp, still00.bmp
+ *                      E1's ending screen, drawn once with dastat 128 as
+ *                      game.c does, faded in from black: setpalettefade
+ *                      (0,0,0,63), then 32, then 0
+ *  It fails on a GL error, a failed capture, a fade that doesn't redden, or
+ *  a still screen that doesn't brighten as it fades in.
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
  *
@@ -30,6 +35,7 @@ void faketimerhandler(void) { }
 
 #define APLAYER 1405  /* names.h: a player start */
 #define FIRSTGUN 2524  /* names.h: the pistol */
+#define VICTORY1 3260  /* names.h: E1's ending screen */
 
 /* Like premap.c genspriteremaps(): the palette swaps from lookup.dat. */
 static int load_lookups(void)
@@ -106,6 +112,8 @@ int main(int argc, char **argv)
     short ang, sectnum;
     char path[1024];
     double r0, g0, r1, g1;
+    static const int stillfade[3] = { 63, 32, 0 };
+    double still[3], rs, gs;
     GLenum err;
     int32_t i;
 
@@ -159,12 +167,28 @@ int main(int argc, char **argv)
     snprintf(path, sizeof (path), "%s/unfade.bmp", argv[2]);
     save_front(path, &r0, &g0);
     printf("mean red/green: faded %.1f/%.1f, unfaded %.1f/%.1f\n", r1, g1, r0, g0);
+
+    /* game.c's E1 ending: the screen goes up once, then palto fades it in. */
+    setpalettefade(0, 0, 0, 63);
+    clearview(0);
+    rotatesprite(0, 50<<16, 65536, 0, VICTORY1, 0, 0, 2+8+16+64+128, 0, 0, xdim-1, ydim-1);
+    nextpage();
+    for (i = 0; i < 3; i++)
+    {
+        setpalettefade(0, 0, 0, stillfade[i]);
+        snprintf(path, sizeof (path), "%s/still%02d.bmp", argv[2], stillfade[i]);
+        save_front(path, &rs, &gs);
+        still[i] = (rs + gs) / 2;
+    }
+    printf("still screen mean red+green/2: fade 63 %.1f, 32 %.1f, 0 %.1f\n", still[0], still[1], still[2]);
     err = glGetError();
 
     uninitengine();
 
     if (err != GL_NO_ERROR) { fprintf(stderr, "FAIL: glGetError 0x%x\n", (unsigned) err); return 1; }
     if ((r1 < r0 + 64) || (g1 > g0 + 1)) { fprintf(stderr, "FAIL: the fade isn't red\n"); return 1; }
+    if ((still[1] < still[0] + 8) || (still[2] < still[1] + 8))
+        { fprintf(stderr, "FAIL: the still screen doesn't fade in\n"); return 1; }
     printf("PASS: render_gl\n");
     return 0;
 }

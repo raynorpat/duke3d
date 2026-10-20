@@ -4023,6 +4023,11 @@ void nextpage(void)
    			if (((per->pagesleft&127) == 0) && (i == permtail))
    				permtail = ((permtail+1)&(MAXPERMS-1));
    		}
+#ifdef USE_OPENGL
+			/* Renderer 3: that repeats sprites of the frame just shown; it
+			   isn't new drawing, so a fade still shows that frame again. */
+		if (rendmode == 3) _glframereplayed();
+#endif
     } /* if */
 
 	faketimerhandler();

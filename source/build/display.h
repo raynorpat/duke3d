@@ -163,6 +163,8 @@ void glredrawlastframe(void);
 #ifdef USE_OPENGL
 /* Renderer 3: the engine drew to the back buffer since the last swap. */
 void _glframedrawn(void);
+/* Renderer 3: what was drawn since the swap only repeats the frame shown. */
+void _glframereplayed(void);
 /* Renderer 3: show palfadergb/palfadedelta now if no frame is being drawn. */
 void _glpalettefade(void);
 #endif

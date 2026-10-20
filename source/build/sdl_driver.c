@@ -679,6 +679,17 @@ void _glframedrawn(void)
 
 
 /*
+ * nextpage's permanent-sprite replay after the swap: it repeats sprites of
+ *  the frame just shown, so it doesn't count as drawn, and a still screen
+ *  drawn once can fade.
+ */
+void _glframereplayed(void)
+{
+    framedrawn = 0;
+} /* _glframereplayed */
+
+
+/*
  * setpalettefade in renderer 3. A frame being drawn gets the fade when it's
  *  shown; otherwise the last frame is shown again with the new fade, as a
  *  title screen fading in or out isn't redrawn.
