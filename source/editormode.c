@@ -10,6 +10,7 @@
 #include "SDL.h"
 
 int32_t editorrendermode;
+int32_t editorglfailed;
 
 int32_t editorclamprenderer(int32_t r)
 {
@@ -31,11 +32,14 @@ int editorsetgamemode(const editormode_t *m)
 #ifdef USE_OPENGL
     gltexmiplevel = m->gltexmiplevel;  /* build.cfg: drop this many mipmap levels */
 #endif
+    if (editorrendermode == 3 && editorglfailed)
+        editorrendermode = 0;
     if (editorrendermode == 3 && setgamemode_gl(vidoption) != 0)
     {
         printf("OpenGL renderer unavailable (%s); using the classic renderer.\n", SDL_GetError());
         setgamemode(vidoption, m->xdim3d, m->ydim3d);
         editorrendermode = 0;
+        editorglfailed = 1;
     }
 #ifdef USE_OPENGL
     if (editorrendermode == 3)

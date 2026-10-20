@@ -14,6 +14,9 @@ extern editormode_t editormode;  /* build.c: this run's */
 /* The renderer in use: the asked-for one, or 0 when OpenGL was unavailable. */
 extern int32_t editorrendermode;
 
+/* Set once OpenGL failed this session: renderer 3 then uses classic untried. */
+extern int32_t editorglfailed;
+
 /* A renderer from build.cfg or -renderer: 0 (classic) to 3 (OpenGL); always
  * 0 without Polymost. */
 int32_t editorclamprenderer(int32_t r);

@@ -18,7 +18,7 @@ void faketimerhandler(void) { }
 
 int main(int argc, char **argv)
 {
-    editormode_t m = { 3, 640, 480, 0 };
+    editormode_t m = { 3, 640, 480, 2 };
 #ifdef POLYMOST
     int polymost = 1;
 #else
@@ -39,6 +39,37 @@ int main(int argc, char **argv)
         fprintf(stderr, "FAIL: renderer 3 gave rendermode=%d in use=%d configured=%d %dx%d\n",
                 getrendermode(), (int) editorrendermode, (int) m.renderer,
                 (int) xdim, (int) ydim);
+        return 1;
+    }
+#ifdef USE_OPENGL
+    if (gltexmiplevel != 2)
+    {
+        fprintf(stderr, "FAIL: gltexmiplevel=%d (expected 2)\n", (int) gltexmiplevel);
+        return 1;
+    }
+
+    /* GL failed once, so the next trip back to 3D doesn't try it again. */
+    if (editorglfailed != 1)
+    {
+        fprintf(stderr, "FAIL: editorglfailed=%d after the fallback\n", (int) editorglfailed);
+        return 1;
+    }
+    editorglfailed = 2;  /* a retry that failed would set it back to 1 */
+    if ((editorsetgamemode(&m) != 0) || (getrendermode() != 0) || (editorglfailed != 2))
+    {
+        fprintf(stderr, "FAIL: second renderer 3 call gave rendermode=%d glfailed=%d\n",
+                getrendermode(), (int) editorglfailed);
+        return 1;
+    }
+#endif
+
+    /* 8-bit modes keep the engine's 1600x1200 limit. */
+    m.renderer = 0;
+    m.xdim3d = 1920;
+    m.ydim3d = 1080;
+    if ((editorsetgamemode(&m) != 0) || (xdim != 1600) || (ydim != 1200))
+    {
+        fprintf(stderr, "FAIL: 1920x1080 in renderer 0 gave %dx%d\n", (int) xdim, (int) ydim);
         return 1;
     }
 
