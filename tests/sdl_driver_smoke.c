@@ -181,6 +181,7 @@ static int screencapture_formats(int argc, char **argv)
     ((unsigned char *) frameplace)[0] = 9;  /* top left */
 
     remove("smoke0000.png"); remove("smoke0000.jpg"); remove("smoke0000.bmp");
+    remove("smoke0001.bmp");
     if ((screencapture("smokexxxx.png", 0) != 0) ||
         (screencapture("smokexxxx.jpg", 0) != 0) ||
         (screencapture("smokexxxx.bmp", 0) != 0))
@@ -240,6 +241,39 @@ static int screencapture_formats(int argc, char **argv)
         {
             fprintf(stderr, "FAIL: BMP pixels %d,%d,%d / %d,%d,%d\n",
                     top[0], top[1], top[2], next[0], next[1], next[2]);
+            return 1;
+        }
+    }
+
+    /* A capture with setpalettefade on has the faded colours, as the screen
+     * does (brightness 0 as the identity: no TABLES.DAT here). The name
+     * taken, it's smoke0001. Index 5 is 30,20,10 faded halfway to 63,0,0. */
+    {
+        unsigned char gamepal[768];
+        const unsigned char *next = bmp + 54 + (h - 1) * stride + 3;
+        const unsigned char want[3] = { (unsigned char) (5 / 63.0 * 255.0),
+                                        (unsigned char) (10 / 63.0 * 255.0),
+                                        (unsigned char) (46 / 63.0 * 255.0) };
+
+        for (i = 0; i < 64; i++)
+            britable[0][i] = (char) i;
+        memset(gamepal, 0, sizeof (gamepal));
+        gamepal[5*3+0] = 30; gamepal[5*3+1] = 20; gamepal[5*3+2] = 10;
+        setbrightness(0, gamepal);
+        setpalettefade(63, 0, 0, 32);
+        f = NULL;
+        if ((screencapture("smokexxxx.bmp", 0) != 0) || ((f = fopen("smoke0001.bmp", "rb")) == NULL) ||
+            (fread(bmp, 1, 54 + stride * h, f) != (size_t) (54 + stride * h)))
+        {
+            fprintf(stderr, "FAIL: a second capture didn't write a whole smoke0001.bmp\n");
+            return 1;
+        }
+        fclose(f);
+        remove("smoke0001.bmp");
+        if (memcmp(next, want, 3) != 0)
+        {
+            fprintf(stderr, "FAIL: faded BMP pixel %d,%d,%d, want %d,%d,%d\n",
+                    next[0], next[1], next[2], want[0], want[1], want[2]);
             return 1;
         }
     }
