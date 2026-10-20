@@ -126,21 +126,28 @@ JFBuild:
 | 3 | Polymost OpenGL |
 
 Set `Renderer` under `[Screen Setup]` in `duke3d.cfg`, or use `-renderer N`
-for one run (the config keeps its own value). Renderer 3 draws at the
-window's real pixel size and uses a legacy (fixed-function) OpenGL context.
-If OpenGL isn't available, the game prints a message and uses renderer 0. The
-map editor is classic only.
+for one run (the config keeps its own value). A number outside 0-3 is taken
+as the nearest one. Renderer 3 draws at the window's real pixel size and
+uses a legacy (fixed-function) OpenGL context. Its window is the size asked
+for, even over the 1600x1200 the 8-bit modes stop at. If OpenGL isn't
+available, the game prints a message and uses renderer 0. The map editor is
+classic only.
+
+A `DUKE3D_POLYMOST=OFF` build has renderer 0 only: 1 and 2 draw with it
+without a message, and 3 prints `OpenGL renderer unavailable (this build has
+no OpenGL); using the classic renderer.`
 
 Other settings, all under `[Screen Setup]`:
 
 - Widescreen and tallscreen: modes wider than 4:3 get a wider view and a 4:3
   status bar and HUD with the sides left empty. This applies to every
   renderer. 320x200, 640x400 and other 4:3 modes draw as before.
-- `GLTextureMipLevel` (default 0): in renderer 3, drop this many mipmap
-  levels from every texture. Over 0 looks blocky.
+- `GLTextureMipLevel` (default 0, at most 15): in renderer 3, drop this many
+  mipmap levels from every texture. Over 0 looks blocky.
 - `ScreenshotFormat`: `png` (default), `jpg` or `bmp`. Screenshots are named
   `duke0000.png` and so on, and go to a `Screenshots` folder inside the one
-  under [Config and saves](#config-and-saves).
+  under [Config and saves](#config-and-saves). They show the screen as it
+  is, fades and flashes included, in every renderer.
 
 Known gaps:
 
