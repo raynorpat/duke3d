@@ -21,11 +21,19 @@
  *                      0x0 tile (it should vanish, not draw grey), and the
  *                      first odd-sized tile is drawn with rotatesprite and
  *                      polymost_drawtilescreen
+ *   <dir>/fb_<pal>_npot<n>_<off|on|off2>.bmp
+ *                      the start view with its sector made dark (shade 24)
+ *                      and given lit tiles (indices 240-254) on its floor,
+ *                      walls and a sprite: polymosttexfullbright 256 (off),
+ *                      240 (on), then 256 again (off2), in the normal and
+ *                      water (<pal>) palettes; normal only for npot 0
  *  It fails on a GL error, a failed capture, a fade that doesn't redden, a
  *  still screen that doesn't brighten as it fades in, a miplevel 1 view
  *  the same as the miplevel 0 one, a 0x0 floor that isn't see-through, a
- *  blank map view, or a 3D view drawn after the map view that differs from
- *  the one drawn before it (GL state left behind).
+ *  blank map view, a 3D view drawn after the map view that differs from
+ *  the one drawn before it (GL state left behind), a fullbright view that
+ *  doesn't brighten, or a fullbright-off view that differs after a
+ *  fullbright-on one (glow textures left behind).
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
  *
@@ -51,11 +59,17 @@ void faketimerhandler(void) { }
 #define THREEDEE 2498  /* names.h */
 #define FIRSTGUN 2524  /* names.h: the pistol */
 #define VICTORY1 3260  /* names.h: E1's ending screen */
+#define LITFLOOR 966  /* a poster: the E1L1 wall tile with the most lit texels */
+#define LITWALL 931  /* fire, from an E1L1 sprite: lit, and 112 wide */
 
 /* polymost.c, which engine.c includes: the editor's tile picker, and the
  * texture cache reset. */
 int32_t polymost_drawtilescreen(int32_t tilex, int32_t tiley, int32_t wallnum, int32_t dimen);
 void polymost_glreset(void);
+void gltexinvalidateall(void);
+
+/* lookup.dat's water palette, after its palookups. */
+static unsigned char waterpal[768];
 
 /* Like premap.c genspriteremaps(): the palette swaps from lookup.dat. */
 static int load_lookups(void)
@@ -74,8 +88,10 @@ static int load_lookups(void)
         kread(fp, remap, 256);
         makepalookup((int32_t) look_pos, remap, 0, 0, 0, 1);
     }
+    kread(fp, waterpal, 768);
     kclose(fp);
     palette[765] = palette[766] = palette[767] = 0;
+    waterpal[765] = waterpal[766] = waterpal[767] = 0;
     return(1);
 }
 
@@ -156,6 +172,25 @@ static double floor_mean(const unsigned char *a)
     return d / (3.0 * (ydim / 20) * (xdim * 98 / 100 - xdim * 80 / 100));
 }
 
+/* Draws the start view with polymosttexfullbright fb, retexturing, and
+ *  saves it as <dir>/<name>.bmp; buf gets the frame. */
+static void fb_shot(int32_t fb, const char *dir, const char *name, unsigned char *buf,
+                    int32_t x, int32_t y, int32_t z, short a, short sect)
+{
+    char path[1024];
+    double rs, gs;
+
+    polymosttexfullbright = fb;
+    gltexinvalidateall();
+    clearallviews(0);
+    drawrooms(x, y, z, a, 100, sect);
+    drawmasks();
+    nextpage();
+    snprintf(path, sizeof (path), "%s/%s.bmp", dir, name);
+    save_front(path, &rs, &gs);
+    read_front(buf);
+}
+
 int main(int argc, char **argv)
 {
     int32_t posx, posy, posz;
@@ -167,9 +202,17 @@ int main(int argc, char **argv)
     GLenum err;
     int32_t i;
     int npot, hasnpot, mip, zerotile = -1, oddtile = -1;
-    unsigned char *shot[2][2], *view3d[2], *map[2];
+    unsigned char *shot[2][2], *view3d[2], *map[2], *fb[2][2][3];
     double mapmean[2];
     short floorpic;
+    int pal;
+    static char litsect[MAXSECTORS];
+    int32_t litx, lity;
+    short litsectnum;
+    char name[64];
+    static const char *palname[2] = { "normal", "water" };
+    static const char *fbname[3] = { "off", "on", "off2" };
+    static const int32_t fbval[3] = { 256, 240, 256 };
 
     if (argc < 3)
     {
@@ -329,6 +372,59 @@ int main(int argc, char **argv)
         printf("map view: mean |npot 1 - npot 0| %.2f\n", front_diff(map[0], map[1]));
     printf("3D view: mean |after map - before map| %.2f\n", front_diff(view3d[0], view3d[1]));
 
+    /* Fullbright: E1L1 has few lit (240-254) texels on walls or floors, so the
+     * start sector is made a dark room with them: a floor of LITFLOOR, walls
+     * (its own and its neighbours') of LITWALL, not a power of two wide (the
+     * split wall path without non-power-of-two textures), and a face sprite
+     * of LITFLOOR ahead to the right, all at shade 24. Then off, on and off
+     * again, at each npot and palette. */
+    printf("lit floor %d is %dx%d, lit wall %d is %dx%d\n", LITFLOOR, tilesizx[LITFLOOR],
+           tilesizy[LITFLOOR], LITWALL, tilesizx[LITWALL], tilesizy[LITWALL]);
+    sector[sectnum].floorpicnum = LITFLOOR;
+    sector[sectnum].floorshade = sector[sectnum].ceilingshade = 24;
+    litsect[sectnum] = 1;  /* the walls of the start sector and its neighbours */
+    for (i = sector[sectnum].wallptr; i < sector[sectnum].wallptr + sector[sectnum].wallnum; i++)
+        if (wall[i].nextsector >= 0) litsect[wall[i].nextsector] = 1;
+    for (i = 0; i < numwalls; i++)
+        if (litsect[sectorofwall(i)]) { wall[i].picnum = LITWALL; wall[i].shade = 24; }
+    litx = posx + (sintable[(ang+512+160)&2047]>>3);  /* ahead, to the right */
+    lity = posy + (sintable[(ang+160)&2047]>>3);
+    litsectnum = sectnum;
+    updatesector(litx, lity, &litsectnum);
+    if (litsectnum < 0) { fprintf(stderr, "FAIL: the lit sprite is outside the map\n"); return 1; }
+    i = insertsprite(litsectnum, 0);
+    sprite[i].x = litx;
+    sprite[i].y = lity;
+    sprite[i].z = sector[litsectnum].floorz;
+    sprite[i].cstat = 0;
+    sprite[i].picnum = LITFLOOR;
+    sprite[i].shade = 24;
+    sprite[i].pal = 0;
+    sprite[i].xrepeat = sprite[i].yrepeat = 64;
+    sprite[i].xoffset = sprite[i].yoffset = 0;
+    sprite[i].ang = ang;
+    memset(fb, 0, sizeof (fb));
+    for (npot = 0; npot <= hasnpot; npot++)
+        for (pal = 0; pal < 2; pal++)
+        {
+            if ((pal == 1) && (npot != hasnpot)) continue;
+            glinfo.texnpot = npot;
+            polymost_glreset();
+            setbrightness(0, pal ? waterpal : palette);
+            for (i = 0; i < 3; i++)
+            {
+                snprintf(name, sizeof (name), "fb_%s_npot%d_%s", palname[pal], npot, fbname[i]);
+                fb[npot][pal][i] = malloc((size_t) xdim * ydim * 3);
+                fb_shot(fbval[i], argv[2], name, fb[npot][pal][i], posx, posy, posz, ang, sectnum);
+                if (err == GL_NO_ERROR) err = glGetError();
+            }
+            printf("fullbright %s npot %d: mean |on - off| %.2f, |off again - off| %.2f\n",
+                   palname[pal], npot, front_diff(fb[npot][pal][1], fb[npot][pal][0]),
+                   front_diff(fb[npot][pal][2], fb[npot][pal][0]));
+        }
+    glinfo.texnpot = hasnpot;
+    polymosttexfullbright = 256;
+
     uninitengine();
 
     if (err != GL_NO_ERROR) { fprintf(stderr, "FAIL: glGetError 0x%x\n", (unsigned) err); return 1; }
@@ -347,6 +443,15 @@ int main(int argc, char **argv)
             { fprintf(stderr, "FAIL: the map view is blank (npot %d)\n", npot); return 1; }
     if (memcmp(view3d[0], view3d[1], (size_t) xdim * ydim * 3) != 0)
         { fprintf(stderr, "FAIL: the 3D view after the map view differs\n"); return 1; }
+    for (npot = 0; npot <= hasnpot; npot++)
+        for (pal = 0; pal < 2; pal++)
+        {
+            if (!fb[npot][pal][0]) continue;
+            if (front_diff(fb[npot][pal][1], fb[npot][pal][0]) < 0.1)
+                { fprintf(stderr, "FAIL: fullbright doesn't brighten (%s, npot %d)\n", palname[pal], npot); return 1; }
+            if (memcmp(fb[npot][pal][2], fb[npot][pal][0], (size_t) xdim * ydim * 3) != 0)
+                { fprintf(stderr, "FAIL: fullbright off differs after on (%s, npot %d)\n", palname[pal], npot); return 1; }
+        }
     printf("PASS: render_gl\n");
     return 0;
 }
