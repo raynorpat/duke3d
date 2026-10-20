@@ -86,11 +86,20 @@ char confilename[128] = {"GAME.CON"},boardfilename[128] = {0};
 char waterpal[768], slimepal[768], titlepal[768], drealms[768], endingpal[768];
 char firstdemofile[80] = { '\0' };
 
+// Screen column of the status bar's x (0-320). Widescreen pillarboxes the
+// bar at 4:3, so this uses rotatesprite's own full-screen mapping.
+static int32_t sbarx(int32_t x)
+{
+    if (widescreen)
+        return ((xdim<<15)+32768+scale((x<<16)-(320<<15),ydim<<16,200*pixelaspect))>>16;
+    return scale(x,xdim,320);
+}
+
 #define patchstatusbar(x1,y1,x2,y2)                                        \
 {                                                                          \
     rotatesprite(0,(200-34)<<16,65536L,0,BOTTOMSTATUSBAR,4,0,10+16+64+128, \
-        scale(x1,xdim,320),scale(y1,ydim,200),                             \
-        scale(x2,xdim,320)-1,scale(y2,ydim,200)-1);                        \
+        sbarx(x1),scale(y1,ydim,200),                                      \
+        sbarx(x2)-1,scale(y2,ydim,200)-1);                                 \
 }
 
 void __interrupt __far newint24( int errval, int ax, int bp, int si );
@@ -1576,6 +1585,25 @@ void displayinventory(struct player_struct *p)
 
 
 
+// Widescreen: tile the view background into rows y1..y2-1 left and right
+// of the 4:3 HUD (the status bar and fragbar don't reach there).
+static void drawwidesides(int32_t y1, int32_t y2)
+{
+    int32_t x, y, cl, cr;
+
+    if (!widescreen) return;
+
+    cl = sbarx(0); cr = sbarx(320)-1;
+    for(y=y1-(y1%tilesizy[BIGHOLE]);y<y2;y+=tilesizy[BIGHOLE])
+        for(x=0;x<xdim;x+=tilesizx[BIGHOLE])
+        {
+            if (x < cl)
+                rotatesprite(x<<16,y<<16,65536L,0,BIGHOLE,8,0,8+16+64+128,0,y1,cl,y2-1);
+            if (x+tilesizx[BIGHOLE] > cr)
+                rotatesprite(x<<16,y<<16,65536L,0,BIGHOLE,8,0,8+16+64+128,cr,y1,xdim-1,y2-1);
+        }
+}
+
 void displayfragbar(void)
 {
     short i, j;
@@ -1585,6 +1613,7 @@ void displayfragbar(void)
     for(i=connecthead;i>=0;i=connectpoint2[i])
         if(i > j) j = i;
 
+    drawwidesides(0,scale(ydim,8*(1+(j>=4)+(j>=8)+(j>=12)),200));
     rotatesprite(0,0,65600L,0,FRAGBAR,0,0,2+8+16+64+128,0,0,xdim-1,ydim-1);
     if(j >= 4) rotatesprite(319,(8)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128,0,0,xdim-1,ydim-1);
     if(j >= 8) rotatesprite(319,(16)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128,0,0,xdim-1,ydim-1);
@@ -1730,6 +1759,7 @@ void coolgaugetext(short snum)
 
     if ((uint32_t)u == 0xffffffff)
     {
+        drawwidesides(scale(ydim,200-34,200),ydim);
         patchstatusbar(0,0,320,200);
         if (ud.multimode > 1 && ud.coop != 1)
             rotatesprite(277<<16,(200-27)<<16,65536L,0,KILLSICON,0,0,10+16+128,0,0,xdim-1,ydim-1);
@@ -1988,12 +2018,14 @@ void showtwoscreens(void)
     ps[myconnectindex].palette = palette;
     for(i=0;i<64;i+=7) palto(0,0,0,i);
     KB_FlushKeyboardQueue();
+    if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,3291,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     while( !KB_KeyWaiting() ) getpackets();
 
     for(i=0;i<64;i+=7) palto(0,0,0,i);
     KB_FlushKeyboardQueue();
+    if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,3290,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     while( !KB_KeyWaiting() ) getpackets();
@@ -2402,6 +2434,7 @@ void displayrest(int32_t smoothratio)
 
     if(ud.show_help)
     {
+        if (widescreen) clearallviews(0L);
         switch(ud.show_help)
         {
             case 1:
@@ -2899,7 +2932,9 @@ static void se40code(int32_t x,int32_t y,int32_t z,int32_t a,int32_t h, int32_t 
 }
 #endif
 
-static int32_t oyrepeat=-1;
+static int32_t oyrepeat=-1, oxfov=65536;
+static int32_t tiltbytes;
+static char *tiltbuf;
 
 void displayrooms(short snum,int32_t smoothratio)
 {
@@ -2907,6 +2942,7 @@ void displayrooms(short snum,int32_t smoothratio)
     short sect, cang, k, choriz,tsect;
     struct player_struct *p;
     int32_t tposx,tposy,tposz,dx,dy,thoriz,i;
+    int32_t xfov, tiltw, b;
     short tang;
 
     p = &ps[snum];
@@ -2968,10 +3004,13 @@ void displayrooms(short snum,int32_t smoothratio)
     else
     {
         i = divscale22(1,sprite[p->i].yrepeat+28);
-        if (i != oyrepeat)
+        xfov = 65536;
+        if (widescreen) xfov = divscale16(xdim*3,ydim*4);
+        if (i != oyrepeat || xfov != oxfov)
         {
             oyrepeat = i;
-            setaspect(oyrepeat,yxaspect);
+            oxfov = xfov;
+            setaspect(mulscale16(oyrepeat,xfov),yxaspect);
         }
 
         if(screencapt)
@@ -2989,17 +3028,38 @@ void displayrooms(short snum,int32_t smoothratio)
         {
                 if (ud.screen_tilting) tang = p->rotscrnang; else tang = 0;
 
+                // Widescreen draws the tile at 4:3 by the window's height,
+                // so make it (an even number of columns) as wide as the window.
+                // Its size follows the window, so it lives outside the cache.
+                tiltw = 320;
+                if (widescreen)
+                {
+                    tiltw = (scale(windowx2-windowx1+1,100*pixelaspect,(windowy2-windowy1+1)<<16)+1)<<1;
+                    // Renderers 1 and 2 address a power-of-two tile through
+                    // picsiz, which setviewtotile doesn't update.
+                    if ((tiltw&(tiltw-1)) == 0) tiltw += 2;
+                    if (tiltbytes < tiltw*tiltw)
+                    {
+                        tiltbytes = tiltw*tiltw;
+                        tiltbuf = realloc(tiltbuf,tiltbytes);
+                    }
+                    waloff[MAXTILES-2] = (intptr_t)tiltbuf;
+                }
+                else if (waloff[MAXTILES-2] == (intptr_t)tiltbuf)
+                    waloff[MAXTILES-2] = 0;
+
                 walock[MAXTILES-2] = 255;
                 if (waloff[MAXTILES-2] == 0)
                     allocache(&waloff[MAXTILES-2],320L*320L,&walock[MAXTILES-2]);
                 if ((tang&1023) == 0)
-                    setviewtotile(MAXTILES-2,200L>>(1-ud.detail),320L>>(1-ud.detail));
+                    setviewtotile(MAXTILES-2,200L>>(1-ud.detail),tiltw>>(1-ud.detail));
                 else
-                    setviewtotile(MAXTILES-2,320L>>(1-ud.detail),320L>>(1-ud.detail));
+                    setviewtotile(MAXTILES-2,tiltw>>(1-ud.detail),tiltw>>(1-ud.detail));
                 if ((tang&1023) == 512)
                 {     //Block off unscreen section of 90ø tilted screen
-                    j = ((320-60)>>(1-ud.detail));
-                    for(i=(60>>(1-ud.detail))-1;i>=0;i--)
+                    b = (tiltw-200)>>1;
+                    j = ((tiltw-b)>>(1-ud.detail));
+                    for(i=(b>>(1-ud.detail))-1;i>=0;i--)
                     {
                         startumost[i] = 1; startumost[i+j] = 1;
                         startdmost[i] = 0; startdmost[i+j] = 0;
@@ -3008,7 +3068,7 @@ void displayrooms(short snum,int32_t smoothratio)
 
                 i = (tang&511); if (i > 256) i = 512-i;
                 i = sintable[i+512]*8 + sintable[i]*5L;
-                setaspect(i>>1,yxaspect);
+                setaspect(mulscale16(i>>1,xfov),yxaspect);
           }
 
           if ( (snum == myconnectindex) && (numplayers > 1) )
@@ -7410,6 +7470,7 @@ void Logo(void)
     for(i=0;i<64;i+=7) palto(0,0,0,i);
     ps[myconnectindex].palette = drealms;
     palto(0,0,0,63);
+    if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,DREALMS,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     totalclock = 0;
@@ -7423,6 +7484,7 @@ void Logo(void)
     ps[myconnectindex].palette = titlepal;
     glsetgamepalette();
     flushperms();
+    if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,BETASCREEN,0,0,2+8+16+64,0,0,xdim-1,ydim-1);
     KB_FlushKeyboardQueue();
     nextpage();
@@ -7431,6 +7493,7 @@ void Logo(void)
 
     while(totalclock < (860+120) && !KB_KeyWaiting())
     {
+        if (widescreen) clearallviews(0L);
         rotatesprite(0,0,65536L,0,BETASCREEN,0,0,2+8+16+64,0,0,xdim-1,ydim-1);
 
         if( totalclock > 120 && totalclock < (120+60) )
@@ -7486,6 +7549,7 @@ void Logo(void)
 
     if(ud.multimode > 1)
     {
+        if (widescreen) clearallviews(0L);
         rotatesprite(0,0,65536L,0,BETASCREEN,0,0,2+8+16+64,0,0,xdim-1,ydim-1);
 
         rotatesprite(160<<16,(104)<<16,60<<10,0,DUKENUKEM,0,0,2+8,0,0,xdim-1,ydim-1);
@@ -8168,6 +8232,7 @@ int main(int argc,char **argv)
         clearview(0L);
         ps[myconnectindex].palette = palette;
         palto(0,0,0,0);
+        if (widescreen) clearallviews(0L);
         rotatesprite(320<<15,200<<15,65536L,0,LOADSCREEN,0,0,2+8+64,0,0,xdim-1,ydim-1);
         menutext(160,105,0,0,"LOADING SAVED GAME...");
         nextpage();
@@ -9532,6 +9597,7 @@ void doorders(void)
     glsetgamepalette();
     totalclock = 0;
     KB_FlushKeyboardQueue();
+    if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,ORDERING,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     totalclock = 0;while( !KB_KeyWaiting() ) getpackets();
@@ -9539,6 +9605,7 @@ void doorders(void)
     for(i=0;i<63;i+=7) palto(0,0,0,i);
     totalclock = 0;
     KB_FlushKeyboardQueue();
+    if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,ORDERING+1,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     totalclock = 0;while( !KB_KeyWaiting() ) getpackets();
@@ -9546,6 +9613,7 @@ void doorders(void)
     for(i=0;i<63;i+=7) palto(0,0,0,i);
     totalclock = 0;
     KB_FlushKeyboardQueue();
+    if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,ORDERING+2,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     totalclock = 0;while( !KB_KeyWaiting() ) getpackets();
@@ -9553,6 +9621,7 @@ void doorders(void)
     for(i=0;i<63;i+=7) palto(0,0,0,i);
     totalclock = 0;
     KB_FlushKeyboardQueue();
+    if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,ORDERING+3,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     totalclock = 0;while( !KB_KeyWaiting() ) getpackets();
@@ -9605,6 +9674,7 @@ void dobonus(char bonusonly)
                 ps[myconnectindex].palette = endingpal;
                 glsetgamepalette();
                 clearview(0L);
+                if (widescreen) clearallviews(0L);
                 rotatesprite(0,50<<16,65536L,0,VICTORY1,0,0,2+8+16+64+128,0,0,xdim-1,ydim-1);
                 nextpage();
                 for(t=63;t>=0;t--) palto(0,0,0,t);
@@ -9614,6 +9684,7 @@ void dobonus(char bonusonly)
                 while( 1 )
                 {
                     clearview(0L);
+                    if (widescreen) clearallviews(0L);
                     rotatesprite(0,50<<16,65536L,0,VICTORY1,0,0,2+8+16+64+128,0,0,xdim-1,ydim-1);
 
                     // boss
@@ -9656,6 +9727,7 @@ void dobonus(char bonusonly)
             ps[myconnectindex].palette = palette;
             glsetgamepalette();
 
+            if (widescreen) clearallviews(0L);
             rotatesprite(0,0,65536L,0,3292,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
             nextpage(); for(t=63;t>0;t--) palto(0,0,0,t);
             while( !KB_KeyWaiting() ) getpackets();
@@ -9684,6 +9756,7 @@ void dobonus(char bonusonly)
             KB_FlushKeyboardQueue();
             ps[myconnectindex].palette = palette;
             glsetgamepalette();
+            if (widescreen) clearallviews(0L);
             rotatesprite(0,0,65536L,0,3293,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
             nextpage(); for(t=63;t>0;t--) palto(0,0,0,t);
             while( !KB_KeyWaiting() ) getpackets();
@@ -9823,6 +9896,7 @@ void dobonus(char bonusonly)
         if(!(MusicToggle == 0 || MusicDevice == NumSoundCards))
             sound(BONUSMUSIC);
 
+        if (widescreen) clearallviews(0L);
         rotatesprite(0,0,65536L,0,MENUSCREEN,16,0,2+8+16+64,0,0,xdim-1,ydim-1);
         rotatesprite(160<<16,34<<16,65536L,0,INGAMEDUKETHREEDEE,0,0,10,0,0,xdim-1,ydim-1);
 #if DUKE3D_GAMEVER >= GAMEVER_14
@@ -9923,6 +9997,7 @@ void dobonus(char bonusonly)
             break;
     }
 
+    if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,BONUSSCREEN+gfx_offset,0,0,2+8+16+64+128,0,0,xdim-1,ydim-1);
 
     menutext(160,20-6,0,0,&level_names[(ud.volume_number*11)+ud.last_level-1][0]);
@@ -9943,6 +10018,7 @@ void dobonus(char bonusonly)
     {
         if(ps[myconnectindex].gm&MODE_EOL)
         {
+            if (widescreen) clearallviews(0L);
             rotatesprite(0,0,65536L,0,BONUSSCREEN+gfx_offset,0,0,2+8+16+64+128,0,0,xdim-1,ydim-1);
 
             if( totalclock > (1000000000L) && totalclock < (1000000320L) )

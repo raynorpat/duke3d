@@ -3181,6 +3181,7 @@ void menus(void)
             }
 
             flushperms();
+            if (widescreen) clearallviews(0L);
             rotatesprite(0,0,65536L,0,ORDERING+current_menu-400,0,0,10+16+64,0,0,xdim-1,ydim-1);
 
 #else
@@ -3239,6 +3240,7 @@ void menus(void)
             }
 
             flushperms();
+            if (widescreen) clearallviews(0L);
             switch(current_menu)
             {
                 case 400:
@@ -4253,6 +4255,7 @@ void playanm(char *fn,char t)
 
        waloff[MAXTILES-3-t] = FP_OFF(ANIM_DrawFrame(i));
        invalidatetile(MAXTILES-3-t, -1, -1);  /* renderer 3: upload the new frame. */
+       if (widescreen) clearallviews(0L);
        rotatesprite(0<<16,0<<16,65536L,512,MAXTILES-3-t,0,0,2+4+8+16+64, 0,0,xdim-1,ydim-1);
        nextpage();
 
