@@ -710,8 +710,10 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 		hackscx = 1.0; hackscy = 1.0;
 
 		if (!glinfo.texnpot) {
-			for(xx=1;xx<tsizx;xx+=xx); ox2 = (double)1.0/(double)xx;
-			for(yy=1;yy<tsizy;yy+=yy); oy2 = (double)1.0/(double)yy;
+			for(xx=1;xx<tsizx;xx+=xx);
+			for(yy=1;yy<tsizy;yy+=yy);
+			ox2 = (double)1.0/(double)xx;
+			oy2 = (double)1.0/(double)yy;
 		} else {
 			xx = max(1,tsizx); ox2 = (double)1.0/(double)xx;
 			yy = max(1,tsizy); oy2 = (double)1.0/(double)yy;
@@ -1034,7 +1036,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 #if (USEZBUFFER != 0)
 											zbufmem[vidp-(char *)frameplace] = d0+16384; //+ hack so wall&floor sprites don't disappear
 #endif
-											vidp[0] = palptr[walptr[(((u0>>16)&tsizxm1)<<ltsizy) + ((v0>>16)&tsizym1)]]; //+((d0>>13)&0x3f00)];
+											vidp[0] = palptr[(unsigned char)walptr[(((u0>>16)&tsizxm1)<<ltsizy) + ((v0>>16)&tsizym1)]]; //+((d0>>13)&0x3f00)];
 #else
 											vidp[0] = ((d0>>16)&255);
 #endif
@@ -1056,7 +1058,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 #if (USEZBUFFER != 0)
 											zbufmem[vidp-(char *)frameplace] = d0;
 #endif
-											vidp[0] = palptr[walptr[imod(u0>>16,tsizx)*tsizy + ((v0>>16)&tsizym1)]]; //+((d0>>13)&0x3f00)];
+											vidp[0] = palptr[(unsigned char)walptr[imod(u0>>16,tsizx)*tsizy + ((v0>>16)&tsizym1)]]; //+((d0>>13)&0x3f00)];
 #else
 											vidp[0] = ((d0>>16)&255);
 #endif
