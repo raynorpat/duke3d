@@ -1,7 +1,7 @@
 # Polymost Renderers — Design
 
 Date: 2026-10-19
-Status: Draft (awaiting review)
+Status: Approved
 
 ## Intent
 
