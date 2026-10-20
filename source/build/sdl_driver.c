@@ -150,7 +150,7 @@ static int gl_window_h = 480;
 static int framedrawn = 0;  /* something was drawn since the last swap */
 static GLuint lastframe = 0;  /* the last swapped frame, before its fade */
 static int lastframe_set = 0;  /* lastframe holds a frame yet */
-static int lastframe_w, lastframe_h;  /* its power-of-two texture size */
+static int lastframe_w, lastframe_h;  /* its texture size */
 #endif
 
 SDL_Surface *surface = NULL; /* This isn't static so that we can use it elsewhere AH */
@@ -575,7 +575,8 @@ static int gl_has_extension(const char *exts, const char *name)
 
 /*
  * The texture that keeps the last frame, for fades over a frame that isn't
- *  being redrawn. GL 1.1 has no non-power-of-two textures.
+ *  being redrawn. GL 1.1 has no non-power-of-two textures, so without
+ *  GL_ARB_texture_non_power_of_two it's rounded up to one.
  */
 static void gl_alloc_lastframe(void)
 {
@@ -586,8 +587,13 @@ static void gl_alloc_lastframe(void)
     lastframe = 0;
     lastframe_set = 0;
 
-    for (lastframe_w = 1; lastframe_w < xres; lastframe_w <<= 1) ;
-    for (lastframe_h = 1; lastframe_h < yres; lastframe_h <<= 1) ;
+    lastframe_w = xres;
+    lastframe_h = yres;
+    if (!glinfo.texnpot)
+    {
+        for (lastframe_w = 1; lastframe_w < xres; lastframe_w <<= 1) ;
+        for (lastframe_h = 1; lastframe_h < yres; lastframe_h <<= 1) ;
+    } /* if */
     glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxsize);
     if ((lastframe_w > maxsize) || (lastframe_h > maxsize))
     {
