@@ -3679,11 +3679,23 @@ void glsetgamepalette(void)
 #ifdef POLYMOST
     palette_t fadergb;
     unsigned char fadedelta;
+#ifdef USE_OPENGL
+    char *pal = ps[myconnectindex].palette;
+    /* Lights glow in the game's palettes, not in the title, ending or 3DR ones. */
+    int32_t fullbright = (pal == (char *)palette || pal == waterpal || pal == slimepal) ? 240 : 256;
+#endif
 
     if (getrendermode() != 3) return;
-    if (ps[myconnectindex].palette == glgamepalette && ud.brightness == glgamebrightness)
+    if (ps[myconnectindex].palette == glgamepalette && ud.brightness == glgamebrightness
+#ifdef USE_OPENGL
+        && fullbright == polymosttexfullbright
+#endif
+        )
         return;
 
+#ifdef USE_OPENGL
+    polymosttexfullbright = fullbright;  /* setbrightness retextures. */
+#endif
     glgamepalette = ps[myconnectindex].palette;
     glgamebrightness = ud.brightness;
     fadergb = palfadergb;  /* setbrightness clears the fade. */
