@@ -164,8 +164,9 @@ Known gaps:
 ### Map editor
 
 The editor (`build`) draws its 3D mode in the same four renderers; the 2D mode
-is unchanged. Its settings are in `build.cfg`, which replaces `setup.dat`. It
-is in the config folder under [Config and saves](#config-and-saves) (macOS and
+is unchanged. A `DUKE3D_POLYMOST=OFF` build's editor is renderer 0 only and
+Alt+K stays on it. Its settings are in `build.cfg`, which replaces
+`setup.dat`. It is in the config folder under [Config and saves](#config-and-saves) (macOS and
 Linux) or the working directory (Windows), is written when the editor exits,
 and is read with each value clamped. The editor reads `duke3d.grp` from the
 working directory.
