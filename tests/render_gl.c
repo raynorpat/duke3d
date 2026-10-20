@@ -545,6 +545,12 @@ int main(int argc, char **argv)
      * for. */
     if ((_setgamemode(1, 1680, 900) != 0) || (setgamemode_gl(1) != 0))
         { fprintf(stderr, "FAIL: the 1680x900 mode\n"); return 1; }
+    /* OpenGL again from OpenGL: a new window replaces the old one. */
+    if (setgamemode_gl(1) != 0)
+        { fprintf(stderr, "FAIL: OpenGL again from OpenGL\n"); return 1; }
+    view_shot(NULL, posx, posy, posz, ang, sectnum);
+    if ((err = glGetError()) != GL_NO_ERROR)
+        { fprintf(stderr, "FAIL: glGetError 0x%x after OpenGL again\n", (unsigned) err); return 1; }
     SDL_GetWindowSize(SDL_GL_GetCurrentWindow(), &winw, &winh);
     printf("1680x900 mode: window %dx%d\n", winw, winh);
     uninitengine();

@@ -762,12 +762,10 @@ int setgamemode_gl(char davidoption)
     if ((SDL_WasInit(SDL_INIT_VIDEO) == 0) && (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0))
         return(-1);
 
-    destroy_gl_window();  /* already in GL: start again. */
-
     /*
-     * Make the GL window before dropping the 8-bit one, so a failure leaves
-     *  the 8-bit mode as it was. SDL2 can't add GL to a window that has an
-     *  SDL_Renderer, so it's a new window.
+     * Make the GL window before dropping the old one, so a failure leaves
+     *  the 8-bit (or GL) mode as it was. SDL2 can't add GL to a window that
+     *  has an SDL_Renderer, so it's a new window.
      */
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
@@ -786,6 +784,11 @@ int setgamemode_gl(char davidoption)
         return(-1);
     } /* if */
 
+    if (sdl_glcontext != NULL)  /* already in GL: drop it, its context current. */
+    {
+        SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
+        destroy_gl_window();
+    } /* if */
     free_video_surfaces();
     if (sdl_renderer != NULL)
     {

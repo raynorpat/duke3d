@@ -348,8 +348,8 @@ Ported from later JFBuild commits, retyped as above:
   kept by `go_to_new_vid_mode`, or the size `_setgamemode` was asked for
   when it clamped it, and the current fullscreen state) with a legacy context (double buffered, 24-bit depth, swap
   interval 1 or else 0), and only then drops the 8-bit window, renderer,
-  texture and surfaces, so any failure returns -1 with the 8-bit mode
-  untouched. It sets JFBuild's GL state, fills `glinfo` from whole
+  texture and surfaces (or, from GL, the old GL window), so any failure
+  returns -1 with the mode untouched. It sets JFBuild's GL state, fills `glinfo` from whole
   `GL_EXTENSIONS` tokens, sets `bpp = 32`, `xdim`/`ydim` to the drawable
   size clamped to `MAXXDIM`x`MAXYDIM`, `qsetmode = 200` and `frameplace = 0`,
   then calls `setrendermode(3)` and `polymost_glreset()`. Without
