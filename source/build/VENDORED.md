@@ -363,7 +363,10 @@ Ported from later JFBuild commits, retyped as above:
   same way before and after each GL mode change.
 - In GL: `_nextpage` swaps; the fullscreen toggle and
   `SDL_WINDOWEVENT_SIZE_CHANGED` re-read the drawable size and, if it
-  changed, call `polymost_glreset()` and redo the mode variables.
+  changed, call `polymost_glreset()` and redo the mode variables. With no
+  frame being drawn, the last frame is drawn again, stretched to the new
+  size, and swapped, so a still screen (which isn't redrawn) and its fades
+  survive.
   `setupmouse`, the mouse motion clamp and `_idle` check `sdl_window`
   instead of `surface`, and the clamp and `setupmouse`'s centre use the
   window's size, as SDL's mouse events are in points, not the (on a

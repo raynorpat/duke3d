@@ -270,7 +270,7 @@ int main(int argc, char **argv)
     int32_t oldxdim, oldydim;
     int lfnpot, lfpot, resized, palkept, palsame, winw, winh;
     unsigned char *buf, cleared[2];
-    double palwater;
+    double palwater, resizedmean;
     Uint32 t0;
 
     if (argc < 3)
@@ -540,7 +540,13 @@ int main(int argc, char **argv)
                (palfadedelta == savedfadedelta));
     printf("resize: %dx%d to %dx%d; palette and fade %s\n", (int) oldxdim, (int) oldydim,
            (int) xdim, (int) ydim, palkept ? "kept" : "lost");
+    /* Nothing was being drawn (as on a still screen): the last frame is
+     * still there to fade, not black. */
     setpalettefade(0, 0, 0, 0);
+    snprintf(path, sizeof (path), "%s/resized.bmp", argv[2]);
+    save_front(path, &rs, &gs);
+    resizedmean = (rs + gs) / 2;
+    printf("after the resize, unfaded: mean red+green/2 %.1f\n", resizedmean);
     view_shot(NULL, posx, posy, posz, ang, sectnum);
     lfpot = lastframe_same();
     glinfo.texnpot = hasnpot;
@@ -589,6 +595,7 @@ int main(int argc, char **argv)
         { fprintf(stderr, "FAIL: the water palette doesn't retexture\n"); return 1; }
     if (!resized) { fprintf(stderr, "FAIL: the window didn't resize\n"); return 1; }
     if (!palkept) { fprintf(stderr, "FAIL: the resize lost the palette or fade\n"); return 1; }
+    if (resizedmean < 8) { fprintf(stderr, "FAIL: the last frame is gone after the resize\n"); return 1; }
     if ((!lfnpot) || (!lfpot)) { fprintf(stderr, "FAIL: the last frame shows differently\n"); return 1; }
 
     /* A mode over the 8-bit 1600x1200 limit (it changes xdim and ydim, so

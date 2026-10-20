@@ -628,15 +628,12 @@ static void gl_draw_fade(void)
 } /* gl_draw_fade */
 
 
-/* Fills the back buffer with the last frame. Its rows are bottom-up. */
-static void gl_draw_lastframe(void)
+/* Fills the back buffer with (0,0)-(u,v) of a frame texture: bottom-up rows. */
+static void gl_draw_frame(GLuint tex, float u, float v)
 {
-    float u = (float) xres / (float) lastframe_w;
-    float v = (float) yres / (float) lastframe_h;
-
     setpolymost2dview();
     glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, lastframe);
+    glBindTexture(GL_TEXTURE_2D, tex);
     glColor4f(1, 1, 1, 1);
     glBegin(GL_QUADS);
     glTexCoord2f(0, v); glVertex2i(0, 0);
@@ -645,6 +642,14 @@ static void gl_draw_lastframe(void)
     glTexCoord2f(0, 0); glVertex2i(0, yres);
     glEnd();
     glDisable(GL_TEXTURE_2D);
+} /* gl_draw_frame */
+
+
+/* Fills the back buffer with the last frame. */
+static void gl_draw_lastframe(void)
+{
+    gl_draw_frame(lastframe, (float) xres / (float) lastframe_w,
+                  (float) yres / (float) lastframe_h);
 } /* gl_draw_lastframe */
 
 
@@ -724,12 +729,19 @@ static void init_gl_res_vars(void)
 } /* init_gl_res_vars */
 
 
-/* The drawable changed size (fullscreen toggle, a move between displays). */
+/*
+ * The drawable changed size (fullscreen toggle, a move between displays).
+ *  With no frame being drawn (a still screen, which isn't drawn again), the
+ *  last frame is shown again, stretched to the new size, and kept as the
+ *  new last frame, so the screen and its fades don't go black.
+ */
 static void gl_resize(void)
 {
     int w, h;
     palette_t pal[256], fadergb;
     unsigned char fadedelta;
+    GLuint old;
+    float oldu = 0, oldv = 0;
 
     SDL_GL_GetDrawableSize(sdl_window, &w, &h);
     if (w > MAXXDIM) w = MAXXDIM;
@@ -741,12 +753,27 @@ static void gl_resize(void)
     memcpy(pal, curpalette, sizeof (pal));
     fadergb = palfadergb;
     fadedelta = palfadedelta;
+    old = 0;
+    if ((lastframe_set) && (!framedrawn))
+    {
+        old = lastframe;
+        oldu = (float) xres / (float) lastframe_w;
+        oldv = (float) yres / (float) lastframe_h;
+        lastframe = 0;  /* keep it from gl_alloc_lastframe. */
+    } /* if */
     polymost_glreset();
     init_gl_res_vars();
     memcpy(curpalette, pal, sizeof (pal));
     palfadergb = fadergb;
     palfadedelta = fadedelta;
     gltexinvalidateall();
+
+    if (old != 0)
+    {
+        gl_draw_frame(old, oldu, oldv);
+        glDeleteTextures(1, &old);
+        gl_swap();  /* framedrawn: it becomes lastframe, faded and shown. */
+    } /* if */
 } /* gl_resize */
 #endif
 
