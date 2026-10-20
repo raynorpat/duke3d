@@ -150,6 +150,7 @@ static int gl_window_h = 480;
 static int framedrawn = 0;  /* something was drawn since the last swap */
 static GLuint lastframe = 0;  /* the last swapped frame, before its fade */
 static int lastframe_set = 0;  /* lastframe holds a frame yet */
+static int swapped = 0;  /* a swap has shown something in this mode */
 static int lastframe_w, lastframe_h;  /* its texture size */
 #endif
 
@@ -586,6 +587,7 @@ static void gl_alloc_lastframe(void)
         glDeleteTextures(1, &lastframe);
     lastframe = 0;
     lastframe_set = 0;
+    swapped = 0;
 
     lastframe_w = xres;
     lastframe_h = yres;
@@ -667,6 +669,7 @@ static void gl_swap(void)
         gl_draw_fade();
 
     SDL_GL_SwapWindow(sdl_window);
+    swapped = 1;
     framedrawn = 0;
 } /* gl_swap */
 
@@ -702,6 +705,7 @@ void _glpalettefade(void)
     if (palfadedelta)
         gl_draw_fade();
     SDL_GL_SwapWindow(sdl_window);
+    swapped = 1;
     framedrawn = 0;
 } /* _glpalettefade */
 
@@ -1727,14 +1731,18 @@ static unsigned char *gl_screencapture(int *w, int *h)
 {
     unsigned char *rgb, *top, *bottom, t;
     size_t rowbytes, i, n;
-    int y, a = palfadedelta, front = 0;
+    int y, a = palfadedelta, front = 0, failed;
 
     *w = xdim;
     *h = ydim;
     if (!framedrawn)
     {
         if (lastframe == 0)
+        {
+            if (!swapped)  /* the front buffer holds nothing yet. */
+                return(NULL);
             front = 1;
+        } /* if */
         else if (!lastframe_set)
             return(NULL);
         else
@@ -1754,8 +1762,17 @@ static unsigned char *gl_screencapture(int *w, int *h)
         glReadBuffer(GL_FRONT);
         a = 0;  /* the swap drew the fade there already. */
     } /* if */
+    while (glGetError() != GL_NO_ERROR) {}  /* only the read's own error counts. */
     glReadPixels(0, 0, *w, *h, GL_RGB, GL_UNSIGNED_BYTE, rgb);
+    failed = (glGetError() != GL_NO_ERROR);
+    while (glGetError() != GL_NO_ERROR) {}
     glReadBuffer(GL_BACK);
+    while (glGetError() != GL_NO_ERROR) {}  /* leave no error behind. */
+    if (failed)
+    {
+        free(rgb);
+        return(NULL);
+    } /* if */
 
     for (y = 0; y < *h / 2; y++)  /* GL rows are bottom-up. */
     {
