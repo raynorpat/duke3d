@@ -4,9 +4,12 @@
  *  behind it and a farther one in front of it. The one behind is closer,
  *  so it's drawn after the masked wall unless drawmasks finds it behind the
  *  wall first, which needs the wall's screen extent (xb1/xb2 in renderer
- *  0, dxb1/dxb2 in Polymost). Hidden behind a solid wall, it must leave the
- *  frame the same as without it. Renderer 1 shows the order; renderer 2's
- *  z-buffer hides the sprite whatever the order.
+ *  0, dxb1/dxb2 in Polymost). Behind a solid wall it must be hidden: the
+ *  frame is the same as without it, as renderer 1 shows (renderer 2's
+ *  z-buffer hides it whatever the order). Behind a see-through (cstat 128)
+ *  one it must show through, drawn before the wall is blended over it, as
+ *  renderers 0 and 2 show (drawn after, renderer 2's z-buffer, which the
+ *  wall wrote, hides it; renderer 1 draws flat colour, so it's hidden).
  *
  *  usage: render_maskorder <DUKE3D.GRP> <renderer>...
  *  Run with SDL_VIDEODRIVER=dummy.
@@ -110,7 +113,7 @@ int main(int argc, char **argv)
 {
     short walltile, spritetile, behind, front;
     unsigned char *with, *without, *neither;
-    int32_t i, a, diff, shown;
+    int32_t i, a, diff, shown, see;
     int fail = 0;
 
     if (argc < 3)
@@ -154,32 +157,39 @@ int main(int argc, char **argv)
     neither = malloc(xdim * ydim);
 
     for (a = 2; a < argc; a++)
-    {
-        setrendermode(atoi(argv[a]));
-        sprite[behind].cstat = sprite[front].cstat = (short) 32768;
-        draw(neither);
-        sprite[front].cstat = 0;
-        draw(without);
-        sprite[behind].cstat = 0;
-        draw(with);
-        for (i = 0, shown = 0, diff = 0; i < xdim * ydim; i++)
+        for (see = 0; see < 2; see++)
         {
-            shown += (without[i] != neither[i]);
-            diff += (with[i] != without[i]);
+            setrendermode(atoi(argv[a]));
+            wall[1].cstat = wall[7].cstat = see ? 16|128 : 16;
+            sprite[behind].cstat = sprite[front].cstat = (short) 32768;
+            draw(neither);
+            sprite[front].cstat = 0;
+            draw(without);
+            sprite[behind].cstat = 0;
+            draw(with);
+            for (i = 0, shown = 0, diff = 0; i < xdim * ydim; i++)
+            {
+                shown += (without[i] != neither[i]);
+                diff += (with[i] != without[i]);
+            }
+            printf("renderer %d, %s wall: the front sprite covers %d pixels; the one behind the wall shows in %d\n",
+                   getrendermode(), see ? "see-through" : "solid", (int) shown, (int) diff);
+            if (shown == 0)
+            {
+                fprintf(stderr, "FAIL: renderer %d doesn't draw the sprite in front\n", getrendermode());
+                fail = 1;
+            }
+            if ((diff != 0) && (!see || (getrendermode() == 1)))
+            {
+                fprintf(stderr, "FAIL: renderer %d draws the sprite behind the masked wall over it\n", getrendermode());
+                fail = 1;
+            }
+            if ((diff == 0) && see && (getrendermode() != 1))
+            {
+                fprintf(stderr, "FAIL: renderer %d hides the sprite behind the see-through wall\n", getrendermode());
+                fail = 1;
+            }
         }
-        printf("renderer %d: the front sprite covers %d pixels; the one behind the wall shows in %d\n",
-               getrendermode(), (int) shown, (int) diff);
-        if (shown == 0)
-        {
-            fprintf(stderr, "FAIL: renderer %d doesn't draw the sprite in front\n", getrendermode());
-            fail = 1;
-        }
-        if (diff != 0)
-        {
-            fprintf(stderr, "FAIL: renderer %d draws the sprite behind the masked wall over it\n", getrendermode());
-            fail = 1;
-        }
-    }
     uninitengine();
     return(fail);
 }
