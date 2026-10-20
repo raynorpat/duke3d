@@ -42,6 +42,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "platform.h"
 #include "build.h"
 #include "display.h"
@@ -142,6 +143,29 @@ static void save_front(const char *path, double *red, double *green)
     free(tmp);
 }
 
+/* The mean red and green of a 24-bit BMP (0 if it can't be read). */
+static void bmp_mean(const char *path, double *red, double *green)
+{
+    SDL_Surface *b = SDL_LoadBMP(path);
+    SDL_Surface *s = (b != NULL) ? SDL_ConvertSurfaceFormat(b, SDL_PIXELFORMAT_RGB24, 0) : NULL;
+    long n;
+    int x, y;
+    const unsigned char *p;
+
+    *red = *green = 0;
+    if (s != NULL)
+    {
+        for (y = 0; y < s->h; y++)
+            for (x = 0, p = (const unsigned char *) s->pixels + y * s->pitch; x < s->w; x++, p += 3)
+                { *red += p[0]; *green += p[1]; }
+        n = (long) s->w * s->h;
+        *red /= n;
+        *green /= n;
+    }
+    SDL_FreeSurface(s);
+    SDL_FreeSurface(b);
+}
+
 /* Reads the front buffer as RGB into buf (xdim*ydim*3 bytes). */
 static void read_front(unsigned char *buf)
 {
@@ -223,7 +247,7 @@ int main(int argc, char **argv)
     int32_t posx, posy, posz;
     short ang, sectnum;
     char path[1024];
-    double r0, g0, r1, g1;
+    double r0, g0, r1, g1, capr, capg;
     static const int stillfade[3] = { 63, 32, 0 };
     double still[3], rs, gs;
     GLenum err;
@@ -294,10 +318,18 @@ int main(int argc, char **argv)
     setpalettefade(63, 0, 0, 32);
     snprintf(path, sizeof (path), "%s/fade.bmp", argv[2]);
     save_front(path, &r1, &g1);
+    /* A screenshot has the fade, as the screen does (and as in 8-bit). */
+    snprintf(path, sizeof (path), "%s/capfade0000.bmp", argv[2]);
+    remove(path);
+    snprintf(path, sizeof (path), "%s/capfadexxxx.bmp", argv[2]);
+    if (screencapture(path, 0) != 0) { fprintf(stderr, "FAIL: screencapture of the fade\n"); return 1; }
+    snprintf(path, sizeof (path), "%s/capfade0000.bmp", argv[2]);
+    bmp_mean(path, &capr, &capg);
     setpalettefade(0, 0, 0, 0);
     snprintf(path, sizeof (path), "%s/unfade.bmp", argv[2]);
     save_front(path, &r0, &g0);
-    printf("mean red/green: faded %.1f/%.1f, unfaded %.1f/%.1f\n", r1, g1, r0, g0);
+    printf("mean red/green: faded %.1f/%.1f, unfaded %.1f/%.1f, faded screenshot %.1f/%.1f\n",
+           r1, g1, r0, g0, capr, capg);
 
     /* game.c's E1 ending: the screen goes up once, then palto fades it in. */
     setpalettefade(0, 0, 0, 63);
@@ -509,6 +541,8 @@ int main(int argc, char **argv)
 
     if (err != GL_NO_ERROR) { fprintf(stderr, "FAIL: glGetError 0x%x\n", (unsigned) err); return 1; }
     if ((r1 < r0 + 64) || (g1 > g0 + 1)) { fprintf(stderr, "FAIL: the fade isn't red\n"); return 1; }
+    if ((fabs(capr - r1) > 1) || (fabs(capg - g1) > 1))
+        { fprintf(stderr, "FAIL: the screenshot's fade isn't the screen's\n"); return 1; }
     if ((still[1] < still[0] + 8) || (still[2] < still[1] + 8))
         { fprintf(stderr, "FAIL: the still screen doesn't fade in\n"); return 1; }
     for (npot = 0; npot <= hasnpot; npot++)

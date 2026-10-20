@@ -1687,47 +1687,51 @@ int setvesa(int32_t x, int32_t y)
 #ifdef USE_OPENGL
 /*
  * RGB of the frame (JFBuild's GL branch), top row first, in a malloc'd
- *  buffer, or NULL. A frame being drawn is read from the back buffer;
- *  otherwise it's the last swapped frame, as the back buffer is undefined
- *  after a swap. The size is the drawable's, not the window's.
+ *  buffer, or NULL. It's read from the back buffer: a frame being drawn is
+ *  there; otherwise the last swapped frame is drawn there again first, as
+ *  the back buffer is undefined after a swap (with no last frame, NULL).
+ *  The fade the swap puts over it is applied here the same way, so it's
+ *  the picture on screen, as in 8-bit. The size is the drawable's.
  */
 static unsigned char *gl_screencapture(int *w, int *h)
 {
-    unsigned char *pix, *rgb;
-    int rowbytes, y;
+    unsigned char *rgb, *top, *bottom, t;
+    size_t rowbytes, i, n;
+    int y, a = palfadedelta;
 
     *w = xdim;
     *h = ydim;
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    if ((framedrawn) || (!lastframe_set))
+    if (!framedrawn)
     {
-        rowbytes = *w * 3;
-        pix = (unsigned char *) malloc(rowbytes * *h);
-        if (pix != NULL)
-            glReadPixels(0, 0, *w, *h, GL_RGB, GL_UNSIGNED_BYTE, pix);
+        if (!lastframe_set)
+            return(NULL);
+        gl_draw_lastframe();
+        framedrawn = 0;  /* that's the last frame again, not a new one. */
     } /* if */
-    else
+
+    rowbytes = (size_t) *w * 3;
+    rgb = (unsigned char *) malloc(rowbytes * *h);
+    if (rgb == NULL)
+        return(NULL);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, *w, *h, GL_RGB, GL_UNSIGNED_BYTE, rgb);
+
+    for (y = 0; y < *h / 2; y++)  /* GL rows are bottom-up. */
     {
-        rowbytes = lastframe_w * 3;
-        pix = (unsigned char *) malloc(rowbytes * lastframe_h);
-        if (pix != NULL)
+        top = rgb + y * rowbytes;
+        bottom = rgb + (*h - 1 - y) * rowbytes;
+        for (i = 0; i < rowbytes; i++)
+            { t = top[i]; top[i] = bottom[i]; bottom[i] = t; }
+    } /* for */
+
+    if (a)  /* gl_draw_fade's blend: palfadergb at alpha palfadedelta. */
+        for (i = 0, n = rowbytes * *h; i < n; i += 3)
         {
-            glBindTexture(GL_TEXTURE_2D, lastframe);
-            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, pix);
-        } /* if */
-    } /* else */
+            rgb[i+0] = (rgb[i+0] * (255 - a) + palfadergb.r * a + 127) / 255;
+            rgb[i+1] = (rgb[i+1] * (255 - a) + palfadergb.g * a + 127) / 255;
+            rgb[i+2] = (rgb[i+2] * (255 - a) + palfadergb.b * a + 127) / 255;
+        } /* for */
 
-    rgb = (unsigned char *) malloc(*w * 3 * *h);
-    if ((pix != NULL) && (rgb != NULL))
-        for (y = 0; y < *h; y++)  /* GL rows are bottom-up. */
-            memcpy(rgb + y * *w * 3, pix + (*h - 1 - y) * rowbytes, *w * 3);
-    else
-    {
-        free(rgb);
-        rgb = NULL;
-    } /* else */
-
-    free(pix);
     return(rgb);
 } /* gl_screencapture */
 #endif
@@ -1782,11 +1786,18 @@ static unsigned char *classic_screencapture(int *w, int *h, char inverseit)
 } /* classic_screencapture */
 
 
+/* stb_image_write's output: the file, and whether every write worked. */
+typedef struct
+{
+    int fd;
+    int ok;
+} capturefile;
+
 static void screencapture_write(void *context, void *data, int size)
 {
-    int *ok = (int *) context;
-    if ((*ok) && (write(ok[1], data, size) != size))
-        *ok = 0;
+    capturefile *out = (capturefile *) context;
+    if ((out->ok) && (write(out->fd, data, size) != size))
+        out->ok = 0;
 } /* screencapture_write */
 
 
@@ -1798,7 +1809,8 @@ int screencapture(char *_filename, char inverseit)
 {
     unsigned char *rgb;
     int fil = -1;
-    int w, h, ok[2];
+    int w, h, written;
+    capturefile out;
     int captcnt;
     size_t flen = strlen(_filename);
     char *filename = alloca(flen + 1);
@@ -1825,25 +1837,28 @@ int screencapture(char *_filename, char inverseit)
 #endif
         rgb = classic_screencapture(&w, &h, inverseit);
 
-    if (rgb == NULL)
-    {
-        close(fil);
-        return(-1);
-    } /* if */
-
-    ok[0] = 1;
-    ok[1] = fil;
+    out.fd = fil;
+    out.ok = 1;
+    written = 0;
     ext = filename + flen - 3;
-    if (SDL_strcasecmp(ext, "jpg") == 0)
-        stbi_write_jpg_to_func(screencapture_write, ok, w, h, 3, rgb, 90);
+    if (rgb == NULL)
+        out.ok = 0;
+    else if (SDL_strcasecmp(ext, "jpg") == 0)
+        written = stbi_write_jpg_to_func(screencapture_write, &out, w, h, 3, rgb, 90);
     else if (SDL_strcasecmp(ext, "bmp") == 0)
-        stbi_write_bmp_to_func(screencapture_write, ok, w, h, 3, rgb);
+        written = stbi_write_bmp_to_func(screencapture_write, &out, w, h, 3, rgb);
     else
-        stbi_write_png_to_func(screencapture_write, ok, w, h, 3, rgb, w * 3);
+        written = stbi_write_png_to_func(screencapture_write, &out, w, h, 3, rgb, w * 3);
 
     free(rgb);
-    close(fil);
-    return(ok[0] ? 0 : -1);
+    if (close(fil) != 0)
+        out.ok = 0;
+    if ((!written) || (!out.ok))  /* no capture, or no whole file: none. */
+    {
+        remove(filename);
+        return(-1);
+    } /* if */
+    return(0);
 } /* screencapture */
 
 

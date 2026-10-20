@@ -8,6 +8,7 @@
 #include <string.h>
 #if !PLATFORM_WIN32
 #include <signal.h>
+#include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
@@ -246,6 +247,33 @@ static int screencapture_formats(int argc, char **argv)
 
     for (i = 0; i < 3; i++)
         remove(i == 0 ? "smoke0000.png" : i == 1 ? "smoke0000.jpg" : "smoke0000.bmp");
+
+#if !PLATFORM_WIN32
+    /* A file that can't be written whole (a 64-byte file size limit): an
+     * error, and no file left behind. */
+    {
+        struct rlimit old, lim;
+
+        signal(SIGXFSZ, SIG_IGN);
+        getrlimit(RLIMIT_FSIZE, &old);
+        lim = old;
+        lim.rlim_cur = 64;
+        setrlimit(RLIMIT_FSIZE, &lim);
+        i = screencapture("smokexxxx.bmp", 0);
+        setrlimit(RLIMIT_FSIZE, &old);
+        f = fopen("smoke0000.bmp", "rb");
+        if (f != NULL)
+            fclose(f);
+        remove("smoke0000.bmp");
+        if ((i != -1) || (f != NULL))
+        {
+            fprintf(stderr, "FAIL: a short write returned %d and %s the file\n", i,
+                    (f != NULL) ? "left" : "removed");
+            return 1;
+        }
+    }
+#endif
+
     _uninitengine();
     printf("PASS: screencapture_formats\n");
     return 0;

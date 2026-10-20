@@ -410,9 +410,11 @@ Ported from later JFBuild commits, retyped as above:
     before any `drawrooms`, such as E1's ending screen) doesn't count as
     drawing: `nextpage` calls `_glframereplayed()` (prototyped in
     `display.h`) after it, which clears `framedrawn`.
-  - `screencapture`'s RGB comes from the back buffer if a frame is being
-    drawn, otherwise from `lastframe`, as the back buffer is undefined after
-    a swap (see the stb_image_write section). The fade isn't in it.
+  - `screencapture`'s RGB comes from the back buffer. A frame being drawn
+    is there; otherwise `lastframe` is drawn there first, as the back buffer
+    is undefined after a swap, and with no `lastframe` the capture fails.
+    The current fade is blended in as the fade quad does, so screenshots
+    show it as the 8-bit modes' do (see the stb_image_write section).
   - `numpages` is 2, as in JFBuild's GL mode, and back to 0 on leaving GL.
   - `glredrawlastframe()` (not in JFBuild; prototyped in `display.h` and
     `engine_protos.h`) draws `lastframe`, without the fade, into the frame
@@ -433,4 +435,5 @@ top-down 24-bit RGB, and the file name's extension picks `stbi_write_jpg`
 through `_to_func` onto the file it opened with `O_EXCL`. The 8-bit modes use
 the surface's palette (the faded one on screen); the editor's 640-wide 2D
 mode uses the 16-colour `vgapal16` and still honours `inverseit`. `build.c`'s
-editor captures are named `captxxxx.png`.
+editor captures are named `captxxxx.png`. If there's no picture, the encoder
+fails or a write fails, it removes the file and returns -1.
