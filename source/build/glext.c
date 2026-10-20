@@ -190,9 +190,9 @@ void gl_initdrawpath(const char *exts)
                               core15 || gl_has_extension(exts, "GL_ARB_vertex_buffer_object"),
                               core15 ? "" : "ARB");
         /* GLSL only as core 2.0: GL_ARB_shader_objects's calls differ. */
-    glinfo.glsl = gl_loadprocs(glslprocs, NUMPROCS(glslprocs), core20 && !gl_forcefail, "");
+    glinfo.glsl = gl_loadprocs(glslprocs, NUMPROCS(glslprocs), core20 && (gl_forcefail != 1), "");
     glinfo.fbo = gl_loadprocs(fboprocs, NUMPROCS(fboprocs),
-                              (arbfbo || gl_has_extension(exts, "GL_EXT_framebuffer_object")) && !gl_forcefail,
+                              (arbfbo || gl_has_extension(exts, "GL_EXT_framebuffer_object")) && (gl_forcefail != 1),
                               arbfbo ? "" : "EXT");
 
     gldrawpath = gl_choosepath(gldrawpathrequest, major, minor, glinfo.vbo, glinfo.glsl, glinfo.fbo);

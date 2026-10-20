@@ -41,7 +41,8 @@ int gl_choosepath(int requested, int glmajor, int glminor, int hasvbo, int hasgl
 extern int32_t gldrawpathrequest, gldrawpath;
 	/* The size renderer 3 draws at (0: the window's). Not used yet. */
 extern int32_t glinternalwidth, glinternalheight;
-	/* Test hook: nonzero makes GLSL and FBOs unavailable, as if they failed. */
+	/* Test hook: 1 makes GLSL and FBOs unavailable, as if they failed; 2 makes
+	 * the shader path's shader not compile, 3 its framebuffer incomplete. */
 extern int32_t gl_forcefail;
 
 #ifdef USE_OPENGL

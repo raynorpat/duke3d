@@ -145,6 +145,7 @@ int32_t bpp = 8;
 struct glinfo_t glinfo;
 char nofog = 0;
 extern void polymost_glreset(void);
+extern void polymost_resolve_shader(void);
 extern void gltexinvalidateall(void);
 extern void polymost_buildshaderamp(void);
 static SDL_GLContext sdl_glcontext = NULL;  /* non-NULL while in renderer 3 */
@@ -659,6 +660,7 @@ static void gl_draw_lastframe(void)
 /* Shows the back buffer: keeps it in lastframe, fades it, swaps. */
 static void gl_swap(void)
 {
+    polymost_resolve_shader();  /* a 3D view still in the GL 2.1 tier's framebuffer */
     glsub_flush();
     if ((framedrawn) && (lastframe != 0))
     {
@@ -1745,6 +1747,7 @@ static unsigned char *gl_screencapture(int *w, int *h)
     size_t rowbytes, i, n;
     int y, a = palfadedelta, front = 0, failed;
 
+    polymost_resolve_shader();
     *w = xdim;
     *h = ydim;
     if (!framedrawn)

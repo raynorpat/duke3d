@@ -8084,6 +8084,10 @@ void makepalookup(int32_t palnum, char *remapbuf, signed char r,
 			allocache((intptr_t *)&palookup[palnum],numpalookups<<8,&permanentlock);
 	}
 
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	glshlookupdirty = 1;  /* renderer 3's GL 2.1 tier uploads them again */
+#endif
+
 	if (dastat == 0) return;
 	if ((r|g|b|63) != 63) return;
 
@@ -8821,6 +8825,7 @@ void clearview(int32_t dacol)
 #if defined(POLYMOST) && defined(USE_OPENGL)
 	if (rendmode == 3)
 	{
+		polymost_resolve_shader();
 		glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
 		/* only the view window, as below (JFBuild clears it all) */
 		glScissor(windowx1,yres-(windowy2+1),windowx2-windowx1+1,windowy2-windowy1+1);
@@ -8862,6 +8867,7 @@ void clearallviews(int32_t dacol)
 #if defined(POLYMOST) && defined(USE_OPENGL)
 	if (rendmode == 3)
 	{
+		polymost_resolve_shader();
 		glViewport(0,0,xdim,ydim); glox1 = -1;
 		glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -9353,6 +9359,7 @@ void setpolymost2dview(void)
 {
 #if defined(POLYMOST) && defined(USE_OPENGL)
 	if (rendmode < 3) return;
+	polymost_resolve_shader();  /* the 3D view goes under 2D drawing */
 
 	if (gloy1 != -1)
 	{

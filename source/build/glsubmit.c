@@ -11,6 +11,7 @@
 int32_t glsubmode = GLSUB_IMMEDIATE;
 int32_t glsub_force = -1;
 uint32_t glsub_arraydraws = 0;
+int32_t glsub_flusheach = 0;
 
 typedef struct { float x, y, z, u, v, r, g, b, a; } glsubvert_t;
 
@@ -68,7 +69,9 @@ void glsub_init(void)
 	batchn = 0;
 	cur = glstart; //a new context's texcoord and colour
 	vbo = 0;
-	if ((gldrawpath >= GLPATH_VBO) && (glinfo.vbo)) bglGenBuffers(1, &vbo);
+		/* The shader path streams from client arrays too: on Apple's driver a
+		 * buffer refilled per draw is slower than them (see glsub_flush). */
+	if ((gldrawpath == GLPATH_VBO) && (glinfo.vbo)) bglGenBuffers(1, &vbo);
 	if (vbo != 0) //none: client arrays
 	{
 		bglBindBuffer(GL_ARRAY_BUFFER, vbo); //left bound: the pointers are offsets into it
@@ -159,5 +162,6 @@ void glsub_vertex(float x, float y, float z)
 void glsub_end(void)
 {
 	if (glsubmode == GLSUB_IMMEDIATE) glEnd();
+	else if (glsub_flusheach) glsub_flush();
 }
 #endif

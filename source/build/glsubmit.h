@@ -23,6 +23,9 @@ extern int32_t glsubmode;
 extern int32_t glsub_force;
 	/* glDrawArrays calls made, for tests. */
 extern uint32_t glsub_arraydraws;
+	/* Test hook: nonzero draws each glsub_begin..glsub_end at its end, so a
+	 * frame comes out the same unless a state change misses a flush. */
+extern int32_t glsub_flusheach;
 
 	/* With a new context current, after gl_initdrawpath. */
 void glsub_init(void);
