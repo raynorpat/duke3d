@@ -1900,13 +1900,7 @@ void ExtInit(void)
 
                 initmouse();
 
-// CTW - MODIFICATION
-// I just updated this quickly to force it to work.
-// You'll want to update it properly to support other video modes.
-        initengine();
-        setgamemode(2,320L,200L);
-
-// CTW END - MODIFICATION
+        initengine();  // main sets the video mode
 
         kensplayerheight = 40; //32
          zmode = 1;
