@@ -10,6 +10,10 @@
  *                      E1's ending screen, drawn once with dastat 128 as
  *                      game.c does, faded in from black: setpalettefade
  *                      (0,0,0,63), then 32, then 0
+ *   <dir>/map_npot<n>.bmp
+ *                      the E1L1 map view (drawmapview, as overhead_on 2)
+ *                      with render_classic2d's translucent floor sprite,
+ *                      non-power-of-two textures off/on (<n>)
  *   <dir>/tex_npot<n>_mip<m>.bmp
  *                      the start view again with non-power-of-two textures
  *                      off/on (<n>; on only if the driver has them) and
@@ -19,7 +23,9 @@
  *                      polymost_drawtilescreen
  *  It fails on a GL error, a failed capture, a fade that doesn't redden, a
  *  still screen that doesn't brighten as it fades in, a miplevel 1 view
- *  the same as the miplevel 0 one, or a 0x0 floor that isn't see-through.
+ *  the same as the miplevel 0 one, a 0x0 floor that isn't see-through, a
+ *  blank map view, or a 3D view drawn after the map view that differs from
+ *  the one drawn before it (GL state left behind).
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
  *
@@ -42,6 +48,7 @@ void keyhandler(void) { }
 void faketimerhandler(void) { }
 
 #define APLAYER 1405  /* names.h: a player start */
+#define THREEDEE 2498  /* names.h */
 #define FIRSTGUN 2524  /* names.h: the pistol */
 #define VICTORY1 3260  /* names.h: E1's ending screen */
 
@@ -160,7 +167,9 @@ int main(int argc, char **argv)
     GLenum err;
     int32_t i;
     int npot, hasnpot, mip, zerotile = -1, oddtile = -1;
-    unsigned char *shot[2][2];
+    unsigned char *shot[2][2], *view3d[2], *map[2];
+    double mapmean[2];
+    short floorpic;
 
     if (argc < 3)
     {
@@ -236,6 +245,7 @@ int main(int argc, char **argv)
             (tilesizx[i] & 1) && (tilesizy[i] & 1)) oddtile = i;
     }
     if ((zerotile < 0) || (oddtile < 0)) { fprintf(stderr, "FAIL: no 0x0 or odd-sized tile\n"); return 1; }
+    floorpic = sector[sectnum].floorpicnum;
     sector[sectnum].floorpicnum = zerotile;
     printf("0x0 tile %d on sector %d's floor; odd tile %d is %dx%d\n", zerotile, sectnum,
            oddtile, tilesizx[oddtile], tilesizy[oddtile]);
@@ -273,6 +283,52 @@ int main(int argc, char **argv)
     else
         printf("no GL_ARB_texture_non_power_of_two: npot 1 not drawn\n");
 
+    /* The map view, between two 3D views that must come out the same. */
+    sector[sectnum].floorpicnum = floorpic;
+    i = insertsprite(sectnum, 0);  /* render_classic2d's translucent floor sprite */
+    sprite[i].x = posx + (sintable[(ang+512)&2047]>>6);
+    sprite[i].y = posy + (sintable[ang&2047]>>6);
+    sprite[i].z = sector[sectnum].floorz;
+    sprite[i].cstat = 32|2;
+    sprite[i].picnum = THREEDEE;
+    sprite[i].shade = 0;
+    sprite[i].pal = 0;
+    sprite[i].xrepeat = sprite[i].yrepeat = 32;
+    sprite[i].xoffset = sprite[i].yoffset = 0;
+    sprite[i].ang = ang;
+    memset(show2dsector, 0xff, sizeof (show2dsector));
+    for (i = 0; i < 2; i++)
+    {
+        polymost_glreset();
+        clearallviews(0);
+        drawrooms(posx, posy, posz, ang, 100, sectnum);
+        drawmasks();
+        nextpage();
+        view3d[i] = malloc((size_t) xdim * ydim * 3);
+        read_front(view3d[i]);
+        if (i) break;
+        for (npot = 0; npot <= hasnpot; npot++)
+        {
+            glinfo.texnpot = npot;
+            polymost_glreset();
+            clearview(0);
+            drawmapview(posx, posy, 2048, ang);
+            nextpage();
+            snprintf(path, sizeof (path), "%s/map_npot%d.bmp", argv[2], npot);
+            save_front(path, &rs, &gs);
+            mapmean[npot] = (rs + gs) / 2;
+            map[npot] = malloc((size_t) xdim * ydim * 3);
+            read_front(map[npot]);
+            if (err == GL_NO_ERROR) err = glGetError();
+        }
+        glinfo.texnpot = hasnpot;
+    }
+    for (npot = 0; npot <= hasnpot; npot++)
+        printf("map view npot %d: mean red+green/2 %.1f\n", npot, mapmean[npot]);
+    if (hasnpot)
+        printf("map view: mean |npot 1 - npot 0| %.2f\n", front_diff(map[0], map[1]));
+    printf("3D view: mean |after map - before map| %.2f\n", front_diff(view3d[0], view3d[1]));
+
     uninitengine();
 
     if (err != GL_NO_ERROR) { fprintf(stderr, "FAIL: glGetError 0x%x\n", (unsigned) err); return 1; }
@@ -286,6 +342,11 @@ int main(int argc, char **argv)
         for (mip = 0; mip < 2; mip++)
             if (floor_mean(shot[npot][mip]) > 32)
                 { fprintf(stderr, "FAIL: the 0x0 floor draws (npot %d, miplevel %d)\n", npot, mip); return 1; }
+    for (npot = 0; npot <= hasnpot; npot++)
+        if (mapmean[npot] < 8)
+            { fprintf(stderr, "FAIL: the map view is blank (npot %d)\n", npot); return 1; }
+    if (memcmp(view3d[0], view3d[1], (size_t) xdim * ydim * 3) != 0)
+        { fprintf(stderr, "FAIL: the 3D view after the map view differs\n"); return 1; }
     printf("PASS: render_gl\n");
     return 0;
 }
