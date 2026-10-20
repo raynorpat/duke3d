@@ -12,7 +12,7 @@ typedef struct {
     unsigned char keys[BUILDCFG_NUMKEYS];
 } buildcfg_t;
 
-/* Fills c with the defaults; keys are astub.c's original keys[]. */
+/* Fills c with the defaults; keys are build.c's buildkeys[] initializer. */
 void buildcfg_defaults(buildcfg_t *c);
 
 /* Reads path over the defaults and clamps. 0 read, -1 missing (c untouched). */

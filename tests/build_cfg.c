@@ -58,6 +58,7 @@ int main(void)
 
     buildcfg_defaults(&d);
     CHECK(d.keys[0] == 0xc8 && d.keys[18] == 0x0f);
+    CHECK(d.keys[12] == 0x33 && d.keys[13] == 0x34);  /* strafe: , and . */
 
     /* round trip */
     CHECK(buildcfg_write(&d, cfg) == 0);
