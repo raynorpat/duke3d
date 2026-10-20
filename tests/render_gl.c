@@ -59,7 +59,8 @@
  *  renderer 0 darkens by distance), or a shader path (GL 2.1: palette
  *  indices) 3D view with a colour that isn't the palette's, whose frames
  *  change when every draw is flushed, whose 2D frames differ from immediate
- *  mode's, whose frame doesn't fade or capture, or that doesn't fall back to
+ *  mode's, whose view smaller than the screen isn't where vbo draws it or
+ *  loses the border, whose frame doesn't fade or capture, or that doesn't fall back to
  *  vbo, drawing as vbo does, when its shader or framebuffer fails.
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
@@ -290,6 +291,32 @@ static void view_shot(unsigned char *buf, int32_t x, int32_t y, int32_t z, short
     drawmasks();
     nextpage();
     if (buf) read_front(buf);
+}
+
+/* Draws the start view in a window a quarter of the screen in from each
+ *  side, over a screen cleared to colour 31 (as a view with a status bar
+ *  and border); buf gets the frame. */
+static void small_shot(unsigned char *buf, int32_t x, int32_t y, int32_t z, short a, short sect)
+{
+    clearallviews(31);
+    setview(xdim/4, ydim/4, xdim*3/4-1, ydim*3/4-1);
+    drawrooms(x, y, z, a, 100, sect);
+    drawmasks();
+    nextpage();
+    read_front(buf);
+    setview(0, 0, xdim-1, ydim-1);
+}
+
+/* Mean absolute difference per channel of two read_front buffers inside
+ *  small_shot's window. */
+static double small_diff(const unsigned char *a, const unsigned char *b)
+{
+    long x, y, i, d = 0, n = 0;
+    for (y = ydim - ydim*3/4; y < ydim - ydim/4; y++)  /* GL rows are bottom-up. */
+        for (x = xdim/4; x < xdim*3/4; x++, n++)
+            for (i = 0; i < 3; i++)
+                d += abs((int) a[(y * xdim + x) * 3 + i] - (int) b[(y * xdim + x) * 3 + i]);
+    return (double) d / (n * 3.0);
 }
 
 /* The frames path_shots draws. */
@@ -617,7 +644,8 @@ int main(int argc, char **argv)
         { GLPATH_IMMEDIATE, GLSUB_ARRAYS, GLSUB_ARRAYS, "immediate, vertex arrays" },
         { GLPATH_VBO, -1, GLSUB_VBO, "vbo" },
     };
-    unsigned char *pathshot[2][PATHSHOTS], *shshot[2][PATHSHOTS], *ref, *mirror[2];
+    unsigned char *pathshot[2][PATHSHOTS], *shshot[2][PATHSHOTS], *ref, *mirror[2], *small[2];
+    double smalld;
     double shfade[2][2];
     int p, s, pathdiffer;
     uint32_t draws;
@@ -1191,6 +1219,9 @@ int main(int argc, char **argv)
         if (i != 0) { fprintf(stderr, "FAIL: draw path shader: screencapture\n"); return 1; }
         if ((err = glGetError()) != GL_NO_ERROR)
             { fprintf(stderr, "FAIL: glGetError 0x%x after the shader path's fade\n", (unsigned) err); return 1; }
+        small[0] = malloc((size_t) xdim * ydim * 3);
+        small[1] = malloc((size_t) xdim * ydim * 3);
+        small_shot(small[0], posx, posy, posz, ang, sectnum);
 
         gldrawpathrequest = GLPATH_VBO;
         if (setgamemode_gl(1) != 0) { fprintf(stderr, "FAIL: OpenGL with draw path vbo\n"); return 1; }
@@ -1198,6 +1229,17 @@ int main(int argc, char **argv)
         ref = malloc((size_t) xdim * ydim * 3);
         buf = malloc((size_t) xdim * ydim * 3);
         view_shot(ref, posx, posy, posz, ang, sectnum);
+        /* A view smaller than the screen: the border stays, and the view is
+         * where vbo draws it, the right way up (near vbo's, as at full size). */
+        small_shot(small[1], posx, posy, posz, ang, sectnum);
+        smalld = small_diff(small[0], small[1]);
+        printf("draw path shader, small view: border red %d (colour 31's %d); mean |shader - vbo| inside %.2f\n",
+               small[0][(2 * xdim + 2) * 3], curpalette[31].r, smalld);
+        if ((memcmp(&small[0][(2 * xdim + 2) * 3], &small[1][(2 * xdim + 2) * 3], 3) != 0) ||
+            (small[0][(2 * xdim + 2) * 3] != curpalette[31].r) || (smalld > 8))
+            { fprintf(stderr, "FAIL: draw path shader: a view smaller than the screen\n"); return 1; }
+        free(small[0]);
+        free(small[1]);
         for (i = 2; i <= 3; i++)
         {
             gl_forcefail = i;
