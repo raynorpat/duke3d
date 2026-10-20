@@ -351,6 +351,7 @@ void docacheit(void)
             {
                 polymost_precache((short)i,0,0);
                 polymost_precache((short)i,0,1);
+                if((++j&7) == 0) getpackets();
             }
 #endif
 
