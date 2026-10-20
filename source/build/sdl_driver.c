@@ -722,6 +722,8 @@ static void init_gl_res_vars(void)
 static void gl_resize(void)
 {
     int w, h;
+    palette_t pal[256], fadergb;
+    unsigned char fadedelta;
 
     SDL_GL_GetDrawableSize(sdl_window, &w, &h);
     if (w > MAXXDIM) w = MAXXDIM;
@@ -729,8 +731,16 @@ static void gl_resize(void)
     if ((w == xres) && (h == yres))
         return;
 
+    /* init_res_lookups sets the base palette and drops the fade: keep both. */
+    memcpy(pal, curpalette, sizeof (pal));
+    fadergb = palfadergb;
+    fadedelta = palfadedelta;
     polymost_glreset();
     init_gl_res_vars();
+    memcpy(curpalette, pal, sizeof (pal));
+    palfadergb = fadergb;
+    palfadedelta = fadedelta;
+    gltexinvalidateall();
 } /* gl_resize */
 #endif
 
