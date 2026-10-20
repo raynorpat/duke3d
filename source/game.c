@@ -7830,6 +7830,15 @@ uint32_t grpcrc32(uint32_t crc, const unsigned char *buf, size_t n)
     return ~crc;
 }
 
+// A renderer number from duke3d.cfg or -renderer, limited to 0 (classic)
+// through 3 (Polymost OpenGL).
+int clamprenderer(int32_t r)
+{
+    if (r < 0) return 0;
+    if (r > 3) return 3;
+    return r;
+}
+
 // Names the release a GRP comes from when it's a known one other than this build's.
 const char *grpmismatch(int32_t size, uint32_t crc)
 {
@@ -8071,6 +8080,10 @@ int main(int argc,char **argv)
         setgamemode(ScreenMode,ScreenWidth,ScreenHeight);
     }
 // CTW END - MODIFICATION
+
+    // -renderer N picks the renderer for this run only; duke3d.cfg keeps its own.
+    i = CheckParm("RENDERER");
+    setrendermode(clamprenderer(i ? ((i+1 < _argc) ? atoi(_argv[i+1]) : 0) : RendererSetting));
 
     genspriteremaps();
 

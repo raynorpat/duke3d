@@ -41,6 +41,13 @@ int main(void)
     check("FindDistance2D(1000,1)", FindDistance2D(1000, 1), 962);
     check("FindDistance2D(3000,4000)", FindDistance2D(3000, 4000), 5039);
 
+    /* Renderer numbers from duke3d.cfg or -renderer: 0 classic to 3 OpenGL. */
+    check("clamprenderer(-1)", clamprenderer(-1), 0);
+    check("clamprenderer(0)",  clamprenderer(0),  0);
+    check("clamprenderer(2)",  clamprenderer(2),  2);
+    check("clamprenderer(3)",  clamprenderer(3),  3);
+    check("clamprenderer(7)",  clamprenderer(7),  3);
+
 #if DUKE3D_GAMEVER < GAMEVER_14
     /* 1.3D CONs have no definevolumename or defineskillname. */
     check_str("volume_names[0]", volume_names[0], "L.A. MELTDOWN");
