@@ -405,15 +405,10 @@ void initmenupaths(char *filename)
  */
 void showmouse(void)
 {
-	int32_t i;
-
-	for(i=1;i<=4;i++)
-	{
-		plotpixel(searchx+i,searchy,whitecol);
-		plotpixel(searchx-i,searchy,whitecol);
-		plotpixel(searchx,searchy-i,whitecol);
-		plotpixel(searchx,searchy+i,whitecol);
-	}
+	drawline256((searchx+1)<<12, (searchy  )<<12, (searchx+5)<<12, (searchy  )<<12, whitecol);
+	drawline256((searchx  )<<12, (searchy+1)<<12, (searchx  )<<12, (searchy+5)<<12, whitecol);
+	drawline256((searchx-1)<<12, (searchy  )<<12, (searchx-5)<<12, (searchy  )<<12, whitecol);
+	drawline256((searchx  )<<12, (searchy-1)<<12, (searchx  )<<12, (searchy-5)<<12, whitecol);
 }
 
 
