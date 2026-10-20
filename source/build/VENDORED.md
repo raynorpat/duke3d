@@ -133,7 +133,8 @@ unchanged.
     `(long)vidp`. `zbufoff` is gone.
   - `polymost_dorotatesprite` saves `frameoffset` in an `intptr_t`.
 - `ftol`/`dtol`: only the C fallback is kept (the MSVC, Watcom and GCC x87
-  versions are gone). It truncates where x87 `fistp` rounds.
+  versions are gone). It uses `lrintf`/`lrint`, which round to nearest as
+  x87 `fistp` does.
 - Removed, as out of scope (hightile, kplib, md2, defs, OSD):
   - `#include "md2sprite.c"`, `md2tims`, `usemodels` and the `md2draw` calls
     in `polymost_drawsprite`; the `models[]` loop in `gltexapplyprops`; the
@@ -195,7 +196,7 @@ Ported from later JFBuild commits, retyped as above:
   `gltexmaxsize-1`, and written back), uploading level `js` as level 0, and
   drops more while a texture is over `1<<gltexmaxsize`. `gltexmaxsize` is
   the log2 of `GL_MAX_TEXTURE_SIZE`, read on the first upload (6 if GL
-  returns 0); both come from upstream between the 2004 import and this
+  returns 0) and again after each `polymost_glreset` (not upstream); both come from upstream between the 2004 import and this
   commit. Both are `int32_t`, declared in `build.h` under `USE_OPENGL`; the
   game sets `gltexmiplevel` from `duke3d.cfg`'s `[Screen Setup]
   GLTextureMipLevel` before each GL mode set (textures made earlier keep
@@ -264,7 +265,8 @@ Ported from later JFBuild commits, retyped as above:
   (256, off) is in `build.h`. `drawpoly` given `METH_LAYERS` (8) draws the
   polygon again with the glow texture at colour (1,1,1,alpha), fog off,
   blended and without depth writes, then restores the base pass's state;
-  `fog_is_on` follows every fog enable and disable. `domost`,
+  `fog_is_on` follows every fog enable and disable. A failed glow-layer
+  allocation leaves the base texture without one. `domost`,
   `polymost_drawmaskwall` and `polymost_drawsprite`'s face, wall and floor
   sprites pass it; `dorotatesprite` doesn't. Changes from upstream:
   `drawpoly` strips the flag on entry, so nothing else (renderer 2
@@ -331,6 +333,8 @@ Ported from later JFBuild commits, retyped as above:
   hand over to their `polymost_` versions; `completemirror` does nothing;
   `setviewtotile` saves `rendmode` and draws to the tile with the classic
   renderer, and `setviewback` restores it and calls `invalidatetile`.
+  `setviewtotile` also sets the tile's `picsiz` from its new size (not
+  upstream), as Polymost addresses a power-of-two tile through it.
 - `engine.c`: `setrendermode` (0-3; 3 needs `bpp > 8`, and a GL mode always
   gets 3; returns the renderer set, where JFBuild returns 0), `getrendermode`,
   `setrollangle` and `invalidatetile`, from JFBuild. Their prototypes are in
@@ -391,7 +395,9 @@ Ported from later JFBuild commits, retyped as above:
   passes 0-255, which clamps to white); points are placed on pixel centres
   (upstream uses integer corners, plus a "+2 hack" row offset for text).
 - `engine.c`: `setpolymost2dview()` from JFBuild, prototyped in `engine.h`
-  and `engine_protos.h`.
+  and `engine_protos.h`. It also turns fog off (not upstream);
+  `resizeglcheck`, `polymost_drawmaskwall` and `polymost_drawsprite` turn
+  it on again.
 - `engine.c`: `setbrightness` keeps the palette it's given (`basepal`) and
   clears `palfadergb`/`palfadedelta`, as JFBuild's does. New
   `setpalettefade(r, g, b, offset)` (0-63, offset 0-64): it stores
