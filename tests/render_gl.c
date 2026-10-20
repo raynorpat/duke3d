@@ -49,7 +49,9 @@
  *  glsetgamepalette (render_gl_game.c) losing the fade or fullbright or
  *  taking the wrong player's palette, a last frame lost in a resize, or a
  *  mode over the 8-bit 1600x1200 limit whose window isn't the size asked
- *  for.
+ *  for, or a draw path (immediate, vertex arrays, vbo, shader) that draws
+ *  any of a set of frames differently from immediate mode or doesn't send
+ *  its vertices its own way.
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
  *
@@ -66,6 +68,8 @@
 #include "cache1d.h"
 #include "SDL.h"
 #include "SDL_opengl.h"
+#include "glext.h"
+#include "glsubmit.h"
 
 /* The game is linked in (for render_gl_game.c), so it provides the
  * engine's callbacks. */
@@ -276,6 +280,56 @@ static void view_shot(unsigned char *buf, int32_t x, int32_t y, int32_t z, short
     if (buf) read_front(buf);
 }
 
+/* The frames path_shots draws. */
+#define PATHSHOTS 7
+
+/* Draws the frames compared across draw paths into shots: the start view
+ *  with a HUD tile, text, a line and a pixel, then turned three ways (sky,
+ *  sprites), with fullbright on (glow passes over masked walls and a
+ *  translucent sprite, as the caller sets them), the map view with lines and
+ *  the tile picker, and a still screen. */
+static void path_shots(unsigned char **shots, int32_t x, int32_t y, int32_t z, short a,
+                       short sect, short tile)
+{
+    int i;
+
+    for (i = 0; i < 5; i++)
+    {
+        polymosttexfullbright = (i == 4) ? 240 : 256;
+        if (i >= 3) gltexinvalidateall();
+        clearallviews(0);
+        drawrooms(x, y, z, (short) ((a + (i & 3) * 512) & 2047), 100, sect);
+        drawmasks();
+        if (i == 0)
+        {
+            rotatesprite(160<<16, 130<<16, 65536, 0, FIRSTGUN, 0, 0, 2, 0, 0, xdim-1, ydim-1);
+            printext256(16, 16, 31, 0, "RENDERER 3 PRINTEXT256", 0);
+            printext256(16, 32, 159, -1, "small font", 1);
+            drawline256(16<<12, 48<<12, (xdim-16)<<12, (ydim-16)<<12, 31);
+            plotpixel(8, 8, 31);
+        }
+        nextpage();
+        read_front(shots[i]);
+    }
+    polymosttexfullbright = 256;
+    gltexinvalidateall();
+
+    clearview(0);
+    drawmapview(x, y, 2048, a);
+    for (i = 0; i < 64; i++)
+        drawline256((xdim/2)<<12, (ydim/2)<<12, (xdim/2 + (sintable[(i*32+512)&2047]>>7))<<12,
+                    (ydim/2 + (sintable[(i*32)&2047]>>7))<<12, (unsigned char) (i + 64));
+    setpolymost2dview();
+    polymost_drawtilescreen(8, 8, tile, 128);
+    nextpage();
+    read_front(shots[5]);
+
+    clearview(0);
+    rotatesprite(0, 50<<16, 65536, 0, VICTORY1, 0, 0, 2+8+16+64+128, 0, 0, xdim-1, ydim-1);
+    nextpage();
+    read_front(shots[6]);
+}
+
 /* Shows the last frame again (setpalettefade with no frame drawn): lastframe
  *  must give back what was on screen. 1 if it does. */
 static int lastframe_same(void)
@@ -329,6 +383,15 @@ int main(int argc, char **argv)
     static const char *glowname[3] = { "neither", "masked", "translucent" };
     int overtop, startw, starth, artsize, gamepal, askh;
     SDL_Rect usable;
+    static const struct { int32_t path, force, mode; const char *name; } paths[] = {
+        { GLPATH_IMMEDIATE, GLSUB_IMMEDIATE, GLSUB_IMMEDIATE, "immediate" },
+        { GLPATH_IMMEDIATE, GLSUB_ARRAYS, GLSUB_ARRAYS, "immediate, vertex arrays" },
+        { GLPATH_VBO, -1, GLSUB_VBO, "vbo" },
+        { GLPATH_SHADER, -1, GLSUB_VBO, "shader" },
+    };
+    unsigned char *pathshot[2][PATHSHOTS];
+    int p, s, pathdiffer;
+    int32_t draws, refxdim = 0, refydim = 0;
 
     if (argc < 3)
     {
@@ -744,6 +807,56 @@ int main(int argc, char **argv)
     if (!palkept) { fprintf(stderr, "FAIL: the resize lost the palette or fade\n"); return 1; }
     if (resizeddiff > 4) { fprintf(stderr, "FAIL: the last frame isn't shown again after the resize\n"); return 1; }
     if ((!lfnpot) || (!lfpot)) { fprintf(stderr, "FAIL: the last frame shows differently\n"); return 1; }
+
+    /* Each draw path, forced, draws the same frames byte for byte as
+     * immediate mode, with the masked walls and translucent sprite of the
+     * fullbright checks; a path the driver lacks is skipped. */
+    for (i = sector[sectnum].wallptr; i < sector[sectnum].wallptr + sector[sectnum].wallnum; i++)
+        if (wall[i].nextsector >= 0) wall[i].cstat |= 16;
+    sprite[litspr].cstat = 2;
+    for (s = 0; s < PATHSHOTS; s++)
+    {
+        pathshot[0][s] = malloc((size_t) xdim * ydim * 3);
+        pathshot[1][s] = malloc((size_t) xdim * ydim * 3);
+    }
+    for (p = 0; p < (int) (sizeof (paths) / sizeof (paths[0])); p++)
+    {
+        gldrawpathrequest = paths[p].path;
+        glsub_force = paths[p].force;
+        if (setgamemode_gl(1) != 0)
+            { fprintf(stderr, "FAIL: OpenGL with draw path %s\n", paths[p].name); return 1; }
+        if (gldrawpath != paths[p].path)
+        {
+            printf("draw path %s: not on this driver, skipped\n", paths[p].name);
+            continue;
+        }
+        if (p == 0) { refxdim = xdim; refydim = ydim; }
+        if ((xdim != refxdim) || (ydim != refydim))
+            { fprintf(stderr, "FAIL: draw path %s is %dx%d\n", paths[p].name, (int) xdim, (int) ydim); return 1; }
+        setbrightness(0, palette);
+        draws = glsub_arraydraws;
+        path_shots(pathshot[p != 0], posx, posy, posz, ang, sectnum, oddtile);
+        draws = glsub_arraydraws - draws;
+        if ((err = glGetError()) != GL_NO_ERROR)
+            { fprintf(stderr, "FAIL: glGetError 0x%x on draw path %s\n", (unsigned) err, paths[p].name); return 1; }
+        for (s = 0, pathdiffer = 0; (p != 0) && (s < PATHSHOTS); s++)
+            if (memcmp(pathshot[0][s], pathshot[1][s], (size_t) xdim * ydim * 3) != 0)
+            {
+                printf("draw path %s: frame %d differs from immediate, mean |difference| %.4f\n",
+                       paths[p].name, s, front_diff(pathshot[1][s], pathshot[0][s]));
+                pathdiffer = 1;
+            }
+        printf("draw path %s: %d array draws, %s\n", paths[p].name, (int) draws,
+               (p == 0) ? "the reference" : (pathdiffer ? "differs" : "the same as immediate"));
+        if (glsubmode != paths[p].mode)
+            { fprintf(stderr, "FAIL: draw path %s sends vertices as mode %d\n", paths[p].name, (int) glsubmode); return 1; }
+        if ((draws == 0) != (paths[p].mode == GLSUB_IMMEDIATE))
+            { fprintf(stderr, "FAIL: draw path %s made %d array draws\n", paths[p].name, (int) draws); return 1; }
+        if (pathdiffer)
+            { fprintf(stderr, "FAIL: draw path %s draws differently from immediate\n", paths[p].name); return 1; }
+    }
+    gldrawpathrequest = GLPATH_AUTO;
+    glsub_force = -1;
 
     /* A mode over the 8-bit 1600x1200 limit (it changes xdim and ydim, so
      * after the checks above): the OpenGL window still gets the size asked
