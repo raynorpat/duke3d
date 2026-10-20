@@ -409,7 +409,8 @@ Ported from later JFBuild commits, retyped as above:
   to draw the batch first (binding the bound texture or enabling an enabled
   cap is skipped while batching), and `gl_swap` draws it before the swap.
   `setgamemode_gl` calls `glsub_init`, `destroy_gl_window` `glsub_uninit`.
-  Every path draws the same pixels as JFBuild's immediate mode.
+  Every path draws the same pixels as JFBuild's immediate mode on the
+  drivers tested (macOS's 2.1).
 
 ## Renderer 3: 2D, clears, palette, fades, screenshots
 

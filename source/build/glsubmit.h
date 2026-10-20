@@ -22,7 +22,7 @@ extern int32_t glsubmode;
 	 * send vertices that way (-1: its own choice). */
 extern int32_t glsub_force;
 	/* glDrawArrays calls made, for tests. */
-extern int32_t glsub_arraydraws;
+extern uint32_t glsub_arraydraws;
 
 	/* With a new context current, after gl_initdrawpath. */
 void glsub_init(void);

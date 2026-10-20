@@ -10,7 +10,7 @@
 
 int32_t glsubmode = GLSUB_IMMEDIATE;
 int32_t glsub_force = -1;
-int32_t glsub_arraydraws = 0;
+uint32_t glsub_arraydraws = 0;
 
 typedef struct { float x, y, z, u, v, r, g, b, a; } glsubvert_t;
 

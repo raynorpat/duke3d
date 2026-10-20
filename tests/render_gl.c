@@ -391,7 +391,8 @@ int main(int argc, char **argv)
     };
     unsigned char *pathshot[2][PATHSHOTS];
     int p, s, pathdiffer;
-    int32_t draws, refxdim = 0, refydim = 0;
+    uint32_t draws;
+    int32_t refxdim = 0, refydim = 0;
 
     if (argc < 3)
     {
