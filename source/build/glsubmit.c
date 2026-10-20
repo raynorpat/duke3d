@@ -63,11 +63,14 @@ void glsub_init(void)
 {
 	const char *base = (const char *)batch;
 
+	static const glsubvert_t glstart = { 0, 0, 0, 0, 0, 1, 1, 1, 1 };
+
 	batchn = 0;
+	cur = glstart; //a new context's texcoord and colour
 	vbo = 0;
-	if ((gldrawpath >= GLPATH_VBO) && (glinfo.vbo))
+	if ((gldrawpath >= GLPATH_VBO) && (glinfo.vbo)) bglGenBuffers(1, &vbo);
+	if (vbo != 0) //none: client arrays
 	{
-		bglGenBuffers(1, &vbo);
 		bglBindBuffer(GL_ARRAY_BUFFER, vbo); //left bound: the pointers are offsets into it
 		base = NULL;
 	}
