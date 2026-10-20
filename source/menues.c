@@ -3679,15 +3679,16 @@ static int32_t glgamebrightness;
  *  palette must reach the engine before the next draw, not at the next
  *  palto. Applies it only when it changed, keeping any fade. In a game or
  *  demo it's the viewed player's (screenpeek), as restorepalette sets;
- *  elsewhere (title, bonus and ending screens) the game sets
- *  myconnectindex's.
+ *  elsewhere (title, bonus and ending screens, and at a level's end) the
+ *  game sets myconnectindex's.
  */
 void glsetgamepalette(void)
 {
 #ifdef POLYMOST
     palette_t fadergb;
     unsigned char fadedelta;
-    char *pal = ps[(ps[myconnectindex].gm&(MODE_GAME|MODE_DEMO)) ? screenpeek : myconnectindex].palette;
+    char *pal = ps[((ps[myconnectindex].gm&(MODE_GAME|MODE_DEMO)) &&
+                    !(ps[myconnectindex].gm&MODE_EOL)) ? screenpeek : myconnectindex].palette;
 #ifdef USE_OPENGL
     /* Lights glow in the game's palettes, not in the title, ending or 3DR ones. */
     int32_t fullbright = (pal == (char *)palette || pal == waterpal || pal == slimepal) ? 240 : 256;
