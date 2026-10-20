@@ -158,6 +158,8 @@ char nofog = 0;
 extern void polymost_glreset(void);
 static SDL_GLContext sdl_glcontext = NULL;  /* non-NULL while in renderer 3 */
 static char gl_davidoption = 1;
+static int gl_window_w = 640;  /* windowed size: the last 8-bit window's */
+static int gl_window_h = 480;
 #endif
 
 SDL_Surface *surface = NULL; /* This isn't static so that we can use it elsewhere AH */
@@ -500,6 +502,10 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
     scale = (w < 640) ? (640 / w) : 1;
     if (scale < 1)
         scale = 1;
+#ifdef USE_OPENGL
+    gl_window_w = w * scale;  /* a fullscreen window reports the desktop size. */
+    gl_window_h = h * scale;
+#endif
 
     if (sdl_window == NULL)
     {
@@ -614,15 +620,10 @@ int setgamemode_gl(char davidoption)
     SDL_Window *window;
     SDL_GLContext context;
     const char *exts;
-    int w = 640;
-    int h = 480;
 
     SDL_ClearError();
     if ((SDL_WasInit(SDL_INIT_VIDEO) == 0) && (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0))
         return(-1);
-
-    if (sdl_window != NULL)
-        SDL_GetWindowSize(sdl_window, &w, &h);
 
     destroy_gl_window();  /* already in GL: start again. */
 
@@ -634,7 +635,8 @@ int setgamemode_gl(char davidoption)
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     window = SDL_CreateWindow(titlelong,
-                    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h,
+                    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                    gl_window_w, gl_window_h,
                     SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI |
                     (sdl_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
     if (window == NULL)

@@ -192,8 +192,8 @@ unchanged.
   sent over the network.
 - `sdl_driver.c`: `setgamemode_gl(davidoption)`, prototyped in `display.h`
   and `engine_protos.h`. It makes a new `SDL_WINDOW_OPENGL |
-  SDL_WINDOW_ALLOW_HIGHDPI` window (same size and fullscreen state as the
-  old one) with a legacy context (double buffered, 24-bit depth, swap
+  SDL_WINDOW_ALLOW_HIGHDPI` window (the last 8-bit window's windowed size,
+  kept by `go_to_new_vid_mode`, and the current fullscreen state) with a legacy context (double buffered, 24-bit depth, swap
   interval 1 or else 0), and only then drops the 8-bit window, renderer,
   texture and surfaces, so any failure returns -1 with the 8-bit mode
   untouched. It sets JFBuild's GL state, fills `glinfo` from whole
