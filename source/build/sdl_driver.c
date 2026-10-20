@@ -2178,14 +2178,21 @@ int VBE_setPalette(int32_t start, int32_t num, char *palettebuffer)
 #ifdef USE_OPENGL
     if (sdl_glcontext != NULL)  /* 6-bit BGR0 to 8-bit, then retexture. */
     {
+        palette_t newpal[256];
+
         for (i = 0; i < num; i++, p += 4)
         {
-            curpalette[start+i].b = (p[0] << 2) | (p[0] >> 4);
-            curpalette[start+i].g = (p[1] << 2) | (p[1] >> 4);
-            curpalette[start+i].r = (p[2] << 2) | (p[2] >> 4);
-            curpalette[start+i].f = 0;
+            newpal[i].b = (p[0] << 2) | (p[0] >> 4);
+            newpal[i].g = (p[1] << 2) | (p[1] >> 4);
+            newpal[i].r = (p[2] << 2) | (p[2] >> 4);
+            newpal[i].f = 0;
         } /* for */
-        gltexinvalidateall();
+        /* the same palette again (a flash's end) needn't retexture. */
+        if (memcmp(&curpalette[start], newpal, num * sizeof (palette_t)) != 0)
+        {
+            memcpy(&curpalette[start], newpal, num * sizeof (palette_t));
+            gltexinvalidateall();
+        } /* if */
         return(1);
     } /* if */
 #endif

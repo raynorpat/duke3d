@@ -3699,7 +3699,9 @@ void glsetgamepalette(void)
         return;
 
 #ifdef USE_OPENGL
-    polymosttexfullbright = fullbright;  /* setbrightness retextures. */
+    /* setbrightness retextures only if the palette changed. */
+    if (fullbright != polymosttexfullbright) gltexinvalidateall();
+    polymosttexfullbright = fullbright;
 #endif
     glgamepalette = ps[myconnectindex].palette;
     glgamebrightness = ud.brightness;
