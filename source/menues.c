@@ -29,6 +29,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "mouse.h"
 #include "savegame.h"
 #include "animlib.h"
+#include "glext.h"
 
 /* this should be a proper prototype included from a header file */
 #if PLATFORM_UNIX
@@ -3703,8 +3704,9 @@ void glsetgamepalette(void)
         return;
 
 #ifdef USE_OPENGL
-    /* setbrightness retextures only if the palette changed. */
-    if (fullbright != polymosttexfullbright) gltexinvalidateall();
+    /* setbrightness retextures only if the palette changed; the GL 2.1 tier
+       has no RGB textures, and its shade tables keep lights lit. */
+    if ((fullbright != polymosttexfullbright) && (gldrawpath != GLPATH_SHADER)) gltexinvalidateall();
     polymosttexfullbright = fullbright;
 #endif
     glgamepalette = pal;
