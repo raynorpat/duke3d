@@ -1718,22 +1718,29 @@ int setvesa(int32_t x, int32_t y)
  *  there; otherwise the last swapped frame is drawn there again first, as
  *  the back buffer is undefined after a swap (with no last frame, NULL).
  *  The fade the swap puts over it is applied here the same way, so it's
- *  the picture on screen, as in 8-bit. The size is the drawable's.
+ *  the picture on screen, as in 8-bit. With no last-frame texture (over
+ *  GL_MAX_TEXTURE_SIZE) it reads the front buffer, fade and all. The size
+ *  is the drawable's.
  */
 static unsigned char *gl_screencapture(int *w, int *h)
 {
     unsigned char *rgb, *top, *bottom, t;
     size_t rowbytes, i, n;
-    int y, a = palfadedelta;
+    int y, a = palfadedelta, front = 0;
 
     *w = xdim;
     *h = ydim;
     if (!framedrawn)
     {
-        if (!lastframe_set)
+        if (lastframe == 0)
+            front = 1;
+        else if (!lastframe_set)
             return(NULL);
-        gl_draw_lastframe();
-        framedrawn = 0;  /* that's the last frame again, not a new one. */
+        else
+        {
+            gl_draw_lastframe();
+            framedrawn = 0;  /* that's the last frame again, not a new one. */
+        } /* else */
     } /* if */
 
     rowbytes = (size_t) *w * 3;
@@ -1741,7 +1748,13 @@ static unsigned char *gl_screencapture(int *w, int *h)
     if (rgb == NULL)
         return(NULL);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    if (front)
+    {
+        glReadBuffer(GL_FRONT);
+        a = 0;  /* the swap drew the fade there already. */
+    } /* if */
     glReadPixels(0, 0, *w, *h, GL_RGB, GL_UNSIGNED_BYTE, rgb);
+    glReadBuffer(GL_BACK);
 
     for (y = 0; y < *h / 2; y++)  /* GL rows are bottom-up. */
     {
