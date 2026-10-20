@@ -191,6 +191,33 @@ static void fb_shot(int32_t fb, const char *dir, const char *name, unsigned char
     read_front(buf);
 }
 
+/* Draws the start view without retexturing; buf (if any) gets the frame. */
+static void view_shot(unsigned char *buf, int32_t x, int32_t y, int32_t z, short a, short sect)
+{
+    clearallviews(0);
+    drawrooms(x, y, z, a, 100, sect);
+    drawmasks();
+    nextpage();
+    if (buf) read_front(buf);
+}
+
+/* Shows the last frame again (setpalettefade with no frame drawn): lastframe
+ *  must give back what was on screen. 1 if it does. */
+static int lastframe_same(void)
+{
+    unsigned char *a = malloc((size_t) xdim * ydim * 3);
+    unsigned char *b = malloc((size_t) xdim * ydim * 3);
+    int same;
+
+    read_front(a);
+    setpalettefade(0, 0, 0, 0);
+    read_front(b);
+    same = (memcmp(a, b, (size_t) xdim * ydim * 3) == 0);
+    free(a);
+    free(b);
+    return same;
+}
+
 int main(int argc, char **argv)
 {
     int32_t posx, posy, posz;
@@ -213,6 +240,13 @@ int main(int argc, char **argv)
     static const char *palname[2] = { "normal", "water" };
     static const char *fbname[3] = { "off", "on", "off2" };
     static const int32_t fbval[3] = { 256, 240, 256 };
+    unsigned char *palshot[3];
+    palette_t savedpal[256], savedfade;
+    unsigned char savedfadedelta;
+    int32_t oldxdim, oldydim;
+    int lfnpot, lfpot, resized, palkept, palsame;
+    double palwater;
+    Uint32 t0;
 
     if (argc < 3)
     {
@@ -425,6 +459,54 @@ int main(int argc, char **argv)
     glinfo.texnpot = hasnpot;
     polymosttexfullbright = 256;
 
+    /* A palette change through setbrightness retextures without a reset; the
+     * same palette again (a flash's end) draws the same frame. */
+    for (i = 0; i < 3; i++)
+    {
+        palshot[i] = malloc((size_t) xdim * ydim * 3);
+        setbrightness(0, (i == 2) ? waterpal : palette);
+        view_shot(palshot[i], posx, posy, posz, ang, sectnum);
+    }
+    palsame = (memcmp(palshot[1], palshot[0], (size_t) xdim * ydim * 3) == 0);
+    palwater = front_diff(palshot[2], palshot[0]);
+    printf("palette: same again %s; mean |water - normal| %.2f\n",
+           palsame ? "unchanged" : "changed", palwater);
+    lfnpot = lastframe_same();
+    if (err == GL_NO_ERROR) err = glGetError();
+
+    /* A window resize (as a fullscreen toggle) underwater, mid-fade: the
+     * palette and fade survive. The last-frame texture is made again, this
+     * time without non-power-of-two textures. */
+    setpalettefade(0, 0, 63, 16);
+    memcpy(savedpal, curpalette, sizeof (savedpal));
+    savedfade = palfadergb;
+    savedfadedelta = palfadedelta;
+    oldxdim = xdim;
+    oldydim = ydim;
+    glinfo.texnpot = 0;
+    SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), 800, 520);
+    for (t0 = SDL_GetTicks(); (xdim == oldxdim) && (SDL_GetTicks() - t0 < 3000); SDL_Delay(10))
+        _handle_events();
+    resized = (xdim != oldxdim);
+    palkept = ((memcmp(savedpal, curpalette, sizeof (savedpal)) == 0) &&
+               (memcmp(&savedfade, &palfadergb, sizeof (savedfade)) == 0) &&
+               (palfadedelta == savedfadedelta));
+    printf("resize: %dx%d to %dx%d; palette and fade %s\n", (int) oldxdim, (int) oldydim,
+           (int) xdim, (int) ydim, palkept ? "kept" : "lost");
+    setpalettefade(0, 0, 0, 0);
+    view_shot(NULL, posx, posy, posz, ang, sectnum);
+    lfpot = lastframe_same();
+    glinfo.texnpot = hasnpot;
+    /* back to the first size: the checks below use xdim and ydim. */
+    SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), 640, 400);
+    for (t0 = SDL_GetTicks(); (xdim != oldxdim) && (SDL_GetTicks() - t0 < 3000); SDL_Delay(10))
+        _handle_events();
+    if ((xdim != oldxdim) || (ydim != oldydim))
+        { fprintf(stderr, "FAIL: the window didn't resize back\n"); return 1; }
+    printf("last frame shown again unchanged: npot %d %s, npot 0 %s\n", hasnpot,
+           lfnpot ? "yes" : "no", lfpot ? "yes" : "no");
+    if (err == GL_NO_ERROR) err = glGetError();
+
     uninitengine();
 
     if (err != GL_NO_ERROR) { fprintf(stderr, "FAIL: glGetError 0x%x\n", (unsigned) err); return 1; }
@@ -452,6 +534,13 @@ int main(int argc, char **argv)
             if (memcmp(fb[npot][pal][2], fb[npot][pal][0], (size_t) xdim * ydim * 3) != 0)
                 { fprintf(stderr, "FAIL: fullbright off differs after on (%s, npot %d)\n", palname[pal], npot); return 1; }
         }
+    if (!palsame)
+        { fprintf(stderr, "FAIL: the same palette again changes the frame\n"); return 1; }
+    if (palwater < 1)
+        { fprintf(stderr, "FAIL: the water palette doesn't retexture\n"); return 1; }
+    if (!resized) { fprintf(stderr, "FAIL: the window didn't resize\n"); return 1; }
+    if (!palkept) { fprintf(stderr, "FAIL: the resize lost the palette or fade\n"); return 1; }
+    if ((!lfnpot) || (!lfpot)) { fprintf(stderr, "FAIL: the last frame shows differently\n"); return 1; }
     printf("PASS: render_gl\n");
     return 0;
 }
