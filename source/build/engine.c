@@ -220,7 +220,7 @@ int32_t globalvisibility, globalhisibility, globalpisibility, globalcisibility;
 char globparaceilclip, globparaflorclip;
 
 int32_t viewingrangerecip;
-	/* JFBuild: pixelaspect starts square, as setaspect divides by it */
+/* JFBuild: pixelaspect starts square, as setaspect divides by it */
 int32_t pixelaspect = 65536;
 
 int32_t asm1, asm4;

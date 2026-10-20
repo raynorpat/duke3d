@@ -2981,7 +2981,7 @@ void polymost_dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short 
 		if (!(dastat&8))
 		{
 			if (widescreen) {
-				x = ydimenscale;   //= scale(xdimen,yxaspect,320);
+				x = ydimenscale;   //= scale(ydimen,yxaspect,mulscale16(200,pixelaspect));
 				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),oydimen<<16,200*pixelaspect);
 			} else {
 				x = xdimenscale;   //= scale(xdimen,yxaspect,320);

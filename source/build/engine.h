@@ -120,6 +120,8 @@ void getzsofslope(short sectnum, int32_t dax, int32_t day, int32_t *ceilz, int32
  * setaspect(((ydim*320)<<16)/(xdim*200));
  * Note that in 320*200 mode the value passed would be 65536
  * which is a 1:1 aspect ratio.
+ * (This port's setview calls setaspect(xfov,pixelaspect) instead, where
+ * xfov is 65536, or xdim*3/(ydim*4) in widescreen modes.)
  * \n---------------------\n
  * Since drawmapview is also affect by the aspect ratio, you
  * will need to make sure drawoverheadmap is affected so
