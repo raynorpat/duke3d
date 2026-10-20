@@ -2719,6 +2719,10 @@ void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
 	umost[0] = shortptr1[0]-windowy1;
 	dmost[0] = shortptr2[0]-windowy1;
 
+#ifdef POLYMOST
+	polymost_drawrooms(); if (rendmode) { return; }
+#endif
+
 /*
  * every cycle counts...and the CRC gets checked at the start, so this only
  *  would trigger only if they've changed it in memory after loading (and what
@@ -3580,6 +3584,10 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 	int32_t xsiz, ysiz, xoff, yoff, npoints, yplc, yinc, lx, rx, xx, xend;
 	int32_t xv, yv, xv2, yv2, obuffermode=0, qlinemode=0, y1ve[4], y2ve[4], u4, d4;
 	char bad;
+
+#ifdef POLYMOST
+	if (rendmode) { polymost_dorotatesprite(sx,sy,z,a,picnum,dashade,dapalnum,dastat,cx1,cy1,cx2,cy2); return; }
+#endif
 
 	xsiz = tilesizx[picnum]; ysiz = tilesizy[picnum];
 	if (dastat&16) { xoff = 0; yoff = 0; }
@@ -4445,6 +4453,10 @@ static void drawmaskwall(short damaskwallcnt)
 	sectortype *sec, *nsec;
 	walltype *wal;
 
+#ifdef POLYMOST
+	if (rendmode) { polymost_drawmaskwall(damaskwallcnt); return; }
+#endif
+
 	z = maskwall[damaskwallcnt];
 	wal = &wall[thewall[z]];
 	sectnum = thesector[z]; sec = &sector[sectnum];
@@ -4831,6 +4843,10 @@ static void drawsprite (int32_t snum)
     #ifdef SUPERBUILD
         int32_t *longptr;
     #endif
+
+#ifdef POLYMOST
+	if (rendmode) { polymost_drawsprite(snum); return; }
+#endif
 
 	tspr = tspriteptr[snum];
 
@@ -8661,6 +8677,9 @@ static int32_t bakxsiz[4], bakysiz[4];
 
 static int32_t bakwindowx1[4], bakwindowy1[4];
 static int32_t bakwindowx2[4], bakwindowy2[4];
+#ifdef POLYMOST
+static int32_t bakrendmode, baktile;
+#endif
 
 
 void setviewtotile(short tilenume, int32_t xsiz, int32_t ysiz)
@@ -8674,6 +8693,13 @@ void setviewtotile(short tilenume, int32_t xsiz, int32_t ysiz)
 	bakframeplace[setviewcnt] = frameplace; frameplace = waloff[tilenume];
 	bakwindowx1[setviewcnt] = windowx1; bakwindowy1[setviewcnt] = windowy1;
 	bakwindowx2[setviewcnt] = windowx2; bakwindowy2[setviewcnt] = windowy2;
+#ifdef POLYMOST
+	if (setviewcnt == 0) {
+		bakrendmode = rendmode;
+		baktile = tilenume;
+	}
+	rendmode = 0;
+#endif
 	copybufbyte(&startumost[windowx1],&bakumost[windowx1],(windowx2-windowx1+1)*sizeof(bakumost[0]));
 	copybufbyte(&startdmost[windowx1],&bakdmost[windowx1],(windowx2-windowx1+1)*sizeof(bakdmost[0]));
 	setview(0,0,ysiz-1,xsiz-1);
@@ -8690,6 +8716,13 @@ void setviewback(void)
 
 	if (setviewcnt <= 0) return;
 	setviewcnt--;
+
+#ifdef POLYMOST
+	if (setviewcnt == 0) {
+		rendmode = bakrendmode;
+		invalidatetile(baktile,-1,-1);
+	}
+#endif
 
 	setview(bakwindowx1[setviewcnt],bakwindowy1[setviewcnt],
 			  bakwindowx2[setviewcnt],bakwindowy2[setviewcnt]);
@@ -8752,6 +8785,10 @@ void completemirror(void)
 {
 	int32_t i, dy;
 	intptr_t p;
+
+#ifdef POLYMOST
+	if (rendmode) return;
+#endif
 
 		/* Can't reverse with uninitialized data */
 
@@ -8972,6 +9009,87 @@ void setfirstwall(short sectnum, short newfirstwall)
 
 	for(i=startwall;i<endwall;i++)
 		if (wall[i].nextwall >= 0) wall[wall[i].nextwall].nextwall = i;
+}
+
+
+/*
+ * setrendermode
+ *  0 classic, 1 Polymost solid colour, 2 Polymost software, 3 Polymost
+ *  OpenGL. 3 needs a GL video mode (bpp > 8), and a GL mode always uses 3.
+ *  Returns the renderer set.
+ */
+int setrendermode(int renderer)
+{
+#ifdef POLYMOST
+	if (bpp == 8) {
+		if (renderer < 0) renderer = 0;
+		else if (renderer > 2) renderer = 2;
+	} else {
+		renderer = 3;
+	}
+
+	rendmode = renderer;
+	return rendmode;
+#else
+	return 0;
+#endif
+}
+
+int getrendermode(void)
+{
+#ifndef POLYMOST
+	return 0;
+#else
+	return rendmode;
+#endif
+}
+
+void setrollangle(int32_t rolla)
+{
+#ifdef POLYMOST
+	if (rolla == 0) gtang = 0.0;
+	else gtang = PI * (double)rolla / 1024.0;
+#endif
+}
+
+/*
+ * invalidatetile
+ *  pal: pass -1 to invalidate all palettes for the tile, or >=0 for a particular palette
+ *  how: pass -1 to invalidate all instances of the tile in texture memory, or a bitfield
+ *         bit 0: opaque or masked (non-translucent) texture, using repeating
+ *         bit 1: ignored
+ *         bit 2: ignored (33% translucence, using repeating)
+ *         bit 3: ignored (67% translucence, using repeating)
+ *         bit 4: opaque or masked (non-translucent) texture, using clamping
+ *         bit 5: ignored
+ *         bit 6: ignored (33% translucence, using clamping)
+ *         bit 7: ignored (67% translucence, using clamping)
+ *       clamping is for sprites, repeating is for walls
+ */
+void invalidatetile(short tilenume, int32_t pal, int32_t how)
+{
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	int numpal, firstpal, np;
+	int hp;
+
+	if (rendmode < 3) return;
+
+	if (pal < 0) {
+		numpal = MAXPALOOKUPS;
+		firstpal = 0;
+	} else {
+		numpal = 1;
+		firstpal = pal % MAXPALOOKUPS;
+	}
+
+	for (hp = 0; hp < 8; hp+=4) {
+		if (!(how & pow2long[hp])) continue;
+
+		for (np = firstpal; np < firstpal+numpal; np++) {
+			gltexinvalidate(tilenume, np, hp);
+		}
+	}
+#endif
 }
 
 /* end of engine.c ... */

@@ -146,6 +146,9 @@ char *screen, vesachecked;
 int32_t buffermode, origbuffermode, linearmode;
 char permanentupdate = 0, vgacompatible;
 
+#ifdef POLYMOST
+int32_t bpp = 8;
+#endif
 #ifdef USE_OPENGL
 struct glinfo_t { float maxanisotropy; char bgra, clamptoedge, texcompr; } glinfo;
 char nofog = 0;

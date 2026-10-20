@@ -942,6 +942,13 @@ void preparemirror(int32_t dax, int32_t day, int32_t daz,
                    short *tang);
 void completemirror(void);
 
+/* Renderer selection: 0 classic, 1 Polymost solid colour, 2 Polymost
+ * software, 3 Polymost OpenGL. setrendermode returns the renderer set. */
+int setrendermode(int renderer);
+int getrendermode(void);
+void setrollangle(int32_t rolla);
+void invalidatetile(short tilenume, int32_t pal, int32_t how);
+
 /**@brief Check if a clipping box intersects a wall
  *
  * This function will test if a box intersects a wall.\n

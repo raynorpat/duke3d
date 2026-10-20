@@ -263,3 +263,7 @@ extern void alignceilslope(short dasect, int32_t x, int32_t y, int32_t z);
 extern void alignflorslope(short dasect, int32_t x, int32_t y, int32_t z);
 extern int loopnumofsector(short sectnum, short wallnum);
 extern void setfirstwall(short sectnum, short newfirstwall);
+extern int setrendermode(int renderer);
+extern int getrendermode(void);
+extern void setrollangle(int32_t rolla);
+extern void invalidatetile(short tilenume, int32_t pal, int32_t how);

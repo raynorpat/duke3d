@@ -107,6 +107,12 @@ target_link_libraries(render_e1l1 PRIVATE buildengine duke3d::SDL2main)
 set(DUKE3D_GRP "" CACHE FILEPATH "DUKE3D.GRP for tests that need game data")
 set(DUKE3D_E1L1_CHECKSUM "e0517697" CACHE STRING
     "Expected render_e1l1 frame checksum (hex); empty just prints it")
+# arm64 macOS gives 71717c09 in 1.3D builds and a145a252 in 1.4/1.5 ones
+# (Polymost takes slope heights from getzsofslope, whose maths changed
+# between engine revisions). Not the default: Polymost is floating point, so
+# other platforms and compilers may round differently.
+set(DUKE3D_E1L1_POLYMOST_CHECKSUM "" CACHE STRING
+    "Expected render_e1l1_polymost (renderer 2) frame checksum (hex); empty just prints it")
 if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
   add_test(NAME render_e1l1
     COMMAND render_e1l1 "${DUKE3D_GRP}"
@@ -115,6 +121,24 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
   set_tests_properties(render_e1l1 PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
     TIMEOUT 30)
+
+  # The same view through Polymost: renderer 2 (software) and 1 (solid
+  # colour). Polymost is floating point, so the checksum may differ by
+  # platform; renderer 1 only prints its checksum.
+  if(DUKE3D_POLYMOST)
+    add_test(NAME render_e1l1_polymost
+      COMMAND render_e1l1 "${DUKE3D_GRP}"
+              "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost.bmp"
+              "${DUKE3D_E1L1_POLYMOST_CHECKSUM}" 2)
+    add_test(NAME render_e1l1_polymost_solid
+      COMMAND render_e1l1 "${DUKE3D_GRP}"
+              "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost_solid.bmp"
+              "" 1)
+    set_tests_properties(render_e1l1_polymost render_e1l1_polymost_solid
+      PROPERTIES
+      ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+      TIMEOUT 30)
+  endif()
 
   # Boots the real game to its title loop and into E1L1, headless. It uses
   # the in-repo 1.5 CONs, so not in 1.3D builds.

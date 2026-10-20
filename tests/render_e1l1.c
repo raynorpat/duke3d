@@ -2,9 +2,11 @@
  * Renders the start view of E1L1 from a real DUKE3D.GRP, headless, and
  *  checks the frame against a known checksum.
  *
- *  usage: render_e1l1 <DUKE3D.GRP> <out.bmp> [expected checksum, hex]
+ *  usage: render_e1l1 <DUKE3D.GRP> <out.bmp> [expected checksum, hex] [renderer]
  *
- * Without an expected checksum it just prints the checksum and exits 0.
+ * Without an expected checksum (or with an empty one) it just prints the
+ *  checksum and exits 0. The renderer is a setrendermode() number, 0 if
+ *  not given.
  *  Run with SDL_VIDEODRIVER=dummy.
  */
 #include <stdio.h>
@@ -71,7 +73,7 @@ int main(int argc, char **argv)
 
     if (argc < 3)
     {
-        fprintf(stderr, "usage: %s <DUKE3D.GRP> <out.bmp> [expected checksum]\n", argv[0]);
+        fprintf(stderr, "usage: %s <DUKE3D.GRP> <out.bmp> [expected checksum] [renderer]\n", argv[0]);
         return 2;
     }
 
@@ -119,6 +121,8 @@ int main(int argc, char **argv)
         return 1;
     }
     setbrightness(0, palette);
+    if (argc > 4)
+        setrendermode(atoi(argv[4]));
 
     drawrooms(posx, posy, posz, ang, 100, sectnum);
     drawmasks();
@@ -141,7 +145,7 @@ int main(int argc, char **argv)
 
     uninitengine();
 
-    if ((argc > 3) && (strtoul(argv[3], NULL, 16) != hash))
+    if ((argc > 3) && argv[3][0] && (strtoul(argv[3], NULL, 16) != hash))
     {
         fprintf(stderr, "FAIL: checksum %08x, expected %s\n", (unsigned) hash, argv[3]);
         return 1;

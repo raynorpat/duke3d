@@ -168,6 +168,18 @@ unchanged.
   `hitallsprites`, with `hitscan` skipping its sprite clip-mask test when it's
   set (as JFBuild does).
 - `build.h`: `palette_t`, `rendmode`, `curpalette`, `palfadergb`,
-  `palfadedelta`. `engine_protos.h`: the Polymost entry points.
+  `palfadedelta`, `bpp`. `engine_protos.h`: the Polymost entry points.
+- `engine.c` draws through Polymost when `rendmode` is not 0, at JFBuild's
+  sites: `drawrooms` calls `polymost_drawrooms()` and returns after the
+  `umost`/`dmost` setup; `drawsprite`, `drawmaskwall` and `dorotatesprite`
+  hand over to their `polymost_` versions; `completemirror` does nothing;
+  `setviewtotile` saves `rendmode` and draws to the tile with the classic
+  renderer, and `setviewback` restores it and calls `invalidatetile`.
+- `engine.c`: `setrendermode` (0-3; 3 needs `bpp > 8`, and a GL mode always
+  gets 3; returns the renderer set, where JFBuild returns 0), `getrendermode`,
+  `setrollangle` and `invalidatetile`, from JFBuild. Their prototypes are in
+  `engine.h` and `engine_protos.h`, without `POLYMOST`, so callers needn't
+  check it.
+- `sdl_driver.c`: `bpp`, 8 until an OpenGL video mode sets it.
 - `source/astub.c` (the editor, not vendored) had its own global `curpalette`;
   it's renamed `curpalettenum`.

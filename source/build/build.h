@@ -226,6 +226,8 @@ extern int32_t rendmode;
 extern palette_t curpalette[256];
 extern palette_t palfadergb;
 extern unsigned char palfadedelta;
+	/* Bits per pixel of the video mode: 8 is software, more is OpenGL. */
+extern int32_t bpp;
 #endif
 
 /*************************************************************************
