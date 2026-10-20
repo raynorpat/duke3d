@@ -119,7 +119,6 @@ int32_t glanisotropy = 1;            // 0 = maximum supported by card
 int glusetexcompr = 0;
 int32_t gltexfiltermode = 0;   // GL_NEAREST
 extern char nofog;
-extern struct glinfo_t { float maxanisotropy; char bgra, clamptoedge, texcompr; } glinfo;
 #endif
 
 static inline void ftol (float f, int32_t *a)

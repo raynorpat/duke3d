@@ -151,10 +151,11 @@ unchanged.
   `glusetexcompr = 0`. `glanisotropy` stays 1.
 - OpenGL comes from `"SDL_opengl.h"` (`GL_SILENCE_DEPRECATION` on macOS).
 - `rendmode` is defined in `engine.c`, not here.
-- `glinfo` is declared here as `extern struct glinfo_t { float maxanisotropy;
-  char bgra, clamptoedge, texcompr; }` (upstream got it from `baselayer.h`).
-  `sdl_driver.c` defines it, zeroed, and `nofog` (which upstream declares but
-  no JFBuild file of that commit defines), set to 0.
+- `glinfo` (`struct glinfo_t { float maxanisotropy; char bgra, clamptoedge,
+  texcompr; }`, which upstream got from `baselayer.h`) is declared in
+  `build.h` under `USE_OPENGL`, not here. `sdl_driver.c` defines it, filled in
+  by `setgamemode_gl`, and `nofog` (which upstream declares but no JFBuild
+  file of that commit defines), set to 0.
 - The forward declaration of `wallfront` is gone: ours is defined, non-static,
   before the `#include`.
 - `polymost_dorotatesprite` takes `unsigned char dapalnum, dastat`, as our
@@ -183,3 +184,32 @@ unchanged.
 - `sdl_driver.c`: `bpp`, 8 until an OpenGL video mode sets it.
 - `source/astub.c` (the editor, not vendored) had its own global `curpalette`;
   it's renamed `curpalettenum`.
+
+## OpenGL video mode (renderer 3)
+
+- `build.h`: `MAXXDIM` 7680 and `MAXYDIM` 4320 (were 1600 and 1200), room
+  for 8K drawables. No array sized by them is saved, recorded in demos or
+  sent over the network.
+- `sdl_driver.c`: `setgamemode_gl(davidoption)`, prototyped in `display.h`
+  and `engine_protos.h`. It makes a new `SDL_WINDOW_OPENGL |
+  SDL_WINDOW_ALLOW_HIGHDPI` window (same size and fullscreen state as the
+  old one) with a legacy context (double buffered, 24-bit depth, swap
+  interval 1 or else 0), and only then drops the 8-bit window, renderer,
+  texture and surfaces, so any failure returns -1 with the 8-bit mode
+  untouched. It sets JFBuild's GL state, fills `glinfo` from whole
+  `GL_EXTENSIONS` tokens, sets `bpp = 32`, `xdim`/`ydim` to the drawable
+  size clamped to `MAXXDIM`x`MAXYDIM`, `qsetmode = 200` and `frameplace = 0`,
+  then calls `setrendermode(3)` and `polymost_glreset()`. Without
+  `USE_OPENGL` it returns -1 with an SDL error set.
+- `init_new_res_vars` is split: `init_res_lookups` (`ylookup`,
+  `horizlookup` through `screen`, `setview`, brightness) is shared with GL,
+  where `screen` holds only the lookups and nothing is cleared.
+- Leaving GL (any 8-bit mode set, or shutdown) calls `polymost_glreset()`
+  while the context is current, deletes the context and window, and sets
+  `bpp = 8` and `setrendermode(0)`. JFBuild resets the texture cache the
+  same way before and after each GL mode change.
+- In GL: `_nextpage` swaps; the fullscreen toggle and
+  `SDL_WINDOWEVENT_SIZE_CHANGED` re-read the drawable size and, if it
+  changed, call `polymost_glreset()` and redo the mode variables.
+  `setupmouse`, the mouse motion clamp and `_idle` check `sdl_window`
+  instead of `surface`, and the clamp uses `xres`/`yres`.

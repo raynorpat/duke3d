@@ -127,6 +127,7 @@ extern int setvesa(int32_t x, int32_t y);
 extern int screencapture(char *filename, char inverseit);
 extern void setvmode(int mode);
 extern int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim);
+extern int setgamemode_gl(char davidoption);
 extern void qsetmode640350(void);
 extern void qsetmode640480(void);
 extern void getvalidvesamodes(void);

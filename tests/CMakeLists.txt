@@ -8,6 +8,11 @@ set_tests_properties(sdl_driver_smoke PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
   TIMEOUT 30)
 
+add_test(NAME sdl_driver_smoke_gl_fallback COMMAND sdl_driver_smoke gl_fallback)
+set_tests_properties(sdl_driver_smoke_gl_fallback PROPERTIES
+  ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+  TIMEOUT 30)
+
 # Checks DUKE3D_GAMEVER, BUILD_ENGINEREV, BYTEVERSION and the volume macros
 # against this configuration's DUKE3D_VERSION. The table is kept here, apart
 # from the one that sets them, so a mistake in either shows up.

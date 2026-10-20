@@ -22,8 +22,8 @@
 #define MAXTILES 9216
 #define MAXSTATUS 1024
 #define MAXPLAYERS 16
-#define MAXXDIM 1600
-#define MAXYDIM 1200
+#define MAXXDIM 7680
+#define MAXYDIM 4320
 #define MAXPALOOKUPS 256
 #define MAXPSKYTILES 256
 #define MAXSPRITESONSCREEN 1024
@@ -228,6 +228,11 @@ extern palette_t palfadergb;
 extern unsigned char palfadedelta;
 	/* Bits per pixel of the video mode: 8 is software, more is OpenGL. */
 extern int32_t bpp;
+#ifdef USE_OPENGL
+	/* What the OpenGL driver supports, filled in by setgamemode_gl. */
+struct glinfo_t { float maxanisotropy; char bgra, clamptoedge, texcompr; };
+extern struct glinfo_t glinfo;
+#endif
 #endif
 
 /*************************************************************************

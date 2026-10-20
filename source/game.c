@@ -8083,7 +8083,14 @@ int main(int argc,char **argv)
 
     // -renderer N picks the renderer for this run only; duke3d.cfg keeps its own.
     i = CheckParm("RENDERER");
-    setrendermode(clamprenderer(i ? ((i+1 < _argc) ? atoi(_argv[i+1]) : 0) : RendererSetting));
+    i = clamprenderer(i ? ((i+1 < _argc) ? atoi(_argv[i+1]) : 0) : RendererSetting);
+    if (i == 3 && setgamemode_gl(ScreenMode) != 0)
+    {
+        printf("OpenGL renderer unavailable (%s); using the classic renderer.\n", SDL_GetError());
+        setgamemode(ScreenMode,ScreenWidth,ScreenHeight);
+        i = 0;
+    }
+    setrendermode(i);
 
     genspriteremaps();
 

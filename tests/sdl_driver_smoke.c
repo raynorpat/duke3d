@@ -21,12 +21,58 @@ void timerhandler(void) { timer_calls++; }
 void keyhandler(void) { }
 void faketimerhandler(void) { }
 
+/* Room for 8K drawables in renderer 3. */
+typedef char maxxdim_holds_8k[(MAXXDIM >= 7680) ? 1 : -1];
+typedef char maxydim_holds_8k[(MAXYDIM >= 4320) ? 1 : -1];
+
+/*
+ * The dummy driver has no OpenGL, so setgamemode_gl must fail without
+ *  exiting and leave the classic 8-bit mode usable.
+ */
+static int gl_fallback(int argc, char **argv)
+{
+    _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
+    if (_setgamemode(1, 320, 200) != 0)
+    {
+        fprintf(stderr, "FAIL: _setgamemode(320x200)\n");
+        return 1;
+    }
+
+    if (setgamemode_gl(1) != -1)
+    {
+        fprintf(stderr, "FAIL: setgamemode_gl succeeded under the dummy driver\n");
+        return 1;
+    }
+
+    if (setgamemode(2, 320, 200) != 0)
+    {
+        fprintf(stderr, "FAIL: setgamemode(2,320,200) after the GL fallback\n");
+        return 1;
+    }
+
+    if ((xdim != 320) || (ydim != 200) || (frameplace == 0) || (getrendermode() != 0))
+    {
+        fprintf(stderr, "FAIL: after fallback xdim=%ld ydim=%ld frameplace=%ld rendermode=%d\n",
+                (long) xdim, (long) ydim, (long) frameplace, getrendermode());
+        return 1;
+    }
+
+    memset((void *) frameplace, 7, xdim * ydim);
+    _nextpage();
+    _uninitengine();
+    printf("PASS: gl_fallback\n");
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     char pal[256 * 4];
     char readback[256 * 4];
     unsigned long start;
     int i;
+
+    if ((argc > 1) && (strcmp(argv[1], "gl_fallback") == 0))
+        return gl_fallback(argc, argv);
 
     _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
     if (_setgamemode(1, 320, 200) != 0)

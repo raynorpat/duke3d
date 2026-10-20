@@ -36,6 +36,9 @@
 #include "display.h"
 #include "pragmas.h"
 #include "engine.h"
+#ifdef USE_OPENGL
+#include "SDL_opengl.h"
+#endif
 
 /* need VirtualProtect() from win32 API... */
 #if ((defined PLATFORM_WIN32) && (defined USE_I386_ASM))
@@ -150,8 +153,11 @@ char permanentupdate = 0, vgacompatible;
 int32_t bpp = 8;
 #endif
 #ifdef USE_OPENGL
-struct glinfo_t { float maxanisotropy; char bgra, clamptoedge, texcompr; } glinfo;
+struct glinfo_t glinfo;
 char nofog = 0;
+extern void polymost_glreset(void);
+static SDL_GLContext sdl_glcontext = NULL;  /* non-NULL while in renderer 3 */
+static char gl_davidoption = 1;
 #endif
 
 SDL_Surface *surface = NULL; /* This isn't static so that we can use it elsewhere AH */
@@ -311,9 +317,31 @@ static void free_video_surfaces(void)
 } /* free_video_surfaces */
 
 
+#ifdef USE_OPENGL
+/* Leave renderer 3: drop the GL textures while the context is current,
+ *  then the context and its window. The 8-bit path recreates a window. */
+static void destroy_gl_window(void)
+{
+    if (sdl_glcontext == NULL)
+        return;
+
+    polymost_glreset();
+    SDL_GL_DeleteContext(sdl_glcontext);
+    sdl_glcontext = NULL;
+    SDL_DestroyWindow(sdl_window);
+    sdl_window = NULL;
+    bpp = 8;
+    setrendermode(0);
+} /* destroy_gl_window */
+#endif
+
+
 static void shutdown_video(void)
 {
     free_video_surfaces();
+#ifdef USE_OPENGL
+    destroy_gl_window();
+#endif
 
     if (sdl_renderer != NULL)
     {
@@ -357,11 +385,10 @@ static Uint8 *get_framebuffer(void)
  * !!!  titlebar caption.   --ryan.
  */
 static char screenalloctype = 255;
+static void init_res_lookups(int davidoption, int framebuffer);
+
 static void init_new_res_vars(int davidoption)
 {
-    int i = 0;
-    int j = 0;
-
     setupmouse();
 
     SDL_SetWindowTitle(sdl_window, titlelong);
@@ -370,14 +397,29 @@ static void init_new_res_vars(int davidoption)
     ydim = yres = surface->h;
 
     bytesperline = surface->w;
+	qsetmode = surface->h;
+
+    frameplace = (intptr_t) ( ((Uint8 *) surface->pixels) );
+
+    init_res_lookups(davidoption, 1);
+} /* init_new_res_vars */
+
+
+/*
+ * The part of a mode set shared with OpenGL: ylookup, horizlookup and the
+ *  view. framebuffer is 0 in OpenGL, where screen holds only the lookups,
+ *  frameplace stays 0 and nothing is cleared through it.
+ */
+static void init_res_lookups(int davidoption, int framebuffer)
+{
+    int i = 0;
+    int j = 0;
+
     vesachecked = 1;
     vgacompatible = 1;
     linearmode = 1;
-	qsetmode = surface->h;
 	activepage = visualpage = 0;
     horizlookup = horizlookup2 = NULL;
-
-    frameplace = (intptr_t) ( ((Uint8 *) surface->pixels) );
 
   	if (screen != NULL)
    	{
@@ -388,7 +430,9 @@ static void init_new_res_vars(int davidoption)
 
     if (davidoption != -1)
     {
-    	switch(vidoption)
+    	if (!framebuffer)
+    		i = 0;
+    	else switch(vidoption)
     	{
     		case 1:i = xdim*ydim; break;
     		case 2: xdim = 320; ydim = 200; i = xdim*ydim; break;
@@ -404,9 +448,10 @@ static void init_new_res_vars(int davidoption)
     		 screenalloctype = 1;
     	}
 
-        frameplace = FP_OFF(screen);
-        horizlookup = (int32_t *)(frameplace+i);
-        horizlookup2 = (int32_t *)(frameplace+i+j);
+        if (framebuffer)
+            frameplace = FP_OFF(screen);
+        horizlookup = (int32_t *)(FP_OFF(screen)+i);
+        horizlookup2 = (int32_t *)(FP_OFF(screen)+i+j);
     } /* if */
 
     j = 0;
@@ -426,13 +471,14 @@ static void init_new_res_vars(int davidoption)
     if (davidoption != -1)
     {
     	setview(0L,0L,xdim-1,ydim-1);
-    	clearallviews(0L);
+    	if (framebuffer)
+    		clearallviews(0L);
     } /* if */
 
 	setbrightness((char) curbrightness, (unsigned char *) &palette[0]);
 
 	if (searchx < 0) { searchx = halfxdimen; searchy = (ydimen>>1); }
-} /* init_new_res_vars */
+} /* init_res_lookups */
 
 
 static void go_to_new_vid_mode(int vidoption, int w, int h)
@@ -446,6 +492,9 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
         goto vidmode_failed;
 
     free_video_surfaces();
+#ifdef USE_OPENGL
+    destroy_gl_window();  /* an SDL_Renderer can't share the GL window. */
+#endif
 
     /* low-res modes get a bigger window so they aren't a postage stamp. */
     scale = (w < 640) ? (640 / w) : 1;
@@ -500,6 +549,154 @@ vidmode_failed:
     SDL_Quit();
     exit(13);
 } /* go_to_new_vid_mode */
+
+
+#ifdef USE_OPENGL
+/* Whole-word match in a GL_EXTENSIONS string. */
+static int gl_has_extension(const char *exts, const char *name)
+{
+    size_t len = strlen(name);
+    const char *p = exts;
+
+    while ((p = strstr(p, name)) != NULL)
+    {
+        if (((p == exts) || (p[-1] == ' ')) && ((p[len] == ' ') || (p[len] == '\0')))
+            return(1);
+        p += len;
+    } /* while */
+
+    return(0);
+} /* gl_has_extension */
+
+
+/* xdim/ydim are the drawable size, clamped to what the engine's arrays hold. */
+static void init_gl_res_vars(void)
+{
+    int w, h;
+
+    SDL_GL_GetDrawableSize(sdl_window, &w, &h);
+    if (w > MAXXDIM) w = MAXXDIM;
+    if (h > MAXYDIM) h = MAXYDIM;
+
+    xdim = xres = w;
+    ydim = yres = h;
+    bytesperline = w;
+    qsetmode = 200;
+    frameplace = 0;
+    sdldebug("OpenGL drawable is %dx%d.", w, h);
+
+    SDL_SetWindowTitle(sdl_window, titlelong);
+    setupmouse();
+    init_res_lookups(gl_davidoption, 0);
+} /* init_gl_res_vars */
+
+
+/* The drawable changed size (fullscreen toggle, a move between displays). */
+static void gl_resize(void)
+{
+    int w, h;
+
+    SDL_GL_GetDrawableSize(sdl_window, &w, &h);
+    if (w > MAXXDIM) w = MAXXDIM;
+    if (h > MAXYDIM) h = MAXYDIM;
+    if ((w == xres) && (h == yres))
+        return;
+
+    polymost_glreset();
+    init_gl_res_vars();
+} /* gl_resize */
+#endif
+
+
+int setgamemode_gl(char davidoption)
+{
+#ifdef USE_OPENGL
+    SDL_Window *window;
+    SDL_GLContext context;
+    const char *exts;
+    int w = 640;
+    int h = 480;
+
+    SDL_ClearError();
+    if ((SDL_WasInit(SDL_INIT_VIDEO) == 0) && (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0))
+        return(-1);
+
+    if (sdl_window != NULL)
+        SDL_GetWindowSize(sdl_window, &w, &h);
+
+    destroy_gl_window();  /* already in GL: start again. */
+
+    /*
+     * Make the GL window before dropping the 8-bit one, so a failure leaves
+     *  the 8-bit mode as it was. SDL2 can't add GL to a window that has an
+     *  SDL_Renderer, so it's a new window.
+     */
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    window = SDL_CreateWindow(titlelong,
+                    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h,
+                    SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI |
+                    (sdl_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
+    if (window == NULL)
+        return(-1);
+
+    context = SDL_GL_CreateContext(window);
+    if (context == NULL)
+    {
+        SDL_DestroyWindow(window);
+        return(-1);
+    } /* if */
+
+    free_video_surfaces();
+    if (sdl_renderer != NULL)
+    {
+        SDL_DestroyRenderer(sdl_renderer);
+        sdl_renderer = NULL;
+    } /* if */
+    if (sdl_window != NULL)
+        SDL_DestroyWindow(sdl_window);
+    sdl_window = window;
+    sdl_glcontext = context;
+
+    /* destroying an SDL_Renderer can leave no context current. */
+    SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
+    if (SDL_GL_SetSwapInterval(1) != 0)
+        SDL_GL_SetSwapInterval(0);
+
+    /* the state JFBuild sets after every GL mode change. */
+    glEnable(GL_TEXTURE_2D);
+    glShadeModel(GL_SMOOTH);
+    glClearColor(0, 0, 0, 0.5);
+    glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
+    glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+    glDisable(GL_DITHER);
+
+    exts = (const char *) glGetString(GL_EXTENSIONS);
+    if (exts == NULL)
+        exts = "";
+    glinfo.maxanisotropy = 1.0;
+    if (gl_has_extension(exts, "GL_EXT_texture_filter_anisotropic"))
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &glinfo.maxanisotropy);
+    glinfo.bgra = gl_has_extension(exts, "GL_EXT_bgra");
+    glinfo.clamptoedge = (gl_has_extension(exts, "GL_EXT_texture_edge_clamp") ||
+                          gl_has_extension(exts, "GL_SGIS_texture_edge_clamp"));
+    glinfo.texcompr = gl_has_extension(exts, "GL_ARB_texture_compression");
+    sdldebug("OpenGL %s on %s: bgra %d, clamptoedge %d, texcompr %d, maxanisotropy %g.",
+             (const char *) glGetString(GL_VERSION), (const char *) glGetString(GL_RENDERER),
+             glinfo.bgra, glinfo.clamptoedge, glinfo.texcompr, glinfo.maxanisotropy);
+
+    bpp = 32;
+    gl_davidoption = davidoption;
+    init_gl_res_vars();
+    setrendermode(3);
+    polymost_glreset();
+    last_render_ticks = SDL_GetTicks();
+    return(0);
+#else
+    (void) davidoption;
+    return(SDL_SetError("this build has no OpenGL"));
+#endif
+} /* setgamemode_gl */
 
 
 static __inline int sdl_mouse_button_filter(SDL_MouseButtonEvent const *event)
@@ -560,7 +757,7 @@ static int sdl_mouse_wheel_filter(SDL_MouseWheelEvent const *event)
 
 static int sdl_mouse_motion_filter(SDL_Event const *event)
 {
-    if (surface == NULL)
+    if (sdl_window == NULL)
         return(0);
 
     if (event->type == SDL_JOYBALLMOTION)
@@ -589,9 +786,9 @@ static int sdl_mouse_motion_filter(SDL_Event const *event)
     } /* else */
 
    	if (mouse_x < 0) mouse_x = 0;
-   	if (mouse_x > surface->w) mouse_x = surface->w;
+   	if (mouse_x > xres) mouse_x = xres;
    	if (mouse_y < 0) mouse_y = 0;
-   	if (mouse_y > surface->h) mouse_y = surface->h;
+   	if (mouse_y > yres) mouse_y = yres;
 
     return(0);
 } /* sdl_mouse_motion_filter */
@@ -614,6 +811,13 @@ static int attempt_fullscreen_toggle(void)
     } /* if */
 
     sdl_fullscreen = !sdl_fullscreen;
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+    {
+        gl_resize();  /* macOS may report the new size later, as an event. */
+        return(1);
+    } /* if */
+#endif
     output_surface_info(surface);
     return(1);
 } /* attempt_fullscreen_toggle */
@@ -744,6 +948,11 @@ static int root_sdl_event_filter(const SDL_Event *event)
         case SDL_WINDOWEVENT:
             if (event->window.event == SDL_WINDOWEVENT_EXPOSED)
                 present_surface();
+#ifdef USE_OPENGL
+            else if ((event->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) &&
+                     (sdl_glcontext != NULL))
+                gl_resize();
+#endif
             return(0);
         case SDL_QUIT:
             /* !!! rcg TEMP */
@@ -1858,14 +2067,15 @@ void uninitvesa(void)
 
 int setupmouse(void)
 {
-    if (surface == NULL)
+    if (sdl_window == NULL)
         return(0);
 
     set_mouse_grab(mouse_grabbed);
     SDL_ShowCursor(0);
 
-    mouse_x = surface->w / 2;
-    mouse_y = surface->h / 2;
+    /* in OpenGL there's no surface; xres/yres are already the drawable. */
+    mouse_x = ((surface != NULL) ? surface->w : xres) / 2;
+    mouse_y = ((surface != NULL) ? surface->h : yres) / 2;
     mouse_relative_x = mouse_relative_y = 0;
 
         /*
@@ -1914,6 +2124,11 @@ void _nextpage(void)
 
     handle_events();
 
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+        SDL_GL_SwapWindow(sdl_window);
+    else
+#endif
     if (renderer == RENDERER_SOFTWARE)
     {
         if (qsetmode == 200)
@@ -2249,7 +2464,7 @@ void clear2dscreen(void)
 
 void _idle(void)
 {
-    if (surface != NULL)
+    if (sdl_window != NULL)
         handle_events();
     SDL_Delay(1);
 } /* _idle */
