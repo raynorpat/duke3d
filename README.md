@@ -128,8 +128,8 @@ JFBuild:
 Set `Renderer` under `[Screen Setup]` in `duke3d.cfg`, or use `-renderer N`
 for one run (the config keeps its own value). A number outside 0-3 is taken
 as the nearest one. Renderer 3 draws at the window's real pixel size and
-uses a legacy (fixed-function) OpenGL context. Its window is the size asked
-for, even over the 1600x1200 the 8-bit modes stop at. If OpenGL isn't
+uses a legacy (fixed-function) OpenGL context. Windowed, it opens at the size
+asked for, even over the 1600x1200 the 8-bit modes stop at. If OpenGL isn't
 available, the game prints a message and uses renderer 0. The map editor is
 classic only.
 
