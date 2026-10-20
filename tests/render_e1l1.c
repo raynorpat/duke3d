@@ -126,6 +126,15 @@ static int draw_tilt(int32_t x, int32_t y, int32_t z, short a, short sect, short
     return 1;
 }
 
+/* The surface's rows, packed xdim wide (its pitch may be over xdim). */
+static void pack_surface(unsigned char *dst)
+{
+    int32_t y;
+
+    for (y = 0; y < ydim; y++)
+        memcpy(dst + y * xdim, (unsigned char *) surface->pixels + y * surface->pitch, xdim);
+}
+
 /* A tilted frame and a low detail one, one after the other in pic. */
 static int draw_tilts(int32_t x, int32_t y, int32_t z, short a, short sect, unsigned char *pic)
 {
@@ -133,12 +142,12 @@ static int draw_tilts(int32_t x, int32_t y, int32_t z, short a, short sect, unsi
     if (!draw_tilt(x, y, z, a, sect, 128, 1))
         return 0;
     nextpage();
-    memcpy(pic, surface->pixels, xdim * ydim);
+    pack_surface(pic);
     clearallviews(0);
     if (!draw_tilt(x, y, z, a, sect, 0, 0))
         return 0;
     nextpage();
-    memcpy(pic + xdim * ydim, surface->pixels, xdim * ydim);
+    pack_surface(pic + xdim * ydim);
     return 1;
 }
 
@@ -148,6 +157,7 @@ int main(int argc, char **argv)
     short ang, sectnum;
     uint32_t hash = 2166136261u;
     const unsigned char *pix;
+    unsigned char *shot;
     int32_t i, same, npix;
     int tilt;
 
@@ -202,7 +212,8 @@ int main(int argc, char **argv)
         return 1;
     }
     setbrightness(0, palette);
-    pix = (const unsigned char *) surface->pixels;
+    shot = (unsigned char *) malloc(xdim * ydim);
+    pix = shot;
     npix = xdim * ydim;
     if (tilt)
     {
@@ -256,8 +267,9 @@ int main(int argc, char **argv)
         clearview(0);
         draw_through_tile(posx, posy, posz, ang, sectnum);
         nextpage();
+        pack_surface(shot);
         for (i = 0, same = 0; i < xdim * ydim; i++)
-            same += (classic[i] == ((unsigned char *) surface->pixels)[i]);
+            same += (classic[i] == shot[i]);
         printf("through a tile: %d%% of pixels as in renderer 0\n", (int) (same * 100 / (xdim * ydim)));
         free(classic);
         /* Renderer 2 samples the tile a little differently (58% the same);
@@ -275,6 +287,7 @@ int main(int argc, char **argv)
         drawrooms(posx, posy, posz, ang, 100, sectnum);
         drawmasks();
         nextpage();
+        pack_surface(shot);
     }
 
     if (SDL_SaveBMP(surface, argv[2]) != 0)
