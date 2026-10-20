@@ -744,6 +744,7 @@ int main(int argc, char **argv)
     oldydim = ydim;
     SDL_GetWindowSize(SDL_GL_GetCurrentWindow(), &startw, &starth);
     glinfo.texnpot = 0;
+    polymost_glreset();  /* textures keep their size: remake them (the resize does too, if it happens) */
     SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), 800, 520);
     for (t0 = SDL_GetTicks(); (xdim == oldxdim) && (SDL_GetTicks() - t0 < 3000); SDL_Delay(10))
         _handle_events();
@@ -767,6 +768,7 @@ int main(int argc, char **argv)
     view_shot(NULL, posx, posy, posz, ang, sectnum);
     lfpot = lastframe_same();
     glinfo.texnpot = hasnpot;
+    polymost_glreset();
     /* back to the first size: the checks below use xdim and ydim. */
     SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), startw, starth);
     for (t0 = SDL_GetTicks(); (xdim != oldxdim) && (SDL_GetTicks() - t0 < 3000); SDL_Delay(10))
