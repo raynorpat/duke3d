@@ -265,7 +265,8 @@ typedef struct
 	int32_t sx, sy, z;
 	short a, picnum;
 	signed char dashade;
-	unsigned char dapalnum, dastat, pagesleft;
+	unsigned char dapalnum, pagesleft;
+	unsigned short dastat;
 	int32_t cx1, cy1, cx2, cy2;
 } permfifotype;
 static permfifotype permfifo[MAXPERMS];
@@ -3577,7 +3578,7 @@ static int clippoly4(int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2)
 
 
 static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short picnum,
-	signed char dashade, unsigned char dapalnum, char dastat, int32_t cx1,
+	signed char dashade, unsigned char dapalnum, unsigned short dastat, int32_t cx1,
 	int32_t cy1, int32_t cx2, int32_t cy2)
 {
 	int32_t cosang, sinang, v, nextv, dax1, dax2, oy, bx, by, ny1, ny2;
@@ -3637,10 +3638,15 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 
 	xv = mulscale14(cosang,z);
 	yv = mulscale14(sinang,z);
-	if (((dastat&2) != 0) || ((dastat&8) == 0)) /* Don't aspect unscaled perms */
+	if (((dastat&2) != 0 && (dastat&256) == 0) || ((dastat&8) == 0)) /* Don't aspect unscaled perms */
 	{
 		xv2 = mulscale16(xv,xyaspect);
 		yv2 = mulscale16(yv,xyaspect);
+	}
+	else if (pixelaspect == 65536 && ((dastat&2) && (dastat&256))) /* Skew 1:1 to 1.2:1 aspect */
+	{
+		xv2 = mulscale16(xv,78643);
+		yv2 = mulscale16(yv,78643);
 	}
 	else
 	{
@@ -3701,10 +3707,15 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 	i = divscale32(1L,z);
 	xv = mulscale14(sinang,i);
 	yv = mulscale14(cosang,i);
-	if (((dastat&2) != 0) || ((dastat&8) == 0)) /* Don't aspect unscaled perms */
+	if (((dastat&2) != 0 && (dastat&256) == 0) || ((dastat&8) == 0)) /* Don't aspect unscaled perms */
 	{
 		yv2 = mulscale16(-xv,yxaspect);
 		xv2 = mulscale16(yv,yxaspect);
+	}
+	else if (pixelaspect == 65536 && ((dastat&2) && (dastat&256))) /* Skew 1:1 to 1.2:1 aspect */
+	{
+		yv2 = mulscale16(-xv,54613);
+		xv2 = mulscale16(yv,54613);
 	}
 	else
 	{
@@ -7938,7 +7949,7 @@ void flushperms(void)
 
 
 void rotatesprite(int32_t sx, int32_t sy, int32_t z, short a, short picnum,
-                  signed char dashade, char dapalnum, char dastat,
+                  signed char dashade, char dapalnum, unsigned short dastat,
                   int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2)
 {
 	int32_t i;

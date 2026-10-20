@@ -158,8 +158,8 @@ unchanged.
   file of that commit defines), set to 0.
 - The forward declaration of `wallfront` is gone: ours is defined, non-static,
   before the `#include`.
-- `polymost_dorotatesprite` takes `unsigned char dapalnum, dastat`, as our
-  `dorotatesprite` does.
+- `polymost_dorotatesprite` takes `unsigned char dapalnum` and `unsigned
+  short dastat`, as our `dorotatesprite` does.
 
 ## Later JFBuild fixes
 
@@ -304,6 +304,14 @@ Ported from later JFBuild commits, retyped as above:
   as before. Not taken: `MAXXDIM`/`MAXYDIM` (ours are bigger), the new
   default modes, `7703ab6`'s `slopalookup` size and assert, and the
   editor's `qsetmode` parts.
+- `2a8cfbb54ac46481276b78411d41285d9daed2ba`: `dastat` is an `unsigned
+  short` in `rotatesprite`, `permfifotype`, `dorotatesprite` and
+  `polymost_dorotatesprite` (and `engine.h`'s and `engine_protos.h`'s
+  prototypes), and `dastat&256` with `dastat&2` marks a tile with square
+  pixels: it gets no `xyaspect` correction, and is drawn 1.2 times as wide
+  when `pixelaspect` is 65536 (320x200 and 640x400). Duke passes no bit
+  over 128 (its callers' `char` and `short` `dastat`s are all at most 255),
+  so nothing it draws changes.
 
 ## Engine hooks
 

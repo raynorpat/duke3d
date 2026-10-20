@@ -855,6 +855,8 @@ void flushperms(void);
  * @arg if ((dastat&64) != 0) - draw everything (don't check 255's) (faster)
  * @arg if ((dastat&128) == 0) - nuttin' special
  * @arg if ((dastat&128) != 0) - automatically draw to all video pages
+ * @arg if ((dastat&256) != 0) - with dastat&2, the tile has square pixels: no aspect
+ *  correction, but drawn 1.2 times as wide at 320x200 and 640x400 (JFBuild)
  * @remark Note: As a special case, if both ((dastat&2) != 0) and ((dastat&8) != 0)
  * then rotatesprite will scale to the full screen (0,0,xdim-1,ydim-1)
  * rather than setview's viewing window. (windowx1,windowy1,etc.)
@@ -866,7 +868,7 @@ void flushperms(void);
  * The sprite will only get drawn inside the rectangle from (50,50) to (270,150).
  */
 void rotatesprite(int32_t sx, int32_t sy, int32_t z, short a, short picnum,
-                  signed char dashade, char dapalnum, char dastat,
+                  signed char dashade, char dapalnum, unsigned short dastat,
                   int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2);
 /**@brief Make a lookup table for remapping.
  *
