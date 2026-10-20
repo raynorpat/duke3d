@@ -4961,6 +4961,45 @@ void overheadeditor(void)
 }
 
 
+static char renderermessage[82];
+static int32_t renderermessageclock;  /* totalclock when it stops showing */
+
+/* Alt+K: the next renderer in the 3D view, and in build.cfg on exit. */
+static void cyclerenderer(void)
+{
+	static const char *names[4] = { "classic", "Polymost solid", "Polymost software", "Polymost OpenGL" };
+	int32_t previous = editorrendermode, oxdim = xdim, oydim = ydim, glavailable = 0;
+
+#ifdef USE_OPENGL
+	glavailable = !editorglfailed;
+#endif
+	editormode.renderer = editorcyclerenderer(previous,glavailable);
+	sprintf(renderermessage,"Renderer %d: %s",(int)editormode.renderer,names[editormode.renderer]);
+	if (editormode.renderer != previous)
+	{
+		editorrendererpicked = 1;
+		if (editorsetgamemode(&editormode) < 0)
+		{
+			ExtUnInit();
+			uninitkeys();
+			uninittimer();
+			printf("%d * %d not supported in this graphics mode\n",editormode.xdim3d,editormode.ydim3d);
+			exit(0);
+		}
+		if (editorrendermode != editormode.renderer)  /* OpenGL failed: back to the last one */
+		{
+			sprintf(renderermessage,"OpenGL unavailable");
+			editormode.renderer = previous;
+			editorsetgamemode(&editormode);
+		}
+		searchx = scale(searchx,xdim,oxdim);
+		searchy = scale(searchy,ydim,oydim);
+		lockclock = totalclock;  /* the mode change isn't a frame */
+	}
+	renderermessageclock = totalclock+2*PLATFORM_TIMER_HZ;
+}
+
+
 void editinput(void)
 {
 	char smooshyalign, repeatpanalign, buffer[80];
@@ -4983,6 +5022,11 @@ void editinput(void)
 		screencapture("captxxxx.png",keystatus[0x2a]|keystatus[0x36]);
 		keystatus[88] = 0;
 	}
+	if (((keystatus[0x38]|keystatus[0xb8]) > 0) && (keystatus[0x25] > 0))  /* ALT-K */
+	{
+		keystatus[0x25] = 0;
+		cyclerenderer();
+	}
 
 	mousz = 0;
 	getmousevalues(&mousx,&mousy,&bstatus);
@@ -4993,6 +5037,8 @@ void editinput(void)
 	if (searchx > xdim-5) searchx = xdim-5;
 	if (searchy > ydim-5) searchy = ydim-5;
 	showmouse();
+	if (totalclock < renderermessageclock)
+		printmessage256(renderermessage);
 
 	if (keystatus[0x3b] > 0) posx--;
 	if (keystatus[0x3c] > 0) posx++;

@@ -89,6 +89,19 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /* Alt+K: 0, 1, 2, 3 and round, 3 skipped without OpenGL; classic only
+     * without Polymost. */
+    if ((editorcyclerenderer(0, 1) != (polymost ? 1 : 0)) ||
+        (editorcyclerenderer(1, 1) != (polymost ? 2 : 0)) ||
+        (editorcyclerenderer(2, 1) != (polymost ? 3 : 0)) ||
+        (editorcyclerenderer(3, 1) != 0) ||
+        (editorcyclerenderer(2, 0) != 0) ||
+        (editorcyclerenderer(0, 0) != (polymost ? 1 : 0)))
+    {
+        fprintf(stderr, "FAIL: editorcyclerenderer\n");
+        return 1;
+    }
+
     _uninitengine();
     printf("PASS: editor_mode\n");
     return 0;

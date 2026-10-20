@@ -11,6 +11,7 @@
 
 int32_t editorrendermode;
 int32_t editorglfailed;
+int32_t editorrendererpicked;
 
 int32_t editorclamprenderer(int32_t r)
 {
@@ -21,6 +22,21 @@ int32_t editorclamprenderer(int32_t r)
     if (r < 0) return 0;
     if (r > 3) return 3;
     return r;
+#endif
+}
+
+int editorcyclerenderer(int current, int glavailable)
+{
+#ifndef POLYMOST
+    (void) current;
+    (void) glavailable;
+    return 0;
+#else
+    int next = (current + 1) & 3;
+
+    if ((next == 3) && !glavailable)
+        next = 0;
+    return next;
 #endif
 }
 

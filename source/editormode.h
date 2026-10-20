@@ -21,6 +21,13 @@ extern int32_t editorglfailed;
  * 0 without Polymost. */
 int32_t editorclamprenderer(int32_t r);
 
+/* Set once Alt+K picked a renderer: build.cfg then saves editormode's. */
+extern int32_t editorrendererpicked;
+
+/* Alt+K: the renderer after current, 0 to 3 and round, skipping 3 when
+ * glavailable is 0; always 0 without Polymost. */
+int editorcyclerenderer(int current, int glavailable);
+
 /* Sets the 8-bit 3D mode at m's size, then OpenGL for renderer 3 (classic if
  * it's unavailable), then the renderer. m is left as asked. 0 ok, -1 when the
  * 8-bit mode can't be set. */

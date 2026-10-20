@@ -1855,6 +1855,9 @@ static void savebuildcfg(void)
    // BUILD_WINDOWED forces a window for this run only; keep build.cfg's choice.
    if (getenv(BUILD_WINDOWED) == NULL)
        buildcfg.fullscreen = getvideofullscreen();
+   // Alt+K's renderer is kept; -renderer's alone isn't.
+   if (editorrendererpicked)
+       buildcfg.renderer = editormode.renderer;
    buildcfg_write(&buildcfg,buildcfgpath);
 }
 
