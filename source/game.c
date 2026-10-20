@@ -1599,25 +1599,37 @@ static int32_t backgroundtop(void)
     return y1;
 }
 
-// Widescreen: tile the view background into rows y1..y2-1 left and right
-// of the 4:3 HUD (the status bar and fragbar don't reach there), lined up
-// with drawbackground's tiles.
-static void drawwidesides(int32_t y1, int32_t y2)
+// Screen column of a 16.16 x in widescreen's 320x200 full-screen mapping.
+static int32_t sbarx16(int32_t x)
 {
-    int32_t x, y, cl, cr, th;
+    return ((xdim<<15)+32768+scale(x-(320<<15),ydim<<16,200*pixelaspect))>>16;
+}
+
+// Widescreen: carry a 320-wide HUD bar (tile picnum at 320x200 x 0, y sy,
+// zoom z) out to the screen edges in rows y1..y2-1, with copies of its own
+// outer n columns mirrored back and forth so every join matches. Each
+// copy's tile edge pokes d past its join and its clip overlaps the copy
+// (or bar) inside it by a pixel, so rounding leaves no gap at a join.
+static void drawwidebarends(short picnum, int32_t sy, int32_t z, int32_t n, signed char shade, int32_t y1, int32_t y2)
+{
+    int32_t k, e, s, w, d;
 
     if (!widescreen) return;
 
-    cl = sbarx(0); cr = sbarx(320)-1;
-    th = tilesizy[BIGHOLE];
-    for(y=y1-((y1-backgroundtop())%th+th)%th;y<y2;y+=th)
-        for(x=0;x<xdim;x+=tilesizx[BIGHOLE])
-        {
-            if (x < cl)
-                rotatesprite(x<<16,y<<16,65536L,0,BIGHOLE,8,0,8+16+64+128,0,y1,cl,y2-1);
-            if (x+tilesizx[BIGHOLE] > cr)
-                rotatesprite(x<<16,y<<16,65536L,0,BIGHOLE,8,0,8+16+64+128,cr,y1,xdim-1,y2-1);
-        }
+    s = n*z; w = tilesizx[picnum]*z; d = z>>6;
+    for(k=0;sbarx16(-k*s) > 0 || sbarx16(w+k*s) < xdim;k++)
+    {
+        e = -k*s;   // left side: this copy ends at e
+        if (k&1)
+            rotatesprite(e-s-d,sy,z,0,picnum,shade,0,2+8+16+64+128,sbarx16(e-s),y1,sbarx16(e),y2-1);
+        else
+            rotatesprite(e+d,sy,z,1024,picnum,shade,0,2+4+8+16+64+128,sbarx16(e-s),y1,sbarx16(e),y2-1);
+        e = w+k*s;  // right side: this copy starts at e
+        if (k&1)
+            rotatesprite(e+s-w+d,sy,z,0,picnum,shade,0,2+8+16+64+128,sbarx16(e)-1,y1,sbarx16(e+s)-1,y2-1);
+        else
+            rotatesprite(e+w-d,sy,z,1024,picnum,shade,0,2+4+8+16+64+128,sbarx16(e)-1,y1,sbarx16(e+s)-1,y2-1);
+    }
 }
 
 void displayfragbar(void)
@@ -1629,7 +1641,8 @@ void displayfragbar(void)
     for(i=connecthead;i>=0;i=connectpoint2[i])
         if(i > j) j = i;
 
-    drawwidesides(0,scale(ydim,8*(1+(j>=4)+(j>=8)+(j>=12)),200));
+    for(i=0;i<=(j>>2);i++)
+        drawwidebarends(FRAGBAR,(i*8)<<16,65600L,3,0,0,scale(ydim,8*(1+(j>>2)),200));
     rotatesprite(0,0,65600L,0,FRAGBAR,0,0,2+8+16+64+128,0,0,xdim-1,ydim-1);
     if(j >= 4) rotatesprite(319,(8)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128,0,0,xdim-1,ydim-1);
     if(j >= 8) rotatesprite(319,(16)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128,0,0,xdim-1,ydim-1);
@@ -1775,7 +1788,7 @@ void coolgaugetext(short snum)
 
     if ((uint32_t)u == 0xffffffff)
     {
-        drawwidesides(scale(ydim,200-34,200),ydim);
+        drawwidebarends(BOTTOMSTATUSBAR,(200-34)<<16,65536L,3,4,scale(ydim,200-34,200),ydim);
         patchstatusbar(0,0,320,200);
         if (ud.multimode > 1 && ud.coop != 1)
             rotatesprite(277<<16,(200-27)<<16,65536L,0,KILLSICON,0,0,10+16+128,0,0,xdim-1,ydim-1);
