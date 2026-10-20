@@ -159,11 +159,11 @@ Run the original plan's Task 6 (README, full version matrix, hand-over for the u
 **Files:** Create `source/build/stb_image_write.h` (vendored, pinned commit). Modify `source/build/sdl_driver.c` (`screencapture`, `gl_screencapture`), `source/global.c` (`dukescreencapture` filename extension), `source/config.c` (`ScreenshotFormat`), `source/build/VENDORED.md`, `tests/sdl_driver_smoke.c`.
 
 **Interfaces:**
-- `int screencapture(char *filename, char inverseit)` keeps its signature. The format comes from the file extension: `.png` uses `stbi_write_png`, `.jpg` uses `stbi_write_jpg` at quality 90.
-- `char ScreenshotFormat[4]` is read and written in `[Screen Setup]` (`png` default).
+- `int screencapture(char *filename, char inverseit)` keeps its signature. The format comes from the file extension: `.png` uses `stbi_write_png`, `.jpg` uses `stbi_write_jpg` at quality 90, `.bmp` uses `stbi_write_bmp`.
+- `char ScreenshotFormat[4]` is read and written in `[Screen Setup]` (`png` default; `jpg` and `bmp` accepted).
 
 - [ ] **Step 1:** Fetch `stb_image_write.h` from a pinned nothings/stb commit (record the SHA and version), with a script file and `curl`. Define `STB_IMAGE_WRITE_IMPLEMENTATION` in exactly one engine `.c` file. Silence its warnings for that file only if needed.
-- [ ] **Step 2: Failing test.** In `sdl_driver_smoke`: in an 8-bit mode with a known palette and a pattern drawn, `screencapture("smoke.png", 0)` writes a file that starts with the PNG signature `89 50 4E 47 0D 0A 1A 0A`, with width and height in the IHDR matching `xdim`/`ydim`. `"smoke.jpg"` starts with `FF D8 FF`.
+- [ ] **Step 2: Failing test.** In `sdl_driver_smoke`: in an 8-bit mode with a known palette and a pattern drawn, `screencapture("smoke.png", 0)` writes a file that starts with the PNG signature `89 50 4E 47 0D 0A 1A 0A`, with width and height in the IHDR matching `xdim`/`ydim`. `"smoke.jpg"` starts with `FF D8 FF`. `"smoke.bmp"` starts with `BM`, and its header width and height match.
 - [ ] **Step 3: Implement.**
   - 8-bit renderers convert `frameplace` through the current faded palette to RGB.
   - Renderer 3 uses the `lastframe` read path it already has.

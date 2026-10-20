@@ -220,9 +220,9 @@ Decisions:
 *(User's request.)* Vendor `stb_image_write.h` (nothings/stb, public domain or MIT) so
 screenshots are written as PNG or JPEG instead of PCX, in every renderer.
 
-- *(My call)* PNG is the default. `[Screen Setup] ScreenshotFormat` in `duke3d.cfg` takes `png`
-  or `jpg`; JPEG uses quality 90. 8-bit renderers convert through the current faded palette.
+- *(My call)* PNG is the default. `[Screen Setup] ScreenshotFormat` in `duke3d.cfg` takes `png`,
+  `jpg` or `bmp` (BMP added at the user's request); JPEG uses quality 90. 8-bit renderers convert through the current faded palette.
   Renderer 3 keeps reading the last finished frame.
-- *(My call)* Files keep the game's existing numbering, with a `.png` or `.jpg` extension.
+- *(My call)* Files keep the game's existing numbering, with a `.png`, `.jpg` or `.bmp` extension.
 - The header goes in `source/build/`, pinned to an exact upstream commit and recorded in
   `VENDORED.md` with its licence.
