@@ -154,7 +154,7 @@ unchanged.
 - OpenGL comes from `"SDL_opengl.h"` (`GL_SILENCE_DEPRECATION` on macOS).
 - `rendmode` is defined in `engine.c`, not here.
 - `glinfo` (`struct glinfo_t { float maxanisotropy; char bgra, clamptoedge,
-  texcompr, texnpot; }`, which upstream got from `baselayer.h`) is declared in
+  texcompr, texnpot, vbo, glsl, fbo; }`; `vbo`/`glsl`/`fbo` are set by `glext.c`), which upstream got from `baselayer.h`) is declared in
   `build.h` under `USE_OPENGL`, not here. `sdl_driver.c` defines it, filled in
   by `setgamemode_gl`, and `nofog` (which upstream declares but no JFBuild
   file of that commit defines), set to 0.
