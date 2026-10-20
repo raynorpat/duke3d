@@ -118,6 +118,8 @@ target_link_libraries(render_classic2d PRIVATE buildengine duke3d::SDL2main)
 set(DUKE3D_GRP "" CACHE FILEPATH "DUKE3D.GRP for tests that need game data")
 set(DUKE3D_E1L1_CHECKSUM "e0517697" CACHE STRING
     "Expected render_e1l1 frame checksum (hex); empty just prints it")
+set(DUKE3D_E1L1_TILT_CHECKSUM "64e7f538" CACHE STRING
+    "Expected render_e1l1_tilt (screen tilt and low detail at 1600x900) checksum (hex); empty just prints it")
 # arm64 macOS gives 0d60cca6 in 1.3D builds and d64ef539 in 1.4/1.5 ones
 # (Polymost takes slope heights from getzsofslope, whose maths changed
 # between engine revisions). Not the default: Polymost is floating point, so
@@ -146,6 +148,15 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
             "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1.bmp"
             ${DUKE3D_E1L1_CHECKSUM})
   set_tests_properties(render_e1l1 PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+    TIMEOUT 30)
+  # game.c's screen tilt and low detail in a widescreen mode whose tile is a
+  # power of two wide.
+  add_test(NAME render_e1l1_tilt
+    COMMAND render_e1l1 "${DUKE3D_GRP}"
+            "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_tilt.bmp"
+            "${DUKE3D_E1L1_TILT_CHECKSUM}" 0 tilt)
+  set_tests_properties(render_e1l1_tilt PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
     TIMEOUT 30)
 
@@ -179,8 +190,13 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
       COMMAND render_e1l1 "${DUKE3D_GRP}"
               "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost_tile.bmp"
               "" 2 tile)
+    # The same tilt and low detail in renderer 2, against renderer 0's.
+    add_test(NAME render_e1l1_polymost_tilt
+      COMMAND render_e1l1 "${DUKE3D_GRP}"
+              "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost_tilt.bmp"
+              "" 2 tilt)
     set_tests_properties(render_e1l1_polymost render_e1l1_polymost_solid
-                         render_e1l1_polymost_tile
+                         render_e1l1_polymost_tile render_e1l1_polymost_tilt
       PROPERTIES
       ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
       TIMEOUT 30)
