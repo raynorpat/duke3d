@@ -139,15 +139,17 @@ Other settings, all under `[Screen Setup]`:
 - `GLTextureMipLevel` (default 0): in renderer 3, drop this many mipmap
   levels from every texture. Over 0 looks blocky.
 - `ScreenshotFormat`: `png` (default), `jpg` or `bmp`. Screenshots are named
-  `duke0000.png` and so on, and go to the folder under
-  [Config and saves](#config-and-saves).
+  `duke0000.png` and so on, and go to a `Screenshots` folder inside the one
+  under [Config and saves](#config-and-saves).
 
 Known gaps:
 
 - Renderer 3 shades with fog instead of the palette ramps, so lighting
   differs from classic (it matches JFBuild's 2004 Polymost).
-- Palette changes (fades, flashes) rebuild the textures in renderer 3, so
-  they are slow.
+- Palette switches (underwater, slime, night vision, the title and ending
+  screens, cutscenes) and brightness changes rebuild the textures in
+  renderer 3, so they can stutter. Fades and flashes are drawn over the
+  frame and don't.
 - No `.md2` models or hi-res texture replacement.
 - Polymost's own todo list applies (sprite sorting, the hall of mirrors near
   the zenith, ...).
