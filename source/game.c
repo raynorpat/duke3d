@@ -2029,6 +2029,42 @@ void binscreen(void)
 }
 
 
+// The renderer for this run: duke3d.cfg's, or -renderer's; 0 if OpenGL failed.
+static int32_t gamerenderer;
+
+// Sets the video mode from ScreenMode/Width/Height, then OpenGL when the
+// renderer is 3, so the renderer survives a mode change.
+static int setgamemoderenderer(void)
+{
+    if (setgamemode(ScreenMode,ScreenWidth,ScreenHeight) < 0)
+        return -1;
+    if (gamerenderer == 3 && setgamemode_gl(ScreenMode) != 0)
+    {
+        printf("OpenGL renderer unavailable (%s); using the classic renderer.\n", SDL_GetError());
+        setgamemode(ScreenMode,ScreenWidth,ScreenHeight);
+        gamerenderer = 0;
+    }
+    setrendermode(gamerenderer);
+    return 0;
+}
+
+// Renderer 3 redraws the whole screen each frame: the border and status bar
+// too, and the view size after the drawable changed size.
+static void gldrawframe(void)
+{
+    static int32_t lastxdim, lastydim;
+
+    if (getrendermode() != 3) return;
+    if (xdim != lastxdim || ydim != lastydim)
+    {
+        lastxdim = xdim;
+        lastydim = ydim;
+        vscrn();
+    }
+    glsetgamepalette();
+    pus = pub = NUMPAGES;
+}
+
 void gameexit(char *msg)
 {
     short i;
@@ -2058,7 +2094,7 @@ void gameexit(char *msg)
         dobonus(1);
 // CTW - MODIFICATION
 //      setgamemode();
-        setgamemode(ScreenMode,ScreenWidth,ScreenHeight);
+        setgamemoderenderer();
 // CTW END - MODIFICATION
     }
 
@@ -2339,6 +2375,11 @@ void displayrest(int32_t smoothratio)
     int32_t cposx,cposy,cang;
 
     pp = &ps[screenpeek];
+
+    // Renderer 3: displayrooms has drawn the border, and draws it again next
+    // frame; queue only this frame's overlays, as a big drawable's border
+    // alone overflows the permanent-sprite queue.
+    if (getrendermode() == 3) flushperms();
 
     if( pp->pals_time > 0 && pp->loogcnt == 0)
     {
@@ -7372,6 +7413,7 @@ void Logo(void)
     nextpage();
 
     ps[myconnectindex].palette = titlepal;
+    glsetgamepalette();
     flushperms();
     rotatesprite(0,0,65536L,0,BETASCREEN,0,0,2+8+16+64,0,0,xdim-1,ydim-1);
     KB_FlushKeyboardQueue();
@@ -8071,26 +8113,19 @@ int main(int argc,char **argv)
         vidoption = 2;
         setgamemode(vidoption,320,200);
     }*/
-    if( setgamemode(ScreenMode,ScreenWidth,ScreenHeight) < 0 )
+    // -renderer N picks the renderer for this run only; duke3d.cfg keeps its own.
+    i = CheckParm("RENDERER");
+    gamerenderer = clamprenderer(i ? ((i+1 < _argc) ? atoi(_argv[i+1]) : 0) : RendererSetting);
+
+    if( setgamemoderenderer() < 0 )
     {
         printf("\nVESA driver for ( %d * %d ) not found/supported!\n",xdim,ydim);
         ScreenMode = 2;
         ScreenWidth = 320;
         ScreenHeight = 200;
-        setgamemode(ScreenMode,ScreenWidth,ScreenHeight);
+        setgamemoderenderer();
     }
 // CTW END - MODIFICATION
-
-    // -renderer N picks the renderer for this run only; duke3d.cfg keeps its own.
-    i = CheckParm("RENDERER");
-    i = clamprenderer(i ? ((i+1 < _argc) ? atoi(_argv[i+1]) : 0) : RendererSetting);
-    if (i == 3 && setgamemode_gl(ScreenMode) != 0)
-    {
-        printf("OpenGL renderer unavailable (%s); using the classic renderer.\n", SDL_GetError());
-        setgamemode(ScreenMode,ScreenWidth,ScreenHeight);
-        i = 0;
-    }
-    setrendermode(i);
 
     genspriteremaps();
 
@@ -8219,6 +8254,7 @@ int main(int argc,char **argv)
         else
             i = 65536;
 
+        gldrawframe();
         displayrooms(screenpeek,i);
         displayrest(i);
 
@@ -8706,6 +8742,7 @@ int32_t playback(void)
             nonsharedkeys();
 
             j = min(max((totalclock-lockclock)*(65536/TICSPERFRAME),0),65536);
+            gldrawframe();
             displayrooms(screenpeek,j);
             displayrest(j);
 
@@ -9484,6 +9521,7 @@ void doorders(void)
 
     for(i=0;i<63;i+=7) palto(0,0,0,i);
     ps[myconnectindex].palette = palette;
+    glsetgamepalette();
     totalclock = 0;
     KB_FlushKeyboardQueue();
     rotatesprite(0,0,65536L,0,ORDERING,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
@@ -9607,6 +9645,7 @@ void dobonus(char bonusonly)
 
             KB_FlushKeyboardQueue();
             ps[myconnectindex].palette = palette;
+            glsetgamepalette();
 
             rotatesprite(0,0,65536L,0,3292,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
             nextpage(); for(t=63;t>0;t--) palto(0,0,0,t);
@@ -9635,6 +9674,7 @@ void dobonus(char bonusonly)
             setview(0,0,xdim-1,ydim-1);
             KB_FlushKeyboardQueue();
             ps[myconnectindex].palette = palette;
+            glsetgamepalette();
             rotatesprite(0,0,65536L,0,3293,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
             nextpage(); for(t=63;t>0;t--) palto(0,0,0,t);
             while( !KB_KeyWaiting() ) getpackets();
@@ -9760,6 +9800,7 @@ void dobonus(char bonusonly)
     FRAGBONUS:
 
     ps[myconnectindex].palette = palette;
+    glsetgamepalette();
     KB_FlushKeyboardQueue();
     totalclock = 0; tinc = 0;
     bonuscnt = 0;

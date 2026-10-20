@@ -156,6 +156,7 @@ extern void dispnames(void);
 extern int getfilenames(char kind[6]);
 extern void sortfilenames(void);
 extern void menus(void);
+extern void glsetgamepalette(void);
 extern void palto(char r, char g, char b, int32_t e);
 extern void drawoverheadmap(int32_t cposx, int32_t cposy, int32_t czoom, short cang);
 extern void endanimsounds(int32_t fr);

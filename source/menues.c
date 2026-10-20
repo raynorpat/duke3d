@@ -3665,6 +3665,35 @@ void menus(void)
     }
 }
 
+/* The game palette and brightness renderer 3 last applied (NULL: unknown). */
+static char *glgamepalette;
+static int32_t glgamebrightness;
+
+/*
+ * Renderer 3 bakes the palette into textures as it draws, so a new
+ *  ps[myconnectindex].palette must reach the engine before the next draw, not
+ *  at the next palto. Applies it only when it changed, keeping any fade.
+ */
+void glsetgamepalette(void)
+{
+#ifdef POLYMOST
+    palette_t fadergb;
+    unsigned char fadedelta;
+
+    if (getrendermode() != 3) return;
+    if (ps[myconnectindex].palette == glgamepalette && ud.brightness == glgamebrightness)
+        return;
+
+    glgamepalette = ps[myconnectindex].palette;
+    glgamebrightness = ud.brightness;
+    fadergb = palfadergb;  /* setbrightness clears the fade. */
+    fadedelta = palfadedelta;
+    setbrightness(ud.brightness>>2,(unsigned char *)glgamepalette);
+    palfadergb = fadergb;
+    palfadedelta = fadedelta;
+#endif
+}
+
 void palto(char r,char g,char b,int32_t e)
 {
     int i;
@@ -3686,6 +3715,14 @@ void palto(char r,char g,char b,int32_t e)
     if( (e&128) == 0 )
         if ((ScreenMode != 1) || (vgacompatible == 1)) limitrate();
 // CTW END - MODIFICATION
+
+    if (getrendermode() == 3)
+    {
+        /* a fade quad over the frame, not a palette (and texture) change. */
+        glsetgamepalette();
+        setpalettefade(min(r,63),min(g,63),min(b,63),e&127);
+        return;
+    }
 
     setbrightness(ud.brightness>>2,temparray);
 }
@@ -4175,6 +4212,11 @@ void playanm(char *fn,char t)
         }
 
         VBE_setPalette(0L,256L,tempbuf);
+        if (getrendermode() == 3)
+        {
+            glgamepalette = NULL;  /* curpalette is the ANM's now. */
+            setpalettefade(0,0,0,0);  /* VBE_setPalette ends a palto fade in renderer 0. */
+        }
 
     ototalclock = totalclock + 10;
 
@@ -4198,6 +4240,7 @@ void playanm(char *fn,char t)
        else                           ototalclock += 10;
 
        waloff[MAXTILES-3-t] = FP_OFF(ANIM_DrawFrame(i));
+       invalidatetile(MAXTILES-3-t, -1, -1);  /* renderer 3: upload the new frame. */
        rotatesprite(0<<16,0<<16,65536L,512,MAXTILES-3-t,0,0,2+4+8+16+64, 0,0,xdim-1,ydim-1);
        nextpage();
 
