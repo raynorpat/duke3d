@@ -161,6 +161,14 @@ unchanged.
 - `polymost_dorotatesprite` takes `unsigned char dapalnum, dastat`, as our
   `dorotatesprite` does.
 
+## Later JFBuild fixes
+
+Ported from later JFBuild commits, retyped as above:
+
+- `1cb8debd775a9592de24f80b9c06fc5ff77dcf12`: `drawline2d` (renderer 1's
+  wireframe) steps along the major axis and clips to the view exactly. The
+  commit's `build.c` part (the editor's `clearkeys`) isn't taken.
+
 ## Engine hooks
 
 - `engine.c`: `#include "polymost.c"` after `wallfront`/`bunchfront`, so the
