@@ -222,7 +222,10 @@ Ported from later JFBuild commits, retyped as above:
   arrays (upstream overwrote them in place through a cast); it binds
   `glpic[gltexcache(...)]` (our cache returns an index); `drawmapview` sets
   `globalpal` to the floor's `floorpal`, or the sprite's `pal`, before each
-  fill in renderer 3 (upstream used whatever was left in it); the alpha test
+  fill in renderer 3 (upstream used whatever was left in it); a
+  relative-aligned floor takes its texture origin from `startwall`'s vertex
+  even when the loop skipped it as collinear (upstream used the first kept
+  point, which shifts the texture, as on E1L3's sector 107); the alpha test
   gets `glAlphaFunc(GL_GREATER,0.32f)`, as nothing else here sets one, and
   is turned off after the draw so the next 3D frame doesn't inherit it;
   `_glframedrawn()` is called on every fill; the projection pop is under

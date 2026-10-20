@@ -8580,6 +8580,16 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 			}
 			if ((i&0xf0) != 0xf0) continue;
 			bakx1 = rx1[0]; baky1 = mulscale16(ry1[0]-(ydim<<11),xyaspect)+(ydim<<11);
+#if defined(POLYMOST) && defined(USE_OPENGL)
+				/* the texture origin is startwall's vertex, which renderer 3's
+				   loop skips if it's collinear (an upstream bug) */
+			if (rendmode == 3)
+			{
+				ox = wall[startwall].x - dax; oy = wall[startwall].y - day;
+				bakx1 = dmulscale16(ox,xvect,-oy,yvect) + (xdim<<11);
+				baky1 = mulscale16(dmulscale16(oy,xvect2,ox,yvect2),xyaspect)+(ydim<<11);
+			}
+#endif
 			if (i&0x0f)
 			{
 				npoints = clippoly(npoints,i);
