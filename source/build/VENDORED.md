@@ -251,7 +251,7 @@ Ported from later JFBuild commits, retyped as above:
   is translucent without cstat 512 and the classic state left before it is
   already normal; with cstat 512 added, the 320x200 map checksum goes from
   `763b8c56` (without the fix) to `c9790d70`.
-- `a031bac` (the fullbright feature only, not the 2009 texture cache
+- `a031bac10735daefb0bbb4b379cf11460270729c` (the fullbright feature only, not the 2009 texture cache
   refactor around it): fullbright texels in renderer 3. `gloadtile` builds,
   beside each cached texture, a glow texture (`glpicfb[]`, 0 for none) of
   the texels whose palookup-mapped index is in `[polymosttexfullbright,
