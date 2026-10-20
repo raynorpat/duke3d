@@ -124,11 +124,27 @@ int main(void)
 #if PLATFORM_UNIX
     /* duke3d.cfg values out of range, or in capitals, are read and written
        back as the game uses them. (Elsewhere the setup file is picked from a
-       list of the folder's .cfg files.) Last, as it loads a whole setup. */
+       list of the folder's .cfg files.) Last, as it loads a whole setup. The
+       file lives under a temporary HOME, never the working directory's. */
     {
-        FILE *f = fopen("duke3d.cfg", "w");
-        char text[16384];
+        FILE *f;
+        char text[16384], home[256], cfg[512], *slash;
+        const char *tmp = getenv("TMPDIR");
         size_t n;
+
+        snprintf(home, sizeof(home), "%s/duke3d_cfg_XXXXXX",
+                 tmp != NULL && tmp[0] != '\0' ? tmp : "/tmp");
+        if (mkdtemp(home) == NULL) {
+            printf("FAIL cfg temp dir\n");
+            return 1;
+        }
+        setenv("HOME", home, 1);
+        if (setup_homedir() != 0) {
+            printf("FAIL cfg setup_homedir\n");
+            return 1;
+        }
+        GetPathFromEnvironment(cfg, sizeof(cfg), "duke3d.cfg");
+        f = fopen(cfg, "w");
 
         fputs("[Screen Setup]\nRenderer = 7\nGLTextureMipLevel = 99\n"
               "ScreenshotFormat = \"JPG\"\n", f);
@@ -139,7 +155,7 @@ int main(void)
         check("cfg GLTextureMipLevel 99", GLTextureMipLevel, 15);
         check_str("cfg ScreenshotFormat JPG", ScreenshotFormat, "jpg");
         CONFIG_WriteSetup();
-        f = fopen("duke3d.cfg", "r");
+        f = fopen(cfg, "r");
         n = fread(text, 1, sizeof(text) - 1, f);
         fclose(f);
         text[n] = 0;
@@ -147,13 +163,18 @@ int main(void)
         check("cfg writes GLTextureMipLevel 15", strstr(text, "GLTextureMipLevel = 15") != NULL, 1);
         check("cfg writes ScreenshotFormat jpg", strstr(text, "ScreenshotFormat = \"jpg\"") != NULL, 1);
 
-        f = fopen("duke3d.cfg", "w");
+        f = fopen(cfg, "w");
         fputs("[Screen Setup]\nRenderer = -2\nGLTextureMipLevel = -3\n", f);
         fclose(f);
         CONFIG_ReadSetup();
         check("cfg Renderer -2", RendererSetting, 0);
         check("cfg GLTextureMipLevel -3", GLTextureMipLevel, 0);
-        remove("duke3d.cfg");
+        remove(cfg);
+        while ((slash = strrchr(cfg, '/')) != NULL) {
+            *slash = 0;
+            if (rmdir(cfg) != 0 || strcmp(cfg, home) == 0)
+                break;
+        }
     }
 #endif
 
