@@ -134,7 +134,8 @@ unchanged.
   - `polymost_dorotatesprite` saves `frameoffset` in an `intptr_t`.
 - `ftol`/`dtol`: only the C fallback is kept (the MSVC, Watcom and GCC x87
   versions are gone). It uses `lrintf`/`lrint`, which round to nearest as
-  x87 `fistp` does.
+  x87 `fistp` does. The engine is built with `-fno-math-errno` (GCC and
+  Clang), so they inline rather than call libm.
 - Removed, as out of scope (hightile, kplib, md2, defs, OSD):
   - `#include "md2sprite.c"`, `md2tims`, `usemodels` and the `md2draw` calls
     in `polymost_drawsprite`; the `models[]` loop in `gltexapplyprops`; the
@@ -194,21 +195,21 @@ Ported from later JFBuild commits, retyped as above:
 - `ef311521781fc667d5d145f9c4c112987ec18ca9`: `gltexmiplevel`, like Quake's
   picmip. `uploadtexture` drops that many mipmap levels (clamped to
   `gltexmaxsize-1`, and written back), uploading level `js` as level 0, and
-  drops more while a texture is over `1<<gltexmaxsize`. `gltexmaxsize` is
-  the log2 of `GL_MAX_TEXTURE_SIZE`, read on the first upload (6 if GL
-  returns 0) and again after each `polymost_glreset` (not upstream); both come from upstream between the 2004 import and this
-  commit. Both are `int32_t`, declared in `build.h` under `USE_OPENGL`; the
-  game sets `gltexmiplevel` from `duke3d.cfg`'s `[Screen Setup]
-  GLTextureMipLevel` before each GL mode set (textures made earlier keep
-  their size until `polymost_glreset()`). With the `GL_NEAREST` default,
-  a miplevel over 0 looks blocky. Change from upstream: `js` is cut, per
-  texture, to the texture's last level, so one smaller than `2^js` (such
-  as a 0-sized tile's 1x1) still gets a level 0; upstream uploaded nothing
-  and GL drew the polygon untextured. Not taken: the OSD variables
-  (`gltexturemaxsize`, `gltexturemiplevel`); the commit's `drawpoly` part,
-  which zeroes the alpha-test cutoff for invalid textures (E2L7's urinals
-  behind the mirror), as our `drawpoly` has no alpha test; its
-  `winlayer.c` part.
+  drops more while a texture is over `1<<gltexmaxsize`. `gltexmaxsize` is the
+  log2 of `GL_MAX_TEXTURE_SIZE`, read on the first upload (6 if GL returns 0)
+  and again after each `polymost_glreset` (not upstream); both come from
+  upstream between the 2004 import and this commit. Both are `int32_t`,
+  declared in `build.h` under `USE_OPENGL`; the game sets `gltexmiplevel`
+  from `duke3d.cfg`'s `[Screen Setup] GLTextureMipLevel` (0-15 when the
+  config is read) before each GL mode set (textures made earlier keep their
+  size until `polymost_glreset()`). With the `GL_NEAREST` default, a miplevel
+  over 0 looks blocky. Change from upstream: `js` is cut, per texture, to the
+  texture's last level, so one smaller than `2^js` (such as a 0-sized tile's
+  1x1) still gets a level 0; upstream uploaded nothing and GL drew the
+  polygon untextured. Not taken: the OSD variables (`gltexturemaxsize`,
+  `gltexturemiplevel`); the commit's `drawpoly` part, which zeroes the
+  alpha-test cutoff for invalid textures (E2L7's urinals behind the mirror),
+  as our `drawpoly` has no alpha test; its `winlayer.c` part.
 - `ccf7aa8d8019a249a4592d7dd9b950afa1cbbd3c`: the GL map view.
   `drawmapview` no longer returns at once in renderer 3, and `fillpolygon`
   hands over to the new `polymost_fillpolygon`, which turns the classic
@@ -356,7 +357,8 @@ Ported from later JFBuild commits, retyped as above:
   when it clamped it, and the current fullscreen state) with a legacy context (double buffered, 24-bit depth, swap
   interval 1 or else 0), and only then drops the 8-bit window, renderer,
   texture and surfaces (or, from GL, the old GL window), so any failure
-  returns -1 with the mode untouched. It sets JFBuild's GL state, fills `glinfo` from whole
+  returns -1 with the mode untouched (from GL, its context is made current
+  again). It sets JFBuild's GL state, fills `glinfo` from whole
   `GL_EXTENSIONS` tokens, sets `bpp = 32`, `xdim`/`ydim` to the drawable
   size clamped to `MAXXDIM`x`MAXYDIM`, `qsetmode = 200` and `frameplace = 0`,
   then calls `setrendermode(3)` and `polymost_glreset()`. Without
@@ -425,9 +427,11 @@ Ported from later JFBuild commits, retyped as above:
     `display.h`) after it, which clears `framedrawn`.
   - `screencapture`'s RGB comes from the back buffer. A frame being drawn
     is there; otherwise `lastframe` is drawn there first, as the back buffer
-    is undefined after a swap, and with no `lastframe` the capture fails.
-    The current fade is blended in as the fade quad does, so screenshots
-    show it as the 8-bit modes' do (see the stb_image_write section).
+    is undefined after a swap, and with no frame in `lastframe` yet the
+    capture fails. The current fade is blended in as the fade quad does, so
+    screenshots show it as the 8-bit modes' do (see the stb_image_write
+    section). With no `lastframe` texture (over `GL_MAX_TEXTURE_SIZE`) it
+    reads the front buffer instead, which has the fade.
   - `numpages` is 2, as in JFBuild's GL mode, and back to 0 on leaving GL.
   - `glredrawlastframe()` (not in JFBuild; prototyped in `display.h` and
     `engine_protos.h`) draws `lastframe`, without the fade, into the frame
