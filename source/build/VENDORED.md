@@ -365,7 +365,9 @@ Ported from later JFBuild commits, retyped as above:
   `SDL_WINDOWEVENT_SIZE_CHANGED` re-read the drawable size and, if it
   changed, call `polymost_glreset()` and redo the mode variables.
   `setupmouse`, the mouse motion clamp and `_idle` check `sdl_window`
-  instead of `surface`, and the clamp uses `xres`/`yres`.
+  instead of `surface`, and the clamp and `setupmouse`'s centre use the
+  window's size, as SDL's mouse events are in points, not the (on a
+  high-DPI display, bigger) drawable's pixels.
 - `_setgamemode` (8-bit) still clamps modes over 1600x1200 to 1600x1200,
   now with literals, so the larger `MAXXDIM`/`MAXYDIM` only reach GL. The
   size asked for is kept for renderer 3's window.

@@ -912,8 +912,29 @@ static int sdl_mouse_wheel_filter(SDL_MouseWheelEvent const *event)
 } /* sdl_mouse_wheel_filter */
 
 
+/*
+ * The size mouse_x/mouse_y run over: SDL's mouse events are in the 8-bit
+ *  renderer's logical size, but in the window's points in OpenGL, where
+ *  the drawable (xres, yres) can be bigger (a high-DPI display).
+ */
+static void mouse_area(int *w, int *h)
+{
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+    {
+        SDL_GetWindowSize(sdl_window, w, h);
+        return;
+    } /* if */
+#endif
+    *w = (surface != NULL) ? surface->w : xres;
+    *h = (surface != NULL) ? surface->h : yres;
+} /* mouse_area */
+
+
 static int sdl_mouse_motion_filter(SDL_Event const *event)
 {
+    int w, h;
+
     if (sdl_window == NULL)
         return(0);
 
@@ -942,10 +963,11 @@ static int sdl_mouse_motion_filter(SDL_Event const *event)
         } /* else */
     } /* else */
 
+    mouse_area(&w, &h);
    	if (mouse_x < 0) mouse_x = 0;
-   	if (mouse_x > xres) mouse_x = xres;
+   	if (mouse_x > w) mouse_x = w;
    	if (mouse_y < 0) mouse_y = 0;
-   	if (mouse_y > yres) mouse_y = yres;
+   	if (mouse_y > h) mouse_y = h;
 
     return(0);
 } /* sdl_mouse_motion_filter */
@@ -2301,15 +2323,17 @@ void uninitvesa(void)
 
 int setupmouse(void)
 {
+    int w, h;
+
     if (sdl_window == NULL)
         return(0);
 
     set_mouse_grab(mouse_grabbed);
     SDL_ShowCursor(0);
 
-    /* in OpenGL there's no surface; xres/yres are already the drawable. */
-    mouse_x = ((surface != NULL) ? surface->w : xres) / 2;
-    mouse_y = ((surface != NULL) ? surface->h : yres) / 2;
+    mouse_area(&w, &h);
+    mouse_x = w / 2;
+    mouse_y = h / 2;
     mouse_relative_x = mouse_relative_y = 0;
 
         /*
