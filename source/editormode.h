@@ -28,6 +28,15 @@ extern int32_t editorrendererpicked;
  * glavailable is 0; always 0 without Polymost. */
 int editorcyclerenderer(int current, int glavailable);
 
+/* build.cfg's mousesensitivity in 16.16 (65536 is 1.0). */
+extern int32_t editormousesensitivity;
+
+/* The cursor's move for mouse motion d: d * sensitivity / 2, scaled by
+ * pixels/points (drawable over window size), with what's under a pixel kept
+ * in *rem for the next call. At 1.0 and pixels == points it's d>>1 for d a
+ * multiple of 2. */
+int32_t editormousemove(int32_t d, int32_t pixels, int32_t points, int32_t *rem);
+
 /* Sets the 8-bit 3D mode at m's size, then OpenGL for renderer 3 (classic if
  * it's unavailable), then the renderer. m is left as asked. 0 ok, -1 when the
  * 8-bit mode can't be set. */

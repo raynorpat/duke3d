@@ -102,6 +102,38 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    /* Mouse: at 1.0 the old d>>1 for readmousexy's (multiples of 4) motion;
+     * a half halves it, a 2x drawable doubles it, and what's under a pixel
+     * adds up over calls. */
+    {
+        int32_t d, rem = 0, sum = 0, i;
+
+        for (d = -400; d <= 400; d += 4)
+            if ((editormousemove(d, 640, 640, &rem) != (d >> 1)) || (rem != 0))
+            {
+                fprintf(stderr, "FAIL: editormousemove(%d) at 1.0\n", (int) d);
+                return 1;
+            }
+        editormousesensitivity = 32768;
+        for (i = 0; i < 4; i++)
+            sum += editormousemove(-4, 640, 640, &rem);
+        editormousesensitivity = 65536;
+        if ((sum != -4) || (rem != 0) || (editormousemove(-4, 1280, 640, &rem) != -4))
+        {
+            fprintf(stderr, "FAIL: editormousemove sum=%d rem=%d\n", (int) sum, (int) rem);
+            return 1;
+        }
+        editormousesensitivity = 32768;
+        sum = editormousemove(1, 640, 640, &rem) + editormousemove(1, 640, 640, &rem) +
+              editormousemove(1, 640, 640, &rem) + editormousemove(1, 640, 640, &rem);
+        editormousesensitivity = 65536;
+        if ((sum != 1) || (rem != 0))
+        {
+            fprintf(stderr, "FAIL: editormousemove sub-pixel sum=%d rem=%d\n", (int) sum, (int) rem);
+            return 1;
+        }
+    }
+
     _uninitengine();
     printf("PASS: editor_mode\n");
     return 0;

@@ -12,6 +12,7 @@
 int32_t editorrendermode;
 int32_t editorglfailed;
 int32_t editorrendererpicked;
+int32_t editormousesensitivity = 65536;
 
 int32_t editorclamprenderer(int32_t r)
 {
@@ -38,6 +39,18 @@ int editorcyclerenderer(int current, int glavailable)
         next = 0;
     return next;
 #endif
+}
+
+int32_t editormousemove(int32_t d, int32_t pixels, int32_t points, int32_t *rem)
+{
+    const int64_t unit = 2 << 16;  /* /2 as the old searchx += mousx>>1 */
+    int64_t v = (int64_t) d * editormousesensitivity * pixels / points + *rem;
+    int64_t q = v / unit;
+
+    if ((v % unit) < 0)
+        q--;  /* round down, as >>1 does */
+    *rem = (int32_t) (v - q * unit);
+    return (int32_t) q;
 }
 
 int editorsetgamemode(const editormode_t *m)

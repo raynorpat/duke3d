@@ -98,6 +98,7 @@ short cursectnum; /* The sector the camera is in currently. */
 int32_t hvel; /* The Z velocity of the camera, used for jumping in gravity mode. */
            /* -512 is the starting value when you jump in gravity mode.       */
 static int32_t synctics = 0, lockclock = 0;
+static int32_t mousexrem = 0, mouseyrem = 0;  /* cursor motion under a pixel */
 
 extern volatile int32_t stereomode;
 extern char vgacompatible;
@@ -2271,8 +2272,8 @@ void overheadeditor(void)
 
 		oldmousebstatus = bstatus;
 		getmousevalues(&mousx,&mousy,&bstatus);
-		searchx += (mousx>>1);
-		searchy += (mousy>>1);
+		searchx += editormousemove(mousx,1,1,&mousexrem);
+		searchy += editormousemove(mousy,1,1,&mouseyrem);
 		if (searchx < 8) searchx = 8;
 		if (searchx > 631) searchx = 631;
 		if (searchy < 8) searchy = 8;
@@ -5009,6 +5010,7 @@ void editinput(void)
 	int32_t dashade[2], goalz, xvect, yvect, hiz, loz;
 	short hitsect, hitwall, hitsprite;
 	int32_t hitx, hity, hitz, dax, day, hihit, lohit;
+	int mousew, mouseh;
 
 	if (keystatus[0x57] > 0)  /* F11 - brightness */
 	{
@@ -5030,8 +5032,9 @@ void editinput(void)
 
 	mousz = 0;
 	getmousevalues(&mousx,&mousy,&bstatus);
-	searchx += (mousx>>1);
-	searchy += (mousy>>1);
+	getmousearea(&mousew,&mouseh);  /* in OpenGL, window points to drawable pixels */
+	searchx += editormousemove(mousx,xdim,mousew,&mousexrem);
+	searchy += editormousemove(mousy,ydim,mouseh,&mouseyrem);
 	if (searchx < 4) searchx = 4;
 	if (searchy < 4) searchy = 4;
 	if (searchx > xdim-5) searchx = xdim-5;

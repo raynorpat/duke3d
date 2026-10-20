@@ -976,6 +976,12 @@ static void mouse_area(int *w, int *h)
 } /* mouse_area */
 
 
+void getmousearea(int *w, int *h)
+{
+    mouse_area(w, h);
+} /* getmousearea */
+
+
 static int sdl_mouse_motion_filter(SDL_Event const *event)
 {
     int w, h;
