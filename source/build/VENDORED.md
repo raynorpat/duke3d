@@ -168,6 +168,13 @@ Ported from later JFBuild commits, retyped as above:
 - `1cb8debd775a9592de24f80b9c06fc5ff77dcf12`: `drawline2d` (renderer 1's
   wireframe) steps along the major axis and clips to the view exactly. The
   commit's `build.c` part (the editor's `clearkeys`) isn't taken.
+- `61483f00734fd722bb4982786b758f26b7905a8a` (`engine.c`'s `drawmasks`): in
+  renderers 1-3, the scan for sprites behind a masked wall tests the
+  sprite's screen x against the wall's `dxb1`/`dxb2` (Polymost's float
+  extents) instead of `xb1`/`xb2`, which Polymost doesn't fill in. Renderer
+  0 keeps the `xb1`/`xb2` test.
+  `dxb1`/`dxb2` stay static, as `engine.c` `#include`s this file; the
+  commit's `polymosttex` changes aren't taken.
 
 ## Engine hooks
 
