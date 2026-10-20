@@ -5092,7 +5092,7 @@ void editinput(void)
 		if (keystatus[buildkeys[8]] > 0)                            /* A (stand high) */
 		{
 			if (keystatus[0x1d] > 0)
-				horiz = max(-100,horiz-((keystatus[buildkeys[4]]+1)<<2));
+				horiz = max(-100,horiz-((keystatus[buildkeys[4]]+1)*synctics*2));
 			else
 			{
 				goalz -= (16<<8);
@@ -5103,7 +5103,7 @@ void editinput(void)
 		if (keystatus[buildkeys[9]] > 0)                            /* Z (stand low) */
 		{
 			if (keystatus[0x1d] > 0)
-				horiz = min(300,horiz+((keystatus[buildkeys[4]]+1)<<2));
+				horiz = min(300,horiz+((keystatus[buildkeys[4]]+1)*synctics*2));
 			else
 			{
 				goalz += (12<<8);
@@ -5128,7 +5128,7 @@ void editinput(void)
 		if (keystatus[buildkeys[8]] > 0)                            /* A */
 		{
 			if (keystatus[0x1d] > 0)
-				horiz = max(-100,horiz-((keystatus[buildkeys[4]]+1)<<2));
+				horiz = max(-100,horiz-((keystatus[buildkeys[4]]+1)*synctics*2));
 			else
 			{
 				if (zmode != 1)
@@ -5143,7 +5143,7 @@ void editinput(void)
 		if (keystatus[buildkeys[9]] > 0)                            /* Z (stand low) */
 		{
 			if (keystatus[0x1d] > 0)
-				horiz = min(300,horiz+((keystatus[buildkeys[4]]+1)<<2));
+				horiz = min(300,horiz+((keystatus[buildkeys[4]]+1)*synctics*2));
 			else
 			{
 				if (zmode != 1)
