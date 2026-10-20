@@ -481,8 +481,7 @@ void gloadtile (int32_t dapic, int32_t dapal, int32_t dameth, int32_t gltexind, 
 
 	pic = (coltype *)malloc(xsiz*ysiz*sizeof(coltype));
 	if (!pic) return;
-	fbpic = (coltype *)calloc(xsiz*ysiz,sizeof(coltype)); //fullbright texels, transparent elsewhere
-	if (!fbpic) { free(pic); return; }
+	fbpic = (coltype *)calloc(xsiz*ysiz,sizeof(coltype)); //fullbright texels, transparent elsewhere; NULL: no glow layer
 
 	if (!waloff[dapic])
 	{
@@ -517,7 +516,7 @@ void gloadtile (int32_t dapic, int32_t dapal, int32_t dameth, int32_t gltexind, 
 					wpptr->g = curpalette[j].g;
 					wpptr->b = curpalette[j].b;
 					wpptr->a = 255;
-					if ((j >= polymosttexfullbright) && (j < 255))
+					if ((j >= polymosttexfullbright) && (j < 255) && (fbpic))
 						{ fbpic[wpptr-pic] = *wpptr; hasfullbright = 1; }
 				}
 			}
@@ -3134,10 +3133,13 @@ static void tessectrap (float *px, float *py, int32_t *point2, int32_t numpoints
 	static raster *rst = 0;
 	if (numpoints+16 > allocpoints) //16 for safety
 	{
+		raster *nrst; int32_t *nslist, *nnpoint2;
+
+		nrst = realloc(rst,(numpoints+16)*sizeof(raster)); if (nrst) rst = nrst;
+		nslist = realloc(slist,(numpoints+16)*sizeof(int32_t)); if (nslist) slist = nslist;
+		nnpoint2 = realloc(npoint2,(numpoints+16)*sizeof(int32_t)); if (nnpoint2) npoint2 = nnpoint2;
+		if ((!nrst) || (!nslist) || (!nnpoint2)) return; //out of memory: draw nothing
 		allocpoints = numpoints+16;
-		rst = realloc(rst,allocpoints*sizeof(raster));
-		slist = realloc(slist,allocpoints*sizeof(int32_t));
-		npoint2 = realloc(npoint2,allocpoints*sizeof(int32_t));
 	}
 
 		//Remove unnecessary collinear points:
