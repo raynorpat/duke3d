@@ -40,6 +40,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "sndcards.h"
 
 #include "duke3d.h"
+#include "glext.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -2087,6 +2088,9 @@ static int setgamemoderenderer(void)
         return -1;
 #ifdef USE_OPENGL
     gltexmiplevel = GLTextureMipLevel;  // duke3d.cfg: drop this many mipmap levels
+    gldrawpathrequest = GLDrawPath;  // the path asked for; setgamemode_gl picks what the driver has
+    glinternalwidth = GLInternalWidth;
+    glinternalheight = GLInternalHeight;
 #endif
     if (gamerenderer == 3 && setgamemode_gl(ScreenMode) != 0)
     {

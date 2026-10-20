@@ -6,6 +6,7 @@
 #define SDL_MAIN_HANDLED  /* game.c's main() is renamed; this one is ours. */
 #include <sys/stat.h>
 #include "duke3d.h"
+#include "glext.h"
 #if PLATFORM_WIN32
 #include <direct.h>
 #define mkdir(d, m) _mkdir(d)
@@ -147,13 +148,17 @@ int main(void)
         f = fopen(cfg, "w");
 
         fputs("[Screen Setup]\nRenderer = 7\nGLTextureMipLevel = 99\n"
-              "ScreenshotFormat = \"JPG\"\n", f);
+              "ScreenshotFormat = \"JPG\"\nGLDrawPath = \"Shader\"\n"
+              "GLInternalWidth = -5\nGLInternalHeight = 99999\n", f);
         fclose(f);
         CONFIG_GetSetupFilename();
         CONFIG_ReadSetup();
         check("cfg Renderer 7", RendererSetting, 3);
         check("cfg GLTextureMipLevel 99", GLTextureMipLevel, 15);
         check_str("cfg ScreenshotFormat JPG", ScreenshotFormat, "jpg");
+        check("cfg GLDrawPath Shader", GLDrawPath, GLPATH_SHADER);
+        check("cfg GLInternalWidth -5", GLInternalWidth, 0);
+        check("cfg GLInternalHeight 99999", GLInternalHeight, 4320);
         CONFIG_WriteSetup();
         f = fopen(cfg, "r");
         n = fread(text, 1, sizeof(text) - 1, f);
@@ -162,13 +167,19 @@ int main(void)
         check("cfg writes Renderer 3", strstr(text, "Renderer = 3") != NULL, 1);
         check("cfg writes GLTextureMipLevel 15", strstr(text, "GLTextureMipLevel = 15") != NULL, 1);
         check("cfg writes ScreenshotFormat jpg", strstr(text, "ScreenshotFormat = \"jpg\"") != NULL, 1);
+        check("cfg writes GLDrawPath shader", strstr(text, "GLDrawPath = \"shader\"") != NULL, 1);
+        check("cfg writes GLInternalWidth 0", strstr(text, "GLInternalWidth = 0") != NULL, 1);
+        check("cfg writes GLInternalHeight 4320", strstr(text, "GLInternalHeight = 4320") != NULL, 1);
 
         f = fopen(cfg, "w");
-        fputs("[Screen Setup]\nRenderer = -2\nGLTextureMipLevel = -3\n", f);
+        fputs("[Screen Setup]\nRenderer = -2\nGLTextureMipLevel = -3\n"
+              "GLDrawPath = \"bogus\"\nGLInternalWidth = 320\n", f);
         fclose(f);
         CONFIG_ReadSetup();
         check("cfg Renderer -2", RendererSetting, 0);
         check("cfg GLTextureMipLevel -3", GLTextureMipLevel, 0);
+        check("cfg GLDrawPath bogus", GLDrawPath, GLPATH_AUTO);
+        check("cfg GLInternalWidth 320", GLInternalWidth, 320);
         remove(cfg);
         while ((slash = strrchr(cfg, '/')) != NULL) {
             *slash = 0;

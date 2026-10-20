@@ -42,6 +42,7 @@ extern int stricmp(const char *x, const char *y);
 #include <time.h>
 #include "duke3d.h"
 #include "scriplib.h"
+#include "glext.h"
 
 
 // we load this in to get default button and key assignments
@@ -79,6 +80,8 @@ int32 MouseAiming;
 int32 ScreenMode;
 int32 RendererSetting;
 int32 GLTextureMipLevel;
+int32 GLDrawPath;  // GLPATH_*: renderer 3's draw path, auto by default
+int32 GLInternalWidth, GLInternalHeight;  // renderer 3's size, 0: the window's
 char ScreenshotFormat[4];  // png, jpg or bmp
 int32 ScreenWidth;
 int32 ScreenHeight;
@@ -313,6 +316,9 @@ void CONFIG_SetDefaults( void )
    ScreenMode = 2;
    RendererSetting = 0;
    GLTextureMipLevel = 0;
+   GLDrawPath = GLPATH_AUTO;
+   GLInternalWidth = 0;
+   GLInternalHeight = 0;
    strcpy(ScreenshotFormat, "png");
    ScreenWidth = 320;
    ScreenHeight = 200;
@@ -701,6 +707,13 @@ void CONFIG_ReadSetup( void )
    // largest, 65536) and lowers this to its own GPU's limit when it uploads.
    GLTextureMipLevel = max(0,min(15,GLTextureMipLevel));
    temp[0] = 0;
+   SCRIPT_GetString( scripthandle, "Screen Setup", "GLDrawPath",temp);
+   GLDrawPath = gl_pathfromname(temp);
+   SCRIPT_GetNumber( scripthandle, "Screen Setup", "GLInternalWidth",&GLInternalWidth);
+   SCRIPT_GetNumber( scripthandle, "Screen Setup", "GLInternalHeight",&GLInternalHeight);
+   GLInternalWidth = max(0,min(7680,GLInternalWidth));
+   GLInternalHeight = max(0,min(4320,GLInternalHeight));
+   temp[0] = 0;
    SCRIPT_GetString( scripthandle, "Screen Setup", "ScreenshotFormat",temp);
    if (stricmp(temp, "jpg") == 0)
       strcpy(ScreenshotFormat, "jpg");
@@ -842,6 +855,9 @@ void CONFIG_WriteSetup( void )
    SCRIPT_PutNumber( scripthandle, "Screen Setup", "ScreenGamma",ud.brightness,false,false);
    SCRIPT_PutNumber( scripthandle, "Screen Setup", "Renderer",RendererSetting,false,false);
    SCRIPT_PutNumber( scripthandle, "Screen Setup", "GLTextureMipLevel",GLTextureMipLevel,false,false);
+   SCRIPT_PutString( scripthandle, "Screen Setup", "GLDrawPath",(char *)gl_pathname(GLDrawPath));
+   SCRIPT_PutNumber( scripthandle, "Screen Setup", "GLInternalWidth",GLInternalWidth,false,false);
+   SCRIPT_PutNumber( scripthandle, "Screen Setup", "GLInternalHeight",GLInternalHeight,false,false);
    SCRIPT_PutString( scripthandle, "Screen Setup", "ScreenshotFormat",ScreenshotFormat);
    SCRIPT_PutNumber( scripthandle, "Misc", "Executions",ud.executions,false,false);
    SCRIPT_PutNumber( scripthandle, "Misc", "RunMode",ud.auto_run,false,false);
