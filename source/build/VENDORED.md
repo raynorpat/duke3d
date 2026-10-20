@@ -386,7 +386,8 @@ Ported from later JFBuild commits, retyped as above:
 - `glext.c`/`glext.h` (ours, not JFBuild's): renderer 3's draw paths
   (`GLPATH_AUTO`, `IMMEDIATE`, `VBO`, `SHADER`) and their setting names,
   the pure `gl_choosepath`, and the GL entry points past 1.1 as `bgl…`
-  pointers from `SDL_GL_GetProcAddress` (vertex buffers at GL 1.5 or
+  pointers from `SDL_GL_GetProcAddress` (`glActiveTexture` at GL 1.3 or
+  `GL_ARB_multitexture`; vertex buffers at GL 1.5 or
   `GL_ARB_vertex_buffer_object`; GLSL at GL 2.0; FBOs from
   `GL_ARB_framebuffer_object` or `GL_EXT_framebuffer_object`), each group
   all loaded or all NULL, so the binary runs on a 1.1 driver.

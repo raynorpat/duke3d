@@ -82,8 +82,11 @@ static const glproc_t vboprocs[] = {
     { (void **) &bglBufferSubData, "glBufferSubData" },
 };
 
-static const glproc_t glslprocs[] = {
+static const glproc_t multitexprocs[] = {
     { (void **) &bglActiveTexture, "glActiveTexture" },
+};
+
+static const glproc_t glslprocs[] = {
     { (void **) &bglCreateShader, "glCreateShader" },
     { (void **) &bglShaderSource, "glShaderSource" },
     { (void **) &bglCompileShader, "glCompileShader" },
@@ -172,14 +175,17 @@ void gl_initdrawpath(const char *exts)
 {
     const char *version = (const char *) glGetString(GL_VERSION);
     int major = 1, minor = 1;
-    int core15, core20, arbfbo;
+    int core13, core15, core20, arbfbo;
 
     if ((version == NULL) || (sscanf(version, "%d.%d", &major, &minor) != 2))
         major = 1, minor = 1;
+    core13 = (major > 1) || ((major == 1) && (minor >= 3));
     core15 = (major > 1) || ((major == 1) && (minor >= 5));
     core20 = (major >= 2);
     arbfbo = (major >= 3) || gl_has_extension(exts, "GL_ARB_framebuffer_object");
 
+    gl_loadprocs(multitexprocs, NUMPROCS(multitexprocs),
+                 core13 || gl_has_extension(exts, "GL_ARB_multitexture"), core13 ? "" : "ARB");
     glinfo.vbo = gl_loadprocs(vboprocs, NUMPROCS(vboprocs),
                               core15 || gl_has_extension(exts, "GL_ARB_vertex_buffer_object"),
                               core15 ? "" : "ARB");

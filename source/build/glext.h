@@ -62,8 +62,10 @@ extern PFNGLBINDBUFFERPROC bglBindBuffer;
 extern PFNGLBUFFERDATAPROC bglBufferData;
 extern PFNGLBUFFERSUBDATAPROC bglBufferSubData;
 
-	/* GL 2.0 */
+	/* GL 1.3 or GL_ARB_multitexture */
 extern PFNGLACTIVETEXTUREPROC bglActiveTexture;
+
+	/* GL 2.0 */
 extern PFNGLCREATESHADERPROC bglCreateShader;
 extern PFNGLSHADERSOURCEPROC bglShaderSource;
 extern PFNGLCOMPILESHADERPROC bglCompileShader;
