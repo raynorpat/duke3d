@@ -254,3 +254,7 @@ unchanged.
     from `lastframe`, as the back buffer is undefined after a swap. The
     fade isn't in it.
   - `numpages` is 2, as in JFBuild's GL mode, and back to 0 on leaving GL.
+  - `glredrawlastframe()` (not in JFBuild; prototyped in `display.h` and
+    `engine_protos.h`) draws `lastframe`, without the fade, into the frame
+    being drawn. Duke's 1.3D load/save menus draw over the previous frame,
+    which renderer 3 doesn't keep after a swap.

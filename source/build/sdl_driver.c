@@ -824,6 +824,19 @@ int setgamemode_gl(char davidoption)
 } /* setgamemode_gl */
 
 
+/*
+ * Renderer 3: starts the frame being drawn from the last frame shown, without
+ *  its fade, for a screen that draws over what's already there.
+ */
+void glredrawlastframe(void)
+{
+#ifdef USE_OPENGL
+    if ((sdl_glcontext != NULL) && (lastframe_set))
+        gl_draw_lastframe();
+#endif
+} /* glredrawlastframe */
+
+
 static __inline int sdl_mouse_button_filter(SDL_MouseButtonEvent const *event)
 {
         /*

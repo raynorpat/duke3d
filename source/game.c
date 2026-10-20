@@ -2913,7 +2913,12 @@ void displayrooms(short snum,int32_t smoothratio)
 #if DUKE3D_GAMEVER < GAMEVER_14
     // 1.3D draws nothing (and runs no camera timer) behind the load/save menus.
     if(screencapt == 0 && (p->gm&MODE_MENU) && (current_menu/100) == 3)
+    {
+        // Renderer 3 has no lasting framebuffer: start from the last frame,
+        // unfaded, so a frozen flash doesn't build up behind the menu.
+        if (getrendermode() == 3) glredrawlastframe();
         return;
+    }
 #endif
 
     if(pub > 0)
@@ -9594,10 +9599,11 @@ void dobonus(char bonusonly)
         case 0:
             if(ud.lockout == 0)
             {
+                ps[myconnectindex].palette = endingpal;
+                glsetgamepalette();
                 clearview(0L);
                 rotatesprite(0,50<<16,65536L,0,VICTORY1,0,0,2+8+16+64+128,0,0,xdim-1,ydim-1);
                 nextpage();
-                ps[myconnectindex].palette = endingpal;
                 for(t=63;t>=0;t--) palto(0,0,0,t);
 
                 KB_FlushKeyboardQueue();
