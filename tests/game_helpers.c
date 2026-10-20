@@ -41,6 +41,13 @@ int main(void)
     check("FindDistance2D(1000,1)", FindDistance2D(1000, 1), 962);
     check("FindDistance2D(3000,4000)", FindDistance2D(3000, 4000), 5039);
 
+    /* Renderer numbers from duke3d.cfg or -renderer: 0 classic to 3 OpenGL. */
+    check("clamprenderer(-1)", clamprenderer(-1), 0);
+    check("clamprenderer(0)",  clamprenderer(0),  0);
+    check("clamprenderer(2)",  clamprenderer(2),  2);
+    check("clamprenderer(3)",  clamprenderer(3),  3);
+    check("clamprenderer(7)",  clamprenderer(7),  3);
+
 #if DUKE3D_GAMEVER < GAMEVER_14
     /* 1.3D CONs have no definevolumename or defineskillname. */
     check_str("volume_names[0]", volume_names[0], "L.A. MELTDOWN");
@@ -113,6 +120,63 @@ int main(void)
     check("1.3D full GRP", grpmismatch(26524524, 0xBBC9CE44) != NULL, 1);
 #endif
     check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
+
+#if PLATFORM_UNIX
+    /* duke3d.cfg values out of range, or in capitals, are read and written
+       back as the game uses them. (Elsewhere the setup file is picked from a
+       list of the folder's .cfg files.) Last, as it loads a whole setup. The
+       file lives under a temporary HOME, never the working directory's. */
+    {
+        FILE *f;
+        char text[16384], home[256], cfg[512], *slash;
+        const char *tmp = getenv("TMPDIR");
+        size_t n;
+
+        snprintf(home, sizeof(home), "%s/duke3d_cfg_XXXXXX",
+                 tmp != NULL && tmp[0] != '\0' ? tmp : "/tmp");
+        if (mkdtemp(home) == NULL) {
+            printf("FAIL cfg temp dir\n");
+            return 1;
+        }
+        setenv("HOME", home, 1);
+        if (setup_homedir() != 0) {
+            printf("FAIL cfg setup_homedir\n");
+            return 1;
+        }
+        GetPathFromEnvironment(cfg, sizeof(cfg), "duke3d.cfg");
+        f = fopen(cfg, "w");
+
+        fputs("[Screen Setup]\nRenderer = 7\nGLTextureMipLevel = 99\n"
+              "ScreenshotFormat = \"JPG\"\n", f);
+        fclose(f);
+        CONFIG_GetSetupFilename();
+        CONFIG_ReadSetup();
+        check("cfg Renderer 7", RendererSetting, 3);
+        check("cfg GLTextureMipLevel 99", GLTextureMipLevel, 15);
+        check_str("cfg ScreenshotFormat JPG", ScreenshotFormat, "jpg");
+        CONFIG_WriteSetup();
+        f = fopen(cfg, "r");
+        n = fread(text, 1, sizeof(text) - 1, f);
+        fclose(f);
+        text[n] = 0;
+        check("cfg writes Renderer 3", strstr(text, "Renderer = 3") != NULL, 1);
+        check("cfg writes GLTextureMipLevel 15", strstr(text, "GLTextureMipLevel = 15") != NULL, 1);
+        check("cfg writes ScreenshotFormat jpg", strstr(text, "ScreenshotFormat = \"jpg\"") != NULL, 1);
+
+        f = fopen(cfg, "w");
+        fputs("[Screen Setup]\nRenderer = -2\nGLTextureMipLevel = -3\n", f);
+        fclose(f);
+        CONFIG_ReadSetup();
+        check("cfg Renderer -2", RendererSetting, 0);
+        check("cfg GLTextureMipLevel -3", GLTextureMipLevel, 0);
+        remove(cfg);
+        while ((slash = strrchr(cfg, '/')) != NULL) {
+            *slash = 0;
+            if (rmdir(cfg) != 0 || strcmp(cfg, home) == 0)
+                break;
+        }
+    }
+#endif
 
     if (failures) {
         printf("%d failures\n", failures);

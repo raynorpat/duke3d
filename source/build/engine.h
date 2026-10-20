@@ -120,6 +120,8 @@ void getzsofslope(short sectnum, int32_t dax, int32_t day, int32_t *ceilz, int32
  * setaspect(((ydim*320)<<16)/(xdim*200));
  * Note that in 320*200 mode the value passed would be 65536
  * which is a 1:1 aspect ratio.
+ * (This port's setview calls setaspect(xfov,pixelaspect) instead, where
+ * xfov is 65536, or xdim*3/(ydim*4) in widescreen modes.)
  * \n---------------------\n
  * Since drawmapview is also affect by the aspect ratio, you
  * will need to make sure drawoverheadmap is affected so
@@ -364,15 +366,20 @@ unsigned char getpixel(int32_t x, int32_t y);
  */
 void setbrightness(char dabrightness, unsigned char *dapal);
 
+/* Fades the screen toward (r,g,b), 0-63 each, by offset (0-64) / 64.
+ * setbrightness cancels it. */
+void setpalettefade(unsigned char r, unsigned char g, unsigned char b, unsigned char offset);
+
 /**@brief Take a screenshot.
  *
  * This function will dump a picture of the current screen
  * to a file. \n
  * Set \a inverseit to 1 if you want the colors inverted.
+ * The format is the extension: ".png", ".jpg" or ".bmp".
  * @param *filename The filename to write to.
  * @param inverseit Set to 1 if you want the colors inverted.
  * @remark Notes on \a filename:
- * \n If you use "captxxxx.pcx" as your filename,
+ * \n If you use "captxxxx.png" as your filename,
  * Build will automatically replace the x's with
  * an automatically incrementing number, starting
  * from 0000.
@@ -851,6 +858,8 @@ void flushperms(void);
  * @arg if ((dastat&64) != 0) - draw everything (don't check 255's) (faster)
  * @arg if ((dastat&128) == 0) - nuttin' special
  * @arg if ((dastat&128) != 0) - automatically draw to all video pages
+ * @arg if ((dastat&256) != 0) - with dastat&2, the tile has square pixels: no aspect
+ *  correction, but drawn 1.2 times as wide at 320x200 and 640x400 (JFBuild)
  * @remark Note: As a special case, if both ((dastat&2) != 0) and ((dastat&8) != 0)
  * then rotatesprite will scale to the full screen (0,0,xdim-1,ydim-1)
  * rather than setview's viewing window. (windowx1,windowy1,etc.)
@@ -862,7 +871,7 @@ void flushperms(void);
  * The sprite will only get drawn inside the rectangle from (50,50) to (270,150).
  */
 void rotatesprite(int32_t sx, int32_t sy, int32_t z, short a, short picnum,
-                  signed char dashade, char dapalnum, char dastat,
+                  signed char dashade, char dapalnum, unsigned short dastat,
                   int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2);
 /**@brief Make a lookup table for remapping.
  *
@@ -910,6 +919,9 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang);
  */
 void setview(int32_t x1, int32_t y1, int32_t x2, int32_t y2);
 
+/**@brief Sets pixelaspect, widescreen and tallscreen for xdim and ydim. */
+void calcpixelaspect(void);
+
 /**@brief Shows a tile on screen, saving the previous view.
  *
  * This function will show a tile on screen, saving the previous
@@ -941,6 +953,15 @@ void preparemirror(int32_t dax, int32_t day, int32_t daz,
                    short dasector, int32_t *tposx, int32_t *tposy,
                    short *tang);
 void completemirror(void);
+
+/* Renderer selection: 0 classic, 1 Polymost solid colour, 2 Polymost
+ * software, 3 Polymost OpenGL. setrendermode returns the renderer set. */
+int setrendermode(int renderer);
+int getrendermode(void);
+void setrollangle(int32_t rolla);
+void invalidatetile(short tilenume, int32_t pal, int32_t how);
+/* Sets OpenGL up for 2D drawing in renderer 3; does nothing otherwise. */
+void setpolymost2dview(void);
 
 /**@brief Check if a clipping box intersects a wall
  *

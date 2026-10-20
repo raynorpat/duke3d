@@ -2,9 +2,15 @@
  * Renders the start view of E1L1 from a real DUKE3D.GRP, headless, and
  *  checks the frame against a known checksum.
  *
- *  usage: render_e1l1 <DUKE3D.GRP> <out.bmp> [expected checksum, hex]
+ *  usage: render_e1l1 <DUKE3D.GRP> <out.bmp> [expected checksum, hex] [renderer] [tile|tilt]
  *
- * Without an expected checksum it just prints the checksum and exits 0.
+ * Without an expected checksum (or with an empty one) it just prints the
+ *  checksum and exits 0. The renderer is a setrendermode() number, 0 if
+ *  not given. With "tile", the view goes through a tile 256 tall, as in
+ *  game.c's low detail mode, and must look like renderer 0's. With "tilt",
+ *  it draws game.c's screen tilt and low detail at 1600x900, where the tile
+ *  is 512 or 256 wide; the checksum covers both frames, and renderers other
+ *  than 0 must look like renderer 0's.
  *  Run with SDL_VIDEODRIVER=dummy.
  */
 #include <stdio.h>
@@ -15,6 +21,7 @@
 #include "display.h"
 #include "engine.h"
 #include "cache1d.h"
+#include "pragmas.h"
 #include "SDL.h"
 
 extern SDL_Surface *surface;  /* sdl_driver.c */
@@ -61,17 +68,102 @@ static void setup_la_backdrop(void)
     pskybits = 3;
 }
 
+/*
+ * game.c's low detail and screen tilt: the view drawn into a tile whose
+ *  height (the screen's width) is a power of two, put on screen turned 90
+ *  degrees with rotatesprite.
+ */
+#define VIEWTILE (MAXTILES-2)
+static void draw_through_tile(int32_t x, int32_t y, int32_t z, short a, short sect)
+{
+    static unsigned char tilebuf[100*256];
+
+    walock[VIEWTILE] = 255;
+    waloff[VIEWTILE] = (intptr_t) tilebuf;
+    setviewtotile(VIEWTILE, 100, 256);
+    drawrooms(x, y, z, a, 100, sect);
+    drawmasks();
+    setviewback();
+    picanm[VIEWTILE] &= 0xff0000ff;
+    rotatesprite(160<<16, 100<<16, 131072, 512, VIEWTILE, 0, 0, 4+2+64,
+                 windowx1, windowy1, windowx2, windowy2);
+}
+
+/*
+ * game.c's screen tilt (displayrooms) in a widescreen mode: the tile is as
+ *  wide as the view window, which at 1600x900 with screen size 16 (a
+ *  1440x675 window) is 512, a power of two, and 256 in low detail (detail 0).
+ */
+static int draw_tilt(int32_t x, int32_t y, int32_t z, short a, short sect, short tang, int detail)
+{
+    static unsigned char tilebuf[512*512];
+    int32_t xfov, tiltw, i;
+
+    xfov = divscale16(xdim*3, ydim*4);
+    setaspect(xfov, yxaspect);
+    tiltw = (scale(windowx2-windowx1+1,100*pixelaspect,(windowy2-windowy1+1)<<16)+1)<<1;
+    if (tiltw != 512)
+    {
+        fprintf(stderr, "FAIL: the tilt tile is %d wide, not 512\n", (int) tiltw);
+        return 0;
+    }
+    walock[VIEWTILE] = 255;
+    waloff[VIEWTILE] = (intptr_t) tilebuf;
+    if ((tang&1023) == 0)
+        setviewtotile(VIEWTILE, 200>>(1-detail), tiltw>>(1-detail));
+    else
+        setviewtotile(VIEWTILE, tiltw>>(1-detail), tiltw>>(1-detail));
+    i = (tang&511); if (i > 256) i = 512-i;
+    i = sintable[i+512]*8 + sintable[i]*5;
+    setaspect(mulscale16(i>>1,xfov), yxaspect);
+    drawrooms(x, y, z, a, 100, sect);
+    drawmasks();
+    setviewback();
+    picanm[VIEWTILE] &= 0xff0000ff;
+    if (detail == 1) i >>= 1;
+    rotatesprite(160<<16, 100<<16, i, tang+512, VIEWTILE, 0, 0, 4+2+64,
+                 windowx1, windowy1, windowx2, windowy2);
+    return 1;
+}
+
+/* The surface's rows, packed xdim wide (its pitch may be over xdim). */
+static void pack_surface(unsigned char *dst)
+{
+    int32_t y;
+
+    for (y = 0; y < ydim; y++)
+        memcpy(dst + y * xdim, (unsigned char *) surface->pixels + y * surface->pitch, xdim);
+}
+
+/* A tilted frame and a low detail one, one after the other in pic. */
+static int draw_tilts(int32_t x, int32_t y, int32_t z, short a, short sect, unsigned char *pic)
+{
+    clearallviews(0);
+    if (!draw_tilt(x, y, z, a, sect, 128, 1))
+        return 0;
+    nextpage();
+    pack_surface(pic);
+    clearallviews(0);
+    if (!draw_tilt(x, y, z, a, sect, 0, 0))
+        return 0;
+    nextpage();
+    pack_surface(pic + xdim * ydim);
+    return 1;
+}
+
 int main(int argc, char **argv)
 {
     int32_t posx, posy, posz;
     short ang, sectnum;
     uint32_t hash = 2166136261u;
     const unsigned char *pix;
-    int32_t i;
+    unsigned char *shot;
+    int32_t i, same, npix;
+    int tilt;
 
     if (argc < 3)
     {
-        fprintf(stderr, "usage: %s <DUKE3D.GRP> <out.bmp> [expected checksum]\n", argv[0]);
+        fprintf(stderr, "usage: %s <DUKE3D.GRP> <out.bmp> [expected checksum] [renderer]\n", argv[0]);
         return 2;
     }
 
@@ -112,17 +204,91 @@ int main(int argc, char **argv)
     }
     setup_la_backdrop();
 
+    tilt = (argc > 5) && (strcmp(argv[5], "tilt") == 0);
     _platform_init(argc, argv, "render_e1l1", "render");
-    if (_setgamemode(1, 320, 200) != 0)
+    if (_setgamemode(1, tilt ? 1600 : 320, tilt ? 900 : 200) != 0)
     {
-        fprintf(stderr, "FAIL: _setgamemode(320x200)\n");
+        fprintf(stderr, "FAIL: _setgamemode\n");
         return 1;
     }
     setbrightness(0, palette);
+    shot = (unsigned char *) malloc(xdim * ydim);
+    pix = shot;
+    npix = xdim * ydim;
+    if (tilt)
+    {
+        /* vscrn() at screen size 16: the view inside a border and above
+         *  the status bar. */
+        static unsigned char classic[2*1600*900], pic[2*1600*900];
+        int32_t n;
 
-    drawrooms(posx, posy, posz, ang, 100, sectnum);
-    drawmasks();
-    nextpage();
+        if ((xdim != 1600) || (ydim != 900))
+        {
+            fprintf(stderr, "FAIL: got %dx%d, not 1600x900\n", (int) xdim, (int) ydim);
+            return 1;
+        }
+        setview(80, 36, 1519, 710);
+        if (!draw_tilts(posx, posy, posz, ang, sectnum, classic))
+            return 1;
+        pix = classic;
+        npix = 2 * xdim * ydim;
+        if ((argc > 4) && atoi(argv[4]))
+        {
+            setrendermode(atoi(argv[4]));
+            if (!draw_tilts(posx, posy, posz, ang, sectnum, pic))
+                return 1;
+            /* inside the view window */
+            for (i = 0, same = 0, n = 0; i < npix; i++)
+                if (((i % xdim) >= windowx1) && ((i % xdim) <= windowx2) &&
+                    (((i / xdim) % ydim) >= windowy1) && (((i / xdim) % ydim) <= windowy2))
+                {
+                    same += (classic[i] == pic[i]);
+                    n++;
+                }
+            printf("tilt and low detail: %d%% of pixels as in renderer 0\n", (int) (same * 100 / n));
+            /* Renderer 2 gets 89%; a tile addressed with the wrong power
+             * of two, 23%. */
+            if (same * 100 < n * 60)
+            {
+                fprintf(stderr, "FAIL: the tilted views aren't renderer 0's\n");
+                return 1;
+            }
+            pix = pic;
+        }
+    }
+    else if ((argc > 5) && (strcmp(argv[5], "tile") == 0))
+    {
+        /* through a tile: the renderer's picture against renderer 0's. */
+        unsigned char *classic = (unsigned char *) malloc(xdim * ydim);
+
+        draw_through_tile(posx, posy, posz, ang, sectnum);
+        memcpy(classic, (void *) frameplace, xdim * ydim);
+        setrendermode(atoi(argv[4]));
+        clearview(0);
+        draw_through_tile(posx, posy, posz, ang, sectnum);
+        nextpage();
+        pack_surface(shot);
+        for (i = 0, same = 0; i < xdim * ydim; i++)
+            same += (classic[i] == shot[i]);
+        printf("through a tile: %d%% of pixels as in renderer 0\n", (int) (same * 100 / (xdim * ydim)));
+        free(classic);
+        /* Renderer 2 samples the tile a little differently (58% the same);
+         * a tile addressed with the wrong power of two is garbage (16%). */
+        if (same * 100 < xdim * ydim * 40)
+        {
+            fprintf(stderr, "FAIL: the view through a tile isn't renderer 0's\n");
+            return 1;
+        }
+    }
+    else
+    {
+        if (argc > 4)
+            setrendermode(atoi(argv[4]));
+        drawrooms(posx, posy, posz, ang, 100, sectnum);
+        drawmasks();
+        nextpage();
+        pack_surface(shot);
+    }
 
     if (SDL_SaveBMP(surface, argv[2]) != 0)
     {
@@ -130,9 +296,8 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    /* FNV-1a over the 8-bit frame. */
-    pix = (const unsigned char *) surface->pixels;
-    for (i = 0; i < xdim * ydim; i++)
+    /* FNV-1a over the 8-bit frame (both frames with "tilt"). */
+    for (i = 0; i < npix; i++)
     {
         hash ^= pix[i];
         hash *= 16777619u;
@@ -141,7 +306,7 @@ int main(int argc, char **argv)
 
     uninitengine();
 
-    if ((argc > 3) && (strtoul(argv[3], NULL, 16) != hash))
+    if ((argc > 3) && argv[3][0] && (strtoul(argv[3], NULL, 16) != hash))
     {
         fprintf(stderr, "FAIL: checksum %08x, expected %s\n", (unsigned) hash, argv[3]);
         return 1;

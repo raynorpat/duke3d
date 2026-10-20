@@ -2071,6 +2071,7 @@ void menus(void)
         case 1008:
         case 1009:
 
+            if (widescreen) clearallviews(0L);
             rotatesprite(160<<16,200<<15,65536L,0,MENUSCREEN,16,0,10+64,0,0,xdim-1,ydim-1);
             rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
             menutext(160,24,0,0,"LOAD GAME");
@@ -2189,6 +2190,7 @@ void menus(void)
         case 2008:
         case 2009:
 
+            if (widescreen) clearallviews(0L);
             rotatesprite(160<<16,200<<15,65536L,0,MENUSCREEN,16,0,10+64,0,0,xdim-1,ydim-1);
             rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
             menutext(160,24,0,0,"SAVE GAME");
@@ -2970,6 +2972,7 @@ void menus(void)
         case 300:
 
             c = 320>>1;
+            if (widescreen) clearallviews(0L);
             rotatesprite(c<<16,200<<15,65536L,0,MENUSCREEN,16,0,10+64,0,0,xdim-1,ydim-1);
             rotatesprite(c<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
 
@@ -3181,6 +3184,7 @@ void menus(void)
             }
 
             flushperms();
+            if (widescreen) clearallviews(0L);
             rotatesprite(0,0,65536L,0,ORDERING+current_menu-400,0,0,10+16+64,0,0,xdim-1,ydim-1);
 
 #else
@@ -3239,6 +3243,7 @@ void menus(void)
             }
 
             flushperms();
+            if (widescreen) clearallviews(0L);
             switch(current_menu)
             {
                 case 400:
@@ -3665,6 +3670,53 @@ void menus(void)
     }
 }
 
+/* The game palette and brightness renderer 3 last applied (NULL: unknown). */
+static char *glgamepalette;
+static int32_t glgamebrightness;
+
+/*
+ * Renderer 3 bakes the palette into textures as it draws, so a new player
+ *  palette must reach the engine before the next draw, not at the next
+ *  palto. Applies it only when it changed, keeping any fade. In a game or
+ *  demo it's the viewed player's (screenpeek), as restorepalette sets;
+ *  elsewhere (title, bonus and ending screens, and at a level's end) the
+ *  game sets myconnectindex's.
+ */
+void glsetgamepalette(void)
+{
+#ifdef POLYMOST
+    palette_t fadergb;
+    unsigned char fadedelta;
+    char *pal = ps[((ps[myconnectindex].gm&(MODE_GAME|MODE_DEMO)) &&
+                    !(ps[myconnectindex].gm&MODE_EOL)) ? screenpeek : myconnectindex].palette;
+#ifdef USE_OPENGL
+    /* Lights glow in the game's palettes, not in the title, ending or 3DR ones. */
+    int32_t fullbright = (pal == (char *)palette || pal == waterpal || pal == slimepal) ? 240 : 256;
+#endif
+
+    if (getrendermode() != 3) return;
+    if (pal == glgamepalette && ud.brightness == glgamebrightness
+#ifdef USE_OPENGL
+        && fullbright == polymosttexfullbright
+#endif
+        )
+        return;
+
+#ifdef USE_OPENGL
+    /* setbrightness retextures only if the palette changed. */
+    if (fullbright != polymosttexfullbright) gltexinvalidateall();
+    polymosttexfullbright = fullbright;
+#endif
+    glgamepalette = pal;
+    glgamebrightness = ud.brightness;
+    fadergb = palfadergb;  /* setbrightness clears the fade. */
+    fadedelta = palfadedelta;
+    setbrightness(ud.brightness>>2,(unsigned char *)glgamepalette);
+    palfadergb = fadergb;
+    palfadedelta = fadedelta;
+#endif
+}
+
 void palto(char r,char g,char b,int32_t e)
 {
     int i;
@@ -3686,6 +3738,14 @@ void palto(char r,char g,char b,int32_t e)
     if( (e&128) == 0 )
         if ((ScreenMode != 1) || (vgacompatible == 1)) limitrate();
 // CTW END - MODIFICATION
+
+    if (getrendermode() == 3)
+    {
+        /* a fade quad over the frame, not a palette (and texture) change. */
+        glsetgamepalette();
+        setpalettefade(min(r,63),min(g,63),min(b,63),e&127);
+        return;
+    }
 
     setbrightness(ud.brightness>>2,temparray);
 }
@@ -4175,6 +4235,11 @@ void playanm(char *fn,char t)
         }
 
         VBE_setPalette(0L,256L,tempbuf);
+        if (getrendermode() == 3)
+        {
+            glgamepalette = NULL;  /* curpalette is the ANM's now. */
+            setpalettefade(0,0,0,0);  /* VBE_setPalette ends a palto fade in renderer 0. */
+        }
 
     ototalclock = totalclock + 10;
 
@@ -4198,6 +4263,8 @@ void playanm(char *fn,char t)
        else                           ototalclock += 10;
 
        waloff[MAXTILES-3-t] = FP_OFF(ANIM_DrawFrame(i));
+       invalidatetile(MAXTILES-3-t, -1, -1);  /* renderer 3: upload the new frame. */
+       if (widescreen) clearallviews(0L);
        rotatesprite(0<<16,0<<16,65536L,512,MAXTILES-3-t,0,0,2+4+8+16+64, 0,0,xdim-1,ydim-1);
        nextpage();
 

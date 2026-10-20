@@ -155,6 +155,19 @@ void __interrupt __far timerhandler(void);
 
 /* resolution inits. sdl_driver.c ... */
 int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim);
+/* Switches to an OpenGL window for renderer 3. Returns 0, or -1 (and leaves
+ *  the 8-bit modes usable) when SDL or OpenGL can't provide one. */
+int setgamemode_gl(char davidoption);
+/* Renderer 3: draws the last frame shown, unfaded, as the new frame's start. */
+void glredrawlastframe(void);
+#ifdef USE_OPENGL
+/* Renderer 3: the engine drew to the back buffer since the last swap. */
+void _glframedrawn(void);
+/* Renderer 3: what was drawn since the swap only repeats the frame shown. */
+void _glframereplayed(void);
+/* Renderer 3: show palfadergb/palfadedelta now if no frame is being drawn. */
+void _glpalettefade(void);
+#endif
 void qsetmode640350(void);
 void qsetmode640480(void);
 
@@ -162,8 +175,6 @@ uint32_t getticks();
 
 void drawline16(int32_t XStart, int32_t YStart, int32_t XEnd, int32_t YEnd, char Color);
 void setcolor16(int i1);
-
-int using_opengl(void);
 
 #endif  /* _INCLUDE_DISPLAY_H_ */
 

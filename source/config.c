@@ -77,6 +77,9 @@ int32 MouseAiming;
 //
 
 int32 ScreenMode;
+int32 RendererSetting;
+int32 GLTextureMipLevel;
+char ScreenshotFormat[4];  // png, jpg or bmp
 int32 ScreenWidth;
 int32 ScreenHeight;
 
@@ -308,6 +311,9 @@ void CONFIG_SetDefaults( void )
    ud.m_marker = 1;
    ud.m_ffire = 1;
    ScreenMode = 2;
+   RendererSetting = 0;
+   GLTextureMipLevel = 0;
+   strcpy(ScreenshotFormat, "png");
    ScreenWidth = 320;
    ScreenHeight = 200;
    NumVoices = 8;
@@ -607,6 +613,7 @@ void CONFIG_ReadSetup( void )
 {
    int32 dummy;
    char commmacro[] = "CommbatMacro# ";
+   char temp[80];
 
    CONFIG_SetDefaults();
    if (SafeFileExists(setupfilename))
@@ -687,6 +694,20 @@ void CONFIG_ReadSetup( void )
    SCRIPT_GetNumber( scripthandle, "Screen Setup", "ScreenWidth",&ScreenWidth);
    SCRIPT_GetNumber( scripthandle, "Screen Setup", "ScreenHeight",&ScreenHeight);
    SCRIPT_GetNumber( scripthandle, "Screen Setup", "ScreenMode",&ScreenMode);
+   SCRIPT_GetNumber( scripthandle, "Screen Setup", "Renderer",&RendererSetting);
+   RendererSetting = clamprenderer(RendererSetting);
+   SCRIPT_GetNumber( scripthandle, "Screen Setup", "GLTextureMipLevel",&GLTextureMipLevel);
+   // The engine drops at most log2(GL_MAX_TEXTURE_SIZE)-1 levels (15 for the
+   // largest, 65536) and lowers this to its own GPU's limit when it uploads.
+   GLTextureMipLevel = max(0,min(15,GLTextureMipLevel));
+   temp[0] = 0;
+   SCRIPT_GetString( scripthandle, "Screen Setup", "ScreenshotFormat",temp);
+   if (stricmp(temp, "jpg") == 0)
+      strcpy(ScreenshotFormat, "jpg");
+   else if (stricmp(temp, "bmp") == 0)
+      strcpy(ScreenshotFormat, "bmp");
+   else
+      strcpy(ScreenshotFormat, "png");
    SCRIPT_GetNumber( scripthandle, "Screen Setup", "ScreenGamma",&ud.brightness);
    SCRIPT_GetNumber( scripthandle, "Screen Setup", "ScreenSize",&ud.screen_size);
    SCRIPT_GetNumber( scripthandle, "Screen Setup", "Out",&ud.lockout);
@@ -819,6 +840,9 @@ void CONFIG_WriteSetup( void )
    SCRIPT_PutNumber( scripthandle, "Sound Setup", "ReverseStereo",ReverseStereo,false,false);
    SCRIPT_PutNumber( scripthandle, "Screen Setup", "ScreenSize",ud.screen_size,false,false);
    SCRIPT_PutNumber( scripthandle, "Screen Setup", "ScreenGamma",ud.brightness,false,false);
+   SCRIPT_PutNumber( scripthandle, "Screen Setup", "Renderer",RendererSetting,false,false);
+   SCRIPT_PutNumber( scripthandle, "Screen Setup", "GLTextureMipLevel",GLTextureMipLevel,false,false);
+   SCRIPT_PutString( scripthandle, "Screen Setup", "ScreenshotFormat",ScreenshotFormat);
    SCRIPT_PutNumber( scripthandle, "Misc", "Executions",ud.executions,false,false);
    SCRIPT_PutNumber( scripthandle, "Misc", "RunMode",ud.auto_run,false,false);
    SCRIPT_PutNumber( scripthandle, "Misc", "Crosshairs",ud.crosshair,false,false);

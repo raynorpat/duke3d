@@ -23,6 +23,23 @@ endif()
 
 target_link_libraries(buildengine PUBLIC duke3d_compile_options duke3d::SDL2)
 
+# engine.c #includes polymost.c, so it's listed only for IDEs.
+target_sources(buildengine PRIVATE polymost.c)
+set_source_files_properties(polymost.c PROPERTIES HEADER_FILE_ONLY ON)
+if(DUKE3D_POLYMOST)
+  find_package(OpenGL REQUIRED)
+  target_compile_definitions(buildengine PUBLIC POLYMOST USE_OPENGL)
+  if(APPLE)
+    target_compile_definitions(buildengine PUBLIC GL_SILENCE_DEPRECATION)
+  endif()
+  target_link_libraries(buildengine PUBLIC OpenGL::GL)
+  # Polymost's ftol/dtol use lrintf/lrint, which become a libm call when
+  # they may have to set errno (GCC's default; Darwin's clang doesn't).
+  if(NOT MSVC)
+    target_compile_options(buildengine PRIVATE -fno-math-errno)
+  endif()
+endif()
+
 if(WIN32)
   target_link_libraries(buildengine PUBLIC ws2_32 winmm)
 elseif(NOT APPLE)

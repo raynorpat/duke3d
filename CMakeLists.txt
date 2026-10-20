@@ -21,6 +21,7 @@ if(DUKE3D_SHAREWARE AND NOT DUKE3D_VERSION STREQUAL "1.3D")
     "had a shareware release; use DUKE3D_VERSION 1.3D or turn DUKE3D_SHAREWARE off")
 endif()
 option(DUKE3D_CONTROLS_MENU "Enable the in-game controls config menu" ON)
+option(DUKE3D_POLYMOST "Build Ken Silverman's Polymost renderers (needs OpenGL)" ON)
 set(DUKE3D_FETCH_SDL "AUTO" CACHE STRING
     "Download and build SDL2: AUTO (only if not found), ON, OFF")
 set_property(CACHE DUKE3D_FETCH_SDL PROPERTY STRINGS AUTO ON OFF)

@@ -22,8 +22,13 @@
 #define MAXTILES 9216
 #define MAXSTATUS 1024
 #define MAXPLAYERS 16
+#ifdef POLYMOST  /* OpenGL draws at the window's pixel size */
+#define MAXXDIM 7680
+#define MAXYDIM 4320
+#else
 #define MAXXDIM 1600
 #define MAXYDIM 1200
+#endif
 #define MAXPALOOKUPS 256
 #define MAXPSKYTILES 256
 #define MAXSPRITESONSCREEN 1024
@@ -164,7 +169,8 @@ EXTERN spritetype tsprite[MAXSPRITESONSCREEN];
 
 EXTERN char vidoption;
 EXTERN int32_t xdim, ydim, ylookup[MAXYDIM+1], numpages;
-EXTERN int32_t yxaspect, viewingrange;
+EXTERN int32_t yxaspect, xyaspect, pixelaspect, widescreen, tallscreen, viewingrange;
+EXTERN int32_t ydimenscale;
 
 EXTERN int32_t validmodecnt;
 EXTERN short validmode[256];
@@ -217,6 +223,31 @@ EXTERN char automapping;
 
 EXTERN char gotpic[(MAXTILES+7)>>3];
 EXTERN char gotsector[(MAXSECTORS+7)>>3];
+
+#ifdef POLYMOST
+	/* Polymost (polymost.c): rendmode 0 is the classic renderer. curpalette
+	 * is the current hardware palette as 8-bit RGB. */
+typedef struct { unsigned char r, g, b, f; } palette_t;
+extern int32_t rendmode;
+extern palette_t curpalette[256];
+extern palette_t palfadergb;
+extern unsigned char palfadedelta;
+	/* Bits per pixel of the video mode: 8 is software, more is OpenGL. */
+extern int32_t bpp;
+#ifdef USE_OPENGL
+	/* What the OpenGL driver supports, filled in by setgamemode_gl. */
+struct glinfo_t { float maxanisotropy; char bgra, clamptoedge, texcompr, texnpot; };
+extern struct glinfo_t glinfo;
+	/* polymost.c: log2 of the largest texture size (0: from GL_MAX_TEXTURE_SIZE
+	 * on the first upload), and how many mipmap levels every texture drops.
+	 * Textures made before a change keep their size until polymost_glreset(). */
+extern int32_t gltexmaxsize, gltexmiplevel;
+	/* polymost.c: palette indices from this up to 254 draw fullbright, unfogged
+	 * and unshaded (256: none). Textures made earlier keep theirs until
+	 * they are invalidated. */
+extern int32_t polymosttexfullbright;
+#endif
+#endif
 
 /*************************************************************************
 POSITION VARIABLES:

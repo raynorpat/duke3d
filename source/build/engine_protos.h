@@ -118,7 +118,6 @@ extern int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf);
 extern int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf);
 
 /* sdl_driver.c */
-extern int using_opengl(void);
 extern void _handle_events(void);
 extern unsigned char _readlastkeyhit(void);
 extern int mprotect_align(const void *addr, size_t len, int prot);
@@ -128,6 +127,8 @@ extern int setvesa(int32_t x, int32_t y);
 extern int screencapture(char *filename, char inverseit);
 extern void setvmode(int mode);
 extern int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim);
+extern int setgamemode_gl(char davidoption);
+extern void glredrawlastframe(void);
 extern void qsetmode640350(void);
 extern void qsetmode640480(void);
 extern void getvalidvesamodes(void);
@@ -181,6 +182,18 @@ extern void genericmultifunction(int32_t other, char *bufptr, int32_t messleng, 
 extern int setgotpic(int32_t i1);
 extern int32_t getclipmask(int i1, int i2, int i3, int i4);
 extern int wallfront(int32_t l1, int32_t l2);
+#ifdef POLYMOST
+extern void polymost_drawrooms(void);
+extern void polymost_drawmaskwall(int32_t damaskwallcnt);
+extern void polymost_drawsprite(int32_t snum);
+extern void polymost_dorotatesprite(int32_t sx, int32_t sy, int32_t z, short a, short picnum, signed char dashade, unsigned char dapalnum, unsigned short dastat, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2);
+extern void polymost_glreset(void);
+extern void gltexinvalidate(int32_t dapicnum, int32_t dapalnum, int32_t dameth);
+extern void gltexinvalidateall(void);
+#endif
+#if defined(POLYMOST) && defined(USE_OPENGL)
+extern void polymost_fillpolygon(int32_t npoints);
+#endif
 extern void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz, short daang, int32_t dahoriz, short dacursectnum);
 extern int loadboard(char *filename, int32_t *daposx, int32_t *daposy, int32_t *daposz, short *daang, short *dacursectnum);
 extern int saveboard(char *filename, int32_t *daposx, int32_t *daposy, int32_t *daposz, short *daang, short *dacursectnum);
@@ -232,11 +245,13 @@ extern void printext256_noupdate(int32_t xpos, int32_t ypos, short col, short ba
 extern int krand(void);
 extern void getzrange(int32_t x, int32_t y, int32_t z, short sectnum, int32_t *ceilz, int32_t *ceilhit, int32_t *florz, int32_t *florhit, int32_t walldist, uint32_t cliptype);
 extern void setview(int32_t x1, int32_t y1, int32_t x2, int32_t y2);
+extern void calcpixelaspect(void);
 extern void setaspect(int32_t daxrange, int32_t daaspect);
 extern void flushperms(void);
-extern void rotatesprite(int32_t sx, int32_t sy, int32_t z, short a, short picnum, signed char dashade, char dapalnum, char dastat, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2);
+extern void rotatesprite(int32_t sx, int32_t sy, int32_t z, short a, short picnum, signed char dashade, char dapalnum, unsigned short dastat, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2);
 extern void makepalookup(int32_t palnum, char *remapbuf, signed char r, signed char g, signed char b, char dastat);
 extern void setbrightness(char dabrightness, unsigned char *dapal);
+extern void setpalettefade(unsigned char r, unsigned char g, unsigned char b, unsigned char offset);
 extern void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang);
 extern void clearview(int32_t dacol);
 extern void clearallviews(int32_t dacol);
@@ -255,3 +270,8 @@ extern void alignceilslope(short dasect, int32_t x, int32_t y, int32_t z);
 extern void alignflorslope(short dasect, int32_t x, int32_t y, int32_t z);
 extern int loopnumofsector(short sectnum, short wallnum);
 extern void setfirstwall(short sectnum, short newfirstwall);
+extern int setrendermode(int renderer);
+extern int getrendermode(void);
+extern void setrollangle(int32_t rolla);
+extern void invalidatetile(short tilenume, int32_t pal, int32_t how);
+extern void setpolymost2dview(void);

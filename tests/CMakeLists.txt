@@ -8,6 +8,14 @@ set_tests_properties(sdl_driver_smoke PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
   TIMEOUT 30)
 
+add_test(NAME sdl_driver_smoke_gl_fallback COMMAND sdl_driver_smoke gl_fallback)
+add_test(NAME sdl_driver_smoke_palette_fade COMMAND sdl_driver_smoke palette_fade)
+add_test(NAME sdl_driver_smoke_screencapture COMMAND sdl_driver_smoke screencapture_formats)
+set_tests_properties(sdl_driver_smoke_gl_fallback sdl_driver_smoke_palette_fade
+                     sdl_driver_smoke_screencapture PROPERTIES
+  ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+  TIMEOUT 30)
+
 # Checks DUKE3D_GAMEVER, BUILD_ENGINEREV, BYTEVERSION and the volume macros
 # against this configuration's DUKE3D_VERSION. The table is kept here, apart
 # from the one that sets them, so a mistake in either shows up.
@@ -104,9 +112,39 @@ endif()
 add_executable(render_e1l1 render_e1l1.c)
 target_link_libraries(render_e1l1 PRIVATE buildengine duke3d::SDL2main)
 
+add_executable(render_classic2d render_classic2d.c)
+target_link_libraries(render_classic2d PRIVATE buildengine duke3d::SDL2main)
+
+add_executable(render_maskorder render_maskorder.c)
+target_link_libraries(render_maskorder PRIVATE buildengine duke3d::SDL2main)
+
 set(DUKE3D_GRP "" CACHE FILEPATH "DUKE3D.GRP for tests that need game data")
 set(DUKE3D_E1L1_CHECKSUM "e0517697" CACHE STRING
     "Expected render_e1l1 frame checksum (hex); empty just prints it")
+set(DUKE3D_E1L1_TILT_CHECKSUM "64e7f538" CACHE STRING
+    "Expected render_e1l1_tilt (screen tilt and low detail at 1600x900) checksum (hex); empty just prints it")
+# arm64 macOS gives 0d60cca6 in 1.3D builds and d64ef539 in 1.4/1.5 ones
+# (Polymost takes slope heights from getzsofslope, whose maths changed
+# between engine revisions). Not the default: Polymost is floating point, so
+# other platforms and compilers may round differently.
+set(DUKE3D_E1L1_POLYMOST_CHECKSUM "" CACHE STRING
+    "Expected render_e1l1_polymost (renderer 2) frame checksum (hex); empty just prints it")
+# render_classic2d's HUD and map view checksums (hex) for the 1.3D GRP;
+# empty just prints them. They are the same in 1.3D and 1.5 builds. The
+# wide modes are pinned with the widescreen port; tall modes must stay as
+# they were.
+foreach(_pin "320x200;9f03fd16;763b8c56" "640x400;c6b6b632;7282abe5"
+             "640x480;92082500;dfe0efbe" "1280x1024;43229c16;441cd127"
+             "480x640;6a4e30ce;28839020" "1280x720;7507d7cd;cc44ab59"
+             "1600x900;872652c4;cc8d7da2")
+  list(GET _pin 0 _size)
+  list(GET _pin 1 _hud)
+  list(GET _pin 2 _map)
+  set(DUKE3D_CLASSIC2D_${_size}_HUD "${_hud}" CACHE STRING
+      "Expected render_classic2d_${_size} HUD checksum (hex); empty just prints it")
+  set(DUKE3D_CLASSIC2D_${_size}_MAP "${_map}" CACHE STRING
+      "Expected render_classic2d_${_size} map view checksum (hex); empty just prints it")
+endforeach()
 if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
   add_test(NAME render_e1l1
     COMMAND render_e1l1 "${DUKE3D_GRP}"
@@ -115,6 +153,81 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
   set_tests_properties(render_e1l1 PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
     TIMEOUT 30)
+  # game.c's screen tilt and low detail in a widescreen mode whose tile is a
+  # power of two wide.
+  add_test(NAME render_e1l1_tilt
+    COMMAND render_e1l1 "${DUKE3D_GRP}"
+            "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_tilt.bmp"
+            "${DUKE3D_E1L1_TILT_CHECKSUM}" 0 tilt)
+  set_tests_properties(render_e1l1_tilt PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+    TIMEOUT 30)
+
+  # Classic renderer HUD rotatesprites and textured map view at several
+  # 8-bit modes.
+  foreach(_size 320x200 640x400 640x480 1280x1024 480x640 1280x720 1600x900)
+    string(REPLACE "x" ";" _wh "${_size}")
+    add_test(NAME render_classic2d_${_size}
+      COMMAND render_classic2d "${DUKE3D_GRP}"
+              "${CMAKE_CURRENT_BINARY_DIR}/render_classic2d_${_size}" ${_wh}
+              "${DUKE3D_CLASSIC2D_${_size}_HUD}" "${DUKE3D_CLASSIC2D_${_size}_MAP}")
+    set_tests_properties(render_classic2d_${_size} PROPERTIES
+      ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+      TIMEOUT 30)
+  endforeach()
+
+  # The same view through Polymost: renderer 2 (software) and 1 (solid
+  # colour). Polymost is floating point, so the checksum may differ by
+  # platform; renderer 1 only prints its checksum.
+  if(DUKE3D_POLYMOST)
+    add_test(NAME render_e1l1_polymost
+      COMMAND render_e1l1 "${DUKE3D_GRP}"
+              "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost.bmp"
+              "${DUKE3D_E1L1_POLYMOST_CHECKSUM}" 2)
+    add_test(NAME render_e1l1_polymost_solid
+      COMMAND render_e1l1 "${DUKE3D_GRP}"
+              "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost_solid.bmp"
+              "" 1)
+    # Renderer 2 drawing a render-to-tile view with a power-of-two height.
+    add_test(NAME render_e1l1_polymost_tile
+      COMMAND render_e1l1 "${DUKE3D_GRP}"
+              "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost_tile.bmp"
+              "" 2 tile)
+    # The same tilt and low detail in renderer 2, against renderer 0's.
+    add_test(NAME render_e1l1_polymost_tilt
+      COMMAND render_e1l1 "${DUKE3D_GRP}"
+              "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost_tilt.bmp"
+              "" 2 tilt)
+    # A sprite behind a masked wall (JFBuild 61483f0). Renderer 1 first, so
+    # renderer 0's xb1/xb2 aren't left to stand in for dxb1/dxb2.
+    add_test(NAME render_maskorder
+      COMMAND render_maskorder "${DUKE3D_GRP}" 1 2 0)
+    set_tests_properties(render_e1l1_polymost render_e1l1_polymost_solid
+                         render_e1l1_polymost_tile render_e1l1_polymost_tilt
+                         render_maskorder
+      PROPERTIES
+      ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+      TIMEOUT 30)
+  endif()
+
+  # Renderer 3 in a real OpenGL window: 2D drawing, screencapture and a
+  # fade, with images left in the build tree to check by eye. It opens a
+  # window, so it's opt-in; with no OpenGL (the dummy driver) it's skipped.
+  option(DUKE3D_GL_TESTS "Run the renderer 3 test, which opens a window" OFF)
+  if(DUKE3D_POLYMOST AND DUKE3D_GL_TESTS)
+    # The game is linked in for its renderer 3 palette code; game.c's main()
+    # is renamed (below), as in con_compile.
+    add_executable(render_gl render_gl.c render_gl_game.c
+                   "${PROJECT_SOURCE_DIR}/source/game.c")
+    target_link_libraries(render_gl PRIVATE duke3d_game duke3d::SDL2main)
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/render_gl")
+    add_test(NAME render_gl
+      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl")
+    set_tests_properties(render_gl PROPERTIES
+      ENVIRONMENT "BUILD_WINDOWED=1"
+      SKIP_RETURN_CODE 77
+      TIMEOUT 30)
+  endif()
 
   # Boots the real game to its title loop and into E1L1, headless. It uses
   # the in-repo 1.5 CONs, so not in 1.3D builds.

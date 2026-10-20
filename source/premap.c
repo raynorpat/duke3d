@@ -1366,6 +1366,7 @@ void dofrontscreens(void)
         clearview(0L);
         ps[myconnectindex].palette = palette;
         palto(0,0,0,0);
+        if (widescreen) clearallviews(0L);
         rotatesprite(320<<15,200<<15,65536L,0,LOADSCREEN,0,0,2+8+64,0,0,xdim-1,ydim-1);
         menutext(160,105,0,0,"LOADING...");
         nextpage();

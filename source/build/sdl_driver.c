@@ -36,9 +36,8 @@
 #include "display.h"
 #include "pragmas.h"
 #include "engine.h"
-
-#if (defined USE_OPENGL)
-#include "buildgl.h"
+#ifdef USE_OPENGL
+#include "SDL_opengl.h"
 #endif
 
 /* need VirtualProtect() from win32 API... */
@@ -50,14 +49,12 @@
 typedef enum
 {
     RENDERER_SOFTWARE,
-    RENDERER_OPENGL3D,
     RENDERER_TOTAL
 } sdl_renderer_type;
 
 const char *renderer_name[RENDERER_TOTAL];
 
 #define ENVRSTR_RENDERER_SOFTWARE  "software"
-#define ENVRSTR_RENDERER_OPENGL3D  "opengl3d"
 
 static sdl_renderer_type renderer = RENDERER_SOFTWARE;
 
@@ -70,6 +67,9 @@ extern int32_t setvlinebpl(int32_t);
 #endif  /* __WATCOMC__ */
 
 #include "cache1d.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 
 /*
@@ -118,23 +118,6 @@ extern int32_t setvlinebpl(int32_t);
 
 #define UNLOCK_SURFACE_AND_RETURN  if (SDL_MUSTLOCK(surface)) SDL_UnlockSurface(surface); return;
 
-static unsigned char tempbuf[MAXWALLS];
-static char pcxheader[128] =
-{
-        0xa,0x5,0x1,0x8,0x0,0x0,0x0,0x0,0x3f,0x1,0xc7,0x0,
-        0x40,0x1,0xc8,0x0,0x0,0x0,0x0,0x8,0x8,0x8,0x10,0x10,
-        0x10,0x18,0x18,0x18,0x20,0x20,0x20,0x28,0x28,0x28,0x30,0x30,
-        0x30,0x38,0x38,0x38,0x40,0x40,0x40,0x48,0x48,0x48,0x50,0x50,
-        0x50,0x58,0x58,0x58,0x60,0x60,0x60,0x68,0x68,0x68,0x70,0x70,
-        0x70,0x78,0x78,0x78,0x0,0x1,0x40,0x1,0x0,0x0,0x0,0x0,
-        0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-        0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-        0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-        0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-        0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,
-};
-
-
 static char vgapal16[48] =
 {
         00,00,00,00,00,42,00,42,00,00,42,42,42,00,00,42,00,42,42,21,00,42,42,42,
@@ -151,6 +134,25 @@ intptr_t frameplace;
 char *screen, vesachecked;
 int32_t buffermode, origbuffermode, linearmode;
 char permanentupdate = 0, vgacompatible;
+
+#ifdef POLYMOST
+int32_t bpp = 8;
+#endif
+#ifdef USE_OPENGL
+struct glinfo_t glinfo;
+char nofog = 0;
+extern void polymost_glreset(void);
+extern void gltexinvalidateall(void);
+static SDL_GLContext sdl_glcontext = NULL;  /* non-NULL while in renderer 3 */
+static char gl_davidoption = 1;
+static int gl_window_w = 640;  /* windowed size: the last 8-bit mode's, unclamped */
+static int gl_window_h = 480;
+static int framedrawn = 0;  /* something was drawn since the last swap */
+static GLuint lastframe = 0;  /* the last swapped frame, before its fade */
+static int lastframe_set = 0;  /* lastframe holds a frame yet */
+static int swapped = 0;  /* a swap has shown something in this mode */
+static int lastframe_w, lastframe_h;  /* its texture size */
+#endif
 
 SDL_Surface *surface = NULL; /* This isn't static so that we can use it elsewhere AH */
 static SDL_Window *sdl_window = NULL;
@@ -232,20 +234,6 @@ static void sdldebug(const char *fmt, ...)
 } /* sdldebug */
 #endif
 
-#if (defined USE_OPENGL)
-void sgldebug(const char *fmt, ...)
-{
-    va_list ap;
-
-    if (_sdl_debug_file)
-    {
-        va_start(ap, fmt);
-        __out_sdldebug("BUILDSDL/GL", fmt, ap);
-        va_end(ap);
-    } /* if */
-} /* sgldebug */
-#endif
-
 
 static void output_surface_info(SDL_Surface *_surface)
 {
@@ -323,9 +311,36 @@ static void free_video_surfaces(void)
 } /* free_video_surfaces */
 
 
+#ifdef USE_OPENGL
+/* Leave renderer 3: drop the GL textures while the context is current,
+ *  then the context and its window. The 8-bit path recreates a window. */
+static void destroy_gl_window(void)
+{
+    if (sdl_glcontext == NULL)
+        return;
+
+    polymost_glreset();
+    if (lastframe != 0)
+        glDeleteTextures(1, &lastframe);
+    lastframe = 0;
+    framedrawn = 0;
+    SDL_GL_DeleteContext(sdl_glcontext);
+    sdl_glcontext = NULL;
+    SDL_DestroyWindow(sdl_window);
+    sdl_window = NULL;
+    bpp = 8;
+    numpages = 0;
+    setrendermode(0);
+} /* destroy_gl_window */
+#endif
+
+
 static void shutdown_video(void)
 {
     free_video_surfaces();
+#ifdef USE_OPENGL
+    destroy_gl_window();
+#endif
 
     if (sdl_renderer != NULL)
     {
@@ -353,21 +368,11 @@ static void set_mouse_grab(int grab)
 
 static Uint8 *get_framebuffer(void)
 {
-    assert(renderer != RENDERER_OPENGL3D);
-
     if (renderer == RENDERER_SOFTWARE)
         return((Uint8 *) surface->pixels);
-    else if (renderer == RENDERER_OPENGL3D)
-        return((Uint8 *) frameplace);
 
     return(NULL);
 } /* get_framebuffer */
-
-
-int using_opengl(void)
-{
-    return(renderer == RENDERER_OPENGL3D);
-} /* using_opengl */
 
 
 /*
@@ -379,11 +384,10 @@ int using_opengl(void)
  * !!!  titlebar caption.   --ryan.
  */
 static char screenalloctype = 255;
+static void init_res_lookups(int davidoption, int framebuffer);
+
 static void init_new_res_vars(int davidoption)
 {
-    int i = 0;
-    int j = 0;
-
     setupmouse();
 
     SDL_SetWindowTitle(sdl_window, titlelong);
@@ -392,17 +396,29 @@ static void init_new_res_vars(int davidoption)
     ydim = yres = surface->h;
 
     bytesperline = surface->w;
+	qsetmode = surface->h;
+
+    frameplace = (intptr_t) ( ((Uint8 *) surface->pixels) );
+
+    init_res_lookups(davidoption, 1);
+} /* init_new_res_vars */
+
+
+/*
+ * The part of a mode set shared with OpenGL: ylookup, horizlookup and the
+ *  view. framebuffer is 0 in OpenGL, where screen holds only the lookups,
+ *  frameplace stays 0 and nothing is cleared through it.
+ */
+static void init_res_lookups(int davidoption, int framebuffer)
+{
+    int i = 0;
+    int j = 0;
+
     vesachecked = 1;
     vgacompatible = 1;
     linearmode = 1;
-	qsetmode = surface->h;
 	activepage = visualpage = 0;
     horizlookup = horizlookup2 = NULL;
-
-    if (renderer == RENDERER_OPENGL3D)
-        frameplace = (intptr_t) NULL;
-    else
-        frameplace = (intptr_t) ( ((Uint8 *) surface->pixels) );
 
   	if (screen != NULL)
    	{
@@ -413,7 +429,9 @@ static void init_new_res_vars(int davidoption)
 
     if (davidoption != -1)
     {
-    	switch(vidoption)
+    	if (!framebuffer)
+    		i = 0;
+    	else switch(vidoption)
     	{
     		case 1:i = xdim*ydim; break;
     		case 2: xdim = 320; ydim = 200; i = xdim*ydim; break;
@@ -429,17 +447,13 @@ static void init_new_res_vars(int davidoption)
     		 screenalloctype = 1;
     	}
 
-        /* !!! FIXME: Should screen get allocated above if in opengl3d mode? */
-
-        if (renderer == RENDERER_OPENGL3D)
-            frameplace = (intptr_t) NULL;
-        else
-        {
+        if (framebuffer)
             frameplace = FP_OFF(screen);
-          	horizlookup = (int32_t *)(frameplace+i);
-           	horizlookup2 = (int32_t *)(frameplace+i+j);
-        } /* else */
+        horizlookup = (int32_t *)(FP_OFF(screen)+i);
+        horizlookup2 = (int32_t *)(FP_OFF(screen)+i+j);
     } /* if */
+
+    calcpixelaspect();
 
     j = 0;
   	for(i = 0; i <= ydim; i++)
@@ -458,13 +472,14 @@ static void init_new_res_vars(int davidoption)
     if (davidoption != -1)
     {
     	setview(0L,0L,xdim-1,ydim-1);
-    	clearallviews(0L);
+    	if (framebuffer)
+    		clearallviews(0L);
     } /* if */
 
 	setbrightness((char) curbrightness, (unsigned char *) &palette[0]);
 
 	if (searchx < 0) { searchx = halfxdimen; searchy = (ydimen>>1); }
-} /* init_new_res_vars */
+} /* init_res_lookups */
 
 
 static void go_to_new_vid_mode(int vidoption, int w, int h)
@@ -478,11 +493,18 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
         goto vidmode_failed;
 
     free_video_surfaces();
+#ifdef USE_OPENGL
+    destroy_gl_window();  /* an SDL_Renderer can't share the GL window. */
+#endif
 
     /* low-res modes get a bigger window so they aren't a postage stamp. */
     scale = (w < 640) ? (640 / w) : 1;
     if (scale < 1)
         scale = 1;
+#ifdef USE_OPENGL
+    gl_window_w = w * scale;  /* a fullscreen window reports the desktop size. */
+    gl_window_h = h * scale;
+#endif
 
     if (sdl_window == NULL)
     {
@@ -532,6 +554,338 @@ vidmode_failed:
     SDL_Quit();
     exit(13);
 } /* go_to_new_vid_mode */
+
+
+#ifdef USE_OPENGL
+/* Whole-word match in a GL_EXTENSIONS string. */
+static int gl_has_extension(const char *exts, const char *name)
+{
+    size_t len = strlen(name);
+    const char *p = exts;
+
+    while ((p = strstr(p, name)) != NULL)
+    {
+        if (((p == exts) || (p[-1] == ' ')) && ((p[len] == ' ') || (p[len] == '\0')))
+            return(1);
+        p += len;
+    } /* while */
+
+    return(0);
+} /* gl_has_extension */
+
+
+/*
+ * The texture that keeps the last frame, for fades over a frame that isn't
+ *  being redrawn. GL 1.1 has no non-power-of-two textures, so without
+ *  GL_ARB_texture_non_power_of_two it's rounded up to one.
+ */
+static void gl_alloc_lastframe(void)
+{
+    GLint maxsize = 0;
+
+    if (lastframe != 0)
+        glDeleteTextures(1, &lastframe);
+    lastframe = 0;
+    lastframe_set = 0;
+    swapped = 0;
+
+    lastframe_w = xres;
+    lastframe_h = yres;
+    if (!glinfo.texnpot)
+    {
+        for (lastframe_w = 1; lastframe_w < xres; lastframe_w <<= 1) ;
+        for (lastframe_h = 1; lastframe_h < yres; lastframe_h <<= 1) ;
+    } /* if */
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maxsize);
+    if ((lastframe_w > maxsize) || (lastframe_h > maxsize))
+    {
+        sdldebug("No last-frame texture: %dx%d is over GL_MAX_TEXTURE_SIZE %d.",
+                 lastframe_w, lastframe_h, (int) maxsize);
+        return;
+    } /* if */
+
+    glGenTextures(1, &lastframe);
+    glBindTexture(GL_TEXTURE_2D, lastframe);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, lastframe_w, lastframe_h, 0,
+                 GL_RGB, GL_UNSIGNED_BYTE, NULL);
+} /* gl_alloc_lastframe */
+
+
+/* A full-screen quad of palfadergb at palfadedelta/256 (JFBuild's showframe). */
+static void gl_draw_fade(void)
+{
+    setpolymost2dview();
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4ub(palfadergb.r, palfadergb.g, palfadergb.b, palfadedelta);
+    glBegin(GL_QUADS);
+    glVertex2i(0, 0);
+    glVertex2i(xres, 0);
+    glVertex2i(xres, yres);
+    glVertex2i(0, yres);
+    glEnd();
+    glDisable(GL_BLEND);
+} /* gl_draw_fade */
+
+
+/* Fills the back buffer with (0,0)-(u,v) of a frame texture: bottom-up rows. */
+static void gl_draw_frame(GLuint tex, float u, float v)
+{
+    setpolymost2dview();
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glColor4f(1, 1, 1, 1);
+    glBegin(GL_QUADS);
+    glTexCoord2f(0, v); glVertex2i(0, 0);
+    glTexCoord2f(u, v); glVertex2i(xres, 0);
+    glTexCoord2f(u, 0); glVertex2i(xres, yres);
+    glTexCoord2f(0, 0); glVertex2i(0, yres);
+    glEnd();
+    glDisable(GL_TEXTURE_2D);
+} /* gl_draw_frame */
+
+
+/* Fills the back buffer with the last frame. */
+static void gl_draw_lastframe(void)
+{
+    gl_draw_frame(lastframe, (float) xres / (float) lastframe_w,
+                  (float) yres / (float) lastframe_h);
+} /* gl_draw_lastframe */
+
+
+/* Shows the back buffer: keeps it in lastframe, fades it, swaps. */
+static void gl_swap(void)
+{
+    if ((framedrawn) && (lastframe != 0))
+    {
+        glBindTexture(GL_TEXTURE_2D, lastframe);
+        glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, xres, yres);
+        lastframe_set = 1;
+    } /* if */
+
+    if (palfadedelta)
+        gl_draw_fade();
+
+    SDL_GL_SwapWindow(sdl_window);
+    swapped = 1;
+    framedrawn = 0;
+} /* gl_swap */
+
+
+void _glframedrawn(void)
+{
+    framedrawn = 1;
+} /* _glframedrawn */
+
+
+/*
+ * nextpage's permanent-sprite replay after the swap: it repeats sprites of
+ *  the frame just shown, so it doesn't count as drawn, and a still screen
+ *  drawn once can fade.
+ */
+void _glframereplayed(void)
+{
+    framedrawn = 0;
+} /* _glframereplayed */
+
+
+/*
+ * setpalettefade in renderer 3. A frame being drawn gets the fade when it's
+ *  shown; otherwise the last frame is shown again with the new fade, as a
+ *  title screen fading in or out isn't redrawn.
+ */
+void _glpalettefade(void)
+{
+    if ((sdl_glcontext == NULL) || (framedrawn) || (!lastframe_set))
+        return;
+
+    gl_draw_lastframe();
+    if (palfadedelta)
+        gl_draw_fade();
+    SDL_GL_SwapWindow(sdl_window);
+    swapped = 1;
+    framedrawn = 0;
+} /* _glpalettefade */
+
+
+/* xdim/ydim are the drawable size, clamped to what the engine's arrays hold. */
+static void init_gl_res_vars(void)
+{
+    int w, h;
+
+    SDL_GL_GetDrawableSize(sdl_window, &w, &h);
+    if (w > MAXXDIM) w = MAXXDIM;
+    if (h > MAXYDIM) h = MAXYDIM;
+
+    xdim = xres = w;
+    ydim = yres = h;
+    bytesperline = w;
+    qsetmode = 200;
+    frameplace = 0;
+    sdldebug("OpenGL drawable is %dx%d.", w, h);
+
+    SDL_SetWindowTitle(sdl_window, titlelong);
+    setupmouse();
+    gl_alloc_lastframe();
+    init_res_lookups(gl_davidoption, 0);
+} /* init_gl_res_vars */
+
+
+/*
+ * The drawable changed size (fullscreen toggle, a move between displays).
+ *  With no frame being drawn (a still screen, which isn't drawn again), the
+ *  last frame is shown again, stretched to the new size, and kept as the
+ *  new last frame, so the screen and its fades don't go black.
+ */
+static void gl_resize(void)
+{
+    int w, h;
+    palette_t pal[256], fadergb;
+    unsigned char fadedelta;
+    GLuint old;
+    float oldu = 0, oldv = 0;
+
+    SDL_GL_GetDrawableSize(sdl_window, &w, &h);
+    if (w > MAXXDIM) w = MAXXDIM;
+    if (h > MAXYDIM) h = MAXYDIM;
+    if ((w == xres) && (h == yres))
+        return;
+
+    /* init_res_lookups sets the base palette and drops the fade: keep both. */
+    memcpy(pal, curpalette, sizeof (pal));
+    fadergb = palfadergb;
+    fadedelta = palfadedelta;
+    old = 0;
+    if ((lastframe_set) && (!framedrawn))
+    {
+        old = lastframe;
+        oldu = (float) xres / (float) lastframe_w;
+        oldv = (float) yres / (float) lastframe_h;
+        lastframe = 0;  /* keep it from gl_alloc_lastframe. */
+    } /* if */
+    polymost_glreset();
+    init_gl_res_vars();
+    memcpy(curpalette, pal, sizeof (pal));
+    palfadergb = fadergb;
+    palfadedelta = fadedelta;
+    gltexinvalidateall();
+
+    if (old != 0)
+    {
+        gl_draw_frame(old, oldu, oldv);
+        glDeleteTextures(1, &old);
+        gl_swap();  /* framedrawn: it becomes lastframe, faded and shown. */
+    } /* if */
+} /* gl_resize */
+#endif
+
+
+int setgamemode_gl(char davidoption)
+{
+#ifdef USE_OPENGL
+    SDL_Window *window;
+    SDL_GLContext context;
+    const char *exts;
+
+    SDL_ClearError();
+    if ((SDL_WasInit(SDL_INIT_VIDEO) == 0) && (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0))
+        return(-1);
+
+    /*
+     * Make the GL window before dropping the old one, so a failure leaves
+     *  the 8-bit (or GL) mode as it was. SDL2 can't add GL to a window that
+     *  has an SDL_Renderer, so it's a new window.
+     */
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    window = SDL_CreateWindow(titlelong,
+                    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                    gl_window_w, gl_window_h,
+                    SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI |
+                    (sdl_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
+    context = (window != NULL) ? SDL_GL_CreateContext(window) : NULL;
+    if (context == NULL)
+    {
+        if (window != NULL)
+            SDL_DestroyWindow(window);
+        /* a backend may have dropped the old context in the attempt. */
+        if (sdl_glcontext != NULL)
+            SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
+        return(-1);
+    } /* if */
+
+    if (sdl_glcontext != NULL)  /* already in GL: drop it, its context current. */
+    {
+        SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
+        destroy_gl_window();
+    } /* if */
+    free_video_surfaces();
+    if (sdl_renderer != NULL)
+    {
+        SDL_DestroyRenderer(sdl_renderer);
+        sdl_renderer = NULL;
+    } /* if */
+    if (sdl_window != NULL)
+        SDL_DestroyWindow(sdl_window);
+    sdl_window = window;
+    sdl_glcontext = context;
+
+    /* destroying an SDL_Renderer can leave no context current. */
+    SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
+    if (SDL_GL_SetSwapInterval(1) != 0)
+        SDL_GL_SetSwapInterval(0);
+
+    /* the state JFBuild sets after every GL mode change. */
+    glEnable(GL_TEXTURE_2D);
+    glShadeModel(GL_SMOOTH);
+    glClearColor(0, 0, 0, 0.5);
+    glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
+    glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+    glDisable(GL_DITHER);
+
+    exts = (const char *) glGetString(GL_EXTENSIONS);
+    if (exts == NULL)
+        exts = "";
+    glinfo.maxanisotropy = 1.0;
+    if (gl_has_extension(exts, "GL_EXT_texture_filter_anisotropic"))
+        glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &glinfo.maxanisotropy);
+    glinfo.bgra = gl_has_extension(exts, "GL_EXT_bgra");
+    glinfo.clamptoedge = (gl_has_extension(exts, "GL_EXT_texture_edge_clamp") ||
+                          gl_has_extension(exts, "GL_SGIS_texture_edge_clamp"));
+    glinfo.texcompr = gl_has_extension(exts, "GL_ARB_texture_compression");
+    glinfo.texnpot = gl_has_extension(exts, "GL_ARB_texture_non_power_of_two");
+    sdldebug("OpenGL %s on %s: bgra %d, clamptoedge %d, texcompr %d, texnpot %d, maxanisotropy %g.",
+             (const char *) glGetString(GL_VERSION), (const char *) glGetString(GL_RENDERER),
+             glinfo.bgra, glinfo.clamptoedge, glinfo.texcompr, glinfo.texnpot, glinfo.maxanisotropy);
+
+    bpp = 32;
+    numpages = 2;  /* as JFBuild: permanent rotatesprites go on both pages. */
+    gl_davidoption = davidoption;
+    init_gl_res_vars();
+    setrendermode(3);
+    polymost_glreset();
+    last_render_ticks = SDL_GetTicks();
+    return(0);
+#else
+    (void) davidoption;
+    return(SDL_SetError("this build has no OpenGL"));
+#endif
+} /* setgamemode_gl */
+
+
+/*
+ * Renderer 3: starts the frame being drawn from the last frame shown, without
+ *  its fade, for a screen that draws over what's already there.
+ */
+void glredrawlastframe(void)
+{
+#ifdef USE_OPENGL
+    if ((sdl_glcontext != NULL) && (lastframe_set))
+        gl_draw_lastframe();
+#endif
+} /* glredrawlastframe */
 
 
 static __inline int sdl_mouse_button_filter(SDL_MouseButtonEvent const *event)
@@ -590,9 +944,30 @@ static int sdl_mouse_wheel_filter(SDL_MouseWheelEvent const *event)
 } /* sdl_mouse_wheel_filter */
 
 
+/*
+ * The size mouse_x/mouse_y run over: SDL's mouse events are in the 8-bit
+ *  renderer's logical size, but in the window's points in OpenGL, where
+ *  the drawable (xres, yres) can be bigger (a high-DPI display).
+ */
+static void mouse_area(int *w, int *h)
+{
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+    {
+        SDL_GetWindowSize(sdl_window, w, h);
+        return;
+    } /* if */
+#endif
+    *w = (surface != NULL) ? surface->w : xres;
+    *h = (surface != NULL) ? surface->h : yres;
+} /* mouse_area */
+
+
 static int sdl_mouse_motion_filter(SDL_Event const *event)
 {
-    if (surface == NULL)
+    int w, h;
+
+    if (sdl_window == NULL)
         return(0);
 
     if (event->type == SDL_JOYBALLMOTION)
@@ -620,10 +995,11 @@ static int sdl_mouse_motion_filter(SDL_Event const *event)
         } /* else */
     } /* else */
 
+    mouse_area(&w, &h);
    	if (mouse_x < 0) mouse_x = 0;
-   	if (mouse_x > surface->w) mouse_x = surface->w;
+   	if (mouse_x > w) mouse_x = w;
    	if (mouse_y < 0) mouse_y = 0;
-   	if (mouse_y > surface->h) mouse_y = surface->h;
+   	if (mouse_y > h) mouse_y = h;
 
     return(0);
 } /* sdl_mouse_motion_filter */
@@ -646,6 +1022,13 @@ static int attempt_fullscreen_toggle(void)
     } /* if */
 
     sdl_fullscreen = !sdl_fullscreen;
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+    {
+        gl_resize();  /* macOS may report the new size later, as an event. */
+        return(1);
+    } /* if */
+#endif
     output_surface_info(surface);
     return(1);
 } /* attempt_fullscreen_toggle */
@@ -776,6 +1159,11 @@ static int root_sdl_event_filter(const SDL_Event *event)
         case SDL_WINDOWEVENT:
             if (event->window.event == SDL_WINDOWEVENT_EXPOSED)
                 present_surface();
+#ifdef USE_OPENGL
+            else if ((event->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) &&
+                     (sdl_glcontext != NULL))
+                gl_resize();
+#endif
             return(0);
         case SDL_QUIT:
             /* !!! rcg TEMP */
@@ -1113,23 +1501,8 @@ static void set_sdl_renderer(void)
 {
     const char *envr = getenv(BUILD_RENDERER);
 
-#ifdef USE_OPENGL
-    int need_opengl_lib = 1;
-#endif
-
     if ((envr == NULL) || (strcmp(envr, ENVRSTR_RENDERER_SOFTWARE) == 0))
         renderer = RENDERER_SOFTWARE;
-
-#ifdef USE_OPENGL
-#if 0
-    else if (strcmp(envr, ENVRSTR_RENDERER_OPENGL3D) == 0)
-    {
-        renderer = RENDERER_OPENGL3D;
-        need_opengl_lib = 1;
-    } /* else if */
-#endif
-
-#endif
 
     else
     {
@@ -1146,23 +1519,6 @@ static void set_sdl_renderer(void)
         exit(1);
     } /* if */
 
-#ifdef USE_OPENGL
-    if (need_opengl_lib)
-    {
-        if (opengl_load_library() == -1)
-        {
-            SDL_Quit();
-            fprintf(stderr, "BUILDSDL/GL: Failed to load OpenGL library!\n");
-            if (getenv(BUILD_SDLDEBUG) == NULL)
-            {
-                fprintf(stderr, "BUILDSDL/GL: Try setting environment variable"
-                                " %s for more info.\n", BUILD_SDLDEBUG);
-            } /* if */
-            _exit(42);
-        } /* if */
-    } /* if */
-#endif
-
 } /* set_sdl_renderer */
 
 
@@ -1170,7 +1526,6 @@ static void init_renderer_names(void)
 {
     memset((void *) renderer_name, '\0', sizeof (renderer_name));
     renderer_name[RENDERER_SOFTWARE] = "RENDERER_SOFTWARE";
-    renderer_name[RENDERER_OPENGL3D] = "RENDERER_OPENGL3D";
 } /* init_renderer_names */
 
 
@@ -1361,14 +1716,163 @@ int setvesa(int32_t x, int32_t y)
     return(0);
 } /* setvesa */
 
+#ifdef USE_OPENGL
+/*
+ * RGB of the frame (JFBuild's GL branch), top row first, in a malloc'd
+ *  buffer, or NULL. It's read from the back buffer: a frame being drawn is
+ *  there; otherwise the last swapped frame is drawn there again first, as
+ *  the back buffer is undefined after a swap (with no last frame, NULL).
+ *  The fade the swap puts over it is applied here the same way, so it's
+ *  the picture on screen, as in 8-bit. With no last-frame texture (over
+ *  GL_MAX_TEXTURE_SIZE) it reads the front buffer, fade and all. The size
+ *  is the drawable's.
+ */
+static unsigned char *gl_screencapture(int *w, int *h)
+{
+    unsigned char *rgb, *top, *bottom, t;
+    size_t rowbytes, i, n;
+    int y, a = palfadedelta, front = 0, failed;
+
+    *w = xdim;
+    *h = ydim;
+    if (!framedrawn)
+    {
+        if (lastframe == 0)
+        {
+            if (!swapped)  /* the front buffer holds nothing yet. */
+                return(NULL);
+            front = 1;
+        } /* if */
+        else if (!lastframe_set)
+            return(NULL);
+        else
+        {
+            gl_draw_lastframe();
+            framedrawn = 0;  /* that's the last frame again, not a new one. */
+        } /* else */
+    } /* if */
+
+    rowbytes = (size_t) *w * 3;
+    rgb = (unsigned char *) malloc(rowbytes * *h);
+    if (rgb == NULL)
+        return(NULL);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    if (front)
+    {
+        glReadBuffer(GL_FRONT);
+        a = 0;  /* the swap drew the fade there already. */
+    } /* if */
+    while (glGetError() != GL_NO_ERROR) {}  /* only the read's own error counts. */
+    glReadPixels(0, 0, *w, *h, GL_RGB, GL_UNSIGNED_BYTE, rgb);
+    failed = (glGetError() != GL_NO_ERROR);
+    while (glGetError() != GL_NO_ERROR) {}
+    glReadBuffer(GL_BACK);
+    while (glGetError() != GL_NO_ERROR) {}  /* leave no error behind. */
+    if (failed)
+    {
+        free(rgb);
+        return(NULL);
+    } /* if */
+
+    for (y = 0; y < *h / 2; y++)  /* GL rows are bottom-up. */
+    {
+        top = rgb + y * rowbytes;
+        bottom = rgb + (*h - 1 - y) * rowbytes;
+        for (i = 0; i < rowbytes; i++)
+            { t = top[i]; top[i] = bottom[i]; bottom[i] = t; }
+    } /* for */
+
+    if (a)  /* gl_draw_fade's blend: palfadergb at alpha palfadedelta. */
+        for (i = 0, n = rowbytes * *h; i < n; i += 3)
+        {
+            rgb[i+0] = (rgb[i+0] * (255 - a) + palfadergb.r * a + 127) / 255;
+            rgb[i+1] = (rgb[i+1] * (255 - a) + palfadergb.g * a + 127) / 255;
+            rgb[i+2] = (rgb[i+2] * (255 - a) + palfadergb.b * a + 127) / 255;
+        } /* for */
+
+    return(rgb);
+} /* gl_screencapture */
+#endif
+
+
+/* RGB of the 8-bit frame through the palette on screen (the faded one), as
+ *  the SDL surface holds it, so the picture is what's presented. */
+static unsigned char *classic_screencapture(int *w, int *h, char inverseit)
+{
+    const SDL_Color *pal = surface->format->palette->colors;
+    unsigned char *rgb, *out;
+    int32_t i, p, numbytes;
+    int col;
+
+    if (qsetmode == 200)
+    {
+        *w = xdim;
+        *h = ydim;
+    } /* if */
+    else  /* the editor's 2D mode: 640 wide, qsetmode high, 16 colors. */
+    {
+        *w = 640;
+        *h = qsetmode;
+    } /* else */
+
+    numbytes = *w * *h;
+    rgb = (unsigned char *) malloc(numbytes * 3);
+    if (rgb == NULL)
+        return(NULL);
+
+    for (p = 0, out = rgb; p < numbytes; p++)
+    {
+        if (qsetmode == 200)
+            col = ((unsigned char *) frameplace)[p];
+        else
+        {
+            col = readpixel(p);
+            if ((inverseit == 1) && (((col&7) == 0) || ((col&7) == 7))) col ^= 15;
+            i = (col & 15) * 3;
+            *out++ = vgapal16[i+0] << 2;
+            *out++ = vgapal16[i+1] << 2;
+            *out++ = vgapal16[i+2] << 2;
+            continue;
+        } /* else */
+
+        *out++ = pal[col].r;
+        *out++ = pal[col].g;
+        *out++ = pal[col].b;
+    } /* for */
+
+    return(rgb);
+} /* classic_screencapture */
+
+
+/* stb_image_write's output: the file, and whether every write worked. */
+typedef struct
+{
+    int fd;
+    int ok;
+} capturefile;
+
+static void screencapture_write(void *context, void *data, int size)
+{
+    capturefile *out = (capturefile *) context;
+    if ((out->ok) && (write(out->fd, data, size) != size))
+        out->ok = 0;
+} /* screencapture_write */
+
+
+/*
+ * The format is the file name's extension: .jpg, .bmp, or else PNG.
+ *  The NNNN before it is replaced by the first number not yet taken.
+ */
 int screencapture(char *_filename, char inverseit)
 {
-	char *ptr = NULL;
-	int fil = -1;
-    int32_t i, bufplc, p, col, ncol, leng, numbytes, xres;
+    unsigned char *rgb;
+    int fil = -1;
+    int w, h, written;
+    capturefile out;
     int captcnt;
     size_t flen = strlen(_filename);
     char *filename = alloca(flen + 1);
+    const char *ext;
     strcpy(filename, _filename);
 
     for (captcnt = 0; (captcnt <= 9999) && (fil == -1); captcnt++)
@@ -1384,117 +1888,35 @@ int screencapture(char *_filename, char inverseit)
     if (fil == -1)
         return -1;
 
-	if (qsetmode == 200)
-	{
-		pcxheader[8] = ((xdim-1)&255); pcxheader[9] = (((xdim-1)>>8)&255);
-		pcxheader[10] = ((ydim-1)&255); pcxheader[11] = (((ydim-1)>>8)&255);
-		pcxheader[12] = (xdim&255); pcxheader[13] = ((xdim>>8)&255);
-		pcxheader[14] = (ydim&255); pcxheader[15] = ((ydim>>8)&255);
-		pcxheader[66] = (xdim&255); pcxheader[67] = ((xdim>>8)&255);
-	}
-	else
-	{
-		pcxheader[8] = ((640-1)&255); pcxheader[9] = (((640-1)>>8)&255);
-		pcxheader[10] = ((qsetmode-1)&255); pcxheader[11] = (((qsetmode-1)>>8)&255);
-		pcxheader[12] = (640&255); pcxheader[13] = ((640>>8)&255);
-		pcxheader[14] = (qsetmode&255); pcxheader[15] = ((qsetmode>>8)&255);
-		pcxheader[66] = (640&255); pcxheader[67] = ((640>>8)&255);
-	}
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+        rgb = gl_screencapture(&w, &h);
+    else
+#endif
+        rgb = classic_screencapture(&w, &h, inverseit);
 
-	write(fil,&pcxheader[0],128);
+    out.fd = fil;
+    out.ok = 1;
+    written = 0;
+    ext = filename + flen - 3;
+    if (rgb == NULL)
+        out.ok = 0;
+    else if (SDL_strcasecmp(ext, "jpg") == 0)
+        written = stbi_write_jpg_to_func(screencapture_write, &out, w, h, 3, rgb, 90);
+    else if (SDL_strcasecmp(ext, "bmp") == 0)
+        written = stbi_write_bmp_to_func(screencapture_write, &out, w, h, 3, rgb);
+    else
+        written = stbi_write_png_to_func(screencapture_write, &out, w, h, 3, rgb, w * 3);
 
-	if (qsetmode == 200)
-	{
-		ptr = (char *)frameplace;
-		numbytes = xdim*ydim;
-		xres = xdim;
-	}
-	else
-	{
-		numbytes = (mul5(qsetmode)<<7);
-		xres = 640;
-	}
-
-	bufplc = 0; p = 0;
-	while (p < numbytes)
-	{
-//		koutp(97,kinp(97)|3);
-
-		if (qsetmode == 200) { col = *ptr; p++; ptr++; }
-		else
-		{
-			col = readpixel(p);
-			p++;
-			if ((inverseit == 1) && (((col&7) == 0) || ((col&7) == 7))) col ^= 15;
-		}
-
-		leng = 1;
-
-		if (qsetmode == 200) ncol = *ptr;
-		else
-		{
-			ncol = readpixel(p);
-			if ((inverseit == 1) && (((ncol&7) == 0) || ((ncol&7) == 7))) ncol ^= 15;
-		}
-
-		while ((ncol == col) && (p < numbytes) && (leng < 63) && ((p%xres) != 0))
-		{
-			leng++;
-
-			if (qsetmode == 200) { p++; ptr++; ncol = *ptr; }
-			else
-			{
-				p++;
-				ncol = readpixel(p);
-				if ((inverseit == 1) && (((ncol&7) == 0) || ((ncol&7) == 7))) ncol ^= 15;
-			}
-		}
-
-		//koutp(97,kinp(97)&252);
-
-		if ((leng > 1) || (col >= 0xc0))
-		{
-			tempbuf[bufplc++] = (leng|0xc0);
-			if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-		}
-		tempbuf[bufplc++] = col;
-		if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-	}
-
-	tempbuf[bufplc++] = 0xc;
-	if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-
-	if (qsetmode == 200)
-	{
-		VBE_getPalette(0,256,&tempbuf[4096]);
-		for(i=0;i<256;i++)
-		{
-			tempbuf[bufplc++] = (tempbuf[(i<<2)+4096+2]<<2);
-			if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-			tempbuf[bufplc++] = (tempbuf[(i<<2)+4096+1]<<2);
-			if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-			tempbuf[bufplc++] = (tempbuf[(i<<2)+4096+0]<<2);
-			if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-		}
-	}
-	else
-	{
-		for(i=0;i<768;i++)
-		{
-			if (i < 48)
-				tempbuf[bufplc++] = (vgapal16[i]<<2);
-			else
-				tempbuf[bufplc++] = 0;
-			if (bufplc == 4096) { bufplc = 0; if (write(fil,&tempbuf[0],4096) < 4096) { close(fil); return(-1); } }
-		}
-
-	}
-
-	if (bufplc > 0)
-		if (write(fil,&tempbuf[0],bufplc) < bufplc) { close(fil); return(-1); }
-
-	close(fil);
-	return(0);
+    free(rgb);
+    if (close(fil) != 0)
+        out.ok = 0;
+    if ((!written) || (!out.ok))  /* no capture, or no whole file: none. */
+    {
+        remove(filename);
+        return(-1);
+    } /* if */
+    return(0);
 } /* screencapture */
 
 
@@ -1531,49 +1953,28 @@ void setvmode(int mode)
 int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim)
 {
 #ifdef USE_OPENGL
-    static int shown_gl_strings = 0;
-    int gl = using_opengl();
-    if (gl)
-        sdl_flags |= SDL_OPENGL;
+    int32_t glw = daxdim, glh = daydim;
 #endif
 
-    if (daxdim > MAXXDIM || daydim > MAXYDIM)
+    /* 8-bit modes keep the original limit; MAXXDIM/MAXYDIM grew for OpenGL. */
+    if (daxdim > 1600 || daydim > 1200)
     {
 	    daxdim = 1600;
 	    daydim = 1200;
     }
 
     if (in_egapalette)
-        restore256_palette();	    
+        restore256_palette();
 
     go_to_new_vid_mode((int) davidoption, daxdim, daydim);
-
-    #ifdef USE_OPENGL
-        if (gl)
-        {
-            if (!shown_gl_strings)
-            {
-                sgldebug("GL_VENDOR [%s]", (char *) dglGetString(GL_VENDOR));
-                sgldebug("GL_RENDERER [%s]", (char *) dglGetString(GL_RENDERER));
-                sgldebug("GL_VERSION [%s]", (char *) dglGetString(GL_VERSION));
-                sgldebug("GL_EXTENSIONS [%s]", (char *) dglGetString(GL_EXTENSIONS));
-                shown_gl_strings = 1;
-            } /* if */
-
-            dglViewport(0, 0, daxdim, daydim);
-            dglEnable(GL_TEXTURE_2D);
-            dglPixelTransferi(GL_MAP_COLOR, GL_TRUE);
-            dglPixelTransferi(GL_INDEX_SHIFT, 0);
-            dglPixelTransferi(GL_INDEX_OFFSET, 0);
-            dglClearDepth(1.0);
-            dglDepthFunc(GL_LESS);
-            dglEnable(GL_DEPTH_TEST);
-            dglShadeModel(GL_SMOOTH);
-            dglMatrixMode(GL_PROJECTION);
-            dglLoadIdentity();
-            dglMatrixMode(GL_MODELVIEW);
-        } /* if */
-    #endif
+#ifdef USE_OPENGL
+    /* but renderer 3's window gets the size asked for. */
+    if ((glw != daxdim) || (glh != daydim))
+    {
+        gl_window_w = glw;
+        gl_window_h = glh;
+    } /* if */
+#endif
 
     qsetmode = 200;
     last_render_ticks = SDL_GetTicks();
@@ -1585,11 +1986,6 @@ void qsetmode640350(void)
 {
     assert(0);
 
-    #ifdef USE_OPENGL
-        if (using_opengl())
-            sdl_flags |= SDL_OPENGL;
-    #endif
-
     go_to_new_vid_mode(-1, 640, 350);
 } /* qsetmode640350 */
 
@@ -1598,11 +1994,6 @@ void qsetmode640480(void)
 {
     if (!in_egapalette)
     	set16color_palette();
-
-    #ifdef USE_OPENGL
-        if (using_opengl())
-            sdl_flags |= SDL_OPENGL;
-    #endif
 
     go_to_new_vid_mode(-1, 640, 480);
     pageoffset = 0;	/* Make sure it goes to the right place - DDOI */
@@ -1908,24 +2299,29 @@ int VBE_setPalette(int32_t start, int32_t num, char *palettebuffer)
     char *p = palettebuffer;
     int i;
 
-#if (defined USE_OPENGL)
-    int gl = using_opengl();
-    GLfloat gl_reds[256];
-    GLfloat gl_greens[256];
-    GLfloat gl_blues[256];
-    GLfloat gl_alphas[256];
+    assert( (start + num) <= (sizeof (fmt_swap) / sizeof (SDL_Color)) );
 
-    if (gl)
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)  /* 6-bit BGR0 to 8-bit, then retexture. */
     {
-        return 255;
-        dglGetPixelMapfv(GL_PIXEL_MAP_I_TO_R, gl_reds);
-        dglGetPixelMapfv(GL_PIXEL_MAP_I_TO_G, gl_greens);
-        dglGetPixelMapfv(GL_PIXEL_MAP_I_TO_B, gl_blues);
-        dglGetPixelMapfv(GL_PIXEL_MAP_I_TO_A, gl_alphas);
+        palette_t newpal[256];
+
+        for (i = 0; i < num; i++, p += 4)
+        {
+            newpal[i].b = (p[0] << 2) | (p[0] >> 4);
+            newpal[i].g = (p[1] << 2) | (p[1] >> 4);
+            newpal[i].r = (p[2] << 2) | (p[2] >> 4);
+            newpal[i].f = 0;
+        } /* for */
+        /* the same palette again (a flash's end) needn't retexture. */
+        if (memcmp(&curpalette[start], newpal, num * sizeof (palette_t)) != 0)
+        {
+            memcpy(&curpalette[start], newpal, num * sizeof (palette_t));
+            gltexinvalidateall();
+        } /* if */
+        return(1);
     } /* if */
 #endif
-
-    assert( (start + num) <= (sizeof (fmt_swap) / sizeof (SDL_Color)) );
 
     for (i = 0; i < num; i++)
     {
@@ -1935,28 +2331,8 @@ int VBE_setPalette(int32_t start, int32_t num, char *palettebuffer)
         sdlp->a = 255;
         p++;   /* This byte is unused in BUILD. */
 
-#if (defined USE_OPENGL)
-        if (gl)
-        {
-            gl_reds[i+start]   = ((GLfloat) sdlp->r) / 255.0f;
-            gl_greens[i+start] = ((GLfloat) sdlp->g) / 255.0f;
-            gl_blues[i+start]  = ((GLfloat) sdlp->b) / 255.0f;
-            gl_alphas[i+start] = 1.0f;
-        } /* if */
-#endif
-
         sdlp++;
     } /* for */
-
-#if (defined USE_OPENGL)
-    if (gl)
-    {
-        dglPixelMapfv(GL_PIXEL_MAP_I_TO_R, start + num, gl_reds);
-        dglPixelMapfv(GL_PIXEL_MAP_I_TO_G, start + num, gl_greens);
-        dglPixelMapfv(GL_PIXEL_MAP_I_TO_B, start + num, gl_blues);
-        dglPixelMapfv(GL_PIXEL_MAP_I_TO_A, start + num, gl_alphas);
-    } /* if */
-#endif
 
     if (surface == NULL)
         return(0);
@@ -1973,9 +2349,25 @@ int VBE_setPalette(int32_t start, int32_t num, char *palettebuffer)
 
 int VBE_getPalette(int32_t start, int32_t num, char *palettebuffer)
 {
-    SDL_Color *sdlp = surface->format->palette->colors + start;
+    SDL_Color *sdlp;
     char *p = palettebuffer + (start * 4);
     int i;
+
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+    {
+        for (i = start; i < start + num; i++)
+        {
+            *p++ = curpalette[i].b >> 2;
+            *p++ = curpalette[i].g >> 2;
+            *p++ = curpalette[i].r >> 2;
+            *p++ = 0;
+        } /* for */
+        return(1);
+    } /* if */
+#endif
+
+    sdlp = surface->format->palette->colors + start;
 
     for (i = 0; i < num; i++)
     {
@@ -2004,14 +2396,17 @@ void uninitvesa(void)
 
 int setupmouse(void)
 {
-    if (surface == NULL)
+    int w, h;
+
+    if (sdl_window == NULL)
         return(0);
 
     set_mouse_grab(mouse_grabbed);
     SDL_ShowCursor(0);
 
-    mouse_x = surface->w / 2;
-    mouse_y = surface->h / 2;
+    mouse_area(&w, &h);
+    mouse_x = w / 2;
+    mouse_y = h / 2;
     mouse_relative_x = mouse_relative_y = 0;
 
         /*
@@ -2060,19 +2455,17 @@ void _nextpage(void)
 
     handle_events();
 
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+        gl_swap();
+    else
+#endif
     if (renderer == RENDERER_SOFTWARE)
     {
         if (qsetmode == 200)
             memcpy(surface->pixels, (const void *) frameplace, surface->w * surface->h);
         present_surface();
     } /* if */
-
-#ifdef USE_OPENGL
-    else if (renderer == RENDERER_OPENGL3D)
-    {
-        opengl_swapbuffers();
-    } /* else if */
-#endif
 
     if ((debug_hall_of_mirrors) && (qsetmode == 200) && (frameplace))
     {
@@ -2163,14 +2556,6 @@ void fillscreen16(int32_t offset, int32_t color, int32_t blocksize)
     Uint8 *surface_end;
     Uint8 *wanted_end;
     Uint8 *pixels;
-
-#if (defined USE_OPENGL)
-    if (renderer == RENDERER_OPENGL3D)
-    {
-        /* !!! dglClearColor() ... */
-        return;
-    } /* if */
-#endif
 
     if (SDL_MUSTLOCK(surface))
         SDL_LockSurface(surface);
@@ -2410,7 +2795,7 @@ void clear2dscreen(void)
 
 void _idle(void)
 {
-    if (surface != NULL)
+    if (sdl_window != NULL)
         handle_events();
     SDL_Delay(1);
 } /* _idle */

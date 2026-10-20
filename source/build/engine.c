@@ -30,10 +30,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#if (defined USE_OPENGL)
-#include "buildgl.h"
-#endif
-
 #include "pragmas.h"
 
 #include "platform.h"
@@ -223,7 +219,9 @@ int32_t globaluclip, globaldclip, globvis;
 int32_t globalvisibility, globalhisibility, globalpisibility, globalcisibility;
 char globparaceilclip, globparaflorclip;
 
-int32_t xyaspect, viewingrangerecip;
+int32_t viewingrangerecip;
+/* JFBuild: pixelaspect starts square, as setaspect divides by it */
+int32_t pixelaspect = 65536;
 
 int32_t asm1, asm4;
 intptr_t asm2, asm3;
@@ -267,7 +265,8 @@ typedef struct
 	int32_t sx, sy, z;
 	short a, picnum;
 	signed char dashade;
-	unsigned char dapalnum, dastat, pagesleft;
+	unsigned char dapalnum, pagesleft;
+	unsigned short dastat;
 	int32_t cx1, cy1, cx2, cy2;
 } permfifotype;
 static permfifotype permfifo[MAXPERMS];
@@ -285,6 +284,10 @@ static int32_t numtilefiles, artfil = -1, artfilnum, artfilplc;
 
 static char inpreparemirror = 0;
 static int32_t mirrorsx1, mirrorsy1, mirrorsx2, mirrorsy2;
+
+#ifdef POLYMOST
+static int32_t hitallsprites = 0;
+#endif
 
 int32_t totalclocklock;
 
@@ -2630,6 +2633,17 @@ static int bunchfront(int32_t b1, int32_t b2)
 }
 
 
+#ifdef POLYMOST
+int32_t rendmode = 0;
+palette_t curpalette[256], palfadergb = { 0,0,0,0 };
+unsigned char palfadedelta = 0;
+
+#define begindrawing()
+#define enddrawing()
+#include "polymost.c"
+#endif
+
+
 void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
                short daang, int32_t dahoriz, short dacursectnum)
 {
@@ -2707,6 +2721,10 @@ void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
 	} while (i != 0);
 	umost[0] = shortptr1[0]-windowy1;
 	dmost[0] = shortptr2[0]-windowy1;
+
+#ifdef POLYMOST
+	polymost_drawrooms(); if (rendmode) { return; }
+#endif
 
 /*
  * every cycle counts...and the CRC gets checked at the start, so this only
@@ -3560,7 +3578,7 @@ static int clippoly4(int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2)
 
 
 static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short picnum,
-	signed char dashade, unsigned char dapalnum, char dastat, int32_t cx1,
+	signed char dashade, unsigned char dapalnum, unsigned short dastat, int32_t cx1,
 	int32_t cy1, int32_t cx2, int32_t cy2)
 {
 	int32_t cosang, sinang, v, nextv, dax1, dax2, oy, bx, by, ny1, ny2;
@@ -3569,6 +3587,10 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 	int32_t xsiz, ysiz, xoff, yoff, npoints, yplc, yinc, lx, rx, xx, xend;
 	int32_t xv, yv, xv2, yv2, obuffermode=0, qlinemode=0, y1ve[4], y2ve[4], u4, d4;
 	char bad;
+
+#ifdef POLYMOST
+	if (rendmode) { polymost_dorotatesprite(sx,sy,z,a,picnum,dashade,dapalnum,dastat,cx1,cy1,cx2,cy2); return; }
+#endif
 
 	xsiz = tilesizx[picnum]; ysiz = tilesizy[picnum];
 	if (dastat&16) { xoff = 0; yoff = 0; }
@@ -3586,9 +3608,14 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 	{
 		if ((dastat&8) == 0)
 		{
-			x = xdimenscale;   /* = scale(xdimen,yxaspect,320); */
-			if (stereomode) x = scale(windowx2-windowx1+1,yxaspect,320);
-			sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),xdimen,320);
+			if (widescreen) {
+				x = ydimenscale;
+				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),ydimen<<16,200*pixelaspect);
+			} else {
+				x = xdimenscale;   /* = scale(xdimen,yxaspect,320); */
+				if (stereomode) x = scale(windowx2-windowx1+1,yxaspect,320);
+				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),xdimen,320);
+			}
 			sy = ((cy1+cy2+2)<<15)+mulscale16(sy-(200<<15),x);
 		}
 		else
@@ -3597,8 +3624,13 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 			   * If not clipping to startmosts, & auto-scaling on, as a
 			   *  hard-coded bonus, scale to full screen instead
                */
-            x = scale(xdim,yxaspect,320);
-			sx = (xdim<<15)+32768+scale(sx-(320<<15),xdim,320);
+			if (widescreen) {
+				x = scale(ydim<<16,yxaspect,200*pixelaspect);
+				sx = (xdim<<15)+32768+scale(sx-(320<<15),ydim<<16,200*pixelaspect);
+			} else {
+				x = scale(xdim,yxaspect,320);
+				sx = (xdim<<15)+32768+scale(sx-(320<<15),xdim,320);
+			}
 			sy = (ydim<<15)+32768+mulscale16(sy-(200<<15),x);
 		}
 		z = mulscale16(z,x);
@@ -3606,10 +3638,15 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 
 	xv = mulscale14(cosang,z);
 	yv = mulscale14(sinang,z);
-	if (((dastat&2) != 0) || ((dastat&8) == 0)) /* Don't aspect unscaled perms */
+	if (((dastat&2) != 0 && (dastat&256) == 0) || ((dastat&8) == 0)) /* Don't aspect unscaled perms */
 	{
 		xv2 = mulscale16(xv,xyaspect);
 		yv2 = mulscale16(yv,xyaspect);
+	}
+	else if (pixelaspect == 65536 && ((dastat&2) && (dastat&256))) /* Skew 1:1 to 1.2:1 aspect */
+	{
+		xv2 = mulscale16(xv,78643);
+		yv2 = mulscale16(yv,78643);
 	}
 	else
 	{
@@ -3670,10 +3707,15 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 	i = divscale32(1L,z);
 	xv = mulscale14(sinang,i);
 	yv = mulscale14(cosang,i);
-	if (((dastat&2) != 0) || ((dastat&8) == 0)) /* Don't aspect unscaled perms */
+	if (((dastat&2) != 0 && (dastat&256) == 0) || ((dastat&8) == 0)) /* Don't aspect unscaled perms */
 	{
 		yv2 = mulscale16(-xv,yxaspect);
 		xv2 = mulscale16(yv,yxaspect);
+	}
+	else if (pixelaspect == 65536 && ((dastat&2) && (dastat&256))) /* Skew 1:1 to 1.2:1 aspect */
+	{
+		yv2 = mulscale16(-xv,54613);
+		xv2 = mulscale16(yv,54613);
 	}
 	else
 	{
@@ -4004,6 +4046,11 @@ void nextpage(void)
    			if (((per->pagesleft&127) == 0) && (i == permtail))
    				permtail = ((permtail+1)&(MAXPERMS-1));
    		}
+#ifdef USE_OPENGL
+			/* Renderer 3: that repeats sprites of the frame just shown; it
+			   isn't new drawing, so a fade still shows that frame again. */
+		if (rendmode == 3) _glframereplayed();
+#endif
     } /* if */
 
 	faketimerhandler();
@@ -4265,6 +4312,19 @@ void drawline256 (int32_t x1, int32_t y1, int32_t x2, int32_t y2, unsigned char 
 
 	col = palookup[0][col];
 
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3)
+	{
+		setpolymost2dview();
+		glBegin(GL_LINES);
+		glColor4ub(curpalette[col].r,curpalette[col].g,curpalette[col].b,255);
+		glVertex2f((float)x1/4096.0,(float)y1/4096.0);
+		glVertex2f((float)x2/4096.0,(float)y2/4096.0);
+		glEnd();
+		return;
+	}
+#endif
+
 	dx = x2-x1; dy = y2-y1;
 	if (dx >= 0)
 	{
@@ -4433,6 +4493,10 @@ static void drawmaskwall(short damaskwallcnt)
 	int32_t i, j, k, x, z, sectnum, z1, z2, lx, rx;
 	sectortype *sec, *nsec;
 	walltype *wal;
+
+#ifdef POLYMOST
+	if (rendmode) { polymost_drawmaskwall(damaskwallcnt); return; }
+#endif
 
 	z = maskwall[damaskwallcnt];
 	wal = &wall[thewall[z]];
@@ -4820,6 +4884,10 @@ static void drawsprite (int32_t snum)
     #ifdef SUPERBUILD
         int32_t *longptr;
     #endif
+
+#ifdef POLYMOST
+	if (rendmode) { polymost_drawsprite(snum); return; }
+#endif
 
 	tspr = tspriteptr[snum];
 
@@ -5797,14 +5865,21 @@ void drawmasks(void)
 			k = -1;
 			gap = 0;
 			for(i=spritesortcnt-2;i>=0;i--)
-				if ((xb1[j] <= (spritesx[i]>>8)) && ((spritesx[i]>>8) <= xb2[j]))
-					if (spritewallfront(tspriteptr[i],(int32_t)thewall[j]) == 0)
-					{
-						drawsprite(i);
-						tspriteptr[i]->owner = -1;
-						k = i;
-						gap++;
-					}
+			{
+#ifdef POLYMOST
+				if (rendmode > 0)
+					l = ((dxb1[j] <= (double)spritesx[i]/256.0) && ((double)spritesx[i]/256.0 <= dxb2[j]));
+				else
+#endif
+					l = ((xb1[j] <= (spritesx[i]>>8)) && ((spritesx[i]>>8) <= xb2[j]));
+				if (l && (spritewallfront(tspriteptr[i],(int32_t)thewall[j]) == 0))
+				{
+					drawsprite(i);
+					tspriteptr[i]->owner = -1;
+					k = i;
+					gap++;
+				}
+			}
 			if (k >= 0)       /* remove holes in sprite list */
 			{
 				for(i=k;i<spritesortcnt;i++)
@@ -6325,6 +6400,9 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 		{
 			spr = &sprite[z];
 			cstat = spr->cstat;
+#ifdef POLYMOST
+			if (!hitallsprites)
+#endif
 			if ((cstat&dasprclipmask) == 0) continue;
 
 			x1 = spr->x; y1 = spr->y; z1 = spr->z;
@@ -7511,6 +7589,46 @@ static void __printext256(int32_t xpos, int32_t ypos, short col, short backcol, 
 	if (fontsize) { fontptr = smalltextfont; charxsiz = 4; }
 				else { fontptr = textfont; charxsiz = 8; }
 
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3)
+	{
+		int32_t xx, yy, lc = -1;
+
+		setpolymost2dview();
+		glBegin(GL_POINTS);
+		for(i=0;name[i];i++)
+		{
+			letptr = &fontptr[name[i]<<3];
+			xx = stx-fontsize;
+			yy = ypos+7;
+			for(y=7;y>=0;y--)
+			{
+				for(x=charxsiz-1;x>=0;x--)
+				{
+					if (letptr[y]&pow2char[7-fontsize-x])
+					{
+						if (lc != col)
+							glColor4ub(curpalette[col].r,curpalette[col].g,curpalette[col].b,255);
+						lc = col;
+						glVertex2f((float)(xx+x)+0.5f,(float)yy+0.5f);
+					}
+					else if (backcol >= 0)
+					{
+						if (lc != backcol)
+							glColor4ub(curpalette[backcol].r,curpalette[backcol].g,curpalette[backcol].b,255);
+						lc = backcol;
+						glVertex2f((float)(xx+x)+0.5f,(float)yy+0.5f);
+					}
+				}
+				yy--;
+			}
+			stx += charxsiz;
+		}
+		glEnd();
+		return;
+	}
+#endif
+
 	for(i=0;name[i];i++)
 	{
 		letptr = &fontptr[name[i]<<3];
@@ -7748,9 +7866,40 @@ void getzrange(int32_t x, int32_t y, int32_t z, short sectnum,
 }
 
 
+/*
+ * JFBuild: the pixel aspect of the mode. Build is built around the
+ *  non-square pixels of Mode 13h, so to get things back square on VGA
+ *  screens, things need to be "compressed" vertically a little. Modes
+ *  wider than 4:3 are widescreen; taller ones (eg. 1280x1024) stretch
+ *  the 2D elements vertically a little.
+ */
+void calcpixelaspect(void)
+{
+	int32_t ratio;
+
+	widescreen = 0;
+	tallscreen = 0;
+	if ((xdim == 320 && ydim == 200) || (xdim == 640 && ydim == 400)) {
+		pixelaspect = 65536;
+	} else {
+		ratio = divscale16(ydim*320, xdim*240);
+		pixelaspect = divscale16(240*320L,320*200L);
+
+		if (ratio < 65536) {
+			widescreen = 1;
+		} else if (ratio > 65536) {
+			tallscreen = 1;
+			pixelaspect = divscale16(ydim*320L,xdim*200L);
+		}
+	}
+}
+
+
 void setview(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
 {
-	int32_t i;
+	int32_t i, xfov = 65536;
+
+	if (widescreen) xfov = divscale16(xdim*3, ydim*4);
 
 	windowx1 = x1; wx1 = (x1<<12);
 	windowy1 = y1; wy1 = (y1<<12);
@@ -7761,7 +7910,7 @@ void setview(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
 	xdimenrecip = divscale32(1L,xdimen);
 	ydimen = (y2-y1)+1;
 
-	setaspect(65536L,(int32_t)divscale16(ydim*320L,xdim*200L));
+	setaspect(mulscale16(65536,xfov), pixelaspect);
 
 	for(i=0;i<windowx1;i++) { startumost[i] = 1, startdmost[i] = 0; }
 	for(i=windowx1;i<=windowx2;i++)
@@ -7789,6 +7938,7 @@ void setaspect(int32_t daxrange, int32_t daaspect)
 	xyaspect = divscale32(1,yxaspect);
 	xdimenscale = scale(xdimen,yxaspect,320);
 	xdimscale = scale(320,xyaspect,xdimen);
+	ydimenscale = scale(ydimen,yxaspect,mulscale16(200,pixelaspect));
 }
 
 
@@ -7799,7 +7949,7 @@ void flushperms(void)
 
 
 void rotatesprite(int32_t sx, int32_t sy, int32_t z, short a, short picnum,
-                  signed char dashade, char dapalnum, char dastat,
+                  signed char dashade, char dapalnum, unsigned short dastat,
                   int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2)
 {
 	int32_t i;
@@ -7976,11 +8126,12 @@ void makepalookup(int32_t palnum, char *remapbuf, signed char r,
 }
 
 
-void setbrightness(char dabrightness, unsigned char *dapal)
+	/* the last palette passed to setbrightness, which setpalettefade blends. */
+static unsigned char basepal[768];
+
+static void applybrightness(unsigned char *dapal)
 {
 	int32_t i, j, k;
-
-	curbrightness = min(max((int32_t)dabrightness,0),15);
 
 	k = 0;
 	if (vidoption == 6)
@@ -8009,12 +8160,56 @@ void setbrightness(char dabrightness, unsigned char *dapal)
 }
 
 
+void setbrightness(char dabrightness, unsigned char *dapal)
+{
+	curbrightness = min(max((int32_t)dabrightness,0),15);
+	if (dapal != basepal) memcpy(basepal, dapal, sizeof(basepal));
+#ifdef POLYMOST
+	palfadergb.r = palfadergb.g = palfadergb.b = 0;
+	palfadedelta = 0;
+#endif
+	applybrightness(basepal);
+}
+
+
+/*
+ * setpalettefade
+ *  Fades toward (r,g,b), 0-63 each, by offset/64. Renderer 3 draws it as a
+ *  quad over the frame; the others blend the palette as the game's palto does.
+ */
+void setpalettefade(unsigned char r, unsigned char g, unsigned char b, unsigned char offset)
+{
+	unsigned char fadepal[768];
+	int32_t i;
+
+#ifdef POLYMOST
+	palfadergb.r = r<<2; palfadergb.g = g<<2; palfadergb.b = b<<2;
+	palfadedelta = (unsigned char)min(offset<<2,255);
+#ifdef USE_OPENGL
+	if (rendmode == 3) { _glpalettefade(); return; }
+#endif
+#endif
+
+	for(i=0;i<768;i+=3)
+	{
+		fadepal[i+0] = basepal[i+0]+((((int32_t)r-(int32_t)basepal[i+0])*(int32_t)offset)>>6);
+		fadepal[i+1] = basepal[i+1]+((((int32_t)g-(int32_t)basepal[i+1])*(int32_t)offset)>>6);
+		fadepal[i+2] = basepal[i+2]+((((int32_t)b-(int32_t)basepal[i+2])*(int32_t)offset)>>6);
+	}
+	applybrightness(fadepal);
+}
+
+
 static void fillpolygon(int32_t npoints)
 {
 	int32_t z, zz, x1, y1, x2, y2, miny, maxy, y, xinc, cnt;
 	int32_t ox, oy, bx, by, day1, day2;
 	intptr_t p;
 	short *ptr, *ptr2;
+
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3) { polymost_fillpolygon(npoints); return; }
+#endif
 
 	miny = 0x7fffffff; maxy = 0x80000000;
 	for(z=npoints-1;z>=0;z--)
@@ -8348,6 +8543,30 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 		{
 			npoints = 0; i = 0;
 			startwall = sec->wallptr;
+#if defined(POLYMOST) && defined(USE_OPENGL)
+			if (rendmode == 3)
+			{
+				j = startwall; l = 0;
+				for(w=sec->wallnum,wal=&wall[startwall];w>0;w--,wal++,j++)
+				{
+					k = lastwall(j);
+					if ((k > j) && (npoints > 0)) { xb1[npoints-1] = l; l = npoints; } //overwrite point2
+						//wall[k].x wal->x wall[wal->point2].x
+						//wall[k].y wal->y wall[wal->point2].y
+					if (!dmulscale1(wal->x-wall[k].x,wall[wal->point2].y-wal->y,-(wal->y-wall[k].y),wall[wal->point2].x-wal->x)) continue;
+					ox = wal->x - dax; oy = wal->y - day;
+					x = dmulscale16(ox,xvect,-oy,yvect) + (xdim<<11);
+					y = dmulscale16(oy,xvect2,ox,yvect2) + (ydim<<11);
+					i |= getclipmask(x-cx1,cx2-x,y-cy1,cy2-y);
+					rx1[npoints] = x;
+					ry1[npoints] = y;
+					xb1[npoints] = npoints+1;
+					npoints++;
+				}
+				if (npoints > 0) xb1[npoints-1] = l; //overwrite point2
+			}
+			else
+#endif
 			for(w=sec->wallnum,wal=&wall[startwall];w>0;w--,wal++)
 			{
 				ox = wal->x - dax; oy = wal->y - day;
@@ -8361,6 +8580,16 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 			}
 			if ((i&0xf0) != 0xf0) continue;
 			bakx1 = rx1[0]; baky1 = mulscale16(ry1[0]-(ydim<<11),xyaspect)+(ydim<<11);
+#if defined(POLYMOST) && defined(USE_OPENGL)
+				/* the texture origin is startwall's vertex, which renderer 3's
+				   loop skips if it's collinear (an upstream bug) */
+			if (rendmode == 3)
+			{
+				ox = wall[startwall].x - dax; oy = wall[startwall].y - day;
+				bakx1 = dmulscale16(ox,xvect,-oy,yvect) + (xdim<<11);
+				baky1 = mulscale16(dmulscale16(oy,xvect2,ox,yvect2),xyaspect)+(ydim<<11);
+			}
+#endif
 			if (i&0x0f)
 			{
 				npoints = clippoly(npoints,i);
@@ -8442,6 +8671,9 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 			globalposx = (globalposx<<(20+globalxshift))+(((int32_t)sec->floorxpanning)<<24);
 			globalposy = (globalposy<<(20+globalyshift))-(((int32_t)sec->floorypanning)<<24);
 
+#if defined(POLYMOST) && defined(USE_OPENGL)
+			if (rendmode == 3) globalpal = sec->floorpal;
+#endif
 			fillpolygon(npoints);
 		}
 
@@ -8560,13 +8792,19 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 
 			if ((spr->cstat&2) == 0)
 				msethlineshift(ox,oy);
-			else
+			else {
+				if (spr->cstat&512) settransreverse(); else settransnormal();
 				tsethlineshift(ox,oy);
+			}
 
 			if ((spr->cstat&0x4) > 0) globalx1 = -globalx1, globaly1 = -globaly1, globalposx = -globalposx;
 			asm1 = (globaly1<<2); globalx1 <<= 2; globalposx <<= (20+2);
 			asm2 = (globalx2<<2); globaly2 <<= 2; globalposy <<= (20+2);
 
+			globalorientation = ((spr->cstat&2)<<7) | ((spr->cstat&512)>>2);	// so polymost can get the translucency. ignored in software mode.
+#if defined(POLYMOST) && defined(USE_OPENGL)
+			if (rendmode == 3) globalpal = spr->pal;
+#endif
 			fillpolygon(npoints);
 		}
 	}
@@ -8579,6 +8817,20 @@ void clearview(int32_t dacol)
 	intptr_t p;
 
 	if (qsetmode != 200) return;
+
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3)
+	{
+		glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
+		/* only the view window, as below (JFBuild clears it all) */
+		glScissor(windowx1,yres-(windowy2+1),windowx2-windowx1+1,windowy2-windowy1+1);
+		glEnable(GL_SCISSOR_TEST);
+		glClear(GL_COLOR_BUFFER_BIT);
+		glDisable(GL_SCISSOR_TEST);
+		_glframedrawn();
+		return;
+	}
+#endif
 
 	dx = windowx2-windowx1+1;
 	dacol += (dacol<<8); dacol += (dacol<<16);
@@ -8606,6 +8858,18 @@ void clearallviews(int32_t dacol)
 	int32_t i;
 
 	if (qsetmode != 200) return;
+
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3)
+	{
+		glViewport(0,0,xdim,ydim); glox1 = -1;
+		glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
+		glClear(GL_COLOR_BUFFER_BIT);
+		_glframedrawn();
+		return;
+	}
+#endif
+
 	dacol += (dacol<<8); dacol += (dacol<<16);
 
 	switch(vidoption)
@@ -8630,12 +8894,26 @@ void clearallviews(int32_t dacol)
 
 void plotpixel(int32_t x, int32_t y, char col)
 {
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3)
+	{
+		setpolymost2dview();
+		glBegin(GL_POINTS);
+		glColor4ub(curpalette[(unsigned char)col].r,curpalette[(unsigned char)col].g,curpalette[(unsigned char)col].b,255);
+		glVertex2f((float)x+0.5f,(float)y+0.5f);
+		glEnd();
+		return;
+	}
+#endif
 	drawpixel(ylookup[y]+x+frameplace,(int32_t)col);
 }
 
 
 unsigned char getpixel(int32_t x, int32_t y)
 {
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode == 3) return 0;
+#endif
 	return(readpixel(ylookup[y]+x+frameplace));
 }
 
@@ -8647,6 +8925,9 @@ static int32_t bakxsiz[4], bakysiz[4];
 
 static int32_t bakwindowx1[4], bakwindowy1[4];
 static int32_t bakwindowx2[4], bakwindowy2[4];
+#ifdef POLYMOST
+static int32_t bakrendmode, baktile;
+#endif
 
 
 void setviewtotile(short tilenume, int32_t xsiz, int32_t ysiz)
@@ -8655,11 +8936,23 @@ void setviewtotile(short tilenume, int32_t xsiz, int32_t ysiz)
 
 		/* DRAWROOMS TO TILE BACKUP&SET CODE */
 	tilesizx[tilenume] = xsiz; tilesizy[tilenume] = ysiz;
+		/* and its picsiz, as allocatepermanenttile, for Polymost */
+	j = 15; while ((j > 1) && (pow2long[j] > xsiz)) j--;
+	picsiz[tilenume] = ((char)j);
+	j = 15; while ((j > 1) && (pow2long[j] > ysiz)) j--;
+	picsiz[tilenume] += ((char)(j<<4));
 	bakxsiz[setviewcnt] = xsiz; bakysiz[setviewcnt] = ysiz;
 	bakvidoption[setviewcnt] = vidoption; vidoption = 2;
 	bakframeplace[setviewcnt] = frameplace; frameplace = waloff[tilenume];
 	bakwindowx1[setviewcnt] = windowx1; bakwindowy1[setviewcnt] = windowy1;
 	bakwindowx2[setviewcnt] = windowx2; bakwindowy2[setviewcnt] = windowy2;
+#ifdef POLYMOST
+	if (setviewcnt == 0) {
+		bakrendmode = rendmode;
+		baktile = tilenume;
+	}
+	rendmode = 0;
+#endif
 	copybufbyte(&startumost[windowx1],&bakumost[windowx1],(windowx2-windowx1+1)*sizeof(bakumost[0]));
 	copybufbyte(&startdmost[windowx1],&bakdmost[windowx1],(windowx2-windowx1+1)*sizeof(bakdmost[0]));
 	setview(0,0,ysiz-1,xsiz-1);
@@ -8676,6 +8969,13 @@ void setviewback(void)
 
 	if (setviewcnt <= 0) return;
 	setviewcnt--;
+
+#ifdef POLYMOST
+	if (setviewcnt == 0) {
+		rendmode = bakrendmode;
+		invalidatetile(baktile,-1,-1);
+	}
+#endif
 
 	setview(bakwindowx1[setviewcnt],bakwindowy1[setviewcnt],
 			  bakwindowx2[setviewcnt],bakwindowy2[setviewcnt]);
@@ -8738,6 +9038,10 @@ void completemirror(void)
 {
 	int32_t i, dy;
 	intptr_t p;
+
+#ifdef POLYMOST
+	if (rendmode) return;
+#endif
 
 		/* Can't reverse with uninitialized data */
 
@@ -8958,6 +9262,117 @@ void setfirstwall(short sectnum, short newfirstwall)
 
 	for(i=startwall;i<endwall;i++)
 		if (wall[i].nextwall >= 0) wall[wall[i].nextwall].nextwall = i;
+}
+
+
+/*
+ * setrendermode
+ *  0 classic, 1 Polymost solid colour, 2 Polymost software, 3 Polymost
+ *  OpenGL. 3 needs a GL video mode (bpp > 8), and a GL mode always uses 3.
+ *  Returns the renderer set.
+ */
+int setrendermode(int renderer)
+{
+#ifdef POLYMOST
+	if (bpp == 8) {
+		if (renderer < 0) renderer = 0;
+		else if (renderer > 2) renderer = 2;
+	} else {
+		renderer = 3;
+	}
+
+	rendmode = renderer;
+	return rendmode;
+#else
+	return 0;
+#endif
+}
+
+int getrendermode(void)
+{
+#ifndef POLYMOST
+	return 0;
+#else
+	return rendmode;
+#endif
+}
+
+void setrollangle(int32_t rolla)
+{
+#ifdef POLYMOST
+	if (rolla == 0) gtang = 0.0;
+	else gtang = PI * (double)rolla / 1024.0;
+#endif
+}
+
+/*
+ * invalidatetile
+ *  pal: pass -1 to invalidate all palettes for the tile, or >=0 for a particular palette
+ *  how: pass -1 to invalidate all instances of the tile in texture memory, or a bitfield
+ *         bit 0: opaque or masked (non-translucent) texture, using repeating
+ *         bit 1: ignored
+ *         bit 2: ignored (33% translucence, using repeating)
+ *         bit 3: ignored (67% translucence, using repeating)
+ *         bit 4: opaque or masked (non-translucent) texture, using clamping
+ *         bit 5: ignored
+ *         bit 6: ignored (33% translucence, using clamping)
+ *         bit 7: ignored (67% translucence, using clamping)
+ *       clamping is for sprites, repeating is for walls
+ */
+void invalidatetile(short tilenume, int32_t pal, int32_t how)
+{
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	int numpal, firstpal, np;
+	int hp;
+
+	if (rendmode < 3) return;
+
+	if (pal < 0) {
+		numpal = MAXPALOOKUPS;
+		firstpal = 0;
+	} else {
+		numpal = 1;
+		firstpal = pal % MAXPALOOKUPS;
+	}
+
+	for (hp = 0; hp < 8; hp+=4) {
+		if (!(how & pow2long[hp])) continue;
+
+		for (np = firstpal; np < firstpal+numpal; np++) {
+			gltexinvalidate(tilenume, np, hp);
+		}
+	}
+#endif
+}
+
+/*
+ * setpolymost2dview
+ *  Sets OpenGL up for 2D drawing in drawable pixels.
+ */
+void setpolymost2dview(void)
+{
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	if (rendmode < 3) return;
+
+	if (gloy1 != -1)
+	{
+		glViewport(0,0,xres,yres);
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		glOrtho(0,xres,yres,0,-1,1);
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+	}
+
+	gloy1 = -1;
+
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_TEXTURE_2D);
+	glDisable(GL_BLEND);
+	glDisable(GL_FOG);  /* resizeglcheck turns it on again for 3D */
+	fog_is_on = 0;
+	_glframedrawn();
+#endif
 }
 
 /* end of engine.c ... */
