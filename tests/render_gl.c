@@ -733,7 +733,8 @@ static void await_resize(int32_t oldw)
 static int shader_frames(const char *dir, int32_t x, int32_t y, int32_t z, short a, short sect, short zerotile)
 {
     unsigned char *gl[SHFRAMES], *classic[SHFRAMES], *buf, *ref;
-    palette_t pal[256];
+    palette_t pal[256], fadepal[2][256], glfade[256];
+    int fadeoff = 0;
     char path[1024];
     int f, i, ok = 1, gw, gh, cw, ch, capsame[2], winw, winh;
     int32_t oldw, oldh;
@@ -764,6 +765,7 @@ static int shader_frames(const char *dir, int32_t x, int32_t y, int32_t z, short
         { double rs, gs; save_front(path, &rs, &gs); }
         read_front(gl[f]);
         getfadedpalette(pal);  /* what's on screen: the fade's palette for "fade" */
+        if (f == 2) memcpy(glfade, pal, sizeof (glfade));
         offpal[f] = off_colours(gl[f], n, pal);
         if ((f == 0) || (f == 2))  /* a screenshot is the screen, faded or not */
         {
@@ -871,6 +873,30 @@ static int shader_frames(const char *dir, int32_t x, int32_t y, int32_t z, short
         { fprintf(stderr, "FAIL: a resize loses the shader path's frame\n"); ok = 0; }
     free(ref);
     free(buf);
+
+    /* A resize mid-fade under water keeps the fade's palette (built from the
+     * base palette, which the mode's setup resets), and the still screen
+     * shown again at the new size is in it. */
+    setbrightness(0, waterpal);
+    view_shot(NULL, x, y, z, a, sect);
+    setpalettefade(63, 0, 0, 32);
+    getfadedpalette(fadepal[0]);
+    oldw = xdim;
+    SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), 800, 520);
+    await_resize(oldw);
+    getfadedpalette(fadepal[1]);
+    buf = malloc((size_t) xdim * ydim * 3);
+    read_front(buf);
+    off = off_colours(buf, (long) xdim * ydim, fadepal[0]);
+    free(buf);
+    printf("shader frames: resize %dx%d mid-fade under water: faded palette %s, %ld pixels shown not of it\n",
+           (int) oldw, (int) xdim, memcmp(fadepal[0], fadepal[1], sizeof (fadepal[0])) ? "CHANGED" : "kept", off);
+    if ((xdim == oldw) || memcmp(fadepal[0], fadepal[1], sizeof (fadepal[0])) || off)
+        { fprintf(stderr, "FAIL: a resize changes the shader path's fade\n"); ok = 0; }
+    setpalettefade(0, 0, 0, 0);
+    setbrightness(0, palette);
+    SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), winw, winh);
+    await_resize(xdim);
     if (glGetError() != GL_NO_ERROR) { fprintf(stderr, "FAIL: GL error in the shader frames\n"); ok = 0; }
 
     /* Renderer 0 at the same size (as near as 8-bit goes). */
@@ -890,8 +916,20 @@ static int shader_frames(const char *dir, int32_t x, int32_t y, int32_t z, short
         snprintf(path, sizeof (path), "%s/shframe_%s_r0.bmp", dir, shframename[f]);
         SDL_SaveBMP(s, path);
         SDL_FreeSurface(s);
-        if (f == 2) setpalettefade(0, 0, 0, 0);
+        if (f == 2)  /* the faded palette is classic's, but for its 6-to-8-bit rounding */
+        {
+            for (i = 0; i < 256; i++)
+            {
+                SDL_Color *c = &surface->format->palette->colors[i];
+                fadeoff = max(fadeoff, abs(c->r - glfade[i].r));
+                fadeoff = max(fadeoff, abs(c->g - glfade[i].g));
+                fadeoff = max(fadeoff, abs(c->b - glfade[i].b));
+            }
+            setpalettefade(0, 0, 0, 0);
+        }
     }
+    printf("shader frames: faded palette at most %d from renderer 0's\n", fadeoff);
+    if (fadeoff > 1) { fprintf(stderr, "FAIL: the shader path's faded palette isn't classic's\n"); ok = 0; }
     setbrightness(0, palette);
     for (f = 0; f < SHFRAMES; f++)
     {
