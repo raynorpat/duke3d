@@ -405,10 +405,14 @@ void initmenupaths(char *filename)
  */
 void showmouse(void)
 {
-	drawline256((searchx+1)<<12, (searchy  )<<12, (searchx+5)<<12, (searchy  )<<12, whitecol);
-	drawline256((searchx  )<<12, (searchy+1)<<12, (searchx  )<<12, (searchy+5)<<12, whitecol);
-	drawline256((searchx-1)<<12, (searchy  )<<12, (searchx-5)<<12, (searchy  )<<12, whitecol);
-	drawline256((searchx  )<<12, (searchy-1)<<12, (searchx  )<<12, (searchy-5)<<12, whitecol);
+	int w, h, k;
+
+	getmousearea(&w,&h);
+	k = max(1,(xdim+(w>>1))/w);  /* 2 on a 2x (high-DPI) OpenGL drawable */
+	drawline256((searchx+k)<<12, (searchy  )<<12, (searchx+5*k)<<12, (searchy    )<<12, whitecol);
+	drawline256((searchx  )<<12, (searchy+k)<<12, (searchx    )<<12, (searchy+5*k)<<12, whitecol);
+	drawline256((searchx-k)<<12, (searchy  )<<12, (searchx-5*k)<<12, (searchy    )<<12, whitecol);
+	drawline256((searchx  )<<12, (searchy-k)<<12, (searchx    )<<12, (searchy-5*k)<<12, whitecol);
 }
 
 
