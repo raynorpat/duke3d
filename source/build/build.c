@@ -6752,6 +6752,8 @@ void editinput(void)
 
 		if ((keystatus[0x3f]|keystatus[0x40]) > 0)  /* F5,F6 */
 		{
+			/* F5-F8: the stub draws on the 2D status bar, which renderer 3 doesn't have */
+			if (getrendermode() != 3)
 			switch(searchstat)
 			{
 				case 1: case 2: ExtShowSectorData(searchsector); break;
@@ -6762,6 +6764,7 @@ void editinput(void)
 		}
 		if ((keystatus[0x41]|keystatus[0x42]) > 0)  /* F7,F8 */
 		{
+			if (getrendermode() != 3)
 			switch(searchstat)
 			{
 				case 1: case 2: ExtEditSectorData(searchsector); break;
@@ -6888,6 +6891,7 @@ int main(int argc,char **argv)
 		if (keystatus[1] > 0)
 		{
 			keystatus[1] = 0;
+			if (getrendermode() == 3) glredrawlastframe();  /* no lasting back buffer */
 			printext256(0,0,whitecol,0,"Really want to quit?",0);
 			nextpage();
 			synctics = totalclock-lockclock;
@@ -6908,6 +6912,7 @@ int main(int argc,char **argv)
                     if (asksave)
                     {
                         asksave = 0;
+                        if (getrendermode() == 3) glredrawlastframe();
             			printext256(0,0,whitecol,0,"Save changes?       ",0);
             			nextpage();
 
