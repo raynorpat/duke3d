@@ -82,6 +82,8 @@ Duke Lookup Table
 #include "build/cache1d.h"  /* rcg05232001 need groupfile support. */
 #include "build/display.h"  /* rcg05232001 need some "vesa" routines. */
 #include "names.h"
+#include "buildcfg.h"
+#include "editormode.h"
 
 
 /* defined in build.c ... */
@@ -118,22 +120,11 @@ static int32_t ototalclock = 0;
 
 static int32_t clockval[16], clockcnt = 0;
 
-#define NUMOPTIONS 8
 #define NUMKEYS 19
 
-static int32_t vesares[13][2] = { {320,200}, {360,200}, {320,240}, {360,240},
-                               {320,400}, {360,400}, {640,350}, {640,400},
-                               {640,480}, {800,600}, {1024,768},{1280,1024},
-                               {1600,1200} };
-
-static char option[NUMOPTIONS] = {0,0,0,0,0,0,1,0};
-static char keys[NUMKEYS] =
-    {
-        0xc8,0xd0,0xcb,0xcd,0x2a,0x9d,0x1d,0x39,
-        0x1e,0x2c,0xd1,0xc9,0x47,0x49,
-        0x9c,0x1c,0xd,0xc,0xf,
-    };
 extern char buildkeys[NUMKEYS];
+
+static buildcfg_t buildcfg;  /* build.cfg, written back on exit */
 
 
 
@@ -1855,8 +1846,8 @@ void Keys2d(void)
 
 void ExtInit(void)
 {
-    int32_t fil;
-    
+    char cfgpath[1024];
+
     printf("------------------------------------------------------------------------------\n");
     printf("BUILD.EXE Copyright (c) 1993 - 1996 Ken Silverman, 3D Realms Entertainment.\n");
     printf("This version of BUILD was created for Duke Nukem 3D and parts were modified\n");
@@ -1881,14 +1872,18 @@ void ExtInit(void)
 
     initgroupfile("duke3d.grp");
 
-    if ((fil = kopen4load("setup.dat",0)) != -1)
-                {
-          kread(fil,option,NUMOPTIONS);
-          kread(fil,keys,NUMKEYS);
-                  memcpy((void *)buildkeys,(void *)keys,NUMKEYS);   //Trick to make build use setup.dat keys
-          kclose(fil);
-                }
-                // if (option[3] != 0) moustat =
+    // build.cfg; without one, the keys of an old setup.dat carry over.
+    buildcfg_defaults(&buildcfg);
+    if ((buildcfg_path(cfgpath,sizeof(cfgpath)) != 0) ||
+        (buildcfg_read(&buildcfg,cfgpath) != 0))
+        buildcfg_import_setupdat(&buildcfg,"setup.dat");
+    memcpy((void *)buildkeys,(void *)buildcfg.keys,NUMKEYS);
+    editormode.renderer = buildcfg.renderer;
+    editormode.xdim3d = buildcfg.xdim3d;
+    editormode.ydim3d = buildcfg.ydim3d;
+    editormode.gltexmiplevel = buildcfg.gltexmiplevel;
+    setvideofullscreen(buildcfg.fullscreen);
+
                 initmouse();
 
 // CTW - MODIFICATION
@@ -1896,11 +1891,6 @@ void ExtInit(void)
 // You'll want to update it properly to support other video modes.
         initengine();
         setgamemode(2,320L,200L);
-/*      switch(option[0]+1)
-        {
-                case 1: initengine(1,vesares[option[6]&15][0],vesares[option[6]&15][1]); break;
-                default: initengine(option[0]+1,320L,200L); break;
-        }*/
 
 // CTW END - MODIFICATION
 
@@ -1915,6 +1905,13 @@ void ExtInit(void)
 
 void ExtUnInit(void)
 {
+   char cfgpath[1024];
+
+   // BUILD_WINDOWED forces a window for this run only; keep build.cfg's choice.
+   if (getenv(BUILD_WINDOWED) == NULL)
+       buildcfg.fullscreen = getvideofullscreen();
+   if (buildcfg_path(cfgpath,sizeof(cfgpath)) == 0)
+       buildcfg_write(&buildcfg,cfgpath);
    uninitgroupfile();
 }
 
