@@ -1702,6 +1702,8 @@ int drawtilescreen(int32_t pictopleft, int32_t picbox)
 
 	xtiles = (xdim>>6); ytiles = (ydim>>6); tottiles = xtiles*ytiles;
 
+	setpolymost2dview();  /* renderer 3: draw in 2D */
+
 	pinc = ylookup[1];
 	clearview(0L);
 	for(cnt=0;cnt<(tottiles<<(gettilezoom<<1));cnt++)         /* draw the 5*3 grid of tiles */
@@ -1720,6 +1722,11 @@ int drawtilescreen(int32_t pictopleft, int32_t picbox)
 				dax = ((cnt%(xtiles<<gettilezoom))<<(6-gettilezoom));
 				day = ((cnt/(xtiles<<gettilezoom))<<(6-gettilezoom));
 				vidpos = ylookup[day]+dax+frameplace;
+#ifdef POLYMOST
+				if (polymost_drawtilescreen(dax,day,wallnum,64>>gettilezoom) != -1)
+					;  /* renderer 3 drew it: there is no frameplace to blit to */
+				else
+#endif
 				if ((xdime <= (64>>gettilezoom)) && (ydime <= (64>>gettilezoom)))
 				{
 					for(i=0;i<xdime;i++)
