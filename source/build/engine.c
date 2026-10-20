@@ -8812,7 +8812,11 @@ void clearview(int32_t dacol)
 	if (rendmode == 3)
 	{
 		glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
+		/* only the view window, as below (JFBuild clears it all) */
+		glScissor(windowx1,yres-(windowy2+1),windowx2-windowx1+1,windowy2-windowy1+1);
+		glEnable(GL_SCISSOR_TEST);
 		glClear(GL_COLOR_BUFFER_BIT);
+		glDisable(GL_SCISSOR_TEST);
 		_glframedrawn();
 		return;
 	}

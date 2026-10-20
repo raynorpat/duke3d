@@ -375,8 +375,9 @@ Ported from later JFBuild commits, retyped as above:
 ## Renderer 3: 2D, clears, palette, fades, screenshots
 
 - `engine.c`: JFBuild's renderer 3 branches, under `rendmode == 3` (not
-  `qsetmode == 200`): `clearview` and `clearallviews` clear the whole back
-  buffer to the palette colour; `plotpixel`, `drawline256` and
+  `qsetmode == 200`): `clearview` (scissored to the view window, as in
+  classic; upstream clears it all) and `clearallviews` (the whole back
+  buffer) clear to the palette colour; `plotpixel`, `drawline256` and
   `printext256`/`printext256_noupdate` (through `__printext256`) draw GL
   points and lines; `getpixel` returns 0. (`drawmapview` returned at once
   here until the ccf7aa8 port below.)

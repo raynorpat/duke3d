@@ -269,6 +269,7 @@ int main(int argc, char **argv)
     unsigned char savedfadedelta;
     int32_t oldxdim, oldydim;
     int lfnpot, lfpot, resized, palkept, palsame, winw, winh;
+    unsigned char *buf, cleared[2];
     double palwater;
     Uint32 t0;
 
@@ -345,6 +346,20 @@ int main(int argc, char **argv)
     }
     printf("still screen mean red+green/2: fade 63 %.1f, 32 %.1f, 0 %.1f\n", still[0], still[1], still[2]);
     err = glGetError();
+
+    /* clearview clears only the view window, as in classic (the border
+     * around a small view stays). */
+    clearallviews(31);
+    setview(xdim/4, ydim/4, xdim*3/4-1, ydim*3/4-1);
+    clearview(0);
+    setview(0, 0, xdim-1, ydim-1);
+    nextpage();
+    buf = malloc((size_t) xdim * ydim * 3);
+    read_front(buf);
+    cleared[0] = buf[(2 * xdim + 2) * 3];  /* bottom left: border */
+    cleared[1] = buf[((ydim/2) * xdim + xdim/2) * 3];  /* middle: view */
+    free(buf);
+    printf("clearview: border red %d, view red %d\n", cleared[0], cleared[1]);
 
     /* A 0x0 tile, and the first tile with both sides odd and over 32. */
     for (i = 0; i < MAXTILES; i++)
@@ -545,6 +560,8 @@ int main(int argc, char **argv)
         { fprintf(stderr, "FAIL: the screenshot's fade isn't the screen's\n"); return 1; }
     if ((still[1] < still[0] + 8) || (still[2] < still[1] + 8))
         { fprintf(stderr, "FAIL: the still screen doesn't fade in\n"); return 1; }
+    if ((cleared[0] == curpalette[0].r) || (cleared[1] != curpalette[0].r))
+        { fprintf(stderr, "FAIL: clearview clears outside the view or not inside it\n"); return 1; }
     for (npot = 0; npot <= hasnpot; npot++)
         if (front_diff(shot[npot][0], shot[npot][1]) == 0)
             { fprintf(stderr, "FAIL: miplevel 1 looks the same as 0 (npot %d)\n", npot); return 1; }
