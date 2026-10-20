@@ -2071,6 +2071,7 @@ void menus(void)
         case 1008:
         case 1009:
 
+            if (widescreen) clearallviews(0L);
             rotatesprite(160<<16,200<<15,65536L,0,MENUSCREEN,16,0,10+64,0,0,xdim-1,ydim-1);
             rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
             menutext(160,24,0,0,"LOAD GAME");
@@ -2189,6 +2190,7 @@ void menus(void)
         case 2008:
         case 2009:
 
+            if (widescreen) clearallviews(0L);
             rotatesprite(160<<16,200<<15,65536L,0,MENUSCREEN,16,0,10+64,0,0,xdim-1,ydim-1);
             rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
             menutext(160,24,0,0,"SAVE GAME");
@@ -2970,6 +2972,7 @@ void menus(void)
         case 300:
 
             c = 320>>1;
+            if (widescreen) clearallviews(0L);
             rotatesprite(c<<16,200<<15,65536L,0,MENUSCREEN,16,0,10+64,0,0,xdim-1,ydim-1);
             rotatesprite(c<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
 
