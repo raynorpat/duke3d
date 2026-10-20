@@ -150,6 +150,7 @@ extern unsigned char *polymost_capture_shader(void);
 extern GLuint polymost_takeframe_shader(void);
 extern void polymost_putframe_shader(GLuint tex);
 extern void polymost_unbind_shader(void);
+extern unsigned char *getbasepalette(void);
 extern void gltexinvalidateall(void);
 extern void polymost_buildshaderamp(void);
 static SDL_GLContext sdl_glcontext = NULL;  /* non-NULL while in renderer 3 */
@@ -771,7 +772,7 @@ static void gl_resize(void)
 {
     int w, h;
     palette_t pal[256], fadergb;
-    unsigned char fadedelta;
+    unsigned char fadedelta, base[768];
     GLuint old, shframe;
     float oldu = 0, oldv = 0;
     int drawn;
@@ -784,6 +785,7 @@ static void gl_resize(void)
 
     /* init_res_lookups sets the base palette and drops the fade: keep both. */
     memcpy(pal, curpalette, sizeof (pal));
+    memcpy(base, getbasepalette(), sizeof (base));  /* the GL 2.1 tier fades it */
     fadergb = palfadergb;
     fadedelta = palfadedelta;
     old = 0;
@@ -798,6 +800,7 @@ static void gl_resize(void)
     polymost_glreset();
     init_gl_res_vars();
     memcpy(curpalette, pal, sizeof (pal));
+    memcpy(getbasepalette(), base, sizeof (base));
     palfadergb = fadergb;
     palfadedelta = fadedelta;
     gltexinvalidateall();

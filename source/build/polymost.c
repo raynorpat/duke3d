@@ -747,6 +747,7 @@ unsigned char *polymost_capture_shader ()
 	if (!glshbound) bglBindFramebuffer(GL_FRAMEBUFFER,glshfbo);
 	glPixelStorei(GL_PACK_ALIGNMENT,1);
 	glReadPixels(0,0,xres,yres,GL_RED,GL_UNSIGNED_BYTE,idx);
+	glPixelStorei(GL_PACK_ALIGNMENT,4);
 	if (!glshbound) bglBindFramebuffer(GL_FRAMEBUFFER,0);
 	getfadedpalette(pal);
 	for(y=0,p=rgb;y<yres;y++) //the framebuffer's rows are bottom-up

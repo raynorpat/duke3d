@@ -8205,6 +8205,16 @@ void setpalettefade(unsigned char r, unsigned char g, unsigned char b, unsigned 
 
 
 #if defined(POLYMOST) && defined(USE_OPENGL)
+/* The palette setbrightness was last given (getfadedpalette fades it), for
+   renderer 3's resize to keep across the mode's setup, which resets it. */
+unsigned char *getbasepalette(void)
+{
+	return(basepal);
+}
+#endif
+
+
+#if defined(POLYMOST) && defined(USE_OPENGL)
 /*
  * getfadedpalette
  *  The palette renderer 3's GL 2.1 tier shows: curpalette, or with a fade,
