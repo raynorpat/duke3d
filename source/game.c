@@ -3040,10 +3040,18 @@ void displayrooms(short snum,int32_t smoothratio)
                     if ((tiltw&(tiltw-1)) == 0) tiltw += 2;
                     if (tiltbytes < tiltw*tiltw)
                     {
-                        tiltbytes = tiltw*tiltw;
-                        tiltbuf = realloc(tiltbuf,tiltbytes);
+                        char *nb = realloc(tiltbuf,tiltw*tiltw);
+                        if (nb != NULL) { tiltbuf = nb; tiltbytes = tiltw*tiltw; }
                     }
-                    waloff[MAXTILES-2] = (intptr_t)tiltbuf;
+                    if (tiltbytes >= tiltw*tiltw)
+                        waloff[MAXTILES-2] = (intptr_t)tiltbuf;
+                    else
+                    {
+                        // Out of memory: the cache's 320x320 tile, at 4:3.
+                        tiltw = 320;
+                        if (waloff[MAXTILES-2] == (intptr_t)tiltbuf)
+                            waloff[MAXTILES-2] = 0;
+                    }
                 }
                 else if (waloff[MAXTILES-2] == (intptr_t)tiltbuf)
                     waloff[MAXTILES-2] = 0;
