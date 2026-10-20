@@ -215,8 +215,11 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
   # window, so it's opt-in; with no OpenGL (the dummy driver) it's skipped.
   option(DUKE3D_GL_TESTS "Run the renderer 3 test, which opens a window" OFF)
   if(DUKE3D_POLYMOST AND DUKE3D_GL_TESTS)
-    add_executable(render_gl render_gl.c)
-    target_link_libraries(render_gl PRIVATE buildengine duke3d::SDL2main)
+    # The game is linked in for its renderer 3 palette code; game.c's main()
+    # is renamed (below), as in con_compile.
+    add_executable(render_gl render_gl.c render_gl_game.c
+                   "${PROJECT_SOURCE_DIR}/source/game.c")
+    target_link_libraries(render_gl PRIVATE duke3d_game duke3d::SDL2main)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/render_gl")
     add_test(NAME render_gl
       COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl")

@@ -29,16 +29,27 @@
  *                      walls and a sprite: polymosttexfullbright 256 (off),
  *                      240 (on), then 256 again (off2), in the normal and
  *                      water (<pal>) palettes; normal only for npot 0
+ *   <dir>/fb_<neither|masked|translucent>_<off|on>.bmp
+ *                      the start sector's walls and floor unlit, with
+ *                      neither, its two-sided walls masked with a lit
+ *                      tile, or the lit sprite translucent; fullbright off
+ *                      and on
  *   <dir>/resized.bmp  the last frame shown again after a window resize
  *  It fails on a GL error, a failed capture, a fade that doesn't redden or
  *  a screenshot without it, a still screen that doesn't brighten as it
  *  fades in, a clearview outside the view window, a miplevel 1 view
  *  the same as the miplevel 0 one, a 0x0 floor that isn't see-through, a
- *  blank map view, a 3D view drawn after the map view that differs from
- *  the one drawn before it (GL state left behind), a fullbright view that
- *  doesn't brighten, a fullbright-off view that differs after a
- *  fullbright-on one (glow textures left behind), a last frame lost in a
- *  resize, or a 1680x900 mode whose window is the 8-bit clamp's 1600x1200.
+ *  blank map view, a map view whose cstat 512 floor sprite looks as cstat
+ *  2, a 2D picture drawn after the map view that isn't on top of it, a 3D
+ *  view drawn after the map view that differs from the one drawn before it
+ *  (GL state left behind), a fullbright view that doesn't brighten (a
+ *  masked wall and a translucent sprite too), a fullbright-off view that
+ *  differs after a fullbright-on one (glow textures left behind), the same
+ *  palette again retexturing (seen by changing a tile's art in between),
+ *  glsetgamepalette (render_gl_game.c) losing the fade or fullbright or
+ *  taking the wrong player's palette, a last frame lost in a resize, or a
+ *  mode over the 8-bit 1600x1200 limit whose window isn't the size asked
+ *  for.
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
  *
@@ -56,10 +67,9 @@
 #include "SDL.h"
 #include "SDL_opengl.h"
 
-/* Callbacks the game normally provides to the engine. */
-void timerhandler(void) { }
-void keyhandler(void) { }
-void faketimerhandler(void) { }
+/* The game is linked in (for render_gl_game.c), so it provides the
+ * engine's callbacks. */
+int glgamepalette_check(void);  /* render_gl_game.c */
 
 #define APLAYER 1405  /* names.h: a player start */
 #define THREEDEE 2498  /* names.h */
@@ -233,6 +243,29 @@ static void fb_shot(int32_t fb, const char *dir, const char *name, unsigned char
     read_front(buf);
 }
 
+/* A tile at least 64x64 with no lit (240-254) texels, not animated. */
+static short unlit_tile(void)
+{
+    short t;
+    int32_t i, n;
+
+    for (t = 0; t < MAXTILES; t++)
+    {
+        if ((tilesizx[t] < 64) || (tilesizy[t] < 64) || (picanm[t] & 192))
+            continue;
+        loadtile(t);
+        if (waloff[t] == 0)
+            continue;
+        n = tilesizx[t] * tilesizy[t];
+        for (i = 0; i < n; i++)
+            if ((((unsigned char *) waloff[t])[i] >= 240) && (((unsigned char *) waloff[t])[i] < 255))
+                break;
+        if (i == n)
+            return(t);
+    }
+    return(-1);
+}
+
 /* Draws the start view without retexturing; buf (if any) gets the frame. */
 static void view_shot(unsigned char *buf, int32_t x, int32_t y, int32_t z, short a, short sect)
 {
@@ -290,6 +323,12 @@ int main(int argc, char **argv)
     unsigned char *buf, *prev, cleared[2];
     double palwater, resizeddiff;
     Uint32 t0;
+    short floorspr, unlit, litspr;
+    unsigned char *map512, *over[2], *artcopy, *glowshot[2];
+    double mapdiff512, glow[3];
+    static const char *glowname[3] = { "neither", "masked", "translucent" };
+    int overtop, startw, starth, artsize, gamepal, askh;
+    SDL_Rect usable;
 
     if (argc < 3)
     {
@@ -427,7 +466,7 @@ int main(int argc, char **argv)
 
     /* The map view, between two 3D views that must come out the same. */
     sector[sectnum].floorpicnum = floorpic;
-    i = insertsprite(sectnum, 0);  /* render_classic2d's translucent floor sprite */
+    floorspr = i = insertsprite(sectnum, 0);  /* render_classic2d's translucent floor sprite */
     sprite[i].x = posx + (sintable[(ang+512)&2047]>>6);
     sprite[i].y = posy + (sintable[ang&2047]>>6);
     sprite[i].z = sector[sectnum].floorz;
@@ -465,8 +504,34 @@ int main(int argc, char **argv)
         }
         glinfo.texnpot = hasnpot;
     }
+    /* The floor sprite more see-through (cstat 512), then a 2D picture over
+     * the map view, which must come out as over a cleared screen. */
+    sprite[floorspr].cstat = 32|2|512;
+    clearview(0);
+    drawmapview(posx, posy, 2048, ang);
+    nextpage();
+    map512 = malloc((size_t) xdim * ydim * 3);
+    read_front(map512);
+    mapdiff512 = front_diff(map512, map[hasnpot]);
+    sprite[floorspr].cstat = 32|2;
+    for (i = 0; i < 2; i++)
+    {
+        clearview(0);
+        if (i == 0) drawmapview(posx, posy, 2048, ang);
+        rotatesprite(160<<16, 100<<16, 32768, 0, VICTORY1, 0, 0, 2+8+64, 0, 0, xdim-1, ydim-1);
+        nextpage();
+        over[i] = malloc((size_t) xdim * ydim * 3);
+        read_front(over[i]);
+    }
+    for (i = ydim * 7 / 16, overtop = 1; i < ydim * 9 / 16; i++)
+        if (memcmp(over[0] + ((size_t) i * xdim + xdim * 7 / 16) * 3,
+                   over[1] + ((size_t) i * xdim + xdim * 7 / 16) * 3, (size_t) (xdim / 8) * 3) != 0)
+            overtop = 0;
+    if (err == GL_NO_ERROR) err = glGetError();
     for (npot = 0; npot <= hasnpot; npot++)
         printf("map view npot %d: mean red+green/2 %.1f\n", npot, mapmean[npot]);
+    printf("map view: mean |floor sprite cstat 512 - 2| %.2f; a 2D picture over it %s\n",
+           mapdiff512, overtop ? "is on top" : "isn't on top");
     if (hasnpot)
         printf("map view: mean |npot 1 - npot 0| %.2f\n", front_diff(map[0], map[1]));
     printf("3D view: mean |after map - before map| %.2f\n", front_diff(view3d[0], view3d[1]));
@@ -491,7 +556,7 @@ int main(int argc, char **argv)
     litsectnum = sectnum;
     updatesector(litx, lity, &litsectnum);
     if (litsectnum < 0) { fprintf(stderr, "FAIL: the lit sprite is outside the map\n"); return 1; }
-    i = insertsprite(litsectnum, 0);
+    litspr = i = insertsprite(litsectnum, 0);
     sprite[i].x = litx;
     sprite[i].y = lity;
     sprite[i].z = sector[litsectnum].floorz;
@@ -524,18 +589,65 @@ int main(int argc, char **argv)
     glinfo.texnpot = hasnpot;
     polymosttexfullbright = 256;
 
+    /* Fullbright on a masked wall and on a translucent sprite: the start
+     * sector's walls and floor unlit, then (1) its two-sided walls masked
+     * with LITFLOOR, or (2) the face sprite translucent, against (0)
+     * neither (what else is lit in view). */
+    unlit = unlit_tile();
+    if (unlit < 0) { fprintf(stderr, "FAIL: no unlit tile\n"); return 1; }
+    sector[sectnum].floorpicnum = sector[sectnum].ceilingpicnum = unlit;
+    for (i = 0; i < numwalls; i++)
+        if (litsect[sectorofwall(i)]) wall[i].picnum = unlit;
+    setbrightness(0, palette);
+    for (pal = 0; pal < 3; pal++)
+    {
+        for (i = sector[sectnum].wallptr; i < sector[sectnum].wallptr + sector[sectnum].wallnum; i++)
+            if (wall[i].nextsector >= 0)
+            {
+                wall[i].overpicnum = LITFLOOR;
+                if (pal == 1) wall[i].cstat |= 16; else wall[i].cstat &= ~16;
+            }
+        sprite[litspr].cstat = (pal == 2) ? 2 : (short) 32768;
+        for (i = 0; i < 2; i++)
+        {
+            glowshot[i] = malloc((size_t) xdim * ydim * 3);
+            snprintf(name, sizeof (name), "fb_%s_%s", glowname[pal], fbname[i]);
+            fb_shot(fbval[i], argv[2], name, glowshot[i], posx, posy, posz, ang, sectnum);
+        }
+        glow[pal] = front_diff(glowshot[1], glowshot[0]);
+        free(glowshot[0]);
+        free(glowshot[1]);
+    }
+    sprite[litspr].cstat = 0;
+    polymosttexfullbright = 256;
+    if (err == GL_NO_ERROR) err = glGetError();
+    printf("fullbright: mean |on - off| neither %.3f, masked wall %.3f, translucent sprite %.3f\n",
+           glow[0], glow[1], glow[2]);
+
     /* A palette change through setbrightness retextures without a reset; the
-     * same palette again (a flash's end) draws the same frame. */
+     * same palette again (a flash's end) doesn't: with the unlit tile's art
+     * changed in memory between, a retexture would show it. */
+    artsize = tilesizx[unlit] * tilesizy[unlit];
+    artcopy = malloc(artsize);
     for (i = 0; i < 3; i++)
     {
         palshot[i] = malloc((size_t) xdim * ydim * 3);
+        if (i == 1)
+        {
+            memcpy(artcopy, (void *) waloff[unlit], artsize);
+            memset((void *) waloff[unlit], 31, artsize);
+        }
         setbrightness(0, (i == 2) ? waterpal : palette);
         view_shot(palshot[i], posx, posy, posz, ang, sectnum);
+        if (i == 1)
+            memcpy((void *) waloff[unlit], artcopy, artsize);
     }
     palsame = (memcmp(palshot[1], palshot[0], (size_t) xdim * ydim * 3) == 0);
     palwater = front_diff(palshot[2], palshot[0]);
     printf("palette: same again %s; mean |water - normal| %.2f\n",
            palsame ? "unchanged" : "changed", palwater);
+    gamepal = glgamepalette_check();
+    printf("game palette (glsetgamepalette): %s\n", gamepal ? "as expected" : "wrong");
     lfnpot = lastframe_same();
     prev = malloc((size_t) xdim * ydim * 3);
     read_front(prev);  /* the last frame, unfaded */
@@ -550,6 +662,7 @@ int main(int argc, char **argv)
     savedfadedelta = palfadedelta;
     oldxdim = xdim;
     oldydim = ydim;
+    SDL_GetWindowSize(SDL_GL_GetCurrentWindow(), &startw, &starth);
     glinfo.texnpot = 0;
     SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), 800, 520);
     for (t0 = SDL_GetTicks(); (xdim == oldxdim) && (SDL_GetTicks() - t0 < 3000); SDL_Delay(10))
@@ -575,7 +688,7 @@ int main(int argc, char **argv)
     lfpot = lastframe_same();
     glinfo.texnpot = hasnpot;
     /* back to the first size: the checks below use xdim and ydim. */
-    SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), 640, 400);
+    SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), startw, starth);
     for (t0 = SDL_GetTicks(); (xdim != oldxdim) && (SDL_GetTicks() - t0 < 3000); SDL_Delay(10))
         _handle_events();
     if ((xdim != oldxdim) || (ydim != oldydim))
@@ -602,6 +715,10 @@ int main(int argc, char **argv)
     for (npot = 0; npot <= hasnpot; npot++)
         if (mapmean[npot] < 8)
             { fprintf(stderr, "FAIL: the map view is blank (npot %d)\n", npot); return 1; }
+    if (mapdiff512 == 0)
+        { fprintf(stderr, "FAIL: the map view's cstat 512 floor sprite looks as cstat 2\n"); return 1; }
+    if (!overtop)
+        { fprintf(stderr, "FAIL: a 2D picture drawn after the map view isn't on top\n"); return 1; }
     if (memcmp(view3d[0], view3d[1], (size_t) xdim * ydim * 3) != 0)
         { fprintf(stderr, "FAIL: the 3D view after the map view differs\n"); return 1; }
     for (npot = 0; npot <= hasnpot; npot++)
@@ -613,8 +730,14 @@ int main(int argc, char **argv)
             if (memcmp(fb[npot][pal][2], fb[npot][pal][0], (size_t) xdim * ydim * 3) != 0)
                 { fprintf(stderr, "FAIL: fullbright off differs after on (%s, npot %d)\n", palname[pal], npot); return 1; }
         }
+    if (glow[1] <= glow[0])
+        { fprintf(stderr, "FAIL: fullbright doesn't brighten a masked wall\n"); return 1; }
+    if (glow[2] <= glow[0])
+        { fprintf(stderr, "FAIL: fullbright doesn't brighten a translucent sprite\n"); return 1; }
     if (!palsame)
-        { fprintf(stderr, "FAIL: the same palette again changes the frame\n"); return 1; }
+        { fprintf(stderr, "FAIL: the same palette again retextures\n"); return 1; }
+    if (!gamepal)
+        { fprintf(stderr, "FAIL: glsetgamepalette\n"); return 1; }
     if (palwater < 1)
         { fprintf(stderr, "FAIL: the water palette doesn't retexture\n"); return 1; }
     if (!resized) { fprintf(stderr, "FAIL: the window didn't resize\n"); return 1; }
@@ -624,9 +747,16 @@ int main(int argc, char **argv)
 
     /* A mode over the 8-bit 1600x1200 limit (it changes xdim and ydim, so
      * after the checks above): the OpenGL window still gets the size asked
-     * for. */
-    if ((_setgamemode(1, 1680, 900) != 0) || (setgamemode_gl(1) != 0))
-        { fprintf(stderr, "FAIL: the 1680x900 mode\n"); return 1; }
+     * for. Its height fits the display's usable area (less room for the
+     * title bar), so the window gets it exactly, where the clamp's 1200 is
+     * at least as tall as the display lets a window be. Its width may be held
+     * to a narrower display. */
+    askh = 900;
+    usable.w = usable.h = 0;
+    if (SDL_GetDisplayUsableBounds(0, &usable) == 0)
+        askh = min(askh, usable.h - 96);
+    if ((_setgamemode(1, 1680, askh) != 0) || (setgamemode_gl(1) != 0))
+        { fprintf(stderr, "FAIL: the 1680x%d mode\n", askh); return 1; }
     /* OpenGL again from OpenGL: a new window replaces the old one. */
     if (setgamemode_gl(1) != 0)
         { fprintf(stderr, "FAIL: OpenGL again from OpenGL\n"); return 1; }
@@ -634,10 +764,10 @@ int main(int argc, char **argv)
     if ((err = glGetError()) != GL_NO_ERROR)
         { fprintf(stderr, "FAIL: glGetError 0x%x after OpenGL again\n", (unsigned) err); return 1; }
     SDL_GetWindowSize(SDL_GL_GetCurrentWindow(), &winw, &winh);
-    printf("1680x900 mode: window %dx%d\n", winw, winh);
+    printf("1680x%d mode: window %dx%d (display usable %dx%d)\n", askh, winw, winh, usable.w, usable.h);
     uninitengine();
-    /* not == 1680x900: a small display may hold the window smaller. */
-    if ((winw == 1600) && (winh == 1200)) { fprintf(stderr, "FAIL: the window is the 8-bit clamp's 1600x1200\n"); return 1; }
+    if ((winh != askh) || ((winw != 1680) && (usable.w >= 1680 + 64)))
+        { fprintf(stderr, "FAIL: the window isn't the size asked for\n"); return 1; }
     printf("PASS: render_gl\n");
     return 0;
 }
