@@ -236,6 +236,10 @@ extern struct glinfo_t glinfo;
 	 * on the first upload), and how many mipmap levels every texture drops.
 	 * Textures made before a change keep their size until polymost_glreset(). */
 extern int32_t gltexmaxsize, gltexmiplevel;
+	/* polymost.c: palette indices from this up to 254 draw fullbright, unfogged
+	 * and unshaded (256: none). Textures made earlier keep theirs until
+	 * they are invalidated. */
+extern int32_t polymosttexfullbright;
 #endif
 #endif
 

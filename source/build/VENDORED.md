@@ -251,6 +251,24 @@ Ported from later JFBuild commits, retyped as above:
   is translucent without cstat 512 and the classic state left before it is
   already normal; with cstat 512 added, the 320x200 map checksum goes from
   `763b8c56` (without the fix) to `c9790d70`.
+- `a031bac` (the fullbright feature only, not the 2009 texture cache
+  refactor around it): fullbright texels in renderer 3. `gloadtile` builds,
+  beside each cached texture, a glow texture (`glpicfb[]`, 0 for none) of
+  the texels whose palookup-mapped index is in `[polymosttexfullbright,
+  255)`, transparent elsewhere, with the base texture's filter and wrap; a
+  reload that finds none deletes it, as `polymost_glreset` does all of
+  them, and `gltexapplyprops` updates them too. `polymosttexfullbright`
+  (256, off) is in `build.h`. `drawpoly` given `METH_LAYERS` (8) draws the
+  polygon again with the glow texture at colour (1,1,1,alpha), fog off,
+  blended and without depth writes, then restores the base pass's state;
+  `fog_is_on` follows every fog enable and disable. `domost`,
+  `polymost_drawmaskwall` and `polymost_drawsprite`'s face, wall and floor
+  sprites pass it; `dorotatesprite` doesn't. Changes from upstream:
+  `drawpoly` strips the flag on entry, so nothing else (renderer 2
+  included) sees it; the parallaxed sky gets no glow pass (upstream left out
+  only hightile skyboxes); in the non-power-of-two wall split each piece
+  draws its base and then its glow (upstream's layer mask emptied on the
+  first piece, so later pieces drew nothing). The game sets the threshold.
 
 ## Engine hooks
 

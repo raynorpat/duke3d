@@ -195,6 +195,9 @@ static void uploadtexture(int32_t doalloc, int32_t xsiz, int32_t ysiz, int32_t i
 static int32_t gltexcachead[GLTEXCACHEADSIZ];
 #define GLTEXMAX 65536
 static unsigned int glpic[GLTEXMAX];
+	//Glow texture of each cache slot (0: none): its texels at or above polymosttexfullbright
+static GLuint glpicfb[GLTEXMAX];
+int32_t polymosttexfullbright = 256; //first fullbright palette index (256: off)
 static int32_t gltexcacind[GLTEXMAX], gltexcacnext[GLTEXMAX], gltexcacnum = -1;
 
 void gloadtile(int32_t,int32_t,int32_t,int32_t,int32_t);
@@ -266,12 +269,19 @@ void gltexapplyprops ()
 		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,glfiltermodes[gltexfiltermode].min);
 		if (glinfo.maxanisotropy > 1.0)
 			glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_MAX_ANISOTROPY_EXT,glanisotropy);
+		if (!glpicfb[i]) continue;
+		glBindTexture(GL_TEXTURE_2D,glpicfb[i]);
+		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,glfiltermodes[gltexfiltermode].mag);
+		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,glfiltermodes[gltexfiltermode].min);
+		if (glinfo.maxanisotropy > 1.0)
+			glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_MAX_ANISOTROPY_EXT,glanisotropy);
 	}
 }
 
 //--------------------------------------------------------------------------------------------------
 
 static float glox1, gloy1, glox2, gloy2;
+static int32_t fog_is_on = 0;
 
 	//Use this for both initialization and uninitialization of OpenGL.
 void polymost_glreset ()
@@ -282,7 +292,10 @@ void polymost_glreset ()
 		if (gltexcacnum < 0) gltexcacnum = 0;
 		else
 		{
-			do { gltexcacnum--; glDeleteTextures(1,&glpic[gltexcacnum]); } while (gltexcacnum > 0);
+			do {
+				gltexcacnum--; glDeleteTextures(1,&glpic[gltexcacnum]);
+				if (glpicfb[gltexcacnum]) { glDeleteTextures(1,&glpicfb[gltexcacnum]); glpicfb[gltexcacnum] = 0; }
+			} while (gltexcacnum > 0);
 		}
 	}
 	glox1 = -1;
@@ -322,6 +335,7 @@ void resizeglcheck ()
 
 		if (!nofog) {
 		glEnable(GL_FOG);
+		fog_is_on = 1;
 		glFogi(GL_FOG_MODE,GL_EXP); //GL_EXP(default),GL_EXP2,GL_LINEAR
 		//glHint(GL_FOG_HINT,GL_NICEST);
 		glFogf(GL_FOG_DENSITY,1.0); //must be > 0, default is 1
@@ -447,8 +461,8 @@ static void uploadtexture(int32_t doalloc, int32_t xsiz, int32_t ysiz, int32_t i
 
 void gloadtile (int32_t dapic, int32_t dapal, int32_t dameth, int32_t gltexind, int32_t doalloc)
 {
-	coltype *pic, *wpptr;
-	int32_t j, x, y, x2, y2, xsiz, ysiz, dacol, tsizx, tsizy;
+	coltype *pic, *wpptr, *fbpic;
+	int32_t j, x, y, x2, y2, xsiz, ysiz, dacol, tsizx, tsizy, hasfullbright = 0;
 	int32_t texfmt = GL_RGBA, intexfmt = GL_RGBA8;
 
 	if (doalloc) glGenTextures(1,&glpic[gltexind]);  //# of textures (make OpenGL allocate structure)
@@ -466,6 +480,8 @@ void gloadtile (int32_t dapic, int32_t dapal, int32_t dameth, int32_t gltexind, 
 
 	pic = (coltype *)malloc(xsiz*ysiz*sizeof(coltype));
 	if (!pic) return;
+	fbpic = (coltype *)calloc(xsiz*ysiz,sizeof(coltype)); //fullbright texels, transparent elsewhere
+	if (!fbpic) { free(pic); return; }
 
 	if (!waloff[dapic])
 	{
@@ -500,6 +516,8 @@ void gloadtile (int32_t dapic, int32_t dapal, int32_t dameth, int32_t gltexind, 
 					wpptr->g = curpalette[j].g;
 					wpptr->b = curpalette[j].b;
 					wpptr->a = 255;
+					if ((j >= polymosttexfullbright) && (j < 255))
+						{ fbpic[wpptr-pic] = *wpptr; hasfullbright = 1; }
 				}
 			}
 		}
@@ -540,6 +558,26 @@ void gloadtile (int32_t dapic, int32_t dapal, int32_t dameth, int32_t gltexind, 
 	}
 
 	if (pic) free(pic);
+
+	if (hasfullbright)
+	{
+		x = !glpicfb[gltexind];
+		if (x) glGenTextures(1,&glpicfb[gltexind]);
+		glBindTexture(GL_TEXTURE_2D,glpicfb[gltexind]);
+		fixtransparency(fbpic,tsizx,tsizy,xsiz,ysiz,dameth);
+		uploadtexture(x,xsiz,ysiz,intexfmt,texfmt,fbpic,tsizx,tsizy,dameth);
+		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,glfiltermodes[gltexfiltermode].mag);
+		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,glfiltermodes[gltexfiltermode].min);
+		if (glinfo.maxanisotropy > 1.0)
+			glTexParameterf(GL_TEXTURE_2D,GL_TEXTURE_MAX_ANISOTROPY_EXT,glanisotropy);
+		x = (dameth&4) ? (glinfo.clamptoedge?GL_CLAMP_TO_EDGE:GL_CLAMP) : GL_REPEAT;
+		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,x);
+		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,x);
+		glBindTexture(GL_TEXTURE_2D,glpic[gltexind]);
+	}
+	else if (glpicfb[gltexind])
+		{ glDeleteTextures(1,&glpicfb[gltexind]); glpicfb[gltexind] = 0; } //a reload found none
+	free(fbpic);
 }
 #endif
 
@@ -547,7 +585,32 @@ void gloadtile (int32_t dapic, int32_t dapal, int32_t dameth, int32_t gltexind, 
 	//    n must be <= 8 (assume clipping can double number of vertices)
 	//method: 0:solid, 1:masked(255 is transparent), 2:transluscent #1, 3:transluscent #2
 	//    +4 means it's a sprite, so wraparound isn't needed
+	//    +8 (METH_LAYERS) draws the tile's fullbright texels again over it, unfogged (OpenGL only)
+#define METH_LAYERS 8
 static int32_t pow2xsplit = 0, skyclamphack = 0;
+
+#ifdef USE_OPENGL
+	//Switches to the glow pass: full colour, no fog, blended, no Z writes
+static void polymost_glowbegin (GLuint fbtex, float alpha)
+{
+	glColor4f(1.f,1.f,1.f,alpha);
+	if (fog_is_on) glDisable(GL_FOG);
+	glEnable(GL_BLEND);
+	glDepthMask(GL_FALSE);
+	glBindTexture(GL_TEXTURE_2D,fbtex);
+}
+
+	//Restores what the base pass set
+static void polymost_glowend (GLuint basetex, float *pc, int32_t method)
+{
+	if (fog_is_on) glEnable(GL_FOG);
+	glDepthMask(GL_TRUE);
+	if (!(method&3)) glDisable(GL_BLEND);
+	glColor4fv(pc);
+	glBindTexture(GL_TEXTURE_2D,basetex);
+}
+#endif
+
 void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 {
 	#define PI 3.14159265358979323
@@ -557,7 +620,9 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 	int32_t i, j, k, x, y, z, nn, ix0, ix1, mini, maxi, tsizx, tsizy, tsizxm1, tsizym1, ltsizy;
 	int32_t xx, yy, xi, d0, u0, v0, d1, u1, v1, xmodnice, ymulnice, dorot;
 	char dacol, *walptr, *palptr, *vidp, *vide;
+	int32_t layers = method&METH_LAYERS;
 
+	method &= ~METH_LAYERS;
 	if (n == 3)
 	{
 		if ((dpx[0]-dpx[1])*(dpy[2]-dpy[1]) >= (dpx[2]-dpx[1])*(dpy[0]-dpy[1])) return; //for triangle
@@ -634,10 +699,13 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 #ifdef USE_OPENGL
 	if (rendmode == 3)
 	{
-		float hackscx, hackscy;
+		float hackscx, hackscy, pc[4];
+		GLuint basetex, fbtex;
 
 		if (skyclamphack) method |= 4;
-		glBindTexture(GL_TEXTURE_2D,glpic[gltexcache(globalpicnum,globalpal,method&(~3))]);
+		k = gltexcache(globalpicnum,globalpal,method&4);
+		basetex = glpic[k]; fbtex = layers ? glpicfb[k] : 0;
+		glBindTexture(GL_TEXTURE_2D,basetex);
 
 		hackscx = 1.0; hackscy = 1.0;
 
@@ -665,7 +733,6 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 		}
 
 		{
-		float pc[4];
 		f = ((float)(numpalookups-min(max(globalshade,0),numpalookups)))/((float)numpalookups);
 		pc[0] = pc[1] = pc[2] = f;
 		switch(method&3)
@@ -784,29 +851,39 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 				} while (i);
 				if (nn < 3) continue;
 
-				glBegin(GL_TRIANGLE_FAN);
-				for(i=0;i<nn;i++)
+				for(k=0;k<=(fbtex!=0);k++)
 				{
-					ox = uu[i]; oy = vv[i];
-					dp = ox*ngdx + oy*ngdy + ngdo;
-					up = ox*ngux + oy*nguy + nguo;
-					vp = ox*ngvx + oy*ngvy + ngvo;
-					r = 1.0/dp; glTexCoord2d((up*r-du0+uoffs)*ox2,vp*r*oy2);
-					glVertex3d((ox-ghalfx)*r*grhalfxdown10x,(ghoriz-oy)*r*grhalfxdown10,r*(1.0/1024.0));
+					if (k) polymost_glowbegin(fbtex,pc[3]);
+					glBegin(GL_TRIANGLE_FAN);
+					for(i=0;i<nn;i++)
+					{
+						ox = uu[i]; oy = vv[i];
+						dp = ox*ngdx + oy*ngdy + ngdo;
+						up = ox*ngux + oy*nguy + nguo;
+						vp = ox*ngvx + oy*ngvy + ngvo;
+						r = 1.0/dp; glTexCoord2d((up*r-du0+uoffs)*ox2,vp*r*oy2);
+						glVertex3d((ox-ghalfx)*r*grhalfxdown10x,(ghoriz-oy)*r*grhalfxdown10,r*(1.0/1024.0));
+					}
+					glEnd();
+					if (k) polymost_glowend(basetex,pc,method);
 				}
-				glEnd();
 			}
 		}
 		else
 		{
 			ox2 *= hackscx; oy2 *= hackscy;
-			glBegin(GL_TRIANGLE_FAN);
-			for(i=0;i<n;i++)
+			for(k=0;k<=(fbtex!=0);k++)
 			{
-				r = 1.0/dd[i]; glTexCoord2d(uu[i]*r*ox2,vv[i]*r*oy2);
-				glVertex3d((px[i]-ghalfx)*r*grhalfxdown10x,(ghoriz-py[i])*r*grhalfxdown10,r*(1.0/1024.0));
+				if (k) polymost_glowbegin(fbtex,pc[3]);
+				glBegin(GL_TRIANGLE_FAN);
+				for(i=0;i<n;i++)
+				{
+					r = 1.0/dd[i]; glTexCoord2d(uu[i]*r*ox2,vv[i]*r*oy2);
+					glVertex3d((px[i]-ghalfx)*r*grhalfxdown10x,(ghoriz-py[i])*r*grhalfxdown10,r*(1.0/1024.0));
+				}
+				glEnd();
+				if (k) polymost_glowend(basetex,pc,method);
 			}
-			glEnd();
 		}
 		return;
 	}
@@ -1251,6 +1328,7 @@ int32_t testvisiblemost (float x0, float x1)
 	return(0);
 }
 
+static int32_t domostlayers = METH_LAYERS; //0 while drawing the parallaxed sky: it has no glow pass
 void domost (float x0, float y0, float x1, float y1)
 {
 	double dpx[4], dpy[4];
@@ -1370,24 +1448,24 @@ void domost (float x0, float y0, float x1, float y1)
 					case 1: case 2:
 						dpx[0] = dx0; dpy[0] = vsp[i].cy[0];
 						dpx[1] = dx1; dpy[1] = vsp[i].cy[1];
-						dpx[2] = dx0; dpy[2] = ny0; drawpoly(dpx,dpy,3,0);
+						dpx[2] = dx0; dpy[2] = ny0; drawpoly(dpx,dpy,3,domostlayers);
 						vsp[i].cy[0] = ny0; vsp[i].ctag = gtag; break;
 					case 3: case 6:
 						dpx[0] = dx0; dpy[0] = vsp[i].cy[0];
 						dpx[1] = dx1; dpy[1] = vsp[i].cy[1];
-						dpx[2] = dx1; dpy[2] = ny1; drawpoly(dpx,dpy,3,0);
+						dpx[2] = dx1; dpy[2] = ny1; drawpoly(dpx,dpy,3,domostlayers);
 						vsp[i].cy[1] = ny1; vsp[i].ctag = gtag; break;
 					case 4: case 5: case 7:
 						dpx[0] = dx0; dpy[0] = vsp[i].cy[0];
 						dpx[1] = dx1; dpy[1] = vsp[i].cy[1];
 						dpx[2] = dx1; dpy[2] = ny1;
-						dpx[3] = dx0; dpy[3] = ny0; drawpoly(dpx,dpy,4,0);
+						dpx[3] = dx0; dpy[3] = ny0; drawpoly(dpx,dpy,4,domostlayers);
 						vsp[i].cy[0] = ny0; vsp[i].cy[1] = ny1; vsp[i].ctag = gtag; break;
 					case 8:
 						dpx[0] = dx0; dpy[0] = vsp[i].cy[0];
 						dpx[1] = dx1; dpy[1] = vsp[i].cy[1];
 						dpx[2] = dx1; dpy[2] = vsp[i].fy[1];
-						dpx[3] = dx0; dpy[3] = vsp[i].fy[0]; drawpoly(dpx,dpy,4,0);
+						dpx[3] = dx0; dpy[3] = vsp[i].fy[0]; drawpoly(dpx,dpy,4,domostlayers);
 						vsp[i].ctag = vsp[i].ftag = -1; break;
 					default: break;
 				}
@@ -1399,24 +1477,24 @@ void domost (float x0, float y0, float x1, float y1)
 					case 7: case 6:
 						dpx[0] = dx0; dpy[0] = ny0;
 						dpx[1] = dx1; dpy[1] = vsp[i].fy[1];
-						dpx[2] = dx0; dpy[2] = vsp[i].fy[0]; drawpoly(dpx,dpy,3,0);
+						dpx[2] = dx0; dpy[2] = vsp[i].fy[0]; drawpoly(dpx,dpy,3,domostlayers);
 						vsp[i].fy[0] = ny0; vsp[i].ftag = gtag; break;
 					case 5: case 2:
 						dpx[0] = dx0; dpy[0] = vsp[i].fy[0];
 						dpx[1] = dx1; dpy[1] = ny1;
-						dpx[2] = dx1; dpy[2] = vsp[i].fy[1]; drawpoly(dpx,dpy,3,0);
+						dpx[2] = dx1; dpy[2] = vsp[i].fy[1]; drawpoly(dpx,dpy,3,domostlayers);
 						vsp[i].fy[1] = ny1; vsp[i].ftag = gtag; break;
 					case 4: case 3: case 1:
 						dpx[0] = dx0; dpy[0] = ny0;
 						dpx[1] = dx1; dpy[1] = ny1;
 						dpx[2] = dx1; dpy[2] = vsp[i].fy[1];
-						dpx[3] = dx0; dpy[3] = vsp[i].fy[0]; drawpoly(dpx,dpy,4,0);
+						dpx[3] = dx0; dpy[3] = vsp[i].fy[0]; drawpoly(dpx,dpy,4,domostlayers);
 						vsp[i].fy[0] = ny0; vsp[i].fy[1] = ny1; vsp[i].ftag = gtag; break;
 					case 0:
 						dpx[0] = dx0; dpy[0] = vsp[i].cy[0];
 						dpx[1] = dx1; dpy[1] = vsp[i].cy[1];
 						dpx[2] = dx1; dpy[2] = vsp[i].fy[1];
-						dpx[3] = dx0; dpy[3] = vsp[i].fy[0]; drawpoly(dpx,dpy,4,0);
+						dpx[3] = dx0; dpy[3] = vsp[i].fy[0]; drawpoly(dpx,dpy,4,domostlayers);
 						vsp[i].ctag = vsp[i].ftag = -1; break;
 					default: break;
 				}
@@ -1616,11 +1694,13 @@ static void polymost_drawalls (int32_t bunch)
 		else if ((nextsectnum < 0) || (!(sector[nextsectnum].floorstat&1)))
 		{
 				//Parallaxing sky... hacked for Ken's mountain texture; paper-sky only :/
+			domostlayers = 0;
 #ifdef USE_OPENGL
 			if (rendmode == 3)
 			{
 				if (!nofog) {
 				glDisable(GL_FOG);
+				fog_is_on = 0;
 				//r = ((float)globalpisibility)*((float)((unsigned char)(sec->visibility+16)))*FOGSCALE;
 				//r *= ((double)xdimscale*(double)viewingrange*gdo) / (65536.0*65536.0);
 				//glFogf(GL_FOG_DENSITY,r);
@@ -1688,10 +1768,12 @@ static void polymost_drawalls (int32_t bunch)
 				skyclamphack = 0;
 				if (!nofog) {
 				glEnable(GL_FOG);
+				fog_is_on = 1;
 				//glFogf(GL_FOG_DENSITY,((float)globalvisibility)*((float)((unsigned char)(sec->visibility+16)))*FOGSCALE);
 				}
 			}
 #endif
+			domostlayers = METH_LAYERS;
 		}
 
 		globalpicnum = sec->ceilingpicnum; globalshade = sec->ceilingshade; globalpal = (int32_t)((unsigned char)sec->ceilingpal);
@@ -1797,11 +1879,13 @@ static void polymost_drawalls (int32_t bunch)
 		}
 		else if ((nextsectnum < 0) || (!(sector[nextsectnum].ceilingstat&1)))
 		{
+			domostlayers = 0;
 #ifdef USE_OPENGL
 			if (rendmode == 3)
 			{
 				if (!nofog) {
 				glDisable(GL_FOG);
+				fog_is_on = 0;
 				//r = ((float)globalpisibility)*((float)((unsigned char)(sec->visibility+16)))*FOGSCALE;
 				//r *= ((double)xdimscale*(double)viewingrange*gdo) / (65536.0*65536.0);
 				//glFogf(GL_FOG_DENSITY,r);
@@ -1867,10 +1951,12 @@ static void polymost_drawalls (int32_t bunch)
 				skyclamphack = 0;
 				if (!nofog) {
 				glEnable(GL_FOG);
+				fog_is_on = 1;
 				//glFogf(GL_FOG_DENSITY,((float)globalvisibility)*((float)((unsigned char)(sec->visibility+16)))*FOGSCALE);
 				}
 			}
 #endif
+			domostlayers = METH_LAYERS;
 		}
 
 			//(x0,cy0) == (u=             0,v=0,d=)
@@ -2527,7 +2613,7 @@ void polymost_drawmaskwall (int32_t damaskwallcnt)
 	}
 	if (n < 3) return;
 
-	drawpoly(dpx,dpy,n,method);
+	drawpoly(dpx,dpy,n,method|METH_LAYERS);
 }
 
 void polymost_drawsprite (int32_t snum)
@@ -2605,7 +2691,7 @@ void polymost_drawsprite (int32_t snum)
 				if (py[2] > sy0) py[2] = py[3] = sy0;
 			}
 
-			pow2xsplit = 0; drawpoly(px,py,4,method);
+			pow2xsplit = 0; drawpoly(px,py,4,method|METH_LAYERS);
 			break;
 		case 1: //Wall sprite
 				//Project 3D to 2D
@@ -2720,7 +2806,7 @@ void polymost_drawsprite (int32_t snum)
 			px[1] = sx1; py[1] = sc1;
 			px[2] = sx1; py[2] = sf1;
 			px[3] = sx0; py[3] = sf0;
-			pow2xsplit = 0; drawpoly(px,py,4,method);
+			pow2xsplit = 0; drawpoly(px,py,4,method|METH_LAYERS);
 			break;
 		case 2: //Floor sprite
 			if ((globalorientation&64) != 0)
@@ -2807,7 +2893,7 @@ void polymost_drawsprite (int32_t snum)
 				guo = ((float)tilesizx[globalpicnum])*gdo - guo;
 			}
 
-			pow2xsplit = 0; drawpoly(px,py,npoints,method);
+			pow2xsplit = 0; drawpoly(px,py,npoints,method|METH_LAYERS);
 			break;
 
 		//case 3: //Voxel sprite
