@@ -35,9 +35,9 @@
  *                      tile, or the lit sprite translucent; fullbright off
  *                      and on
  *   <dir>/resized.bmp  the last frame shown again after a window resize
- *   <dir>/cmp_<view>_<r0|immediate|vbo>.bmp
+ *   <dir>/cmp_<view>_<r0|immediate|vbo|shader>.bmp
  *                      E1L1 viewpoints at horiz 100, 640x480, in renderer 0
- *                      and in renderer 3 on the immediate and vbo paths
+ *                      and in renderer 3 on the immediate, vbo and shader paths
  *  It fails on a GL error, a failed capture, a fade that doesn't redden or
  *  a screenshot without it, a still screen that doesn't brighten as it
  *  fades in, a clearview outside the view window, a miplevel 1 view
@@ -52,11 +52,15 @@
  *  glsetgamepalette (render_gl_game.c) losing the fade or fullbright or
  *  taking the wrong player's palette, a last frame lost in a resize, or a
  *  mode over the 8-bit 1600x1200 limit whose window isn't the size asked
- *  for, or a draw path (immediate, vertex arrays, vbo, shader) that draws
- *  any of a set of frames differently from immediate mode or doesn't send
- *  its vertices its own way, or renderer 3 further from renderer 0 than
- *  pinned (each viewpoint's mean difference, and the mean of two regions
- *  that renderer 0 darkens by distance).
+ *  for, or a draw path (immediate, vertex arrays, vbo) that draws any of a
+ *  set of frames differently from immediate mode or doesn't send its
+ *  vertices its own way, or renderer 3 further from renderer 0 than pinned
+ *  (each viewpoint's mean difference, and the mean of two regions that
+ *  renderer 0 darkens by distance), or a shader path (GL 2.1: palette
+ *  indices) 3D view with a colour that isn't the palette's, whose frames
+ *  change when every draw is flushed, whose 2D frames differ from immediate
+ *  mode's, whose frame doesn't fade or capture, or that doesn't fall back to
+ *  vbo, drawing as vbo does, when its shader or framebuffer fails.
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
  *
@@ -374,17 +378,21 @@ static int lastframe_same(void)
 /* The comparison with renderer 0: E1L1 viewpoints at horiz 100 (where the
  *  projections line up), drawn 640x480 in both. Face sprites take their
  *  sector's shade, and fire -127, roughly as game.c animatesprites does. Each view has the
- *  most its mean |renderer 3 - renderer 0| per channel may be. */
+ *  most its mean |renderer 3 - renderer 0| per channel may be, on the fixed
+ *  function paths and on the shader path. The shader path's are pinned at
+ *  what it measured (+0.3), under the target of 8 (and its regions within 3
+ *  of renderer 0's); its translucent surfaces draw opaque for now, so
+ *  "translucent" is pinned but isn't held to the target. */
 #define CMPW 640
 #define CMPH 480
-static const struct { const char *name; int32_t x, y, z; short ang; double maxdiff; } cmpview[] = {
-    { "distance", 13824, 50350, -2048, 1024, 5.8 },
-    { "closeup", 13824, 43118, -2048, 1536, 2.41 },
-    { "dark-lit", 13824, 50350, -2048, 512, 3.3 },
-    { "sprites", 24767, 46541, -2048, 1409, 3.7 },
-    { "sprites-mid", 14107, 44964, -2048, 1793, 4.6 },
-    { "sky", -31243, 7160, -181472, 1446, 5.7 },
-    { "translucent", 14938, 44309, -2048, 300, 6.0 },
+static const struct { const char *name; int32_t x, y, z; short ang; double maxdiff, shmaxdiff; } cmpview[] = {
+    { "distance", 13824, 50350, -2048, 1024, 5.8, 4.7 },
+    { "closeup", 13824, 43118, -2048, 1536, 2.41, 1.4 },
+    { "dark-lit", 13824, 50350, -2048, 512, 3.3, 2.8 },
+    { "sprites", 24767, 46541, -2048, 1409, 3.7, 1.8 },
+    { "sprites-mid", 14107, 44964, -2048, 1793, 4.6, 2.3 },
+    { "sky", -31243, 7160, -181472, 1446, 5.7, 5.4 },
+    { "translucent", 14938, 44309, -2048, 300, 6.0, 6.2 },
 };
 #define NCMPVIEWS ((int) (sizeof (cmpview) / sizeof (cmpview[0])))
 
@@ -392,9 +400,9 @@ static const struct { const char *name; int32_t x, y, z; short ang; double maxdi
  *  behind the Pig Cop and the far street, both dark in renderer 0 through
  *  distance shading alone. Each has the most |renderer 3 - renderer 0| of
  *  its mean may be. */
-static const struct { const char *name; int view, x0, y0, x1, y1; double maxdiff; } cmpregion[] = {
-    { "back room", 3, 240, 60, 460, 180, 1.5 },
-    { "far street", 0, 0, 180, 350, 270, 3.0 },
+static const struct { const char *name; int view, x0, y0, x1, y1; double maxdiff, shmaxdiff; } cmpregion[] = {
+    { "back room", 3, 240, 60, 460, 180, 1.5, 1.0 },
+    { "far street", 0, 0, 180, 350, 270, 3.0, 1.0 },
 };
 #define NCMPREGIONS ((int) (sizeof (cmpregion) / sizeof (cmpregion[0])))
 
@@ -436,20 +444,42 @@ static double cmp_diff(const unsigned char *gl, const unsigned char *classic)
     return (double) d / ((double) xdim * ydim * 3);
 }
 
+/* Pixels of a GL frame (xdim by ydim) whose colour isn't one of curpalette's. */
+static long off_palette(const unsigned char *gl)
+{
+    static unsigned char inpal[1 << 21];  /* a bit per RGB colour */
+    long i, n = 0, c;
+
+    memset(inpal, 0, sizeof (inpal));
+    for (i = 0; i < 256; i++)
+    {
+        c = ((long) curpalette[i].r << 16) | (curpalette[i].g << 8) | curpalette[i].b;
+        inpal[c >> 3] |= 1 << (c & 7);
+    }
+    for (i = 0; i < (long) xdim * ydim; i++)
+    {
+        c = ((long) gl[i*3] << 16) | (gl[i*3+1] << 8) | gl[i*3+2];
+        if (!(inpal[c >> 3] & (1 << (c & 7)))) n++;
+    }
+    return n;
+}
+
 /* Draws the comparison views in renderer 0, then in renderer 3 on the
- *  immediate (vertex arrays) and vbo paths, and checks them against the
- *  limits. Captures go to <dir>/cmp_<view>_<r0|immediate|vbo>.bmp. 0: fail,
+ *  immediate (vertex arrays), vbo and shader paths, and checks them against
+ *  the limits; the shader path's views must be all palette colours.
+ *  Captures go to <dir>/cmp_<view>_<r0|immediate|vbo|shader>.bmp. 0: fail,
  *  77: no OpenGL. */
 static int classic_compare(const char *dir)
 {
     static const struct { int32_t path; const char *name; } cmppath[] = {
-        { GLPATH_IMMEDIATE, "immediate" }, { GLPATH_VBO, "vbo" },
+        { GLPATH_IMMEDIATE, "immediate" }, { GLPATH_VBO, "vbo" }, { GLPATH_SHADER, "shader" },
     };
     static signed char savedshade[MAXSPRITES];
     unsigned char *classic[NCMPVIEWS], *gl;
     char path[1024];
-    double d, m0, m3, rs, gs;
-    int v, p, r, y, x, ok = 1;
+    double d, m0, m3, rs, gs, most;
+    int v, p, r, y, x, ok = 1, sh;
+    long off;
     SDL_Surface *s;
 
     for (v = 0; v < MAXSPRITES; v++)
@@ -502,6 +532,7 @@ static int classic_compare(const char *dir)
         polymosttexfullbright = 240;  /* as the game's palettes (menues.c glsetgamepalette) */
         gltexinvalidateall();
         gl = malloc((size_t) xdim * ydim * 3);
+        sh = (cmppath[p].path == GLPATH_SHADER);
         for (v = 0; v < NCMPVIEWS; v++)
         {
             cmp_draw(v);
@@ -510,9 +541,17 @@ static int classic_compare(const char *dir)
             save_front(path, &rs, &gs);
             read_front(gl);
             d = cmp_diff(gl, classic[v]);
+            most = sh ? cmpview[v].shmaxdiff : cmpview[v].maxdiff;
             printf("classic comparison, %s: %s mean |r3 - r0| %.2f (most %.2f)\n", cmppath[p].name,
-                   cmpview[v].name, d, cmpview[v].maxdiff);
-            if (d > cmpview[v].maxdiff) ok = 0;
+                   cmpview[v].name, d, most);
+            if (d > most) ok = 0;
+            if (sh)
+            {
+                off = off_palette(gl);
+                printf("classic comparison, %s: %s has %ld pixels not of the palette\n",
+                       cmppath[p].name, cmpview[v].name, off);
+                if (off) ok = 0;
+            }
             for (r = 0; r < NCMPREGIONS; r++)
             {
                 if (cmpregion[r].view != v) continue;
@@ -520,9 +559,10 @@ static int classic_compare(const char *dir)
                               cmpregion[r].x1, cmpregion[r].y1);
                 m3 = cmp_mean(gl, xdim, ydim, 1, cmpregion[r].x0, cmpregion[r].y0,
                               cmpregion[r].x1, cmpregion[r].y1);
+                most = sh ? cmpregion[r].shmaxdiff : cmpregion[r].maxdiff;
                 printf("classic comparison, %s: %s mean r0 %.1f, r3 %.1f (most apart %.1f)\n",
-                       cmppath[p].name, cmpregion[r].name, m0, m3, cmpregion[r].maxdiff);
-                if (fabs(m3 - m0) > cmpregion[r].maxdiff) ok = 0;
+                       cmppath[p].name, cmpregion[r].name, m0, m3, most);
+                if (fabs(m3 - m0) > most) ok = 0;
             }
         }
         free(gl);
@@ -576,9 +616,9 @@ int main(int argc, char **argv)
         { GLPATH_IMMEDIATE, GLSUB_IMMEDIATE, GLSUB_IMMEDIATE, "immediate" },
         { GLPATH_IMMEDIATE, GLSUB_ARRAYS, GLSUB_ARRAYS, "immediate, vertex arrays" },
         { GLPATH_VBO, -1, GLSUB_VBO, "vbo" },
-        { GLPATH_SHADER, -1, GLSUB_VBO, "shader" },
     };
-    unsigned char *pathshot[2][PATHSHOTS];
+    unsigned char *pathshot[2][PATHSHOTS], *shshot[2][PATHSHOTS], *ref, *mirror[2];
+    double shfade[2][2];
     int p, s, pathdiffer;
     uint32_t draws;
     int32_t refxdim = 0, refydim = 0;
@@ -608,6 +648,9 @@ int main(int argc, char **argv)
     i = classic_compare(argv[2]);
     if (i != 1) return (i == 77) ? 77 : 1;
     if (_setgamemode(1, 320, 200) != 0) { fprintf(stderr, "FAIL: _setgamemode(320x200)\n"); return 1; }
+    /* The checks up to the draw paths' are of the fixed function tiers (the
+     * glow pass, mip levels, retexturing); the shader path's come after. */
+    gldrawpathrequest = GLPATH_VBO;
     if (setgamemode_gl(1) != 0)
     {
         printf("SKIP: no OpenGL (%s)\n", SDL_GetError());
@@ -1065,6 +1108,118 @@ int main(int argc, char **argv)
     }
     gldrawpathrequest = GLPATH_AUTO;
     glsub_force = -1;
+
+    /* The shader path (GL 2.1) draws 3D as palette indices, so its 3D frames
+     * differ from the other paths' on purpose. Its frames must come out the
+     * same with every draw flushed at once (no state change between polygons,
+     * framebuffer or program switch, missing a flush), with the start floor
+     * and masked walls a tile without art too (its polygons write only
+     * depth, the mirror hack, by a colour mask); its 2D frames (the map
+     * view, a still screen) must be immediate mode's; a fade over its frame must redden the screen and a screenshot
+     * work; and a shader that doesn't compile or a framebuffer that's
+     * incomplete must fall back to the vbo path, drawing as it does. */
+    gldrawpathrequest = GLPATH_SHADER;
+    if (setgamemode_gl(1) != 0) { fprintf(stderr, "FAIL: OpenGL with draw path shader\n"); return 1; }
+    if (gldrawpath != GLPATH_SHADER)
+        printf("draw path shader: not on this driver, skipped\n");
+    else
+    {
+        setbrightness(0, palette);
+        for (i = 0; i < 2; i++)
+        {
+            for (s = 0; s < PATHSHOTS; s++) shshot[i][s] = malloc((size_t) xdim * ydim * 3);
+            glsub_flusheach = i;
+            draws = glsub_arraydraws;
+            path_shots(shshot[i], posx, posy, posz, ang, sectnum, oddtile);
+            draws = glsub_arraydraws - draws;
+            printf("draw path shader%s: %d array draws\n", i ? ", each draw flushed" : "", (int) draws);
+        }
+        floorpic = sector[sectnum].floorpicnum;
+        sector[sectnum].floorpicnum = zerotile;
+        for (i = sector[sectnum].wallptr; i < sector[sectnum].wallptr + sector[sectnum].wallnum; i++)
+            if (wall[i].nextsector >= 0) wall[i].overpicnum = zerotile;  /* over the walls behind */
+        for (i = 0; i < 2; i++)
+        {
+            glsub_flusheach = i;
+            mirror[i] = malloc((size_t) xdim * ydim * 3);
+            view_shot(mirror[i], posx, posy, posz, ang, sectnum);
+        }
+        glsub_flusheach = 0;
+        sector[sectnum].floorpicnum = floorpic;
+        for (i = sector[sectnum].wallptr; i < sector[sectnum].wallptr + sector[sectnum].wallnum; i++)
+            if (wall[i].nextsector >= 0) wall[i].overpicnum = LITFLOOR;
+        if ((err = glGetError()) != GL_NO_ERROR)
+            { fprintf(stderr, "FAIL: glGetError 0x%x on draw path shader\n", (unsigned) err); return 1; }
+        if ((glsubmode != GLSUB_ARRAYS) || (draws == 0))
+            { fprintf(stderr, "FAIL: draw path shader sends vertices as mode %d\n", (int) glsubmode); return 1; }
+        for (s = 0; s < PATHSHOTS; s++)
+            if (memcmp(shshot[0][s], shshot[1][s], (size_t) xdim * ydim * 3) != 0)
+            {
+                fprintf(stderr, "FAIL: draw path shader: frame %d differs with each draw flushed, mean |difference| %.4f\n",
+                        s, front_diff(shshot[0][s], shshot[1][s]));
+                return 1;
+            }
+        if (memcmp(mirror[0], mirror[1], (size_t) xdim * ydim * 3) != 0)
+        {
+            fprintf(stderr, "FAIL: draw path shader: tiles without art differ with each draw flushed\n");
+            return 1;
+        }
+        for (s = 5; s <= 6; s++)
+            if (memcmp(shshot[0][s], pathshot[0][s], (size_t) xdim * ydim * 3) != 0)
+            {
+                fprintf(stderr, "FAIL: draw path shader: 2D frame %d differs from immediate, mean |difference| %.4f\n",
+                        s, front_diff(shshot[0][s], pathshot[0][s]));
+                return 1;
+            }
+        printf("draw path shader: the same with each draw flushed; 2D frames the same as immediate\n");
+
+        view_shot(NULL, posx, posy, posz, ang, sectnum);
+        snprintf(path, sizeof (path), "%s/shader_unfaded.bmp", argv[2]);
+        save_front(path, &shfade[0][0], &shfade[0][1]);
+        setpalettefade(63, 0, 0, 32);
+        snprintf(path, sizeof (path), "%s/shader_faded.bmp", argv[2]);
+        save_front(path, &shfade[1][0], &shfade[1][1]);
+        snprintf(path, sizeof (path), "%s/shadercap0000.bmp", argv[2]);
+        remove(path);
+        snprintf(path, sizeof (path), "%s/shadercapxxxx.bmp", argv[2]);
+        i = screencapture(path, 0);
+        setpalettefade(0, 0, 0, 0);
+        printf("draw path shader: mean red/green unfaded %.1f/%.1f, faded %.1f/%.1f; screenshot %s\n",
+               shfade[0][0], shfade[0][1], shfade[1][0], shfade[1][1], i ? "failed" : "written");
+        if ((shfade[1][0] < shfade[0][0] + 64) || (shfade[1][1] > shfade[0][1] + 1))
+            { fprintf(stderr, "FAIL: draw path shader: the fade isn't red\n"); return 1; }
+        if (i != 0) { fprintf(stderr, "FAIL: draw path shader: screencapture\n"); return 1; }
+        if ((err = glGetError()) != GL_NO_ERROR)
+            { fprintf(stderr, "FAIL: glGetError 0x%x after the shader path's fade\n", (unsigned) err); return 1; }
+
+        gldrawpathrequest = GLPATH_VBO;
+        if (setgamemode_gl(1) != 0) { fprintf(stderr, "FAIL: OpenGL with draw path vbo\n"); return 1; }
+        setbrightness(0, palette);
+        ref = malloc((size_t) xdim * ydim * 3);
+        buf = malloc((size_t) xdim * ydim * 3);
+        view_shot(ref, posx, posy, posz, ang, sectnum);
+        for (i = 2; i <= 3; i++)
+        {
+            gl_forcefail = i;
+            gldrawpathrequest = GLPATH_SHADER;
+            if (setgamemode_gl(1) != 0) { fprintf(stderr, "FAIL: OpenGL with draw path shader\n"); return 1; }
+            setbrightness(0, palette);
+            s = gldrawpath;
+            view_shot(buf, posx, posy, posz, ang, sectnum);
+            err = glGetError();
+            printf("draw path shader with %s: %s, then %s; %s vbo's frame\n",
+                   (i == 2) ? "a shader that doesn't compile" : "an incomplete framebuffer",
+                   gl_pathname(s), gl_pathname(gldrawpath),
+                   memcmp(buf, ref, (size_t) xdim * ydim * 3) ? "not" : "as");
+            if ((s != GLPATH_SHADER) || (gldrawpath != GLPATH_VBO) || (glsubmode != GLSUB_VBO) || (err != GL_NO_ERROR) ||
+                (memcmp(buf, ref, (size_t) xdim * ydim * 3) != 0))
+                { fprintf(stderr, "FAIL: draw path shader doesn't fall back to vbo (gl_forcefail %d)\n", i); return 1; }
+        }
+        gl_forcefail = 0;
+        gldrawpathrequest = GLPATH_AUTO;
+        free(ref);
+        free(buf);
+    }
 
     /* A mode over the 8-bit 1600x1200 limit (it changes xdim and ydim, so
      * after the checks above): the OpenGL window still gets the size asked
