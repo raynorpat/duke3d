@@ -190,6 +190,24 @@ Ported from later JFBuild commits, retyped as above:
   wrote `pic[0]`) and finite texture coordinates. The commit's `build.c`
   part (the editor's file list, `OSD_SetLogFile`) and its hightile
   (`gloadtile_hi`) part aren't taken.
+- `ef311521781fc667d5d145f9c4c112987ec18ca9`: `gltexmiplevel`, like Quake's
+  picmip. `uploadtexture` drops that many mipmap levels (clamped to
+  `gltexmaxsize-1`, and written back), uploading level `js` as level 0, and
+  drops more while a texture is over `1<<gltexmaxsize`. `gltexmaxsize` is
+  the log2 of `GL_MAX_TEXTURE_SIZE`, read on the first upload (6 if GL
+  returns 0); both come from upstream between the 2004 import and this
+  commit. Both are `int32_t`, declared in `build.h` under `USE_OPENGL`; the
+  game sets `gltexmiplevel` from `duke3d.cfg`'s `[Screen Setup]
+  GLTextureMipLevel` before each GL mode set (textures made earlier keep
+  their size until `polymost_glreset()`). With the `GL_NEAREST` default,
+  a miplevel over 0 looks blocky. Change from upstream: `js` is cut, per
+  texture, to the texture's last level, so one smaller than `2^js` (such
+  as a 0-sized tile's 1x1) still gets a level 0; upstream uploaded nothing
+  and GL drew the polygon untextured. Not taken: the OSD variables
+  (`gltexturemaxsize`, `gltexturemiplevel`); the commit's `drawpoly` part,
+  which zeroes the alpha-test cutoff for invalid textures (E2L7's urinals
+  behind the mirror), as our `drawpoly` has no alpha test; its
+  `winlayer.c` part.
 
 ## Engine hooks
 

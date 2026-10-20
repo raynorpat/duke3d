@@ -2038,6 +2038,9 @@ static int setgamemoderenderer(void)
 {
     if (setgamemode(ScreenMode,ScreenWidth,ScreenHeight) < 0)
         return -1;
+#ifdef USE_OPENGL
+    gltexmiplevel = GLTextureMipLevel;  // duke3d.cfg: drop this many mipmap levels
+#endif
     if (gamerenderer == 3 && setgamemode_gl(ScreenMode) != 0)
     {
         printf("OpenGL renderer unavailable (%s); using the classic renderer.\n", SDL_GetError());

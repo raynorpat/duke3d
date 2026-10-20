@@ -10,8 +10,16 @@
  *                      E1's ending screen, drawn once with dastat 128 as
  *                      game.c does, faded in from black: setpalettefade
  *                      (0,0,0,63), then 32, then 0
- *  It fails on a GL error, a failed capture, a fade that doesn't redden, or
- *  a still screen that doesn't brighten as it fades in.
+ *   <dir>/tex_npot<n>_mip<m>.bmp
+ *                      the start view again with non-power-of-two textures
+ *                      off/on (<n>; on only if the driver has them) and
+ *                      gltexmiplevel <m> 0 and 1: the floor underfoot is a
+ *                      0x0 tile (it should vanish, not draw grey), and the
+ *                      first odd-sized tile is drawn with rotatesprite and
+ *                      polymost_drawtilescreen
+ *  It fails on a GL error, a failed capture, a fade that doesn't redden, a
+ *  still screen that doesn't brighten as it fades in, a miplevel 1 view
+ *  the same as the miplevel 0 one, or a 0x0 floor that isn't see-through.
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
  *
@@ -36,6 +44,11 @@ void faketimerhandler(void) { }
 #define APLAYER 1405  /* names.h: a player start */
 #define FIRSTGUN 2524  /* names.h: the pistol */
 #define VICTORY1 3260  /* names.h: E1's ending screen */
+
+/* polymost.c, which engine.c includes: the editor's tile picker, and the
+ * texture cache reset. */
+int32_t polymost_drawtilescreen(int32_t tilex, int32_t tiley, int32_t wallnum, int32_t dimen);
+void polymost_glreset(void);
 
 /* Like premap.c genspriteremaps(): the palette swaps from lookup.dat. */
 static int load_lookups(void)
@@ -106,6 +119,36 @@ static void save_front(const char *path, double *red, double *green)
     free(tmp);
 }
 
+/* Reads the front buffer as RGB into buf (xdim*ydim*3 bytes). */
+static void read_front(unsigned char *buf)
+{
+    glReadBuffer(GL_FRONT);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, xdim, ydim, GL_RGB, GL_UNSIGNED_BYTE, buf);
+    glReadBuffer(GL_BACK);
+}
+
+/* Mean absolute difference per channel of two read_front buffers. */
+static double front_diff(const unsigned char *a, const unsigned char *b)
+{
+    long i, n = (long) xdim * ydim * 3;
+    double d = 0;
+    for (i = 0; i < n; i++) d += abs((int) a[i] - (int) b[i]);
+    return d / n;
+}
+
+/* Mean of a read_front buffer's bottom-right corner (the bottom 5%, x from
+ *  80% to 98%): floor in the start view, black when the floor is gone. */
+static double floor_mean(const unsigned char *a)
+{
+    int x, y;
+    double d = 0;
+    for (y = 0; y < ydim / 20; y++)
+        for (x = xdim * 80 / 100; x < xdim * 98 / 100; x++)
+            d += a[(y * xdim + x) * 3] + a[(y * xdim + x) * 3 + 1] + a[(y * xdim + x) * 3 + 2];
+    return d / (3.0 * (ydim / 20) * (xdim * 98 / 100 - xdim * 80 / 100));
+}
+
 int main(int argc, char **argv)
 {
     int32_t posx, posy, posz;
@@ -116,6 +159,8 @@ int main(int argc, char **argv)
     double still[3], rs, gs;
     GLenum err;
     int32_t i;
+    int npot, hasnpot, mip, zerotile = -1, oddtile = -1;
+    unsigned char *shot[2][2];
 
     if (argc < 3)
     {
@@ -183,12 +228,64 @@ int main(int argc, char **argv)
     printf("still screen mean red+green/2: fade 63 %.1f, 32 %.1f, 0 %.1f\n", still[0], still[1], still[2]);
     err = glGetError();
 
+    /* A 0x0 tile, and the first tile with both sides odd and over 32. */
+    for (i = 0; i < MAXTILES; i++)
+    {
+        if ((zerotile < 0) && (tilesizx[i] == 0) && (tilesizy[i] == 0)) zerotile = i;
+        if ((oddtile < 0) && (tilesizx[i] > 32) && (tilesizy[i] > 32) &&
+            (tilesizx[i] & 1) && (tilesizy[i] & 1)) oddtile = i;
+    }
+    if ((zerotile < 0) || (oddtile < 0)) { fprintf(stderr, "FAIL: no 0x0 or odd-sized tile\n"); return 1; }
+    sector[sectnum].floorpicnum = zerotile;
+    printf("0x0 tile %d on sector %d's floor; odd tile %d is %dx%d\n", zerotile, sectnum,
+           oddtile, tilesizx[oddtile], tilesizy[oddtile]);
+
+    hasnpot = glinfo.texnpot;
+    for (npot = 0; npot <= hasnpot; npot++)
+        for (mip = 0; mip < 2; mip++)
+        {
+            /* Textures already made keep their size: start again. */
+            glinfo.texnpot = npot;
+            gltexmiplevel = mip;
+            polymost_glreset();
+            clearallviews(0);
+            drawrooms(posx, posy, posz, ang, 100, sectnum);
+            drawmasks();
+            rotatesprite(270<<16, 150<<16, 65536/2, 0, oddtile, 0, 0, 2, 0, 0, xdim-1, ydim-1);
+            setpolymost2dview();
+            polymost_drawtilescreen(8, 8, oddtile, 256);
+            polymost_drawtilescreen(160, 8, zerotile, 256);
+            nextpage();
+            snprintf(path, sizeof (path), "%s/tex_npot%d_mip%d.bmp", argv[2], npot, mip);
+            save_front(path, &rs, &gs);
+            shot[npot][mip] = malloc((size_t) xdim * ydim * 3);
+            read_front(shot[npot][mip]);
+            if (err == GL_NO_ERROR) err = glGetError();
+        }
+    glinfo.texnpot = hasnpot;
+    gltexmiplevel = 0;
+    for (npot = 0; npot <= hasnpot; npot++)
+        printf("npot %d: mean |miplevel 1 - miplevel 0| %.2f; 0x0 floor mean %.1f, %.1f\n", npot,
+               front_diff(shot[npot][0], shot[npot][1]),
+               floor_mean(shot[npot][0]), floor_mean(shot[npot][1]));
+    if (hasnpot)
+        printf("miplevel 0: mean |npot 1 - npot 0| %.2f\n", front_diff(shot[0][0], shot[1][0]));
+    else
+        printf("no GL_ARB_texture_non_power_of_two: npot 1 not drawn\n");
+
     uninitengine();
 
     if (err != GL_NO_ERROR) { fprintf(stderr, "FAIL: glGetError 0x%x\n", (unsigned) err); return 1; }
     if ((r1 < r0 + 64) || (g1 > g0 + 1)) { fprintf(stderr, "FAIL: the fade isn't red\n"); return 1; }
     if ((still[1] < still[0] + 8) || (still[2] < still[1] + 8))
         { fprintf(stderr, "FAIL: the still screen doesn't fade in\n"); return 1; }
+    for (npot = 0; npot <= hasnpot; npot++)
+        if (front_diff(shot[npot][0], shot[npot][1]) == 0)
+            { fprintf(stderr, "FAIL: miplevel 1 looks the same as 0 (npot %d)\n", npot); return 1; }
+    for (npot = 0; npot <= hasnpot; npot++)
+        for (mip = 0; mip < 2; mip++)
+            if (floor_mean(shot[npot][mip]) > 32)
+                { fprintf(stderr, "FAIL: the 0x0 floor draws (npot %d, miplevel %d)\n", npot, mip); return 1; }
     printf("PASS: render_gl\n");
     return 0;
 }

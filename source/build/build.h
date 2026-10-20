@@ -232,6 +232,10 @@ extern int32_t bpp;
 	/* What the OpenGL driver supports, filled in by setgamemode_gl. */
 struct glinfo_t { float maxanisotropy; char bgra, clamptoedge, texcompr, texnpot; };
 extern struct glinfo_t glinfo;
+	/* polymost.c: log2 of the largest texture size (0: from GL_MAX_TEXTURE_SIZE
+	 * on the first upload), and how many mipmap levels every texture drops.
+	 * Textures made before a change keep their size until polymost_glreset(). */
+extern int32_t gltexmaxsize, gltexmiplevel;
 #endif
 #endif
 

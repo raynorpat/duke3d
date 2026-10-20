@@ -118,6 +118,8 @@ static struct glfiltermodes {
 int32_t glanisotropy = 1;            // 0 = maximum supported by card
 int glusetexcompr = 0;
 int32_t gltexfiltermode = 0;   // GL_NEAREST
+int32_t gltexmaxsize = 0;      // 0 means autodetection on first run
+int32_t gltexmiplevel = 0;		// discards this many mipmap levels
 extern char nofog;
 #endif
 
@@ -373,12 +375,30 @@ void fixtransparency (coltype *dapic, int32_t daxsiz, int32_t daysiz, int32_t da
 static void uploadtexture(int32_t doalloc, int32_t xsiz, int32_t ysiz, int32_t intexfmt, int32_t texfmt, coltype *pic, int32_t tsizx, int32_t tsizy, int32_t dameth)
 {
 	coltype *wpptr, *rpptr;
-	int32_t x2, y2, j, x3, y3, y, x, r, g, b, a, k;
-	
-	if (doalloc)
-		glTexImage2D(GL_TEXTURE_2D,0,intexfmt,xsiz,ysiz,0,texfmt,GL_UNSIGNED_BYTE,pic); //loading 1st time
-	else
-		glTexSubImage2D(GL_TEXTURE_2D,0,0,0,xsiz,ysiz,texfmt,GL_UNSIGNED_BYTE,pic); //overwrite old texture
+	int32_t x2, y2, j, js=0, x3, y3, y, x, r, g, b, a, k;
+
+	if (gltexmaxsize <= 0) {
+		GLint i = 0;
+		glGetIntegerv(GL_MAX_TEXTURE_SIZE, &i);
+		if (!i) gltexmaxsize = 6;   // 2^6 = 64 == default GL max texture size
+		else {
+			gltexmaxsize = 0;
+			for (; i>1; i>>=1) gltexmaxsize++;
+		}
+	}
+
+	js = max(0,min(gltexmaxsize-1,gltexmiplevel));
+	gltexmiplevel = js;
+	while ((xsiz>>js) > (1<<gltexmaxsize) || (ysiz>>js) > (1<<gltexmaxsize)) js++;
+		//Keep a level to upload: a texture smaller than 2^js has no level js
+	while ((js > 0) && !(xsiz>>js) && !(ysiz>>js)) js--;
+
+	if (js == 0) {
+		if (doalloc)
+			glTexImage2D(GL_TEXTURE_2D,0,intexfmt,xsiz,ysiz,0,texfmt,GL_UNSIGNED_BYTE,pic); //loading 1st time
+		else
+			glTexSubImage2D(GL_TEXTURE_2D,0,0,0,xsiz,ysiz,texfmt,GL_UNSIGNED_BYTE,pic); //overwrite old texture
+	}
 
 #if 0
 	gluBuild2DMipmaps(GL_TEXTURE_2D,GL_RGBA8,xsiz,ysiz,texfmt,GL_UNSIGNED_BYTE,pic); //Needs C++ to link?
@@ -414,10 +434,12 @@ static void uploadtexture(int32_t doalloc, int32_t xsiz, int32_t ysiz, int32_t i
 			}
 		}
 		if (tsizx >= 0) fixtransparency(pic,(tsizx+(1<<j)-1)>>j,(tsizy+(1<<j)-1)>>j,x3,y3,dameth);
-		if (doalloc)
-			glTexImage2D(GL_TEXTURE_2D,j,intexfmt,x3,y3,0,texfmt,GL_UNSIGNED_BYTE,pic); //loading 1st time
-		else
-			glTexSubImage2D(GL_TEXTURE_2D,j,0,0,x3,y3,texfmt,GL_UNSIGNED_BYTE,pic); //overwrite old texture
+		if (j >= js) {
+			if (doalloc)
+				glTexImage2D(GL_TEXTURE_2D,j-js,intexfmt,x3,y3,0,texfmt,GL_UNSIGNED_BYTE,pic); //loading 1st time
+			else
+				glTexSubImage2D(GL_TEXTURE_2D,j-js,0,0,x3,y3,texfmt,GL_UNSIGNED_BYTE,pic); //overwrite old texture
+		}
 		x2 = x3; y2 = y3;
 	}
 #endif
