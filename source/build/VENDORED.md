@@ -231,7 +231,11 @@ Ported from later JFBuild commits, retyped as above:
   `gloadtile` would have padded to over the tile's size, after taking whole
   repeats off at the polygon's middle (classic fixed point drops them,
   which only a power-of-two texture hides), so a tile that isn't a power of
-  two draws as it does without them. Not taken: the `glpolygonmode` debug
+  two matches its drawing without them within the repeat at the polygon's
+  middle (other repeats are phase-shifted). Both scales take an empty tile
+  (an animated frame of size 0, which reaches the fill as `drawmapview`
+  checks the size before `animateoffs`) as size 1, as `drawpoly` and
+  `gloadtile` do. Not taken: the `glpolygonmode` debug
   variable, the `clearview`/`clearallviews` colour fix (we already divide
   by 255), and the `winlayer.c` part.
 - `80878afe29b09f07c3ca8a4aecdc54dc7905f571`: map view translucency. In

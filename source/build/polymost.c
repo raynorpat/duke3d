@@ -3163,7 +3163,7 @@ void polymost_fillpolygon (int32_t npoints)
 	static float fx[MAXWALLSB], fy[MAXWALLSB];
 	float f, a = 1.0;
 	double cx, cy;
-	int32_t i;
+	int32_t i, j;
 
 	globalx1 = mulscale16(globalx1,xyaspect);
 	globaly2 = mulscale16(globaly2,xyaspect);
@@ -3191,11 +3191,13 @@ void polymost_fillpolygon (int32_t npoints)
 		cx /= (double)npoints; cy /= (double)npoints;
 		guo -= floor(cx*gux + cy*guy + guo);
 		gvo -= floor(cx*gvx + cy*gvy + gvo);
-		for(i=1;i<tilesizx[globalpicnum];i+=i);
-		f = ((float)i)/((float)tilesizx[globalpicnum]);
+		j = max(1,tilesizx[globalpicnum]); //an animated frame can be empty
+		for(i=1;i<j;i+=i);
+		f = ((float)i)/((float)j);
 		gux *= f; guy *= f; guo *= f;
-		for(i=1;i<tilesizy[globalpicnum];i+=i);
-		f = ((float)i)/((float)tilesizy[globalpicnum]);
+		j = max(1,tilesizy[globalpicnum]);
+		for(i=1;i<j;i+=i);
+		f = ((float)i)/((float)j);
 		gvx *= f; gvy *= f; gvo *= f;
 	}
 
