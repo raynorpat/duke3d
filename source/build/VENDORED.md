@@ -414,20 +414,28 @@ Ported from later JFBuild commits, retyped as above:
   `setgamemode_gl` calls `glsub_init`, `destroy_gl_window` `glsub_uninit`.
   The immediate and vbo paths draw the same pixels as JFBuild's immediate
   mode on the drivers tested (macOS's 2.1).
-- `polymost.c` (ours): on the shader path (GL 2.1) the 3D view draws
-  classic's palette indices into a framebuffer: tiles as `GL_LUMINANCE8`
-  index textures (their own cache, `glidxtex`, kept by `gltexinvalidate`),
-  a program that looks each texel up in `palookup` (a texture of every pal
+- `polymost.c` (ours): on the shader path (GL 2.1) everything draws
+  classic's palette indices into a framebuffer that keeps the frame, as
+  classic's does. Tiles are `GL_LUMINANCE8` index textures (their own
+  cache, `glidxtex`, kept by `gltexinvalidate`; `polymost_precache` makes
+  them, and `premap.c`'s `docacheit` precaches a level's), drawn by a
+  program that looks each texel up in `palookup` (a texture of every pal
   and shade, reloaded when `makepalookup` sets `glshlookupdirty`) at the
-  polygon's shade plus classic's distance shade for the pixel's eye z
-  (`glfogshades`; the parallaxed sky's constant `polymost_skyshade`), with
-  index 255 see-through and no glow pass. `polymost_drawrooms` (cleared),
-  `polymost_drawmaskwall` and `polymost_drawsprite` start it;
-  `polymost_resolve_shader` draws it into the view window through the
-  palette, called by `setpolymost2dview`, `polymost_dorotatesprite`, the
-  tile picker, `clearview`, `clearallviews`, `gl_swap` and screenshots, so
-  2D (still RGB) goes over it. A shader that doesn't compile or link, or an
-  incomplete framebuffer, prints why and falls back to the vbo path.
+  polygon's shade plus, in the 3D view, classic's distance shade for the
+  pixel's eye z (`glfogshades`; the parallaxed sky's constant
+  `polymost_skyshade`), with index 255 see-through when masked and no glow
+  pass. That's the 3D view, rotatesprite, the map view's floors and the
+  tile picker; lines, text, pixels and clears are the index itself
+  (`polymost_2dcolor`). `polymost_shaderdraw` binds the framebuffer and
+  the program for each; `polymost_drawrooms` clears only its depth, so a
+  hole shows what was there, as in classic. `polymost_present_shader`
+  draws the frame into the window through `getfadedpalette` (engine.c:
+  curpalette, or the base palette faded as `setpalettefade` fades the
+  8-bit one); `polymost_capture_shader` reads it the same way for
+  screenshots; `polymost_takeframe_shader`/`polymost_putframe_shader` keep
+  it, stretched, across a resize. A shader that doesn't compile or link,
+  or an incomplete framebuffer, prints why and falls back to the vbo path
+  (retexturing, as palette changes don't on the shader path).
 
 ## Renderer 3: 2D, clears, palette, fades, screenshots
 
@@ -482,6 +490,11 @@ Ported from later JFBuild commits, retyped as above:
     `engine_protos.h`) draws `lastframe`, without the fade, into the frame
     being drawn. Duke's 1.3D load/save menus draw over the previous frame,
     which renderer 3 doesn't keep after a swap.
+  - On the shader path none of the `lastframe` and fade quad steps happen:
+    `gl_swap` and `_glpalettefade` show the framebuffer through the faded
+    palette (`polymost_present_shader`), which keeps the frame for fades,
+    `glredrawlastframe` and screenshots; `VBE_setPalette` doesn't
+    retexture; `_glframereplayed` binds the window's framebuffer again.
 
 # Vendored: stb_image_write.h
 

@@ -202,20 +202,25 @@ static unsigned int glpic[GLTEXMAX];
 	//Glow texture of each cache slot (0: none): its texels at or above polymosttexfullbright
 static GLuint glpicfb[GLTEXMAX];
 int32_t polymosttexfullbright = 256; //first fullbright palette index (256: off)
+uint32_t gl_rgbtexloads = 0, gl_rgbtexinvalidations = 0; //test hooks: gloadtile and gltexinvalidateall calls
 static int32_t gltexcacind[GLTEXMAX], gltexcacnext[GLTEXMAX], gltexcacnum = -1;
 
-	//GL 2.1 tier (gldrawpath GLPATH_SHADER): the 3D view draws classic's palette
-	//   indices, palookup[pal][shade][texel] with the shade worked out per pixel,
-	//   into a framebuffer; the resolve draws that into the window through the
-	//   palette. Drawing outside the 3D view stays RGB, over the resolved view.
+	//GL 2.1 tier (gldrawpath GLPATH_SHADER): everything draws classic's palette
+	//   indices into a framebuffer that keeps the frame, as classic's does: the 3D
+	//   view palookup[pal][shade][texel] with the shade worked out per pixel, 2D
+	//   tiles the same with their own shade, and lines, text and clears the index
+	//   itself. Showing it (polymost_present_shader) draws that into the window
+	//   through the palette, faded as classic fades the 8-bit palette.
 static GLuint glshprog = 0, glshresolve = 0; //the index and resolve programs
 static GLuint glshfbo = 0, glshfbotex = 0, glshdepth = 0; //the framebuffer: an index in red, and depth
 static int32_t glshfbox = 0, glshfboy = 0; //its size
 static GLuint glshlookup = 0, glshpal = 0; //the palookups (a row per pal and shade) and the palette
 static int32_t glshlookupdirty = 1; //makepalookup changed one
 static palette_t glshpalnow[256]; //what glshpal holds
-static int32_t glscene = 0; //the 3D view is drawing into the framebuffer
-static int32_t glscenex1, glsceney1, glscenex2, glsceney2; //its window, to resolve
+void getfadedpalette(palette_t *pal); //engine.c: the palette on screen
+static int32_t glshbound = 0; //drawing goes into the framebuffer (until it's shown)
+static int32_t glshprogon = 0; //with the index program
+static int32_t glscene = 0; //the 3D view is drawing (its depth cleared, its distance shade on)
 static GLuint glidxtex[MAXTILES][2]; //each tile's index texture, repeating and clamped (0: none)
 static char glidxdirty[MAXTILES][2]; //its art changed
 static float glskyshade = 0.f; //classic's distance shade of the parallaxed sky, while drawing it
@@ -270,6 +275,7 @@ void gltexinvalidate (int32_t dapicnum, int32_t dapalnum, int32_t dameth)
 void gltexinvalidateall ()
 {
 	int32_t i;
+	gl_rgbtexinvalidations++;
 	for(i=gltexcacnum-1;i>=0;i--) gltexcacind[i] |= 0x80000000;
 }
 
@@ -400,12 +406,13 @@ static void polymost_setfog (int32_t shade, float zero)
 
 	//The index program: classic's shade is the surface's (r, a whole number) plus the
 	//   whole shades of its distance, shades per unit of eye z (b) times its eye z, as
-	//   getpalookup's shade+(davis>>8) (gl_Color isn't clamped); pal is g. 255 is see-through.
+	//   getpalookup's shade+(davis>>8) (gl_Color isn't clamped); pal is g. 255 is
+	//   see-through when a is 1 (masked), drawn as the others when it's 0 (opaque).
 static const char glshidxvert[] =
 	"#version 120\n"
 	"uniform float numshades;\n"
 	"varying vec2 uv;\n"
-	"varying float shade, dist, row;\n"
+	"varying float shade, dist, row, masked;\n"
 	"void main()\n"
 	"{\n"
 	"    gl_Position = ftransform();\n"
@@ -413,21 +420,22 @@ static const char glshidxvert[] =
 	"    shade = gl_Color.r;\n"
 	"    dist = abs((gl_ModelViewMatrix*gl_Vertex).z)*gl_Color.b;\n"
 	"    row = gl_Color.g*numshades;\n"
+	"    masked = gl_Color.a;\n"
 	"}\n";
 static const char glshidxfrag[] =
 	"#version 120\n"
 	"uniform sampler2D tile, lookup;\n"
 	"uniform float numshades, rowscale;\n"
 	"varying vec2 uv;\n"
-	"varying float shade, dist, row;\n"
+	"varying float shade, dist, row, masked;\n"
 	"void main()\n"
 	"{\n"
 	"    float i = texture2D(tile,uv).r;\n"
-	"    if (i > 254.5/255.0) discard;\n"
+	"    if ((i > 254.5/255.0) && (masked > 0.5)) discard;\n"
 	"    float s = clamp(floor(shade+0.5)+floor(dist),0.0,numshades-1.0);\n"
 	"    gl_FragColor = vec4(texture2D(lookup,vec2((i*255.0+0.5)/256.0,(row+s+0.5)*rowscale)).r,0.0,0.0,1.0);\n"
 	"}\n";
-	//The resolve: each index through the palette
+	//The present: each index through the palette
 static const char glshresvert[] =
 	"#version 120\n"
 	"void main()\n"
@@ -500,7 +508,8 @@ static GLuint polymost_shlink (const char *vs, const char *fs, const char *tex0,
 static void polymost_shaderfree ()
 {
 	glsub_flush();
-	if (glscene) { bglBindFramebuffer(GL_FRAMEBUFFER,0); glscene = 0; }
+	if (glshbound) { bglBindFramebuffer(GL_FRAMEBUFFER,0); glshbound = 0; }
+	glscene = glshprogon = 0;
 	if ((glshprog) || (glshresolve)) bglUseProgram(0);
 	if (glshprog) { bglDeleteProgram(glshprog); glshprog = 0; }
 	if (glshresolve) { bglDeleteProgram(glshresolve); glshresolve = 0; }
@@ -520,6 +529,8 @@ static void polymost_shaderfail (const char *why)
 	polymost_shaderfree();
 	gldrawpath = GLPATH_VBO;
 	glsub_uninit(); glsub_init(); //vertices into a buffer, as the vbo path sends them
+	gltexinvalidateall(); //palette changes didn't retexture on the shader path
+	polymost_buildshaderamp();
 }
 
 	//palookup[pal][shade][index] as a texture 256 wide, a row per pal and shade (a pal
@@ -552,7 +563,7 @@ static int32_t polymost_uploadlookup ()
 	bglUseProgram(glshprog);
 	bglUniform1f(bglGetUniformLocation(glshprog,"numshades"),(float)numpalookups);
 	bglUniform1f(bglGetUniformLocation(glshprog,"rowscale"),1.f/(float)rows);
-	bglUseProgram(0);
+	if (!glshprogon) bglUseProgram(0);
 	glshlookupdirty = 0;
 	return(1);
 }
@@ -597,7 +608,13 @@ static int32_t polymost_shaderready ()
 			bglFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,glshdepth);
 		}
 		status = bglCheckFramebufferStatus(GL_FRAMEBUFFER);
+		if (status == GL_FRAMEBUFFER_COMPLETE) //a new frame starts as index 0
+		{
+			glClearColor(0,0,0,0);
+			glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+		}
 		bglBindFramebuffer(GL_FRAMEBUFFER,0);
+		glshbound = 0;
 		if (status != GL_FRAMEBUFFER_COMPLETE) { polymost_shaderfail("its framebuffer is incomplete"); return(0); }
 	}
 	if ((glshlookupdirty) && (!polymost_uploadlookup()))
@@ -605,43 +622,96 @@ static int32_t polymost_shaderready ()
 	return(1);
 }
 
-	//Starts the 3D view drawing indices into the framebuffer (cleared if clear)
-static void polymost_beginframe_shader (int32_t clear)
+	//Points drawing at the framebuffer (GL 2.1 tier), ending the 3D view, with the
+	//   index program (prog) or without (fixed function, as lines and text draw).
+	//   0: not on that tier, so GL draws RGB as before.
+static int32_t polymost_shaderdraw (int32_t prog)
 {
-	if ((glscene) || (!polymost_shaderready())) return;
-	glsub_flush();
-	bglBindFramebuffer(GL_FRAMEBUFFER,glshfbo);
-	if (clear)
+	if (!polymost_shaderready()) return(0);
+	glscene = 0;
+	if (!glshbound)
 	{
-		glClearColor(0,0,0,0);
-		glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+		glsub_flush();
+		bglBindFramebuffer(GL_FRAMEBUFFER,glshfbo);
+		glshbound = 1;
 	}
-	bglActiveTexture(GL_TEXTURE1);
-	(glBindTexture)(GL_TEXTURE_2D,glshlookup);
-	bglActiveTexture(GL_TEXTURE0);
-	bglUseProgram(glshprog);
-	glscene = 1;
-	glscenex1 = windowx1; glsceney1 = windowy1;
-	glscenex2 = windowx2; glsceney2 = windowy2;
+	if (prog != glshprogon)
+	{
+		glsub_flush();
+		if (prog) //the palookups on unit 1 (the present binds the palette there)
+		{
+			bglActiveTexture(GL_TEXTURE1);
+			(glBindTexture)(GL_TEXTURE_2D,glshlookup);
+			bglActiveTexture(GL_TEXTURE0);
+		}
+		bglUseProgram(prog?glshprog:0);
+		glshprogon = prog;
+	}
+	return(1);
 }
 
-	//Draws the 3D view's indices into its window through the palette. Drawing
-	//   outside the 3D view (2D, the swap, a screenshot) calls it first.
-void polymost_resolve_shader ()
+	//Starts the 3D view drawing indices into the framebuffer, its depth cleared if
+	//   clear. Its colour isn't: a hole in the level shows what was there, as in
+	//   classic (clearview's colour, or the last frame).
+static void polymost_beginframe_shader (int32_t clear)
 {
+	if ((glscene) || (!polymost_shaderdraw(1))) return;
+	if (clear) glClear(GL_DEPTH_BUFFER_BIT);
+	glscene = 1;
+}
+
+	//A 2D colour, palette index col: on the GL 2.1 tier the index itself
+static void polymost_2dcolor (int32_t col)
+{
+	if (glshbound) glsub_color(((float)col)/255.f,0.f,0.f,1.f);
+	else glsub_color(curpalette[col].r/255.f,curpalette[col].g/255.f,curpalette[col].b/255.f,1);
+}
+
+	//Between frames (after nextpage's replay): the window's framebuffer is bound
+	//   again, as for reading the screen. The next drawing binds the frame's.
+void polymost_unbind_shader ()
+{
+	if (!glshbound) return;
+	glsub_flush();
+	bglUseProgram(0);
+	bglBindFramebuffer(GL_FRAMEBUFFER,0);
+	glscene = glshbound = glshprogon = 0;
+}
+
+	//Draws the bound texture over the whole window, its rows bottom-up
+static void polymost_shaderquad ()
+{
+	glsub_color(1.f,1.f,1.f,1.f);
+	glsub_begin(GL_TRIANGLE_FAN);
+	glsub_texcoord(0.f,1.f); glsub_vertex(0.f,0.f,0);
+	glsub_texcoord(1.f,1.f); glsub_vertex((float)xres,0.f,0);
+	glsub_texcoord(1.f,0.f); glsub_vertex((float)xres,(float)yres,0);
+	glsub_texcoord(0.f,0.f); glsub_vertex(0.f,(float)yres,0);
+	glsub_end();
+	glsub_flush();
+}
+
+	//Shows the frame on the GL 2.1 tier: draws the framebuffer's indices into the
+	//   window through the palette on screen (getfadedpalette), for the swap. The
+	//   framebuffer keeps them. 0: not on that tier (or nothing drawn yet).
+int32_t polymost_present_shader ()
+{
+	palette_t pal[256];
 	unsigned char rgb[768];
-	float x1, y1, x2, y2, rx, ry;
 	int32_t i;
 
-	if (!glscene) return;
+	if ((gldrawpath != GLPATH_SHADER) || (!glshfbo)) return(0);
+	setpolymost2dview(); //the 2D view and its state, no 3D view or program
+	if (!glshbound) return(0); //the tier failed
 	glsub_flush();
-	glscene = 0;
 	bglBindFramebuffer(GL_FRAMEBUFFER,0);
+	glshbound = 0;
+	getfadedpalette(pal);
 	bglActiveTexture(GL_TEXTURE1);
-	if ((!glshpal) || (memcmp(glshpalnow,curpalette,sizeof(glshpalnow))))
+	if ((!glshpal) || (memcmp(glshpalnow,pal,sizeof(glshpalnow))))
 	{
-		memcpy(glshpalnow,curpalette,sizeof(glshpalnow));
-		for(i=0;i<256;i++) { rgb[i*3] = curpalette[i].r; rgb[i*3+1] = curpalette[i].g; rgb[i*3+2] = curpalette[i].b; }
+		memcpy(glshpalnow,pal,sizeof(glshpalnow));
+		for(i=0;i<256;i++) { rgb[i*3] = pal[i].r; rgb[i*3+1] = pal[i].g; rgb[i*3+2] = pal[i].b; }
 		if (!glshpal) glGenTextures(1,&glshpal);
 		(glBindTexture)(GL_TEXTURE_2D,glshpal);
 		glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
@@ -653,20 +723,68 @@ void polymost_resolve_shader ()
 	else (glBindTexture)(GL_TEXTURE_2D,glshpal);
 	bglActiveTexture(GL_TEXTURE0);
 	bglUseProgram(glshresolve);
-	setpolymost2dview();
+	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D,glshfbotex);
-	x1 = (float)glscenex1; y1 = (float)glsceney1;
-	x2 = (float)(glscenex2+1); y2 = (float)(glsceney2+1);
-	rx = 1.f/(float)glshfbox; ry = 1.f/(float)glshfboy;
-	glsub_color(1.f,1.f,1.f,1.f);
-	glsub_begin(GL_TRIANGLE_FAN); //the framebuffer's rows are bottom-up
-	glsub_texcoord(x1*rx,1.f-y1*ry); glsub_vertex(x1,y1,0);
-	glsub_texcoord(x2*rx,1.f-y1*ry); glsub_vertex(x2,y1,0);
-	glsub_texcoord(x2*rx,1.f-y2*ry); glsub_vertex(x2,y2,0);
-	glsub_texcoord(x1*rx,1.f-y2*ry); glsub_vertex(x1,y2,0);
-	glsub_end();
-	glsub_flush();
+	polymost_shaderquad();
 	bglUseProgram(0);
+	glDisable(GL_TEXTURE_2D);
+	return(1);
+}
+
+	//The frame as polymost_present_shader shows it: RGB, top row first, xres by
+	//   yres, in a malloc'd buffer. NULL: not on the GL 2.1 tier (or no memory).
+unsigned char *polymost_capture_shader ()
+{
+	palette_t pal[256], *c;
+	unsigned char *idx, *rgb, *p;
+	int32_t x, y;
+
+	if ((gldrawpath != GLPATH_SHADER) || (!glshfbo)) return(NULL);
+	idx = (unsigned char *)malloc(xres*yres);
+	rgb = (unsigned char *)malloc(xres*yres*3);
+	if ((!idx) || (!rgb)) { free(idx); free(rgb); return(NULL); }
+	glsub_flush();
+	if (!glshbound) bglBindFramebuffer(GL_FRAMEBUFFER,glshfbo);
+	glPixelStorei(GL_PACK_ALIGNMENT,1);
+	glReadPixels(0,0,xres,yres,GL_RED,GL_UNSIGNED_BYTE,idx);
+	if (!glshbound) bglBindFramebuffer(GL_FRAMEBUFFER,0);
+	getfadedpalette(pal);
+	for(y=0,p=rgb;y<yres;y++) //the framebuffer's rows are bottom-up
+		for(x=0;x<xres;x++,p+=3)
+		{
+			c = &pal[idx[(yres-1-y)*xres+x]];
+			p[0] = c->r; p[1] = c->g; p[2] = c->b;
+		}
+	free(idx);
+	return(rgb);
+}
+
+	//A window resize, before polymost_glreset: takes the frame's texture from the
+	//   GL 2.1 tier for polymost_putframe_shader after. 0: none.
+GLuint polymost_takeframe_shader ()
+{
+	GLuint tex;
+
+	if ((gldrawpath != GLPATH_SHADER) || (!glshfbotex)) return(0);
+	glsub_flush();
+	if (glshbound) { bglBindFramebuffer(GL_FRAMEBUFFER,0); glshbound = 0; }
+	glscene = 0;
+	tex = glshfbotex; glshfbotex = 0;
+	return(tex);
+}
+
+	//...and draws it into the new framebuffer, stretched to its size, then drops it
+void polymost_putframe_shader (GLuint tex)
+{
+	setpolymost2dview();
+	if (glshbound)
+	{
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D,tex);
+		polymost_shaderquad();
+		glDisable(GL_TEXTURE_2D);
+	}
+	glDeleteTextures(1,&tex);
 }
 
 	//A tile's index texture (GL 2.1 tier): its palette indices as they are, nearest,
@@ -922,6 +1040,7 @@ void gloadtile (int32_t dapic, int32_t dapal, int32_t dameth, int32_t gltexind, 
 	int32_t hist[256];
 
 	memset(hist,0,sizeof(hist));
+	gl_rgbtexloads++;
 
 	if (doalloc) glGenTextures(1,&glpic[gltexind]);  //# of textures (make OpenGL allocate structure)
 	glBindTexture(GL_TEXTURE_2D,glpic[gltexind]);
@@ -1163,7 +1282,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 		GLuint basetex, fbtex;
 
 		if (skyclamphack) method |= 4;
-		if (glscene) //indices: no glow pass, as classic's shade tables keep lit texels lit
+		if (glshbound) //indices: no glow pass, as classic's shade tables keep lit texels lit
 			{ basetex = polymost_idxtex(globalpicnum,method&4); fbtex = 0; }
 		else
 		{
@@ -1185,7 +1304,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 		}
 
 			//Indices don't blend: translucent surfaces draw masked for now
-		if ((glscene) || (!(method&3))) glDisable(GL_BLEND); else glEnable(GL_BLEND);
+		if ((glshbound) || (!(method&3))) glDisable(GL_BLEND); else glEnable(GL_BLEND);
 
 		//glEnable(GL_ALPHA_TEST);
 		//glAlphaFunc(GL_GREATER,0.5);
@@ -1200,10 +1319,11 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 			}
 		}
 
-		if (glscene) //shade, pal, and shades per unit of eye z, for the shader
+		if (glshbound) //shade, pal, shades per unit of eye z (3D only), and masked, for the shader
 		{
 			pc[0] = pc[1] = pc[2] = pc[3] = 1.f;
-			glsub_color((float)globalshade+glskyshade,(float)globalpal,fog_is_on?glfogshades:0.f,1.f);
+			glsub_color((float)globalshade+glskyshade,(float)globalpal,((glscene) && (fog_is_on))?glfogshades:0.f,
+				(method&3)?1.f:0.f);
 			if (!waloff[globalpicnum]) glColorMask(0,0,0,0); //the mirror hack: only depth
 		}
 		else
@@ -1361,7 +1481,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 				if (k) polymost_glowend(basetex,pc,method);
 			}
 		}
-		if ((glscene) && (!waloff[globalpicnum])) glColorMask(1,1,1,1);
+		if ((glshbound) && (!waloff[globalpicnum])) glColorMask(1,1,1,1);
 		return;
 	}
 #endif
@@ -3432,7 +3552,7 @@ void polymost_dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short 
 #ifdef USE_OPENGL
 	if (rendmode == 3)
 	{
-		polymost_resolve_shader(); //the 3D view under it
+		polymost_shaderdraw(1); //GL 2.1: indices, over the 3D view
 		resizeglcheck();
 		_glframedrawn();
 		if (1) //dastat&(2+8))
@@ -3795,6 +3915,15 @@ void polymost_fillpolygon (int32_t npoints)
 	}
 
 	setpolymost2dview(); //disables blending, texturing, and depth testing
+	if (polymost_shaderdraw(1)) //GL 2.1: indices through the palookups, masked (translucent too, for now)
+	{
+		if (!waloff[globalpicnum]) loadtile(globalpicnum);
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D,polymost_idxtex(globalpicnum,0));
+		glsub_color((float)globalshade,(float)(palookup[globalpal]?globalpal:0),0.f,1.f);
+	}
+	else
+	{
 	glEnable(GL_ALPHA_TEST);
 	glAlphaFunc(GL_GREATER,0.32f);
 	glEnable(GL_TEXTURE_2D);
@@ -3808,6 +3937,7 @@ void polymost_fillpolygon (int32_t npoints)
 		case 3: a = 0.33; glEnable(GL_BLEND); break;
 	}
 	glsub_color(f,f,f,a);
+	}
 
 	tessectrap(fx,fy,xb1,npoints);
 
@@ -3824,7 +3954,6 @@ int32_t polymost_drawtilescreen (int32_t tilex, int32_t tiley, int32_t wallnum, 
 	int32_t i;
 
 	if ((rendmode != 3) || (qsetmode != 200)) return(-1);
-	polymost_resolve_shader();
 
 	if (!glinfo.texnpot) {
 		i = (1<<(picsiz[wallnum]&15)); if (i < tilesizx[wallnum]) i += i; xdimepad = (float)i;
@@ -3846,6 +3975,29 @@ int32_t polymost_drawtilescreen (int32_t tilex, int32_t tiley, int32_t wallnum, 
 		scx = (float)dimen;
 		scy = (float)dimen;
 		if (xdime < ydime) scx *= xdime/ydime; else scy *= ydime/xdime;
+	}
+
+	if (polymost_shaderdraw(0)) //GL 2.1: the tile's indices over index 255
+	{
+		glDisable(GL_TEXTURE_2D);
+		glsub_begin(GL_TRIANGLE_FAN);
+		polymost_2dcolor(255);
+		glsub_vertex((float)tilex    ,(float)tiley    ,0);
+		glsub_vertex((float)tilex+scx,(float)tiley    ,0);
+		glsub_vertex((float)tilex+scx,(float)tiley+scy,0);
+		glsub_vertex((float)tilex    ,(float)tiley+scy,0);
+		glsub_end();
+		polymost_shaderdraw(1);
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D,polymost_idxtex(wallnum,4));
+		glsub_color(0.f,0.f,0.f,1.f); //shade 0, pal 0, masked
+		glsub_begin(GL_TRIANGLE_FAN);
+		glsub_texcoord(       0,       0); glsub_vertex((float)tilex    ,(float)tiley    ,0);
+		glsub_texcoord(xdimepad,       0); glsub_vertex((float)tilex+scx,(float)tiley    ,0);
+		glsub_texcoord(xdimepad,ydimepad); glsub_vertex((float)tilex+scx,(float)tiley+scy,0);
+		glsub_texcoord(       0,ydimepad); glsub_vertex((float)tilex    ,(float)tiley+scy,0);
+		glsub_end();
+		return(0);
 	}
 
 	glBindTexture(GL_TEXTURE_2D,glpic[gltexcache(wallnum,0,4)]);
@@ -3886,6 +4038,13 @@ void polymost_precache(int32_t dapicnum, int32_t dapalnum, int32_t datype)
 	//    while sprites are clamped
 
 	if (rendmode < 3) return;
+
+	if (gldrawpath == GLPATH_SHADER) //GL 2.1: the tile's indices, the same for every pal
+	{
+		if (!waloff[dapicnum]) loadtile(dapicnum);
+		if (waloff[dapicnum]) polymost_idxtex(dapicnum,datype&1);
+		return;
+	}
 	
 	if (!palookup[dapalnum]) dapalnum = 0;
 	gltexcache(dapicnum, dapalnum, (datype & 1) << 2);

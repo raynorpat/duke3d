@@ -145,7 +145,11 @@ int32_t bpp = 8;
 struct glinfo_t glinfo;
 char nofog = 0;
 extern void polymost_glreset(void);
-extern void polymost_resolve_shader(void);
+extern int32_t polymost_present_shader(void);
+extern unsigned char *polymost_capture_shader(void);
+extern GLuint polymost_takeframe_shader(void);
+extern void polymost_putframe_shader(GLuint tex);
+extern void polymost_unbind_shader(void);
 extern void gltexinvalidateall(void);
 extern void polymost_buildshaderamp(void);
 static SDL_GLContext sdl_glcontext = NULL;  /* non-NULL while in renderer 3 */
@@ -657,10 +661,20 @@ static void gl_draw_lastframe(void)
 } /* gl_draw_lastframe */
 
 
-/* Shows the back buffer: keeps it in lastframe, fades it, swaps. */
+/*
+ * Shows the back buffer: keeps it in lastframe, fades it, swaps. The GL 2.1
+ *  tier keeps the frame itself, and shows it through the faded palette.
+ */
 static void gl_swap(void)
 {
-    polymost_resolve_shader();  /* a 3D view still in the GL 2.1 tier's framebuffer */
+    if (polymost_present_shader())
+    {
+        SDL_GL_SwapWindow(sdl_window);
+        swapped = 1;
+        framedrawn = 0;
+        return;
+    } /* if */
+
     glsub_flush();
     if ((framedrawn) && (lastframe != 0))
     {
@@ -692,6 +706,7 @@ void _glframedrawn(void)
 void _glframereplayed(void)
 {
     framedrawn = 0;
+    polymost_unbind_shader();  /* the GL 2.1 tier's drawing went into its frame */
 } /* _glframereplayed */
 
 
@@ -702,7 +717,16 @@ void _glframereplayed(void)
  */
 void _glpalettefade(void)
 {
-    if ((sdl_glcontext == NULL) || (framedrawn) || (!lastframe_set))
+    if ((sdl_glcontext == NULL) || (framedrawn))
+        return;
+    if (polymost_present_shader())  /* the GL 2.1 tier keeps the frame */
+    {
+        SDL_GL_SwapWindow(sdl_window);
+        swapped = 1;
+        framedrawn = 0;
+        return;
+    } /* if */
+    if (!lastframe_set)
         return;
 
     gl_draw_lastframe();
@@ -748,8 +772,9 @@ static void gl_resize(void)
     int w, h;
     palette_t pal[256], fadergb;
     unsigned char fadedelta;
-    GLuint old;
+    GLuint old, shframe;
     float oldu = 0, oldv = 0;
+    int drawn;
 
     SDL_GL_GetDrawableSize(sdl_window, &w, &h);
     if (w > MAXXDIM) w = MAXXDIM;
@@ -769,6 +794,7 @@ static void gl_resize(void)
         oldv = (float) yres / (float) lastframe_h;
         lastframe = 0;  /* keep it from gl_alloc_lastframe. */
     } /* if */
+    shframe = polymost_takeframe_shader();  /* the GL 2.1 tier's, drawn or being drawn */
     polymost_glreset();
     init_gl_res_vars();
     memcpy(curpalette, pal, sizeof (pal));
@@ -776,7 +802,14 @@ static void gl_resize(void)
     palfadedelta = fadedelta;
     gltexinvalidateall();
 
-    if (old != 0)
+    if (shframe != 0)
+    {
+        drawn = framedrawn;
+        polymost_putframe_shader(shframe);
+        if (!drawn)
+            gl_swap();  /* a still screen: shown again at the new size. */
+    } /* if */
+    else if (old != 0)
     {
         gl_draw_frame(old, oldu, oldv);
         glDeleteTextures(1, &old);
@@ -1747,9 +1780,11 @@ static unsigned char *gl_screencapture(int *w, int *h)
     size_t rowbytes, i, n;
     int y, a = palfadedelta, front = 0, failed;
 
-    polymost_resolve_shader();
     *w = xdim;
     *h = ydim;
+    rgb = polymost_capture_shader();  /* the GL 2.1 tier's frame, as shown */
+    if (rgb != NULL)
+        return(rgb);
     if (!framedrawn)
     {
         if (lastframe == 0)
@@ -2332,8 +2367,11 @@ int VBE_setPalette(int32_t start, int32_t num, char *palettebuffer)
         if (memcmp(&curpalette[start], newpal, num * sizeof (palette_t)) != 0)
         {
             memcpy(&curpalette[start], newpal, num * sizeof (palette_t));
-            gltexinvalidateall();
-            polymost_buildshaderamp();
+            if (gldrawpath != GLPATH_SHADER)  /* that one looks the palette up as it shows a frame */
+            {
+                gltexinvalidateall();
+                polymost_buildshaderamp();
+            } /* if */
         } /* if */
         return(1);
     } /* if */

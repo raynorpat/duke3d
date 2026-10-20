@@ -4317,7 +4317,7 @@ void drawline256 (int32_t x1, int32_t y1, int32_t x2, int32_t y2, unsigned char 
 	{
 		setpolymost2dview();
 		glsub_begin(GL_LINES);
-		glsub_color(curpalette[col].r/255.f,curpalette[col].g/255.f,curpalette[col].b/255.f,1);
+		polymost_2dcolor(col);
 		glsub_vertex((float)x1/4096.0,(float)y1/4096.0,0);
 		glsub_vertex((float)x2/4096.0,(float)y2/4096.0,0);
 		glsub_end();
@@ -7608,14 +7608,14 @@ static void __printext256(int32_t xpos, int32_t ypos, short col, short backcol, 
 					if (letptr[y]&pow2char[7-fontsize-x])
 					{
 						if (lc != col)
-							glsub_color(curpalette[col].r/255.f,curpalette[col].g/255.f,curpalette[col].b/255.f,1);
+							polymost_2dcolor(col);
 						lc = col;
 						glsub_vertex((float)(xx+x)+0.5f,(float)yy+0.5f,0);
 					}
 					else if (backcol >= 0)
 					{
 						if (lc != backcol)
-							glsub_color(curpalette[backcol].r/255.f,curpalette[backcol].g/255.f,curpalette[backcol].b/255.f,1);
+							polymost_2dcolor(backcol);
 						lc = backcol;
 						glsub_vertex((float)(xx+x)+0.5f,(float)yy+0.5f,0);
 					}
@@ -8202,6 +8202,37 @@ void setpalettefade(unsigned char r, unsigned char g, unsigned char b, unsigned 
 	}
 	applybrightness(fadepal);
 }
+
+
+#if defined(POLYMOST) && defined(USE_OPENGL)
+/*
+ * getfadedpalette
+ *  The palette renderer 3's GL 2.1 tier shows: curpalette, or with a fade,
+ *  the base palette faded as the 8-bit one is above, made 8-bit as
+ *  VBE_setPalette does. palfadedelta keeps offsets up to 64.
+ */
+void getfadedpalette(palette_t *pal)
+{
+	int32_t i, offset;
+	unsigned char c[3];
+
+	if (!palfadedelta) { memcpy(pal,curpalette,sizeof(palette_t)*256); return; }
+	offset = (palfadedelta == 255) ? 64 : (palfadedelta>>2);
+	for(i=0;i<256;i++)
+	{
+		c[0] = basepal[i*3+0]+((((int32_t)(palfadergb.r>>2)-(int32_t)basepal[i*3+0])*offset)>>6);
+		c[1] = basepal[i*3+1]+((((int32_t)(palfadergb.g>>2)-(int32_t)basepal[i*3+1])*offset)>>6);
+		c[2] = basepal[i*3+2]+((((int32_t)(palfadergb.b>>2)-(int32_t)basepal[i*3+2])*offset)>>6);
+		c[0] = britable[curbrightness][c[0]&63];
+		c[1] = britable[curbrightness][c[1]&63];
+		c[2] = britable[curbrightness][c[2]&63];
+		pal[i].r = (c[0]<<2)|(c[0]>>4);
+		pal[i].g = (c[1]<<2)|(c[1]>>4);
+		pal[i].b = (c[2]<<2)|(c[2]>>4);
+		pal[i].f = 0;
+	}
+}
+#endif
 
 
 static void fillpolygon(int32_t npoints)
@@ -8825,8 +8856,10 @@ void clearview(int32_t dacol)
 #if defined(POLYMOST) && defined(USE_OPENGL)
 	if (rendmode == 3)
 	{
-		polymost_resolve_shader();
-		glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
+		if (polymost_shaderdraw(0))  /* GL 2.1: the index */
+			glClearColor((float)dacol/255.f,0,0,0);
+		else
+			glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
 		/* only the view window, as below (JFBuild clears it all) */
 		glScissor(windowx1,yres-(windowy2+1),windowx2-windowx1+1,windowy2-windowy1+1);
 		glEnable(GL_SCISSOR_TEST);
@@ -8867,9 +8900,11 @@ void clearallviews(int32_t dacol)
 #if defined(POLYMOST) && defined(USE_OPENGL)
 	if (rendmode == 3)
 	{
-		polymost_resolve_shader();
+		if (polymost_shaderdraw(0))  /* GL 2.1: the index */
+			glClearColor((float)dacol/255.f,0,0,0);
+		else
+			glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
 		glViewport(0,0,xdim,ydim); glox1 = -1;
-		glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
 		glClear(GL_COLOR_BUFFER_BIT);
 		_glframedrawn();
 		return;
@@ -8905,7 +8940,7 @@ void plotpixel(int32_t x, int32_t y, char col)
 	{
 		setpolymost2dview();
 		glsub_begin(GL_POINTS);
-		glsub_color(curpalette[(unsigned char)col].r/255.f,curpalette[(unsigned char)col].g/255.f,curpalette[(unsigned char)col].b/255.f,1);
+		polymost_2dcolor((unsigned char)col);
 		glsub_vertex((float)x+0.5f,(float)y+0.5f,0);
 		glsub_end();
 		return;
@@ -9359,7 +9394,7 @@ void setpolymost2dview(void)
 {
 #if defined(POLYMOST) && defined(USE_OPENGL)
 	if (rendmode < 3) return;
-	polymost_resolve_shader();  /* the 3D view goes under 2D drawing */
+	polymost_shaderdraw(0);  /* GL 2.1: into the frame's indices, after the 3D view */
 
 	if (gloy1 != -1)
 	{
