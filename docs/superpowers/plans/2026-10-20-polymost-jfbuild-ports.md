@@ -153,3 +153,23 @@
 ### Then: the original plan's Task 6
 
 Run the original plan's Task 6 (README, full version matrix, hand-over for the user's demo check) after Task 7. The README's known-gaps list loses "automap floors in GL" and gains the widescreen notes.
+
+### Task 8: PNG/JPEG screenshots via stb_image_write
+
+**Files:** Create `source/build/stb_image_write.h` (vendored, pinned commit). Modify `source/build/sdl_driver.c` (`screencapture`, `gl_screencapture`), `source/global.c` (`dukescreencapture` filename extension), `source/config.c` (`ScreenshotFormat`), `source/build/VENDORED.md`, `tests/sdl_driver_smoke.c`.
+
+**Interfaces:**
+- `int screencapture(char *filename, char inverseit)` keeps its signature. The format comes from the file extension: `.png` uses `stbi_write_png`, `.jpg` uses `stbi_write_jpg` at quality 90.
+- `char ScreenshotFormat[4]` is read and written in `[Screen Setup]` (`png` default).
+
+- [ ] **Step 1:** Fetch `stb_image_write.h` from a pinned nothings/stb commit (record the SHA and version), with a script file and `curl`. Define `STB_IMAGE_WRITE_IMPLEMENTATION` in exactly one engine `.c` file. Silence its warnings for that file only if needed.
+- [ ] **Step 2: Failing test.** In `sdl_driver_smoke`: in an 8-bit mode with a known palette and a pattern drawn, `screencapture("smoke.png", 0)` writes a file that starts with the PNG signature `89 50 4E 47 0D 0A 1A 0A`, with width and height in the IHDR matching `xdim`/`ydim`. `"smoke.jpg"` starts with `FF D8 FF`.
+- [ ] **Step 3: Implement.**
+  - 8-bit renderers convert `frameplace` through the current faded palette to RGB.
+  - Renderer 3 uses the `lastframe` read path it already has.
+  - `inverseit`, if non-zero, keeps the old inversion.
+  - Rows are written top-down.
+  - The game names files with the configured extension.
+  - Remove the PCX writer only if nothing else calls it; check `/usr/bin/grep -a`.
+- [ ] **Step 4:** Run the full suites (1.3D, 1.5, OFF). Capture once in renderers 0 and 3 from the game or a harness, open the PNGs and judge them.
+- [ ] **Step 5:** Commit `engine: write screenshots as PNG or JPEG with stb_image_write`.
