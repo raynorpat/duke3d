@@ -9350,6 +9350,8 @@ void setpolymost2dview(void)
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_TEXTURE_2D);
 	glDisable(GL_BLEND);
+	glDisable(GL_FOG);  /* resizeglcheck turns it on again for 3D */
+	fog_is_on = 0;
 	_glframedrawn();
 #endif
 }

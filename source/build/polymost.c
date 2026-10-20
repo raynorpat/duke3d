@@ -2547,7 +2547,10 @@ void polymost_drawmaskwall (int32_t damaskwallcnt)
 #ifdef USE_OPENGL
 	if (!nofog) {
 	if (rendmode == 3)
+	{
+		glEnable(GL_FOG); fog_is_on = 1; //setpolymost2dview turns it off
 		glFogf(GL_FOG_DENSITY,((float)globalvisibility)*((float)((unsigned char)(sec->visibility+16)))*FOGSCALE);
+	}
 	}
 #endif
 
@@ -2643,7 +2646,10 @@ void polymost_drawsprite (int32_t snum)
 #ifdef USE_OPENGL
 	if (!nofog) {
 	if (rendmode == 3)
+	{
+		glEnable(GL_FOG); fog_is_on = 1; //setpolymost2dview turns it off
 		glFogf(GL_FOG_DENSITY,((float)globalvisibility)*((float)((unsigned char)(sector[tspr->sectnum].visibility+16)))*FOGSCALE);
+	}
 	}
 #endif
 
