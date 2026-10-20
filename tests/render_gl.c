@@ -189,6 +189,19 @@ static double front_diff(const unsigned char *a, const unsigned char *b)
     return d / n;
 }
 
+/* Mean absolute difference per channel of a read_front buffer (xdim by
+ *  ydim) and a smaller one (w by h) stretched to its size, nearest texel. */
+static double stretch_diff(const unsigned char *small, int w, int h, const unsigned char *big)
+{
+    long x, y, i, d = 0;
+    for (y = 0; y < ydim; y++)
+        for (x = 0; x < xdim; x++)
+            for (i = 0; i < 3; i++)
+                d += abs((int) big[(y * xdim + x) * 3 + i] -
+                         (int) small[((y * h / ydim) * w + x * w / xdim) * 3 + i]);
+    return (double) d / ((double) xdim * ydim * 3);
+}
+
 /* Mean of a read_front buffer's bottom-right corner (the bottom 5%, x from
  *  80% to 98%): floor in the start view, black when the floor is gone. */
 static double floor_mean(const unsigned char *a)
@@ -274,8 +287,8 @@ int main(int argc, char **argv)
     unsigned char savedfadedelta;
     int32_t oldxdim, oldydim;
     int lfnpot, lfpot, resized, palkept, palsame, winw, winh;
-    unsigned char *buf, cleared[2];
-    double palwater, resizedmean;
+    unsigned char *buf, *prev, cleared[2];
+    double palwater, resizeddiff;
     Uint32 t0;
 
     if (argc < 3)
@@ -524,6 +537,8 @@ int main(int argc, char **argv)
     printf("palette: same again %s; mean |water - normal| %.2f\n",
            palsame ? "unchanged" : "changed", palwater);
     lfnpot = lastframe_same();
+    prev = malloc((size_t) xdim * ydim * 3);
+    read_front(prev);  /* the last frame, unfaded */
     if (err == GL_NO_ERROR) err = glGetError();
 
     /* A window resize (as a fullscreen toggle) underwater, mid-fade: the
@@ -546,12 +561,16 @@ int main(int argc, char **argv)
     printf("resize: %dx%d to %dx%d; palette and fade %s\n", (int) oldxdim, (int) oldydim,
            (int) xdim, (int) ydim, palkept ? "kept" : "lost");
     /* Nothing was being drawn (as on a still screen): the last frame is
-     * still there to fade, not black. */
+     * still there to fade, stretched to the new size, not black. */
     setpalettefade(0, 0, 0, 0);
     snprintf(path, sizeof (path), "%s/resized.bmp", argv[2]);
     save_front(path, &rs, &gs);
-    resizedmean = (rs + gs) / 2;
-    printf("after the resize, unfaded: mean red+green/2 %.1f\n", resizedmean);
+    buf = malloc((size_t) xdim * ydim * 3);
+    read_front(buf);
+    resizeddiff = stretch_diff(prev, oldxdim, oldydim, buf);
+    free(buf);
+    free(prev);
+    printf("after the resize, unfaded: mean |frame - last frame stretched| %.2f\n", resizeddiff);
     view_shot(NULL, posx, posy, posz, ang, sectnum);
     lfpot = lastframe_same();
     glinfo.texnpot = hasnpot;
@@ -600,7 +619,7 @@ int main(int argc, char **argv)
         { fprintf(stderr, "FAIL: the water palette doesn't retexture\n"); return 1; }
     if (!resized) { fprintf(stderr, "FAIL: the window didn't resize\n"); return 1; }
     if (!palkept) { fprintf(stderr, "FAIL: the resize lost the palette or fade\n"); return 1; }
-    if (resizedmean < 8) { fprintf(stderr, "FAIL: the last frame is gone after the resize\n"); return 1; }
+    if (resizeddiff > 4) { fprintf(stderr, "FAIL: the last frame isn't shown again after the resize\n"); return 1; }
     if ((!lfnpot) || (!lfpot)) { fprintf(stderr, "FAIL: the last frame shows differently\n"); return 1; }
 
     /* A mode over the 8-bit 1600x1200 limit (it changes xdim and ydim, so

@@ -300,6 +300,7 @@ void polymost_glreset ()
 	}
 	gltexmaxsize = 0; //a new context may have another GL_MAX_TEXTURE_SIZE
 	glox1 = -1;
+	gloy1 = 0; //not -1, so setpolymost2dview sets its view again (the drawable may have resized)
 }
 
 void resizeglcheck ()
