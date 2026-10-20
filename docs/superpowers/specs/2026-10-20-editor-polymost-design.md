@@ -50,7 +50,8 @@ is in the session scratchpad (`jfbuild-editor-recon.md`); its findings are summa
      `keyturnleft`, `keyturnright`, `keyrun`, `keystrafe`, `keyfire`, `keyuse`, `keystandhigh`,
      `keystandlow`, `keylookup`, `keylookdown`, `keystrafeleft`, `keystraferight`, `key2dmode`,
      `keyviewcycle`, `key2dzoomin`, `key2dzoomout`, `keychat`, e.g. `keyforward = c8`), with
-     today's defaults (`keys[]` in `astub.c`). No `keyconsole` (no OSD).
+     today's defaults (`buildkeys[]` in `build.c`, what the editor uses without a `setup.dat`).
+     No `keyconsole` (no OSD).
    - **`setup.dat` is phased out.** The editor only ever used its keys; its `option[]` bytes are
      read and ignored today. One-time migration *(my call)*: when `build.cfg` doesn't exist but
      `setup.dat` does, its keys become the starting bindings and are written to `build.cfg` on

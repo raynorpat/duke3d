@@ -47,7 +47,7 @@
       double mousesensitivity;
       unsigned char keys[BUILDCFG_NUMKEYS];
   } buildcfg_t;
-  void buildcfg_defaults(buildcfg_t *c);              /* keys = astub.c's current keys[] */
+  void buildcfg_defaults(buildcfg_t *c);              /* keys = build.c's buildkeys[] initializer */
   int  buildcfg_read(buildcfg_t *c, const char *path); /* 0 read, -1 missing; clamps */
   int  buildcfg_write(const buildcfg_t *c, const char *path); /* 0 ok, -1 error */
   int  buildcfg_import_setupdat(buildcfg_t *c, const char *path); /* keys only; 0 ok, -1 missing */
