@@ -219,7 +219,9 @@ int32_t globaluclip, globaldclip, globvis;
 int32_t globalvisibility, globalhisibility, globalpisibility, globalcisibility;
 char globparaceilclip, globparaflorclip;
 
-int32_t xyaspect, viewingrangerecip;
+int32_t viewingrangerecip;
+	/* JFBuild: pixelaspect starts square, as setaspect divides by it */
+int32_t pixelaspect = 65536;
 
 int32_t asm1, asm4;
 intptr_t asm2, asm3;
@@ -3605,9 +3607,14 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 	{
 		if ((dastat&8) == 0)
 		{
-			x = xdimenscale;   /* = scale(xdimen,yxaspect,320); */
-			if (stereomode) x = scale(windowx2-windowx1+1,yxaspect,320);
-			sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),xdimen,320);
+			if (widescreen) {
+				x = ydimenscale;
+				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),ydimen<<16,200*pixelaspect);
+			} else {
+				x = xdimenscale;   /* = scale(xdimen,yxaspect,320); */
+				if (stereomode) x = scale(windowx2-windowx1+1,yxaspect,320);
+				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),xdimen,320);
+			}
 			sy = ((cy1+cy2+2)<<15)+mulscale16(sy-(200<<15),x);
 		}
 		else
@@ -3616,8 +3623,13 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 			   * If not clipping to startmosts, & auto-scaling on, as a
 			   *  hard-coded bonus, scale to full screen instead
                */
-            x = scale(xdim,yxaspect,320);
-			sx = (xdim<<15)+32768+scale(sx-(320<<15),xdim,320);
+			if (widescreen) {
+				x = scale(ydim<<16,yxaspect,200*pixelaspect);
+				sx = (xdim<<15)+32768+scale(sx-(320<<15),ydim<<16,200*pixelaspect);
+			} else {
+				x = scale(xdim,yxaspect,320);
+				sx = (xdim<<15)+32768+scale(sx-(320<<15),xdim,320);
+			}
 			sy = (ydim<<15)+32768+mulscale16(sy-(200<<15),x);
 		}
 		z = mulscale16(z,x);
@@ -7843,9 +7855,40 @@ void getzrange(int32_t x, int32_t y, int32_t z, short sectnum,
 }
 
 
+/*
+ * JFBuild: the pixel aspect of the mode. Build is built around the
+ *  non-square pixels of Mode 13h, so to get things back square on VGA
+ *  screens, things need to be "compressed" vertically a little. Modes
+ *  wider than 4:3 are widescreen; taller ones (eg. 1280x1024) stretch
+ *  the 2D elements vertically a little.
+ */
+void calcpixelaspect(void)
+{
+	int32_t ratio;
+
+	widescreen = 0;
+	tallscreen = 0;
+	if ((xdim == 320 && ydim == 200) || (xdim == 640 && ydim == 400)) {
+		pixelaspect = 65536;
+	} else {
+		ratio = divscale16(ydim*320, xdim*240);
+		pixelaspect = divscale16(240*320L,320*200L);
+
+		if (ratio < 65536) {
+			widescreen = 1;
+		} else if (ratio > 65536) {
+			tallscreen = 1;
+			pixelaspect = divscale16(ydim*320L,xdim*200L);
+		}
+	}
+}
+
+
 void setview(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
 {
-	int32_t i;
+	int32_t i, xfov = 65536;
+
+	if (widescreen) xfov = divscale16(xdim*3, ydim*4);
 
 	windowx1 = x1; wx1 = (x1<<12);
 	windowy1 = y1; wy1 = (y1<<12);
@@ -7856,7 +7899,7 @@ void setview(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
 	xdimenrecip = divscale32(1L,xdimen);
 	ydimen = (y2-y1)+1;
 
-	setaspect(65536L,(int32_t)divscale16(ydim*320L,xdim*200L));
+	setaspect(mulscale16(65536,xfov), pixelaspect);
 
 	for(i=0;i<windowx1;i++) { startumost[i] = 1, startdmost[i] = 0; }
 	for(i=windowx1;i<=windowx2;i++)
@@ -7884,6 +7927,7 @@ void setaspect(int32_t daxrange, int32_t daaspect)
 	xyaspect = divscale32(1,yxaspect);
 	xdimenscale = scale(xdimen,yxaspect,320);
 	xdimscale = scale(320,xyaspect,xdimen);
+	ydimenscale = scale(ydimen,yxaspect,mulscale16(200,pixelaspect));
 }
 
 

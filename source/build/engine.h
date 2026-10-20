@@ -914,6 +914,9 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang);
  */
 void setview(int32_t x1, int32_t y1, int32_t x2, int32_t y2);
 
+/**@brief Sets pixelaspect, widescreen and tallscreen for xdim and ydim. */
+void calcpixelaspect(void);
+
 /**@brief Shows a tile on screen, saving the previous view.
  *
  * This function will show a tile on screen, saving the previous

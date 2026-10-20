@@ -245,6 +245,7 @@ extern void printext256_noupdate(int32_t xpos, int32_t ypos, short col, short ba
 extern int krand(void);
 extern void getzrange(int32_t x, int32_t y, int32_t z, short sectnum, int32_t *ceilz, int32_t *ceilhit, int32_t *florz, int32_t *florhit, int32_t walldist, uint32_t cliptype);
 extern void setview(int32_t x1, int32_t y1, int32_t x2, int32_t y2);
+extern void calcpixelaspect(void);
 extern void setaspect(int32_t daxrange, int32_t daaspect);
 extern void flushperms(void);
 extern void rotatesprite(int32_t sx, int32_t sy, int32_t z, short a, short picnum, signed char dashade, char dapalnum, char dastat, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2);

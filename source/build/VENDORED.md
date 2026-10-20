@@ -269,6 +269,41 @@ Ported from later JFBuild commits, retyped as above:
   only hightile skyboxes); in the non-power-of-two wall split each piece
   draws its base and then its glow (upstream's layer mask emptied on the
   first piece, so later pieces drew nothing). The game sets the threshold.
+- Widescreen and tallscreen, in every renderer, in their final upstream form:
+  `6b98b22a07e5101fde6942935418c4b7b94aff4e`,
+  `0187a80f5327b17bc54251dbc9f5ae4075a8db92`,
+  `2c95ef6f945cb5a6b8fa48f437de299538a4177f`,
+  `7703ab676f40414ae84c7b0249b8a5841afcbcb6`,
+  `9691f25ad865c9af119cbdea1f1633ba58b1ca1d`,
+  `88007d9b44962412a06a9e4f19316f6b4872bb13`, with
+  `5e8446845831421ed7a0e858baff081118c89d8c` (no wider field of view at
+  320x200 and 640x400), `11d083e8521e42d5885ee7583979bf8949dd91e1`
+  (rotatesprite's full-precision widescreen scale) and
+  `dbee0ff2c358acfcb1d974a254f2b2f973711095` (exported to the game).
+  `engine.c`'s new `calcpixelaspect()` (prototyped in `engine.h` and
+  `engine_protos.h`) sets `pixelaspect` to 65536 at 320x200 and 640x400 and
+  to 1.2 (78643) otherwise; a mode wider than 4:3 sets `widescreen`, a
+  taller one sets `tallscreen` and `pixelaspect = divscale16(ydim*320,
+  xdim*200)`. Upstream did this in `setgamemode`; we have none, so
+  `sdl_driver.c`'s `init_res_lookups` calls it after the vidoption 2/6
+  switch to 320x200 and before `setview`, for the 8-bit and GL mode sets
+  and GL's resize. `setview` calls `setaspect(mulscale16(65536, xfov),
+  pixelaspect)`, `xfov` being `divscale16(xdim*3, ydim*4)` in widescreen
+  and 65536 otherwise, and `setaspect` sets `ydimenscale = scale(ydimen,
+  yxaspect, mulscale16(200, pixelaspect))`. In widescreen,
+  `dorotatesprite` and `polymost_dorotatesprite`'s auto-scaled
+  (`dastat&2`) sprites scale with the view's or screen's height
+  (`ydimenscale`; `scale(ydim<<16, yxaspect, 200*pixelaspect)`) and centre
+  on its width, so the 320x200 HUD is pillarboxed at 4:3 instead of
+  stretched; otherwise they run the old code, `stereomode` line included.
+  `xyaspect`, `pixelaspect`, `widescreen`, `tallscreen` and `ydimenscale`
+  are in `build.h`; `pixelaspect` starts at 65536 (upstream 0), so a
+  `setaspect` before the first mode set doesn't divide by 0. At 320x200,
+  640x400, every exact 4:3 mode and tallscreen modes `setaspect` gets what
+  it got before (65536 and `divscale16(ydim*320, xdim*200)`), so they draw
+  as before. Not taken: `MAXXDIM`/`MAXYDIM` (ours are bigger), the new
+  default modes, `7703ab6`'s `slopalookup` size and assert, and the
+  editor's `qsetmode` parts.
 
 ## Engine hooks
 

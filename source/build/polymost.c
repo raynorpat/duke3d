@@ -2979,16 +2979,26 @@ void polymost_dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short 
 	{
 		if (!(dastat&8))
 		{
-			x = xdimenscale;   //= scale(xdimen,yxaspect,320);
-			sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),oxdimen,320);
+			if (widescreen) {
+				x = ydimenscale;   //= scale(xdimen,yxaspect,320);
+				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),oydimen<<16,200*pixelaspect);
+			} else {
+				x = xdimenscale;   //= scale(xdimen,yxaspect,320);
+				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),oxdimen,320);
+			}
 			sy = ((cy1+cy2+2)<<15)+mulscale16(sy-(200<<15),x);
 		}
 		else
 		{
 				//If not clipping to startmosts, & auto-scaling on, as a
 				//hard-coded bonus, scale to full screen instead
-			x = scale(xdim,yxaspect,320);
-			sx = (xdim<<15)+32768+scale(sx-(320<<15),xdim,320);
+			if (widescreen) {
+				x = scale(ydim<<16,yxaspect,200*pixelaspect);
+				sx = (xdim<<15)+32768+scale(sx-(320<<15),ydim<<16,200*pixelaspect);
+			} else {
+				x = scale(xdim,yxaspect,320);
+				sx = (xdim<<15)+32768+scale(sx-(320<<15),xdim,320);
+			}
 			sy = (ydim<<15)+32768+mulscale16(sy-(200<<15),x);
 		}
 		z = mulscale16(z,x);

@@ -466,6 +466,8 @@ static void init_res_lookups(int davidoption, int framebuffer)
         horizlookup2 = (int32_t *)(FP_OFF(screen)+i+j);
     } /* if */
 
+    calcpixelaspect();
+
     j = 0;
   	for(i = 0; i <= ydim; i++)
     {

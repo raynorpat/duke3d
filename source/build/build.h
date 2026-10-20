@@ -164,7 +164,8 @@ EXTERN spritetype tsprite[MAXSPRITESONSCREEN];
 
 EXTERN char vidoption;
 EXTERN int32_t xdim, ydim, ylookup[MAXYDIM+1], numpages;
-EXTERN int32_t yxaspect, viewingrange;
+EXTERN int32_t yxaspect, xyaspect, pixelaspect, widescreen, tallscreen, viewingrange;
+EXTERN int32_t ydimenscale;
 
 EXTERN int32_t validmodecnt;
 EXTERN short validmode[256];
