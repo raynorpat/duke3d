@@ -4316,11 +4316,11 @@ void drawline256 (int32_t x1, int32_t y1, int32_t x2, int32_t y2, unsigned char 
 	if (rendmode == 3)
 	{
 		setpolymost2dview();
-		glBegin(GL_LINES);
-		glColor4ub(curpalette[col].r,curpalette[col].g,curpalette[col].b,255);
-		glVertex2f((float)x1/4096.0,(float)y1/4096.0);
-		glVertex2f((float)x2/4096.0,(float)y2/4096.0);
-		glEnd();
+		glsub_begin(GL_LINES);
+		glsub_color(curpalette[col].r/255.f,curpalette[col].g/255.f,curpalette[col].b/255.f,1);
+		glsub_vertex((float)x1/4096.0,(float)y1/4096.0,0);
+		glsub_vertex((float)x2/4096.0,(float)y2/4096.0,0);
+		glsub_end();
 		return;
 	}
 #endif
@@ -7595,7 +7595,7 @@ static void __printext256(int32_t xpos, int32_t ypos, short col, short backcol, 
 		int32_t xx, yy, lc = -1;
 
 		setpolymost2dview();
-		glBegin(GL_POINTS);
+		glsub_begin(GL_POINTS);
 		for(i=0;name[i];i++)
 		{
 			letptr = &fontptr[name[i]<<3];
@@ -7608,23 +7608,23 @@ static void __printext256(int32_t xpos, int32_t ypos, short col, short backcol, 
 					if (letptr[y]&pow2char[7-fontsize-x])
 					{
 						if (lc != col)
-							glColor4ub(curpalette[col].r,curpalette[col].g,curpalette[col].b,255);
+							glsub_color(curpalette[col].r/255.f,curpalette[col].g/255.f,curpalette[col].b/255.f,1);
 						lc = col;
-						glVertex2f((float)(xx+x)+0.5f,(float)yy+0.5f);
+						glsub_vertex((float)(xx+x)+0.5f,(float)yy+0.5f,0);
 					}
 					else if (backcol >= 0)
 					{
 						if (lc != backcol)
-							glColor4ub(curpalette[backcol].r,curpalette[backcol].g,curpalette[backcol].b,255);
+							glsub_color(curpalette[backcol].r/255.f,curpalette[backcol].g/255.f,curpalette[backcol].b/255.f,1);
 						lc = backcol;
-						glVertex2f((float)(xx+x)+0.5f,(float)yy+0.5f);
+						glsub_vertex((float)(xx+x)+0.5f,(float)yy+0.5f,0);
 					}
 				}
 				yy--;
 			}
 			stx += charxsiz;
 		}
-		glEnd();
+		glsub_end();
 		return;
 	}
 #endif
@@ -8898,10 +8898,10 @@ void plotpixel(int32_t x, int32_t y, char col)
 	if (rendmode == 3)
 	{
 		setpolymost2dview();
-		glBegin(GL_POINTS);
-		glColor4ub(curpalette[(unsigned char)col].r,curpalette[(unsigned char)col].g,curpalette[(unsigned char)col].b,255);
-		glVertex2f((float)x+0.5f,(float)y+0.5f);
-		glEnd();
+		glsub_begin(GL_POINTS);
+		glsub_color(curpalette[(unsigned char)col].r/255.f,curpalette[(unsigned char)col].g/255.f,curpalette[(unsigned char)col].b/255.f,1);
+		glsub_vertex((float)x+0.5f,(float)y+0.5f,0);
+		glsub_end();
 		return;
 	}
 #endif

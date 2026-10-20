@@ -39,6 +39,8 @@
 #ifdef USE_OPENGL
 #include "SDL_opengl.h"
 #include "glext.h"
+#define GLSUB_WRAP
+#include "glsubmit.h"
 #endif
 
 /* need VirtualProtect() from win32 API... */
@@ -334,6 +336,7 @@ static void destroy_gl_window(void)
         return;
 
     polymost_glreset();
+    glsub_uninit();
     if (lastframe != 0)
         glDeleteTextures(1, &lastframe);
     lastframe = 0;
@@ -655,6 +658,7 @@ static void gl_draw_lastframe(void)
 /* Shows the back buffer: keeps it in lastframe, fades it, swaps. */
 static void gl_swap(void)
 {
+    glsub_flush();
     if ((framedrawn) && (lastframe != 0))
     {
         glBindTexture(GL_TEXTURE_2D, lastframe);
@@ -854,6 +858,7 @@ int setgamemode_gl(char davidoption)
     glinfo.texcompr = gl_has_extension(exts, "GL_ARB_texture_compression");
     glinfo.texnpot = gl_has_extension(exts, "GL_ARB_texture_non_power_of_two");
     gl_initdrawpath(exts);
+    glsub_init();
     sdldebug("OpenGL %s on %s: bgra %d, clamptoedge %d, texcompr %d, texnpot %d, maxanisotropy %g, vbo %d, glsl %d, fbo %d.",
              (const char *) glGetString(GL_VERSION), (const char *) glGetString(GL_RENDERER),
              glinfo.bgra, glinfo.clamptoedge, glinfo.texcompr, glinfo.texnpot, glinfo.maxanisotropy,

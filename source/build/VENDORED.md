@@ -396,7 +396,20 @@ Ported from later JFBuild commits, retyped as above:
   from `gldrawpathrequest` (the game's `GLDrawPath`, the editor's
   `gldrawpath`) and prints it. `gl_forcefail` (a test hook) makes GLSL and
   FBOs unavailable. `glinternalwidth`/`glinternalheight` are set from the
-  settings but not used yet; every path still draws as JFBuild does.
+  settings but not used yet.
+- `glsubmit.c`/`glsubmit.h` (ours): renderer 3's vertex submission.
+  `polymost.c`'s and `engine.c`'s `glBegin`/`glTexCoord`/`glColor`/
+  `glVertex`/`glEnd` (drawpoly, `drawtrap`/`tessectrap`, the tile picker,
+  `drawline256`, `printext256`, `plotpixel`) are `glsub_*` calls, as floats
+  (`glTexCoord2d`/`glVertex3d` and `glColor4ub` were). On the immediate path
+  they become vertex arrays (`glsub_force`, a test hook, can keep
+  `glBegin`/`glEnd`); on the vbo and shader paths a vertex buffer, given new
+  storage each draw. Fans become triangles so polygons batch; `polymost.c`
+  and `sdl_driver.c` define `GLSUB_WRAP`, which wraps their GL state calls
+  to draw the batch first (binding the bound texture or enabling an enabled
+  cap is skipped while batching), and `gl_swap` draws it before the swap.
+  `setgamemode_gl` calls `glsub_init`, `destroy_gl_window` `glsub_uninit`.
+  Every path draws the same pixels as JFBuild's immediate mode.
 
 ## Renderer 3: 2D, clears, palette, fades, screenshots
 

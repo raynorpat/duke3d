@@ -71,6 +71,10 @@ static int32_t animateoffs(short tilenum, short fakevar);
 #include <math.h> //<-important!
 #ifdef USE_OPENGL
 #include "SDL_opengl.h"
+	//Drawing goes through glsub_*, which may batch vertices: GL state calls
+	//here and in engine.c below draw the batch first.
+#define GLSUB_WRAP
+#include "glsubmit.h"
 #endif
 typedef struct { float x, cy[2], fy[2]; int32_t n, p, tag, ctag, ftag; } vsptyp;
 #define VSPMAX 4096 //<- careful!
@@ -594,7 +598,7 @@ static int32_t pow2xsplit = 0, skyclamphack = 0;
 	//Switches to the glow pass: full colour, no fog, blended, no Z writes
 static void polymost_glowbegin (GLuint fbtex, float alpha)
 {
-	glColor4f(1.f,1.f,1.f,alpha);
+	glsub_color(1.f,1.f,1.f,alpha);
 	if (fog_is_on) glDisable(GL_FOG);
 	glEnable(GL_BLEND);
 	glDepthMask(GL_FALSE);
@@ -607,7 +611,7 @@ static void polymost_glowend (GLuint basetex, float *pc, int32_t method)
 	if (fog_is_on) glEnable(GL_FOG);
 	glDepthMask(GL_TRUE);
 	if (!(method&3)) glDisable(GL_BLEND);
-	glColor4fv(pc);
+	glsub_color(pc[0],pc[1],pc[2],pc[3]);
 	glBindTexture(GL_TEXTURE_2D,basetex);
 }
 #endif
@@ -745,7 +749,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 			case 2: pc[3] = 0.66; break;
 			case 3: pc[3] = 0.33; break;
 		}
-		glColor4f(pc[0],pc[1],pc[2],pc[3]);
+		glsub_color(pc[0],pc[1],pc[2],pc[3]);
 		}
 
 			//Hack for walls&masked walls which use textures that are not a power of 2
@@ -857,17 +861,17 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 				for(k=0;k<=(fbtex!=0);k++)
 				{
 					if (k) polymost_glowbegin(fbtex,pc[3]);
-					glBegin(GL_TRIANGLE_FAN);
+					glsub_begin(GL_TRIANGLE_FAN);
 					for(i=0;i<nn;i++)
 					{
 						ox = uu[i]; oy = vv[i];
 						dp = ox*ngdx + oy*ngdy + ngdo;
 						up = ox*ngux + oy*nguy + nguo;
 						vp = ox*ngvx + oy*ngvy + ngvo;
-						r = 1.0/dp; glTexCoord2d((up*r-du0+uoffs)*ox2,vp*r*oy2);
-						glVertex3d((ox-ghalfx)*r*grhalfxdown10x,(ghoriz-oy)*r*grhalfxdown10,r*(1.0/1024.0));
+						r = 1.0/dp; glsub_texcoord((up*r-du0+uoffs)*ox2,vp*r*oy2);
+						glsub_vertex((ox-ghalfx)*r*grhalfxdown10x,(ghoriz-oy)*r*grhalfxdown10,r*(1.0/1024.0));
 					}
-					glEnd();
+					glsub_end();
 					if (k) polymost_glowend(basetex,pc,method);
 				}
 			}
@@ -878,13 +882,13 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 			for(k=0;k<=(fbtex!=0);k++)
 			{
 				if (k) polymost_glowbegin(fbtex,pc[3]);
-				glBegin(GL_TRIANGLE_FAN);
+				glsub_begin(GL_TRIANGLE_FAN);
 				for(i=0;i<n;i++)
 				{
-					r = 1.0/dd[i]; glTexCoord2d(uu[i]*r*ox2,vv[i]*r*oy2);
-					glVertex3d((px[i]-ghalfx)*r*grhalfxdown10x,(ghoriz-py[i])*r*grhalfxdown10,r*(1.0/1024.0));
+					r = 1.0/dd[i]; glsub_texcoord(uu[i]*r*ox2,vv[i]*r*oy2);
+					glsub_vertex((px[i]-ghalfx)*r*grhalfxdown10x,(ghoriz-py[i])*r*grhalfxdown10,r*(1.0/1024.0));
 				}
-				glEnd();
+				glsub_end();
 				if (k) polymost_glowend(basetex,pc,method);
 			}
 		}
@@ -3119,15 +3123,15 @@ static void drawtrap (float x0, float x1, float y0, float x2, float x3, float y1
 	else if (x2 == x3) { px[1] = x1; py[1] = y0; px[2] = x3; n = 3; }
 	else               { px[1] = x1; py[1] = y0; px[2] = x3; px[3] = x2; py[3] = y1; n = 4; }
 
-	glBegin(GL_TRIANGLE_FAN);
+	glsub_begin(GL_TRIANGLE_FAN);
 	for(i=0;i<n;i++)
 	{
 		px[i] = min(max(px[i],trapextx[0]),trapextx[1]);
-		glTexCoord2f(px[i]*gux + py[i]*guy + guo,
+		glsub_texcoord(px[i]*gux + py[i]*guy + guo,
 						 px[i]*gvx + py[i]*gvy + gvo);
-		glVertex2f(px[i],py[i]);
+		glsub_vertex(px[i],py[i],0);
 	}
-	glEnd();
+	glsub_end();
 }
 
 static void tessectrap (float *px, float *py, int32_t *point2, int32_t numpoints)
@@ -3174,15 +3178,15 @@ static void tessectrap (float *px, float *py, int32_t *point2, int32_t numpoints
 	}
 	if (z != 3) //Simple polygon... early out
 	{
-		glBegin(GL_TRIANGLE_FAN);
+		glsub_begin(GL_TRIANGLE_FAN);
 		for(i=0;i<npoints;i++)
 		{
 			j = slist[i];
-			glTexCoord2f(px[j]*gux + py[j]*guy + guo,
+			glsub_texcoord(px[j]*gux + py[j]*guy + guo,
 							 px[j]*gvx + py[j]*gvy + gvo);
-			glVertex2f(px[j],py[j]);
+			glsub_vertex(px[j],py[j],0);
 		}
-		glEnd();
+		glsub_end();
 		return;
 	}
 
@@ -3325,7 +3329,7 @@ void polymost_fillpolygon (int32_t npoints)
 		case 2: a = 0.66; glEnable(GL_BLEND); break;
 		case 3: a = 0.33; glEnable(GL_BLEND); break;
 	}
-	glColor4f(f,f,f,a);
+	glsub_color(f,f,f,a);
 
 	tessectrap(fx,fy,xb1,npoints);
 
@@ -3370,23 +3374,23 @@ int32_t polymost_drawtilescreen (int32_t tilex, int32_t tiley, int32_t wallnum, 
 	//glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP);
 
 	glDisable(GL_TEXTURE_2D);
-	glBegin(GL_TRIANGLE_FAN);
-	glColor4f((float)curpalette[255].r/255.0,(float)curpalette[255].g/255.0,(float)curpalette[255].b/255.0,1);
-	glVertex2f((float)tilex    ,(float)tiley    );
-	glVertex2f((float)tilex+scx,(float)tiley    );
-	glVertex2f((float)tilex+scx,(float)tiley+scy);
-	glVertex2f((float)tilex    ,(float)tiley+scy);
-	glEnd();
+	glsub_begin(GL_TRIANGLE_FAN);
+	glsub_color((float)curpalette[255].r/255.0,(float)curpalette[255].g/255.0,(float)curpalette[255].b/255.0,1);
+	glsub_vertex((float)tilex    ,(float)tiley    ,0);
+	glsub_vertex((float)tilex+scx,(float)tiley    ,0);
+	glsub_vertex((float)tilex+scx,(float)tiley+scy,0);
+	glsub_vertex((float)tilex    ,(float)tiley+scy,0);
+	glsub_end();
 
-	glColor4f(1,1,1,1);
+	glsub_color(1,1,1,1);
 	glEnable(GL_TEXTURE_2D);
 	glEnable(GL_BLEND);
-	glBegin(GL_TRIANGLE_FAN);
-	glTexCoord2f(       0,       0); glVertex2f((float)tilex    ,(float)tiley    );
-	glTexCoord2f(xdimepad,       0); glVertex2f((float)tilex+scx,(float)tiley    );
-	glTexCoord2f(xdimepad,ydimepad); glVertex2f((float)tilex+scx,(float)tiley+scy);
-	glTexCoord2f(       0,ydimepad); glVertex2f((float)tilex    ,(float)tiley+scy);
-	glEnd();
+	glsub_begin(GL_TRIANGLE_FAN);
+	glsub_texcoord(       0,       0); glsub_vertex((float)tilex    ,(float)tiley    ,0);
+	glsub_texcoord(xdimepad,       0); glsub_vertex((float)tilex+scx,(float)tiley    ,0);
+	glsub_texcoord(xdimepad,ydimepad); glsub_vertex((float)tilex+scx,(float)tiley+scy,0);
+	glsub_texcoord(       0,ydimepad); glsub_vertex((float)tilex    ,(float)tiley+scy,0);
+	glsub_end();
 	
 	return(0);
 #else
