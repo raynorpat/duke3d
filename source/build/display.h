@@ -170,6 +170,10 @@ void setvideodisplaymode(int mode);
 /* The same, set by the next mode set together with its size: one change on
  *  screen (the VIDEO page's DISPLAY and RESOLUTION). */
 void setvideodisplaymodenext(int mode);
+/* 1: game modes' 8-bit frames follow the game's VIDEO rule (borderless at
+ *  the window's size, over 1600x1200 capped keeping the aspect); 0 (the
+ *  default, the editor's): the size asked for, over 1600x1200 clamped. */
+void setvideodrawfit(int on);
 int getvideodisplaymode(void);  /* the window's */
 void setvideovsync(int on);  /* 1: present on vsync (the default) */
 int getvideovsync(void);

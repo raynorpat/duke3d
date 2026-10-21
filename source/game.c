@@ -2348,7 +2348,7 @@ static void video_teststep(const char *tag)
     static const int32_t modes[][3] = {
         { DISPLAY_WINDOWED, 640, 480 }, { DISPLAY_BORDERLESS, 800, 600 },
         { DISPLAY_EXCLUSIVE, 1024, 768 }, { DISPLAY_WINDOWED, 2560, 1440 },
-        { DISPLAY_WINDOWED, 320, 200 }
+        { DISPLAY_WINDOWED, 320, 200 }, { DISPLAY_WINDOWED, 1366, 768 }
     };
     static int32_t step;
     int32_t r = gamerenderer, m = step++ % (int32_t)(sizeof(modes)/sizeof(modes[0]));
@@ -9002,6 +9002,7 @@ int main(int argc,char **argv)
     gamerenderer = clamprenderer(i ? ((i+1 < _argc) ? atoi(_argv[i+1]) : 0) : RendererSetting);
     setvideodisplaymode(DisplayMode);  // the VIDEO menu changes them as it goes
     setvideovsync(VSync);
+    setvideodrawfit(1);  // the VIDEO page's draw sizes (the editor keeps its own)
     gamewidth = ScreenWidth;
     gameheight = ScreenHeight;
 

@@ -69,6 +69,7 @@ int glgamepalette_check(void)
 void videoswitch_setup(void)
 {
     ScreenMode = 1;
+    setvideodrawfit(1);  /* as the game's main() */
     genspriteremaps();  /* the game's water palette */
     myconnectindex = screenpeek = 0;
     ps[0].palette = (char *) palette;  /* as the game has it from the start */

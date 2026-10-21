@@ -189,7 +189,9 @@ static int sdl_displaymode_next = -1;  /* for the next mode set (setvideodisplay
 static int exclusive_w = 0, exclusive_h = 0;  /* exclusive's size: the game mode's */
 static int exclusive_shown_w = 0, exclusive_shown_h = 0;  /* the size it was last set at */
 static int window_w = 640, window_h = 480;  /* windowed size: the last mode's, unclamped */
-static int placed_w = 0, placed_h = 0;  /* the size the window was last given */
+static int placed_w = 0, placed_h = 0;  /* the windowed size the window was last given */
+static int sdl_drawfit = 0;  /* the game's 8-bit draw size rule (setvideodrawfit) */
+static Uint8 *surface_pixels = NULL;  /* surface's, rows exactly its width apart */
 static int32_t mouse_x = 0;
 static int32_t mouse_y = 0;
 static int32_t mouse_relative_x = 0;
@@ -354,6 +356,8 @@ static void free_video_surfaces(void)
         SDL_FreeSurface(surface);
         surface = NULL;
     } /* if */
+    free(surface_pixels);
+    surface_pixels = NULL;
 } /* free_video_surfaces */
 
 
@@ -686,14 +690,13 @@ static int set_window_display(SDL_Window *window, int now, int mode)
 
 
 /*
- * Where a w by h window is centred: on the display's bounds, as SDL's own
+ * Where a w by h window is centred on display d: on its bounds, as SDL's own
  *  centring is not (on macOS, sdl2-compat 2.32 after exclusive keeps the
  *  exclusive mode's usable area, putting the window half off the screen).
  */
-static void centre_window_pos(int w, int h, int *x, int *y)
+static void centre_window_pos(int d, int w, int h, int *x, int *y)
 {
     SDL_Rect b;
-    int d = (sdl_window != NULL) ? SDL_GetWindowDisplayIndex(sdl_window) : 0;
 
     *x = *y = SDL_WINDOWPOS_CENTERED;
     if ((d < 0) || (SDL_GetDisplayBounds(d, &b) != 0))
@@ -722,10 +725,9 @@ static SDL_Window *create_window(int w, int h, Uint32 flags)
         (w == placed_w) && (h == placed_h))
         SDL_GetWindowPosition(sdl_window, &x, &y);
     else
-        centre_window_pos(w, h, &x, &y);
+        centre_window_pos((sdl_window != NULL) ? SDL_GetWindowDisplayIndex(sdl_window) : 0,
+                          w, h, &x, &y);
     window = SDL_CreateWindow(titlelong, x, y, w, h, flags);
-    placed_w = w;
-    placed_h = h;
     if ((window != NULL) && (sdl_displaymode == DISPLAY_EXCLUSIVE))
     {
         sdl_displaymode = set_window_display(window, DISPLAY_WINDOWED, DISPLAY_EXCLUSIVE);
@@ -748,46 +750,58 @@ static int take_next_displaymode(void)
 /*
  * A mode set's window: the windowed size (window_w by window_h) and display
  *  mode. What hasn't changed is left alone, so a window the player moved
- *  stays where it is; a new size is centred.
+ *  stays where it is. A new windowed size is given only while windowed (in
+ *  full screen it waits for the return, so the screen changes once), and
+ *  then centred on the display the window was on.
  */
 static void place_window(int mode)
 {
-    int resized = ((window_w != placed_w) || (window_h != placed_h));
+    int d = SDL_GetWindowDisplayIndex(sdl_window);
+    int x, y;
 
-    if (resized)  /* even when fullscreen, so going windowed restores it. */
-    {
-        SDL_SetWindowSize(sdl_window, window_w, window_h);
-        placed_w = window_w;
-        placed_h = window_h;
-    } /* if */
     if ((mode != sdl_displaymode) ||
         ((mode == DISPLAY_EXCLUSIVE) &&
-         ((resized) || (exclusive_w != exclusive_shown_w) || (exclusive_h != exclusive_shown_h))))
+         ((exclusive_w != exclusive_shown_w) || (exclusive_h != exclusive_shown_h))))
         sdl_displaymode = set_window_display(sdl_window, sdl_displaymode, mode);
-    if ((resized) && (sdl_displaymode == DISPLAY_WINDOWED))
-    {
-        int x, y;
-
-        centre_window_pos(window_w, window_h, &x, &y);
-        SDL_SetWindowPosition(sdl_window, x, y);
-    } /* if */
+    if ((sdl_displaymode != DISPLAY_WINDOWED) ||
+        ((window_w == placed_w) && (window_h == placed_h)))
+        return;
+    SDL_SetWindowSize(sdl_window, window_w, window_h);
+    placed_w = window_w;
+    placed_h = window_h;
+    centre_window_pos(d, window_w, window_h, &x, &y);
+    SDL_SetWindowPosition(sdl_window, x, y);
 } /* place_window */
 
 
 /*
- * The size a game mode's 8-bit frame is drawn at: the size asked for, or in
- *  borderless the window's, which fills the desktop (on macOS, below a
- *  notch), capped to 1600x1200 keeping the aspect, the width a multiple of 4
- *  (the engine assumes bytesperline == width, and SDL pads surface rows to
- *  4). The window shows it scaled.
+ * The size a game mode's 8-bit frame is drawn at. The game's rule
+ *  (setvideodrawfit): the size asked for, or in borderless the window's,
+ *  which fills the desktop (on macOS, below a notch), capped to 1600x1200
+ *  keeping the aspect. Otherwise (the editor) the size asked for, over
+ *  1600x1200 clamped to it. The window shows it scaled.
  */
 static void fit_draw_size(int *w, int *h)
 {
+    if (!sdl_drawfit)
+    {
+        if ((*w > 1600) || (*h > 1200))
+        {
+            *w = 1600;
+            *h = 1200;
+        } /* if */
+        return;
+    } /* if */
     if (sdl_displaymode == DISPLAY_BORDERLESS)
         SDL_GetWindowSize(sdl_window, w, h);
     videoopts_drawsize(*w, *h, 0, w, h);
-    *w &= ~3;
 } /* fit_draw_size */
+
+
+void setvideodrawfit(int on)
+{
+    sdl_drawfit = (on != 0);
+} /* setvideodrawfit */
 
 
 /* fit: a game mode, drawn at fit_draw_size's size in a w by h window. */
@@ -827,6 +841,8 @@ static void go_to_new_vid_mode(int vidoption, int w, int h, int fit)
         sdl_window = create_window(window_w, window_h, 0);
         if (sdl_window == NULL)
             goto vidmode_failed;
+        placed_w = window_w;
+        placed_h = window_h;
 
         sdl_renderer = SDL_CreateRenderer(sdl_window, -1,
                                           sdl_vsync ? SDL_RENDERER_PRESENTVSYNC : 0);
@@ -846,7 +862,10 @@ static void go_to_new_vid_mode(int vidoption, int w, int h, int fit)
 
     if (fit)
         fit_draw_size(&w, &h);
-    surface = SDL_CreateRGBSurface(0, w, h, 8, 0, 0, 0, 0);
+    /* the engine assumes bytesperline == width; SDL would pad rows to 4. */
+    surface_pixels = (Uint8 *) malloc((size_t) w * h);
+    surface = (surface_pixels == NULL) ? NULL :
+              SDL_CreateRGBSurfaceFrom(surface_pixels, w, h, 8, w, 0, 0, 0, 0);
 #ifdef USE_OPENGL
     if (sdl_glcontext != NULL)  /* shown through the GL context: gl_present8 */
     {
@@ -868,7 +887,6 @@ static void go_to_new_vid_mode(int vidoption, int w, int h, int fit)
             goto vidmode_failed;
     } /* else */
 
-    /* the engine assumes bytesperline == width. */
     assert(surface->pitch == surface->w);
 
     output_surface_info(surface);
@@ -1200,8 +1218,6 @@ int setgamemode_gl(char davidoption)
             if (window != NULL)
                 SDL_DestroyWindow(window);
             sdl_displaymode = displaymode;  /* the 8-bit window's, still */
-            placed_w = window_w;
-            placed_h = window_h;
             if ((window != NULL) && (displaymode == DISPLAY_EXCLUSIVE))  /* its display mode again */
                 sdl_displaymode = set_window_display(sdl_window, displaymode, displaymode);
             if (gl_forcefail == 4)
@@ -1219,6 +1235,8 @@ int setgamemode_gl(char davidoption)
             SDL_DestroyWindow(sdl_window);
         sdl_window = window;
         sdl_glcontext = context;
+        placed_w = window_w;
+        placed_h = window_h;
     } /* else */
 
     /* destroying an SDL_Renderer can leave no context current. */

@@ -130,6 +130,7 @@ extern int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim);
 extern int setgamemode_gl(char davidoption);
 extern void setvideodisplaymode(int mode);
 extern void setvideodisplaymodenext(int mode);
+extern void setvideodrawfit(int on);
 extern int getvideodisplaymode(void);
 extern void setvideovsync(int on);
 extern int getvideovsync(void);

@@ -1848,6 +1848,19 @@ static int video_switch_check(void)
     return ok;
 }
 
+/* BUILD_WINDOWED set or not, portably. */
+static void set_build_windowed(int on)
+{
+#if PLATFORM_WIN32
+    _putenv_s(BUILD_WINDOWED, on ? "1" : "");
+#else
+    if (on)
+        setenv(BUILD_WINDOWED, "1", 1);
+    else
+        unsetenv(BUILD_WINDOWED);
+#endif
+}
+
 /*
  * The VIDEO page's resolution and display mode (game.c video_setmode) in
  *  renderer 3: each keeps the window and the context, xdim/ydim follow the
@@ -1872,7 +1885,7 @@ static int video_mode_check(void)
     int i, k, ok = 1, dw, dh, ww, wh, x, y, x2, y2, same, white = 31;
     long dark;
 
-    unsetenv(BUILD_WINDOWED);  /* so borderless is */
+    set_build_windowed(0);  /* so borderless is */
     for (i = 0; i < (int) (sizeof (seq) / sizeof (seq[0])); i++)
     {
         same = ((i > 0) && (seq[i].mode == DISPLAY_WINDOWED) && (seq[i - 1].mode == DISPLAY_WINDOWED) &&
@@ -1931,7 +1944,7 @@ static int video_mode_check(void)
         if (dark != 0)
             { fprintf(stderr, "FAIL: the frame doesn't fill the window\n"); ok = 0; }
     }
-    setenv(BUILD_WINDOWED, "1", 1);
+    set_build_windowed(1);
     return ok;
 }
 

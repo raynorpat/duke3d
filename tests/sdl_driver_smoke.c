@@ -238,6 +238,21 @@ static int smoke_mode(int mode, int w, int h, int wantmode, int xd, int yd, int 
            (long) xdim, (long) ydim, gotw, goth);
     return 1;
 }
+
+/* The window is centred on the dummy display (1024x768). */
+static int smoke_centred(int w, int h)
+{
+    int x, y;
+
+    SDL_GetWindowPosition(smoke_window(), &x, &y);
+    if ((x != (1024 - w) / 2) || (y != (768 - h) / 2))
+    {
+        fprintf(stderr, "FAIL: a %dx%d window at %d,%d, not centred\n", w, h, x, y);
+        return 0;
+    }
+    printf("%dx%d window centred at %d,%d\n", w, h, x, y);
+    return 1;
+}
 #endif
 
 static int mode_sizes(int argc, char **argv)
@@ -247,6 +262,7 @@ static int mode_sizes(int argc, char **argv)
 
     unsetenv(BUILD_WINDOWED);
     setvideodisplaymode(DISPLAY_WINDOWED);
+    setvideodrawfit(1);  /* the game's rule */
     _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
     if (!smoke_mode(-1, 640, 480, DISPLAY_WINDOWED, 640, 480, 640, 480)) return 1;
 
@@ -262,7 +278,7 @@ static int mode_sizes(int argc, char **argv)
 
     if (!smoke_mode(-1, 2560, 1440, DISPLAY_WINDOWED, 1600, 900, 2560, 1440)) return 1;
     if (!smoke_mode(-1, 1200, 1600, DISPLAY_WINDOWED, 900, 1200, 1200, 1600)) return 1;
-    if (!smoke_mode(-1, 1366, 768, DISPLAY_WINDOWED, 1364, 768, 1366, 768)) return 1;
+    if (!smoke_mode(-1, 1366, 768, DISPLAY_WINDOWED, 1366, 768, 1366, 768)) return 1;
     if (!smoke_mode(-1, 320, 200, DISPLAY_WINDOWED, 320, 200, 640, 400)) return 1;
 
     setvideodisplaymodenext(DISPLAY_BORDERLESS);
@@ -280,6 +296,21 @@ static int mode_sizes(int argc, char **argv)
     if (!smoke_mode(DISPLAY_WINDOWED, 1024, 768, DISPLAY_WINDOWED, 1024, 768, 1024, 768)) return 1;
     if (smoke_fsflags() != 0)
         { fprintf(stderr, "FAIL: windowed flags 0x%x\n", (unsigned) smoke_fsflags()); return 1; }
+
+    /* A size set while full screen: the window is centred when windowed again. */
+    if (!smoke_mode(DISPLAY_WINDOWED, 320, 200, DISPLAY_WINDOWED, 320, 200, 640, 400)) return 1;
+    if (!smoke_mode(DISPLAY_EXCLUSIVE, 800, 600, DISPLAY_EXCLUSIVE, 800, 600, 0, 0)) return 1;
+    if (!smoke_mode(DISPLAY_WINDOWED, 800, 600, DISPLAY_WINDOWED, 800, 600, 800, 600)) return 1;
+    if (!smoke_centred(800, 600)) return 1;
+    if (!smoke_mode(DISPLAY_WINDOWED, 640, 480, DISPLAY_WINDOWED, 640, 480, 640, 480)) return 1;
+    if (!smoke_mode(DISPLAY_BORDERLESS, 1000, 700, DISPLAY_BORDERLESS, 1024, 768, 0, 0)) return 1;
+    if (!smoke_mode(DISPLAY_WINDOWED, 1000, 700, DISPLAY_WINDOWED, 1000, 700, 1000, 700)) return 1;
+    if (!smoke_centred(1000, 700)) return 1;
+
+    /* The editor's rule: over 1600x1200 clamped to it. */
+    setvideodrawfit(0);
+    if (!smoke_mode(-1, 1920, 1080, DISPLAY_WINDOWED, 1600, 1200, 1920, 1080)) return 1;
+    setvideodrawfit(1);
 
     setenv(BUILD_WINDOWED, "1", 1);
     if (!smoke_mode(DISPLAY_EXCLUSIVE, 800, 600, DISPLAY_WINDOWED, 800, 600, 800, 600)) return 1;
