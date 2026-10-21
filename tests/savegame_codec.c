@@ -76,7 +76,8 @@ static void test_sprite(void)
 }
 
 #if DUKE3D_GAMEVER < GAMEVER_13D
-/* The DOS 1.1 player_struct (docs/v10-v11/reference.md, "player_struct (1.1)"). */
+/* The DOS 1.1 player_struct (docs/v10-v11/reference.md, "player_struct (1.1)"),
+   or in 1.0 builds the 1.0 one ("player_struct (1.0)"): the same up to 0x321. */
 static void test_player(void)
 {
     static struct player_struct p, back;
@@ -92,7 +93,11 @@ static void test_player(void)
     p.scream_voice = 0x0c0d0e0f; p.gm = 0x11; p.jumping_toggle = 0x15; p.rapid_fire_hold = 0x16;
     p.name[0] = 'D'; p.inven_icon = 0x17; p.lastrandomspot = 0x18; p.spacesuit_on = 1;
     p.scuba_on = 0x19; p.spacesuit_used = 1; p.footprintpal = 0x1a; p.falling_counter = 0x1b;
+#if DUKE3D_GAMEVER < GAMEVER_11
+    p.frag_ps = 3; p.unnamed_322 = 0x1d; p.auto_run = 1; p.gotweapon[0] = 1; p.gotweapon[9] = 1;
+#else
     p.frag_ps = 3; p.aim_mode = 1; p.gotweapon[0] = 1; p.gotweapon[9] = 1;
+#endif
     p.refresh_inventory = 0x1c; p.palette = (char *)b; p.toggle_key_flag = 0x22;
     p.knuckle_incs = 0x23; p.walking_snd_toggle = 0x24; p.interface_toggle_flag = 0x25;
     p.palookup = 0x26; p.pals[2] = 0x27; p.actors_killed = 0x28; p.return_to_center = 0x33;
@@ -126,14 +131,38 @@ static void test_player(void)
     CHECK(b[0x312] == 0x16);
     CHECK(b[0x314] == 'D');
     CHECK(b[0x321] == 0x17);
+#if DUKE3D_GAMEVER < GAMEVER_11
+    CHECK(b[0x322] == 0x1d);
+    CHECK(b[0x326] == 0x18);
+#else
     CHECK(b[0x325] == 0x18);
     CHECK(b[0x326] == 0);       /* no_autoaim: never set */
+#endif
     CHECK(b[0x327] == 1);
     CHECK(b[0x328] == 0x19);
     CHECK(b[0x329] == 1);
     CHECK(b[0x32a] == 0x1a);
     CHECK(b[0x32d] == 0x1b);
     CHECK(b[0x32e] == 3);
+#if DUKE3D_GAMEVER < GAMEVER_11
+    /* No aim_mode: gotweapon and everything after it sit one byte lower, up
+       to the 1.0-only auto_run at 0x34c. */
+    CHECK(b[0x32f] == 1 && b[0x338] == 1);
+    CHECK(b[0x339] == 0x1c);
+    CHECK(b[0x33a] == 0 && b[0x33b] == 0 && b[0x33c] == 0 && b[0x33d] == 0);
+    CHECK(b[0x33e] == 0x22);
+    CHECK(b[0x33f] == 0x23);
+    CHECK(b[0x340] == 0);       /* select_dir: not carried */
+    CHECK(b[0x341] == 0x24);
+    CHECK(b[0x342] == 0x25);
+    CHECK(b[0x343] == 0x26);
+    CHECK(b[0x349] == 0x27);
+    CHECK(b[0x34b] == 0x28);
+    CHECK(b[0x34c] == 1);
+    CHECK(b[0x34d] == 0x33);
+    CHECK(b[0x34e] == 0xee);
+    b[0x33a] = 0x99;   /* a DOS pointer: must not be restored */
+#else
     CHECK(b[0x32f] == 1);
     CHECK(b[0x330] == 1 && b[0x339] == 1);
     CHECK(b[0x33a] == 0x1c);
@@ -149,6 +178,7 @@ static void test_player(void)
     CHECK(b[0x34d] == 0x33);
     CHECK(b[0x34e] == 0xee);
     b[0x33b] = 0x99;   /* a DOS pointer: must not be restored */
+#endif
     CHECK(sg_player(b, &back, 0) == 0x34e);
     CHECK(back.palette == NULL);
     back.palette = p.palette;

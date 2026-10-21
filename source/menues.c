@@ -160,7 +160,9 @@ static int loadpheader(char spot,int32 *vn,int32 *ln,int32 *psk,int32 *nump)
      char filename[] = "game0.sav";
      char fullname[MAX_PATH];
      int32_t fil;
+#if DUKE3D_GAMEVER >= GAMEVER_11
      int32_t bv = 0;
+#endif
 
      filename[4] = spot+'0';
      GetPathFromEnvironment(fullname, sizeof(fullname), filename);
@@ -169,8 +171,13 @@ static int loadpheader(char spot,int32 *vn,int32 *ln,int32 *psk,int32 *nump)
 
      walock[MAXTILES-3] = 255;
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // 1.0 saves have no version: they are told by their layout.
+     if(sg_check10(fil) < 0)
+#else
      bv = sg_read32(fil);
      if(bv != BYTEVERSION)
+#endif
      {
         FTA(114,&ps[myconnectindex]);
         kclose(fil);
@@ -256,6 +263,20 @@ int loadplayerfile(char *fnptr, signed char spot)
 
      ready2send = 0;
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // 1.0 saves have no version: they are told by their layout (rulings.md).
+     // bv is where the save's script was, for its script addresses.
+     bv = sg_check10(fil);
+     if(bv < 0)
+     {
+        printf("%s is not a DOS 1.0 save.\n",fnptr);
+        FTA(114,&ps[myconnectindex]);
+        kclose(fil);
+        ototalclock = totalclock;
+        ready2send = 1;
+        return 1;
+     }
+#else
      bv = sg_read32(fil);
      if(bv != BYTEVERSION)
      {
@@ -284,6 +305,7 @@ int loadplayerfile(char *fnptr, signed char spot)
         ready2send = 1;
         return 1;
      }
+#endif
 
 #if DUKE3D_GAMEVER < GAMEVER_14
      nump = 1;  // 1.3D saves have no player count
@@ -337,9 +359,17 @@ int loadplayerfile(char *fnptr, signed char spot)
      kdfread((char *)waloff[MAXTILES-3],160,100,fil);
 
      numwalls = clampcount(sg_read16(fil),MAXWALLS);
+#if DUKE3D_GAMEVER < GAMEVER_11 // 1.0 saves only the map's walls and sectors
+     sg_readrecs(fil,wall,sizeof(walltype),sg_wall,numwalls,SG_WALL_SIZE,numwalls);
+#else
      sg_readrecs(fil,wall,sizeof(walltype),sg_wall,MAXWALLS,SG_WALL_SIZE,MAXWALLS);
+#endif
      numsectors = clampcount(sg_read16(fil),MAXSECTORS);
+#if DUKE3D_GAMEVER < GAMEVER_11
+     sg_readrecs(fil,sector,sizeof(sectortype),sg_sector,numsectors,SG_SECTOR_SIZE,numsectors);
+#else
      sg_readrecs(fil,sector,sizeof(sectortype),sg_sector,MAXSECTORS,SG_SECTOR_SIZE,MAXSECTORS);
+#endif
      sg_readrecs(fil,sprite,sizeof(spritetype),sg_sprite,MAXSPRITES,SG_SPRITE_SIZE,MAXSPRITES);
      sg_read16s(fil,headspritesect,2,MAXSECTORS+1);
      sg_read16s(fil,prevspritesect,2,MAXSPRITES);
@@ -352,6 +382,12 @@ int loadplayerfile(char *fnptr, signed char spot)
      sg_readrecs(fil,ps,sizeof(struct player_struct),sg_player,SG_DOS_MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
      for(i=0;i<MAXPLAYERS;i++) ps[i].palette = (char *) &palette[0];
      sg_readrecs(fil,po,sizeof(struct player_orig),sg_playerorig,SG_DOS_MAXPLAYERS,SG_PLAYERORIG_DFSIZE,SG_PLAYERORIG_DFCOUNT);
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // 1.0 saves hittype[] here, raw, with DOS script addresses (F10-003):
+     // they are made offsets once actorscrptr[] is in.
+     clearbufbyte(hittype,sizeof(hittype),0L);
+     sg_readrecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,SG_DOS_MAXHITTYPES,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES);
+#endif
      numanimwalls = clampcount(sg_read16(fil),MAXANIMWALLS);
      sg_readrecs(fil,animwall,sizeof(struct animwalltype),sg_animwall,MAXANIMWALLS,SG_ANIMWALL_SIZE*MAXANIMWALLS,1);
      sg_read32s(fil,msx,4,sizeof(msx)/sizeof(msx[0]));
@@ -387,7 +423,18 @@ int loadplayerfile(char *fnptr, signed char spot)
      clearbuf(actorscrptr,MAXTILES,0L);
      sg_read32s(fil,actorscrptr,4,SG_DOS_MAXTILES);
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // Every entry is stored minus the script's address, so the empty ones
+     // hold minus that. An actor's temp_data[1], [4] and [5] at or above it
+     // are addresses; sg_check10 has made sure they're in the script.
+     for(i=0;i<SG_DOS_MAXTILES;i++)
+         if(actorscrptr[i] == -bv) actorscrptr[i] = 0;
+     for(i=0;i<SG_DOS_MAXHITTYPES;i++)
+         if(sprite[i].picnum >= 0 && sprite[i].picnum < MAXTILES && actorscrptr[sprite[i].picnum])
+             for(j=0;j<3;j++)
+                 if(hittype[i].temp_data[sg_scriptslots10[j]] >= bv)
+                     hittype[i].temp_data[sg_scriptslots10[j]] -= bv;
+#elif DUKE3D_GAMEVER < GAMEVER_14
      clearbufbyte(hittype,sizeof(hittype),0L);
      kdfread(&scriptptrs[0],1,SG_DOS_MAXHITTYPES,fil);
      sg_readrecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,SG_DOS_MAXHITTYPES,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES);
@@ -410,14 +457,17 @@ int loadplayerfile(char *fnptr, signed char spot)
      earthquaketime = sg_read8(fil);
      ud.from_bonus = sg_read16(fil);
 #if DUKE3D_GAMEVER < GAMEVER_13D
-     // 1.1 ends with 7 scalars; auto_run and crosshair are bytes.
+     // 1.1 ends with 7 scalars; auto_run and crosshair are bytes. 1.0 ends
+     // with the first 4.
      ud.respawn_monsters = sg_read32(fil);
      ud.m_respawn_monsters = ud.respawn_monsters;
      ud.respawn_items = sg_read32(fil);
      ud.m_respawn_items = ud.respawn_items;
+#if DUKE3D_GAMEVER >= GAMEVER_11
      ud.god = sg_read8(fil);
      ud.auto_run = sg_read8(fil);
      ud.crosshair = sg_read8(fil);
+#endif
 #else
      ud.secretlevel = sg_read16(fil);
      ud.respawn_monsters = sg_read32(fil);
@@ -624,7 +674,9 @@ int saveplayerfile(char *fnptr, signed char spot)
 
      ready2send = 0;
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 saves have no version
      sg_write32(fil,BYTEVERSION);
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D saves have no player count
      sg_write32(fil,ud.multimode);
 #endif
@@ -636,9 +688,17 @@ int saveplayerfile(char *fnptr, signed char spot)
      dfwrite((char *)waloff[MAXTILES-1],160,100,fil);
 
      sg_write16(fil,numwalls);
+#if DUKE3D_GAMEVER < GAMEVER_11 // 1.0 saves only the map's walls and sectors
+     sg_writerecs(fil,wall,sizeof(walltype),sg_wall,numwalls,SG_WALL_SIZE,numwalls);
+#else
      sg_writerecs(fil,wall,sizeof(walltype),sg_wall,MAXWALLS,SG_WALL_SIZE,MAXWALLS);
+#endif
      sg_write16(fil,numsectors);
+#if DUKE3D_GAMEVER < GAMEVER_11
+     sg_writerecs(fil,sector,sizeof(sectortype),sg_sector,numsectors,SG_SECTOR_SIZE,numsectors);
+#else
      sg_writerecs(fil,sector,sizeof(sectortype),sg_sector,MAXSECTORS,SG_SECTOR_SIZE,MAXSECTORS);
+#endif
      sg_writerecs(fil,sprite,sizeof(spritetype),sg_sprite,MAXSPRITES,SG_SPRITE_SIZE,MAXSPRITES);
      sg_write16s(fil,headspritesect,2,MAXSECTORS+1);
      sg_write16s(fil,prevspritesect,2,MAXSPRITES);
@@ -650,6 +710,23 @@ int saveplayerfile(char *fnptr, signed char spot)
      sg_write16s(fil,&cyclers[0][0],12,MAXCYCLERS);
      sg_writerecs(fil,ps,sizeof(struct player_struct),sg_player,SG_DOS_MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
      sg_writerecs(fil,po,sizeof(struct player_orig),sg_playerorig,SG_DOS_MAXPLAYERS,SG_PLAYERORIG_DFSIZE,SG_PLAYERORIG_DFCOUNT);
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // 1.0 saves hittype[] here, raw: an actor's script offsets in
+     // temp_data[1], [4] and [5] go out as DOS addresses (F10-003), and
+     // scriptptrs marks them to undo after.
+     for(i=0;i<SG_DOS_MAXHITTYPES;i++)
+         for(j=0;j<3;j++)
+         {
+             int32_t *t = &hittype[i].temp_data[sg_scriptslots10[j]];
+             scriptptrs[i*3+j] = sprite[i].picnum >= 0 && sprite[i].picnum < MAXTILES &&
+                 actorscrptr[sprite[i].picnum] && *t > 0 && *t < SG_DOS_MAXSCRIPT*4 && (*t&3) == 0;
+             if(scriptptrs[i*3+j]) *t += SG_DOS10_SCRIPTBASE;
+         }
+     sg_writerecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,SG_DOS_MAXHITTYPES,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES);
+     for(i=0;i<SG_DOS_MAXHITTYPES;i++)
+         for(j=0;j<3;j++)
+             if(scriptptrs[i*3+j]) hittype[i].temp_data[sg_scriptslots10[j]] -= SG_DOS10_SCRIPTBASE;
+#endif
      sg_write16(fil,numanimwalls);
      sg_writerecs(fil,animwall,sizeof(struct animwalltype),sg_animwall,MAXANIMWALLS,SG_ANIMWALL_SIZE*MAXANIMWALLS,1);
      sg_write32s(fil,msx,4,sizeof(msx)/sizeof(msx[0]));
@@ -681,9 +758,20 @@ int saveplayerfile(char *fnptr, signed char spot)
      dfwrite(&scriptptrs[0],1,SG_DOS_MAXSCRIPT,fil);
      sg_write32s(fil,script,4,SG_DOS_MAXSCRIPT);
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // 1.0 stores every entry minus the script's address, the empty ones too.
+     for(i=0;i<SG_DOS_MAXTILES;i++)
+         if(actorscrptr[i] == 0) actorscrptr[i] = -SG_DOS10_SCRIPTBASE;
      sg_write32s(fil,actorscrptr,4,SG_DOS_MAXTILES);
+     for(i=0;i<SG_DOS_MAXTILES;i++)
+         if(actorscrptr[i] == -SG_DOS10_SCRIPTBASE) actorscrptr[i] = 0;
+#else
+     sg_write32s(fil,actorscrptr,4,SG_DOS_MAXTILES);
+#endif
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // 1.0 wrote hittype[] after po[].
+#elif DUKE3D_GAMEVER < GAMEVER_14
      dfwrite(&scriptptrs[0],1,SG_DOS_MAXHITTYPES,fil);
      sg_writerecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,SG_DOS_MAXHITTYPES,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES);
 #else
@@ -707,9 +795,11 @@ int saveplayerfile(char *fnptr, signed char spot)
 #if DUKE3D_GAMEVER < GAMEVER_13D
      sg_write32(fil,ud.respawn_monsters);
      sg_write32(fil,ud.respawn_items);
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 ends here
      sg_write8(fil,ud.god);
      sg_write8(fil,ud.auto_run);
      sg_write8(fil,ud.crosshair);
+#endif
 #else
      sg_write16(fil,ud.secretlevel);
      sg_write32(fil,ud.respawn_monsters);

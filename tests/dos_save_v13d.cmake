@@ -1,13 +1,14 @@
-# Runs a 1.3D or 1.1 build headless on a DOS save of its own release. MODE is
+# Runs a 1.3D, 1.1 or 1.0 build headless on a DOS save of its own release. MODE is
 # one of:
 #   load    -loadverify must print the reference state (tests/data/v13d_save_refs.cmake);
 #           then -saveverify writes the game back out. That copy must hold the same
 #           blocks as the DOS save (v13d_save_decode.py compare), and loading it must
 #           print the same state
 #   refuse  each OTHER save (another release or edition) and one with the 1.5
-#           BYTEVERSION must exit 2 with the version message
+#           BYTEVERSION must exit 2 with the version message (1.0: the layout
+#           message, and also for two damaged copies of a 1.0 save)
 #
-#   cmake -DMODE=<mode> -DDUKE3D=<exe> -DDATA=<1.3D data dir> -DEDITION=<full|sw|sw11>
+#   cmake -DMODE=<mode> -DDUKE3D=<exe> -DDATA=<1.3D data dir> -DEDITION=<full|sw|sw11|sw10>
 #         -DREFS=<v13d_save_refs.cmake> -DPYTHON=<python3> -DDECODER=<v13d_save_decode.py>
 #         -DWORK=<scratch dir>
 #         [-DNAME=<ref name>] [-DOTHER=<other releases' saves, ;-separated>] -P dos_save_v13d.cmake
@@ -93,14 +94,30 @@ elseif(MODE STREQUAL "refuse")
   # A 1.5 save's first block: BYTEVERSION 117, uncompressed.
   file(COPY_FILE "${CMAKE_CURRENT_LIST_DIR}/data/v15_save_header.sav" "${_run}/v15.sav")
   list(APPEND _files v15.sav)
+  if(EDITION STREQUAL "sw10")
+    # 1.0 saves have no version, so a damaged 1.0 save must be refused by its
+    # layout: one cut short, and one whose hittype holds a script address
+    # past the end of the script.
+    execute_process(COMMAND "${PYTHON}" -I "${DECODER}" truncate
+                            "${DATA}/refsaves/e1l1start.SAV" short.sav 100
+      WORKING_DIRECTORY "${_run}" RESULT_VARIABLE _result)
+    execute_process(COMMAND "${PYTHON}" -I "${DECODER}" badaddr10
+                            "${DATA}/refsaves/e1l1start.SAV" badaddr.sav
+      WORKING_DIRECTORY "${_run}" RESULT_VARIABLE _result2)
+    if(NOT _result EQUAL 0 OR NOT _result2 EQUAL 0)
+      message(FATAL_ERROR "couldn't make the damaged 1.0 saves")
+    endif()
+    list(APPEND _files short.sav badaddr.sav)
+  endif()
   foreach(_file IN LISTS _files)
     run_duke3d(_result _out -loadverify ${_file})
     if(NOT _result EQUAL 2)
       message(FATAL_ERROR "${_file}: -loadverify exited ${_result}, not 2")
     endif()
     # A 1.0 save has no version: its first four name bytes are read as one.
-    if(NOT _out MATCHES "is a version -?[0-9]+ save, not")
-      message(FATAL_ERROR "${_file}: no version message")
+    # A 1.0 build has none either, and goes by the layout.
+    if(NOT _out MATCHES "is a version -?[0-9]+ save, not|is not a DOS 1\\.0 save")
+      message(FATAL_ERROR "${_file}: no version or layout message")
     endif()
   endforeach()
 else()

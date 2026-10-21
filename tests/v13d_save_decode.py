@@ -18,6 +18,14 @@ this file implements itself.
       are byte offsets from script[0], which is how all three store them.
       The save's layout is told from its first block: a 1.3D BYTEVERSION, 1.1's
       BYTEVERSION 12, or 1.0's 19-byte save name (1.0 writes no version).
+
+  v13d_save_decode.py truncate <save> <out> <n>
+      write the save without its last n bytes.
+
+  v13d_save_decode.py badaddr10 <1.0 save> <out>
+      write the 1.0 save with one actor's hittype temp_data[4] set to the
+      script address just past the end of the script (re-encoding hittype[]
+      as stored blocks), which a loader must refuse.
 """
 import struct
 import sys
@@ -142,6 +150,117 @@ def read_script_10(r):
     return script, actors
 
 
+LZWSIZE = 16384
+
+
+def dfsizes(size, count):
+    """The uncompressed size of each block dfwrite(size, count) writes."""
+    if size > LZWSIZE:
+        size, count = 1, size * count
+    out, k = [], 0
+    for i in range(count):
+        k += size
+        if k > LZWSIZE - size or i == count - 1:
+            out.append(k)
+            k = 0
+    return out
+
+
+def calls_10(bl):
+    """The 1.0 saveplayer's dfwrite calls (0x388d0) as (name, first block,
+    block count), given the save's decompressed blocks."""
+    out, i = [], 0
+
+    def call(name, size, count):
+        nonlocal i
+        n = len(dfsizes(size, count))
+        out.append((name, i, n))
+        i += n
+
+    for size, count in ((19, 1), (4, 1), (4, 1), (4, 1), (160, 100)):
+        call('', size, count)
+    call('numwalls', 2, 1)
+    call('wall', 32, struct.unpack('<h', bl[i - 1])[0])
+    call('numsectors', 2, 1)
+    call('sector', 40, struct.unpack('<h', bl[i - 1])[0])
+    call('sprite', 44, 4096)
+    for size, count in ((2, 1025), (2, 4096), (2, 4096),
+                        (2, 1025), (2, 4096), (2, 4096), (2, 1), (12, 256)):
+        call('', size, count)
+    call('ps', PLAYER_SIZE_11, 8)
+    call('po', 16, 8)
+    call('hittype', 71, 2048)
+    for size, count in ((2, 1), (3072, 1), (4, 2048), (4, 2048),
+                        (2, 1), (2, 64), (2, 1), (2, 64), (2, 64), (1, 128)):
+        call('', size, count)
+    call('script bitmap', 1, 10240)
+    call('script', 4, 10240)
+    call('actorscrptr', 4, 4096)
+    call('lockclock', 4, 1)
+    for size, count in ((2, 1), (2, 256)):
+        call('', size, count)
+    call('animatecnt', 4, 1)
+    call('', 2, 64)
+    call('animateptr', 4, 64)
+    for size, count in ((4, 64), (4, 64), (1, 1), (2, 1), (4, 1), (4, 1)):
+        call('', size, count)
+    return out
+
+
+def layout_10(bl):
+    c = {name: (first, n) for name, first, n in calls_10(bl) if name}
+    return dict(allowed={c['script bitmap'][0]: 'script bitmap',
+                         c['lockclock'][0]: 'lockclock'},
+                animatecnt=c['animatecnt'][0], animateptr=c['animateptr'][0],
+                ps=tuple(range(c['ps'][0], c['ps'][0] + c['ps'][1])),
+                psize=PLAYER_SIZE_11, palette=0x33a, gm=0x30c, gmmask=0)
+
+
+def chunks(path):
+    """Every block's stored bytes (length word included), in file order."""
+    data, pos, out = open(path, 'rb').read(), 0, []
+    while pos + 2 <= len(data):
+        n, = struct.unpack_from('<h', data, pos)
+        out.append(data[pos:pos + 2 + n])
+        pos += 2 + n
+    return out
+
+
+def badaddr_10(src, dst):
+    bl, ch = blocks(src), chunks(src)
+    c = {name: (first, n) for name, first, n in calls_10(bl) if name}
+
+    def call(name, size):
+        first, n = c[name]
+        r = Reader(b''.join(ch[first:first + n]))
+        return r.read(size, len(b''.join(bl[first:first + n])) // size)
+
+    spr = call('sprite', 44)
+    actors = struct.unpack('<4096i', call('actorscrptr', 4))
+    base = -min(actors)
+    ht = bytearray(call('hittype', 71))
+    for i in range(2048):
+        pic, = struct.unpack_from('<h', spr, i * 44 + 14)
+        o = i * 71 + 47 + 4 * 4
+        t4, = struct.unpack_from('<i', ht, o)
+        if 0 <= pic < 4096 and actors[pic] >= 0 and base <= t4 < base + 0xa000:
+            struct.pack_into('<i', ht, o, base + 0xa000)
+            break
+    else:
+        raise ValueError('%s: no actor with a script address' % src)
+    # dfwrite's delta coding, in stored (uncompressed) blocks.
+    delta = bytearray(ht[:71])
+    for j in range(71, len(ht)):
+        delta.append((ht[j] - ht[j - 71]) & 255)
+    new, k = [], 0
+    for size in dfsizes(71, 2048):
+        new.append(struct.pack('<hHH', size + 4, size, 0) + bytes(delta[k:k + size]))
+        k += size
+    first, n = c['hittype']
+    ch[first:first + n] = new
+    open(dst, 'wb').write(b''.join(ch))
+
+
 def blocks(path):
     """Every block's decompressed bytes, in file order."""
     data, pos, out = open(path, 'rb').read(), 0, []
@@ -178,8 +297,11 @@ def compare(dos, ours):
         print('block layouts differ: %d blocks %s vs %d blocks %s'
               % (len(a), [len(x) for x in a], len(b), [len(x) for x in b]))
         return 1
-    version, = struct.unpack('<i', a[0])
-    L = LAYOUTS['1.1' if version == BYTEVERSION_11 else '1.3D']
+    if len(a[0]) == 19:     # 1.0: no BYTEVERSION, the save name comes first
+        L = layout_10(a)
+    else:
+        version, = struct.unpack('<i', a[0])
+        L = LAYOUTS['1.1' if version == BYTEVERSION_11 else '1.3D']
     # animateptr: entries past animatecnt are stale in DOS saves and never
     # read, and we write zeros there.
     n = 4 * struct.unpack('<i', a[L['animatecnt']])[0]
@@ -218,6 +340,13 @@ def main():
             for i, v in enumerate(actors):
                 if v:
                     f.write('actor %d %d\n' % (i, v))
+        return 0
+    if len(sys.argv) == 5 and sys.argv[1] == 'truncate':
+        data = open(sys.argv[2], 'rb').read()
+        open(sys.argv[3], 'wb').write(data[:len(data) - int(sys.argv[4])])
+        return 0
+    if len(sys.argv) == 4 and sys.argv[1] == 'badaddr10':
+        badaddr_10(sys.argv[2], sys.argv[3])
         return 0
     sys.stderr.write(__doc__)
     return 2

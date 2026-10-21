@@ -28,3 +28,16 @@ Each names what was decided, why, and what it costs if it turns out wrong.
   both several weapons and inventory items. So `e1inv` has the weapons (E1L1 weapons
   room) and `e1l2inv` has the inventory (E1L2 inventory room). Cost if wrong: drop the
   `e1l2inv` rows and files.
+- **Task 16c (1.0 saves): told by layout, with the script base taken from the save.**
+  A 1.0 save has no version, so the 1.0 build (which has none either) takes a file
+  only if every `dfwrite` block of the 1.0 layout is there with its uncompressed size,
+  using the file's own `numwalls` and `numsectors`, and the file ends with the last
+  block (`sg_check10`). The first block alone already tells 1.0 apart: it is the
+  19-byte name, where 1.1, 1.3D and 1.5 start with a 4-byte version. The script's DOS
+  address is read from the save's empty `actorscrptr[]` entries rather than fixed at
+  the DOSBox value `0x2d5f08`. A save is refused if those entries disagree, if a
+  non-empty one isn't an aligned offset inside the script, or if an actor's
+  `temp_data[1]`, `[4]` or `[5]` at or above the base (1.0's own test for an address)
+  isn't inside the script. Our saves write `0x2d5f08`. Cost if wrong: a 1.0 save with a
+  number at or above the base in those slots would be refused or misread, and a
+  non-1.0 file that happened to have the whole 1.0 block layout would load as one.

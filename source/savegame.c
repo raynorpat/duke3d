@@ -81,6 +81,8 @@ int32_t sg_sprite(unsigned char *b, void *rec, int write)
  * weaprecs, 10 weapons, frag_ps and interface_toggle_flag are bytes, and the
  * 1.1-only fields sit between ours. on_sector_effector, no_autoaim and
  * select_dir aren't carried: written as zeros, ignored on reading.
+ * The 1.0 one ("player_struct (1.0)") is the same size: it has a byte at
+ * 0x322 and a per-player auto_run, and no no_autoaim or aim_mode.
  */
 int32_t sg_player(unsigned char *b, void *rec, int write)
 {
@@ -135,13 +137,22 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
     if (write) b[o] = 0;    /* on_sector_effector */
     o++;
     F8(p->rapid_fire_hold); F8(p->on_ground);
-    A8(p->name,13); F8(p->inven_icon); F8(p->buttonpalette);
+    A8(p->name,13); F8(p->inven_icon);
+#if DUKE3D_GAMEVER < GAMEVER_11
+    F8(p->unnamed_322);
+#endif
+    F8(p->buttonpalette);
     F8(p->jetpack_on); F8(p->spritebridge); F8(p->lastrandomspot);
+#if DUKE3D_GAMEVER >= GAMEVER_11
     if (write) b[o] = 0;    /* no_autoaim */
     o++;
+#endif
     F8(p->spacesuit_on); F8(p->scuba_on); F8(p->spacesuit_used);
     F8(p->footprintpal); F8(p->heat_on);
-    F8(p->holster_weapon); F8(p->falling_counter); F8(p->frag_ps); F8(p->aim_mode);
+    F8(p->holster_weapon); F8(p->falling_counter); F8(p->frag_ps);
+#if DUKE3D_GAMEVER >= GAMEVER_11
+    F8(p->aim_mode);
+#endif
     A8(p->gotweapon,10); F8(p->refresh_inventory);
     /* palette: a 32-bit DOS pointer. Written as zeros, never read back. */
     if (write) b[o] = b[o+1] = b[o+2] = b[o+3] = 0;
@@ -151,7 +162,11 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
     o++;
     F8(p->walking_snd_toggle); F8(p->interface_toggle_flag); F8(p->palookup); F8(p->hard_landing);
     F8(p->max_secret_rooms); F8(p->secret_rooms); A8(p->pals,3);
-    F8(p->max_actors_killed); F8(p->actors_killed); F8(p->return_to_center);
+    F8(p->max_actors_killed); F8(p->actors_killed);
+#if DUKE3D_GAMEVER < GAMEVER_11
+    F8(p->auto_run);
+#endif
+    F8(p->return_to_center);
     return o;
 }
 #elif DUKE3D_GAMEVER < GAMEVER_14
@@ -393,6 +408,128 @@ int32_t sg_dfblocks(int32_t dasizeof, int32_t count)
     if (k > 0) n++;
     return n;
 }
+
+#if DUKE3D_GAMEVER < GAMEVER_11
+#define SG_LZWBLOCK (SG_LZWSIZE+(SG_LZWSIZE>>4))   /* the most a block may hold */
+
+const int32_t sg_scriptslots10[3] = { 1, 4, 5 };
+
+/* One 1.0 dfwrite call: each block must be there, inside the file, with the
+   uncompressed size dfwrite gave it. With buf, the call is also decoded into
+   buf. Leaves fil past the call. Returns 0 if it doesn't fit. */
+static int32_t sg_call10(int32_t fil, int32_t dasizeof, int32_t count, void *buf)
+{
+    int32_t start = klseek(fil,0,SEEK_CUR), size = dasizeof, n = count, i, k = 0, end = start;
+    short leng, uncompleng;
+
+    if (size > SG_LZWSIZE) { n *= size; size = 1; }
+    for (i = 0; i < n; i++)
+    {
+        k += size;
+        if (k <= SG_LZWSIZE-size && i < n-1) continue;
+        if (!kread16(fil,&leng) || leng < 4 || leng > SG_LZWBLOCK) return 0;
+        if (!kread16(fil,&uncompleng) || uncompleng != k) return 0;
+        end = klseek(fil,leng-2,SEEK_CUR);
+        if (end < 0 || end > kfilelength(fil)) return 0;
+        k = 0;
+    }
+    if (buf != NULL)
+    {
+        klseek(fil,start,SEEK_SET);
+        kdfread(buf,dasizeof,count,fil);
+        klseek(fil,end,SEEK_SET);
+    }
+    return 1;
+}
+
+static int32_t sg_calls10(int32_t fil, const int32_t (*calls)[2], int32_t n)
+{
+    int32_t i;
+
+    for (i = 0; i < n; i++)
+        if (!sg_call10(fil,calls[i][0],calls[i][1],NULL)) return 0;
+    return 1;
+}
+
+int32_t sg_check10(int32_t fil)
+{
+    /* saveplayer's dfwrite calls (1.0 0x388d0), between the decoded ones. */
+    static const int32_t head[][2] = { {19,1}, {4,1}, {4,1}, {4,1}, {160,100} };
+    static const int32_t lists[][2] =
+    {
+        {2,MAXSECTORS+1}, {2,MAXSPRITES}, {2,MAXSPRITES},
+        {2,MAXSTATUS+1}, {2,MAXSPRITES}, {2,MAXSPRITES},
+        {2,1}, {12,MAXCYCLERS},
+        {SG_PLAYER_SIZE,SG_DOS_MAXPLAYERS}, {SG_PLAYERORIG_SIZE,SG_DOS_MAXPLAYERS}
+    };
+    static const int32_t mid[][2] =
+    {
+        {2,1}, {SG_ANIMWALL_SIZE*MAXANIMWALLS,1}, {4,2048}, {4,2048},
+        {2,1}, {2,64}, {2,1}, {2,64}, {2,64}, {1,MAXSECTORS>>3},
+        {1,SG_DOS_MAXSCRIPT}, {4,SG_DOS_MAXSCRIPT}
+    };
+    static const int32_t tail[][2] =
+    {
+        {4,1}, {2,1}, {2,MAXPSKYTILES},
+        {4,1}, {2,MAXANIMATES}, {4,MAXANIMATES}, {4,MAXANIMATES}, {4,MAXANIMATES},
+        {1,1}, {2,1}, {4,1}, {4,1}
+    };
+    static short picnum[SG_DOS_MAXHITTYPES];
+    static unsigned char actors[SG_DOS_MAXTILES*4];
+    unsigned char b[2];
+    int32_t start = klseek(fil,0,SEEK_CUR), base = -1, n, i, k, v;
+
+    if (!sg_calls10(fil,head,5)) goto done;
+    if (!sg_call10(fil,2,1,b)) goto done;
+    n = get16(b);
+    if (n < 1 || n > MAXWALLS || !sg_call10(fil,SG_WALL_SIZE,n,NULL)) goto done;
+    if (!sg_call10(fil,2,1,b)) goto done;
+    n = get16(b);
+    if (n < 1 || n > MAXSECTORS || !sg_call10(fil,SG_SECTOR_SIZE,n,NULL)) goto done;
+    if (!sg_call10(fil,SG_SPRITE_SIZE,MAXSPRITES,sgbuf)) goto done;
+    for (i = 0; i < SG_DOS_MAXHITTYPES; i++) picnum[i] = (short)get16(sgbuf+i*SG_SPRITE_SIZE+14);
+    if (!sg_calls10(fil,lists,10)) goto done;
+    /* hittype[] comes raw, straight after po[] */
+    if (!sg_call10(fil,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES,sgbuf)) goto done;
+    if (!sg_calls10(fil,mid,12)) goto done;
+    if (!sg_call10(fil,4,SG_DOS_MAXTILES,actors)) goto done;
+    if (!sg_calls10(fil,tail,12)) goto done;
+    if (klseek(fil,0,SEEK_CUR) != kfilelength(fil)) goto done;
+
+    /* actorscrptr[]: every entry is stored minus script's address, so the
+       empty ones all hold minus that address, and the others are offsets. */
+    n = 0;
+    for (i = 0; i < SG_DOS_MAXTILES; i++)
+    {
+        v = get32(actors+i*4);
+        if (v < 0)
+        {
+            if (v < -0x7fff0000 || (n != 0 && v != -n)) goto done;
+            n = -v;
+        }
+        else if (v == 0 || v >= SG_DOS_MAXSCRIPT*4 || (v&3)) goto done;
+    }
+    if (n == 0) goto done;
+
+    /* hittype[]: an actor's temp_data[1], [4] and [5] at or above that
+       address (1.0's own test for a script address) must point into the
+       script. */
+    for (i = 0; i < SG_DOS_MAXHITTYPES; i++)
+    {
+        if (picnum[i] < 0 || picnum[i] >= SG_DOS_MAXTILES || get32(actors+picnum[i]*4) < 0) continue;
+        for (k = 0; k < 3; k++)
+        {
+            v = get32(sgbuf+i*SG_WEAPONHIT_SIZE+SG_WEAPONHIT_TEMPDATA+sg_scriptslots10[k]*4);
+            if (v >= n && (v-n >= SG_DOS_MAXSCRIPT*4 || ((v-n)&3))) goto done;
+        }
+    }
+    base = n;
+
+done:
+    klseek(fil,start,SEEK_SET);
+    return base;
+}
+#endif
 
 int32_t sg_playerblocksize(int32_t fil)
 {

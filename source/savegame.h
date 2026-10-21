@@ -1,8 +1,8 @@
 /*
  * Save files use the DOS layout of the build's version (1.5, 1.3D in 1.3D
- * builds, or 1.1 in 1.1 builds): every record packed to 1 byte, every value
- * little-endian, written with the same dfwrite calls (element size and count)
- * the DOS game made, so the LZW blocks come out the same.
+ * builds, 1.1 or 1.0 in those builds): every record packed to 1 byte, every
+ * value little-endian, written with the same dfwrite calls (element size and
+ * count) the DOS game made, so the LZW blocks come out the same.
  */
 #ifndef _INCL_SAVEGAME_H_
 #define _INCL_SAVEGAME_H_
@@ -13,14 +13,14 @@
 #define SG_SECTOR_SIZE      40
 #define SG_SPRITE_SIZE      44
 #if DUKE3D_GAMEVER < GAMEVER_13D
-#define SG_PLAYER_SIZE      0x34e   /* the 1.1 player_struct */
+#define SG_PLAYER_SIZE      0x34e   /* the 1.1 and 1.0 player_struct */
 #define SG_DOS_MAXHITTYPES  2048    /* as in 1.3D */
-#define SG_DOS_MAXPLAYERS   8       /* 1.1 saves ps[] and po[] for 8 players */
-/* 1.1 writes ps[] and po[] as 8 elements each, both in one block. */
+#define SG_DOS_MAXPLAYERS   8       /* 1.1 and 1.0 save ps[] and po[] for 8 players */
+/* They write ps[] and po[] as 8 elements each, both in one block. */
 #define SG_PLAYER_DFSIZE    SG_PLAYER_SIZE
 #define SG_PLAYER_DFCOUNT   SG_DOS_MAXPLAYERS
 #define SG_PLAYER_BLOCK0    (SG_DOS_MAXPLAYERS*SG_PLAYER_SIZE)
-#define SG_DOS_MAXSCRIPT    10240   /* script[] entries in a 1.1 save */
+#define SG_DOS_MAXSCRIPT    10240   /* script[] entries in a 1.1 or 1.0 save */
 #elif DUKE3D_GAMEVER < GAMEVER_14
 #define SG_PLAYER_SIZE      0x552   /* the 1.3D player_struct */
 #define SG_DOS_MAXHITTYPES  2048    /* 1.3D saves hittype[] for the first 2048 sprites only */
@@ -46,6 +46,7 @@
 #define SG_PLAYERORIG_DFCOUNT 1
 #endif
 #define SG_WEAPONHIT_SIZE   71
+#define SG_WEAPONHIT_TEMPDATA 47    /* temp_data[0]'s offset in it */
 #define SG_ANIMWALL_SIZE    6
 #if DUKE3D_GAMEVER < GAMEVER_14
 #define SG_DOS_MAXTILES     4096    /* actorscrptr[] entries in a 1.3D save */
@@ -88,6 +89,22 @@ void sg_readrecs(int32_t fil, void *recs, size_t stride, sg_rec fn, int32_t n, i
 
 /* LZW blocks dfwrite emits for one call. */
 int32_t sg_dfblocks(int32_t dasizeof, int32_t count);
+
+#if DUKE3D_GAMEVER < GAMEVER_11
+/* 1.0 saves store script addresses (actorscrptr[] minus script's address,
+   hittype temp_data raw) as the DOS game had them. Its script was at this
+   address in the DOSBox reference saves; we write saves as if it were. */
+#define SG_DOS10_SCRIPTBASE 0x2d5f08
+
+/* Checks that the whole file, from fil's position, has the 1.0 save layout
+   (docs/v10-v11/reference.md, "Save file") and that its script addresses all
+   point into the script. Leaves fil where it was. Returns the address the
+   save's script was at, or -1 if it isn't a sound 1.0 save. */
+int32_t sg_check10(int32_t fil);
+
+/* The hittype temp_data slots that hold script addresses: 1, 4 and 5. */
+extern const int32_t sg_scriptslots10[3];
+#endif
 
 /* Uncompressed size of the first ps[] block, found without loading anything.
    fil must be just past the version block, and is left there. Returns -1

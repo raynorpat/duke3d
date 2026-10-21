@@ -370,21 +370,28 @@ stride is `0x16` in both.
 
 **1.0: mixed.**
 
-- `script[]`: offsets with a bitmap, but the test is only `v >= 0x102f08` (signed, no
+The base below is `script`'s **run-time** address. The code names it as the
+immediate `0x102f08` (its address in the flat image), which DOS/4GW relocates when it
+loads the EXE; in the five DOSBox reference saves `script` sat at `0x2d5f08`. Another
+machine's memory layout could put it elsewhere, so a loader should take the base from
+the save itself (the empty `actorscrptr[]` entries below hold minus the base).
+
+- `script[]`: offsets with a bitmap, but the test is only `v >= base` (signed, no
   upper bound: `cmp ..,0x102f08 / jl` at `0x38bc5`). Any word at or above the base is
   converted, which round-trips in DOS. Neither 1.0 CON file contains a 7-digit
   constant, so in practice only pointers are marked.
-- `actorscrptr[]`: **every** entry, zero included, is stored as `v - 0x102f08`
-  (`0x38c4a`–`0x38c58`), and `loadplayer` adds the base back to every entry. The base is
-  `script`'s run-time address, not its link address, so an empty slot is stored as
-  `-0x2d5f08` (`0xffd2a0f8`) in the DOSBox reference saves.
+- `actorscrptr[]`: **every** entry, zero included, is stored as `v - base`
+  (`0x38c4a`–`0x38c58`), and `loadplayer` adds the base back to every entry. So an
+  empty slot is stored as `-base`: `-0x2d5f08` (`0xffd2a0f8`) in the reference saves,
+  whose 95 non-empty entries are offsets from 368 to 35240.
 - `hittype[]`: written **raw**, as item 12 above, with no bitmap and no conversion. So
   `temp_data[1]`, `[4]` and `[5]` hold **raw DOS addresses** inside 1.0's `script[]`
-  (`0x102f08`–`0x10cf07`). 1.0 `execute` (`0x377f0`) uses `temp_data[4]` (`0xda3af`) as a
-  pointer into the script (it reads `*(t[4] + 0x10)`), so these are live pointers. A 1.0
-  loader must translate a value `v` in `[0x102f08, 0x10cf08)` to `v - 0x102f08` for the
-  sprites whose picnum has an actor script, as the 1.1 saver does. Those sprites'
-  other `temp_data` slots are left alone.
+  (`[base, base + 0xa000)`; `0x2d6884`–`0x2dcd94` in the reference saves, where every
+  other value an actor has in those slots is 0). 1.0 `execute` (`0x377f0`) uses
+  `temp_data[4]` (`0xda3af`) as a pointer into the script (it reads `*(t[4] + 0x10)`),
+  so these are live pointers. A 1.0 loader must translate a value `v` in
+  `[base, base + 0xa000)` to `v - base` for the sprites whose picnum has an actor
+  script, as the 1.1 saver does. Those sprites' other `temp_data` slots are left alone.
 - `animateptr[]`: offsets from `sector` (`0x21f01c`; `0x38d1a`), as in 1.1.
 
 ### Network packets

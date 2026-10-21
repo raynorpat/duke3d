@@ -495,6 +495,7 @@ struct player_struct
 #endif
 #if DUKE3D_GAMEVER < GAMEVER_11
     char auto_run; // 1.0: per player, toggled by input bit 17 (G10-S06)
+    char unnamed_322; // 1.0: the save's byte 0x322, which nothing sets (reference.md)
 #endif
 };
 
