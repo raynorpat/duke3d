@@ -1731,7 +1731,9 @@ static void non3dr_menus(void)
                 { "MAP FOLLOW MODE", gamefunc_Map_Follow_Mode },
                 { "SEE COOP VIEW", gamefunc_See_Coop_View },
                 { "CHAT MESSAGE", gamefunc_SendMessage },
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no crosshair (G10-G07)
                 { "TOGGLE CROSSHAIR", gamefunc_Toggle_Crosshair },
+#endif
             };
 
             DoKeybindMenu("MISCELLANEOUS", keybinds, ALEN(keybinds), MENU_CONTROLS);
@@ -1745,6 +1747,63 @@ static void non3dr_menus(void)
     }
 }
 
+
+#if DUKE3D_GAMEVER < GAMEVER_11
+// 1.0's credits: six pages, with no hardware page, as its menus() draws them
+// (page, y, line) (G10-G08).
+static const struct { short page, y; const char *text; } credits10[] =
+{
+    { 0, 50, "ORIGINAL CONCEPT" },
+    { 0, 59, "TODD REPLOGLE" },
+    { 0, 68, "ALLEN H. BLUM III" },
+    { 0, 90, "PRODUCED & DIRECTED BY" },
+    { 0, 99, "GREG MALONE" },
+    { 0, 121, "EXECUTIVE PRODUCER" },
+    { 0, 130, "GEORGE BROUSSARD" },
+    { 1, 50, "GAME PROGRAMMING" },
+    { 1, 59, "TODD REPLOGLE" },
+    { 1, 80, "BUILD ENGINE/TOOLS/NET/MODEM" },
+    { 1, 89, "KEN SILVERMAN" },
+    { 1, 111, "MAP DESIGN" },
+    { 1, 120, "ALLEN H BLUM III" },
+    { 1, 129, "RICHARD GRAY" },
+    { 2, 35, "3D MODELING" },
+    { 2, 44, "CHUCK JONES" },
+    { 2, 53, "SAPPHIRE CORPORATION" },
+    { 2, 73, "ARTWORK" },
+    { 2, 82, "DIRK JONES" },
+    { 2, 91, "STEPHEN HORNBACK" },
+    { 2, 100, "JAMES STOREY" },
+    { 2, 119, "NETWORK LAYER/SETUP PROGRAM" },
+    { 2, 128, "MARK DOCHTERMANN" },
+    { 2, 147, "SOUND ENGINE" },
+    { 2, 156, "JIM DOSE" },
+    { 3, 75, "SOUND & MUSIC DEVELOPMENT" },
+    { 3, 84, "ROBERT PRINCE" },
+    { 3, 93, "LEE JACKSON" },
+    { 3, 112, "VOICE TALENT" },
+    { 3, 121, "LANI MINELLA - VOICE PRODUCER" },
+    { 3, 130, "JON ST. JOHN AS \"DUKE NUKEM\"" },
+    { 4, 50, "SPECIAL THANKS TO" },
+    { 4, 59, "STEVE BLACKBURN, SCOTT MILLER" },
+    { 4, 68, "TOM HALL, TERRY NAGY, JOE SIEGLER" },
+    { 4, 87, "THE 3D REALMS BETA TESTERS" },
+    { 4, 96, "MIKE BARTELT, WAYNE BENNER" },
+    { 4, 105, "GLENN BRENSINGER, ROB BROWN" },
+    { 4, 114, "ERIK HARRIS, KEN HECKBERT" },
+    { 4, 123, "TERRY HERRIN, GREG HIVELY" },
+    { 4, 132, "HANK LEUKART, KEN MAYER" },
+    { 4, 141, "JEFF RAUSCH, KELLY ROGERS" },
+    { 4, 150, "MIKE DUNCAN, DOUG HOWELL" },
+    { 5, 50, "DUKE NUKEM IS A TRADEMARK OF" },
+    { 5, 59, "3D REALMS ENTERTAINMENT" },
+    { 5, 78, "DUKE NUKEM 3D" },
+    { 5, 87, "(C) 1996 3D REALMS ENTERTAINMENT" },
+    { 5, 106, "PLEASE READ LICENSE.DOC FOR SHAREWARE" },
+    { 5, 115, "DISTRIBUTION GRANTS AND RESTRICTIONS" },
+    { 5, 134, "MADE IN DALLAS, TEXAS USA" },
+};
+#endif
 
 #if DUKE3D_GAMEVER < GAMEVER_14
 // 1.3D's credits: eight pages of text, as its menus() draws them (page, y, line).
@@ -2283,7 +2342,9 @@ void menus(void)
 
                 sound(KICK_HIT);
                 current_menu--;
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+                if(current_menu < 990) current_menu = 995;
+#elif DUKE3D_GAMEVER < GAMEVER_14
                 if(current_menu < 990) current_menu = 997;
 #else
                 if(current_menu < 990) current_menu = 992;
@@ -2311,14 +2372,20 @@ void menus(void)
                 KB_ClearKeyDown(sc_Space);
                 sound(KICK_HIT);
                 current_menu++;
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+                if(current_menu > 995) current_menu = 990;
+#elif DUKE3D_GAMEVER < GAMEVER_14
                 if(current_menu > 997) current_menu = 990;
 #else
                 if(current_menu > 992) current_menu = 990;
 #endif
             }
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+            for(l=0;l<(int)(sizeof(credits10)/sizeof(credits10[0]));l++)
+                if(credits10[l].page == current_menu-990)
+                    gametext(160,credits10[l].y,(char *)credits10[l].text,0,2+8+16);
+#elif DUKE3D_GAMEVER < GAMEVER_14
             for(l=0;l<(int)(sizeof(credits13)/sizeof(credits13[0]));l++)
                 if(credits13[l].page == current_menu-990)
                     gametext(160,credits13[l].y,(char *)credits13[l].text,0,2+8+16);

@@ -1256,8 +1256,10 @@ char checkhitswitch(short snum,int32_t w,char switchtype)
     {
         case DIPSWITCH:
         case DIPSWITCH+1:
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no TECHSWITCH (G10-S01)
         case TECHSWITCH:
         case TECHSWITCH+1:
+#endif
         case ALIENSWITCH:
         case ALIENSWITCH+1:
             break;
@@ -1339,13 +1341,17 @@ char checkhitswitch(short snum,int32_t w,char switchtype)
         if( lotag == SLT ) switch(PN)
         {
             case DIPSWITCH:
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no TECHSWITCH (G10-S01)
             case TECHSWITCH:
+#endif
             case ALIENSWITCH:
                 if( switchtype == 1 && w == i ) PN++;
                 else if( SHT == 0 ) correctdips++;
                 numdips++;
                 break;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no TECHSWITCH (G10-S01)
             case TECHSWITCH+1:
+#endif
             case DIPSWITCH+1:
             case ALIENSWITCH+1:
                 if( switchtype == 1 && w == i ) PN--;
@@ -1403,14 +1409,18 @@ char checkhitswitch(short snum,int32_t w,char switchtype)
             switch(wall[x].picnum)
         {
             case DIPSWITCH:
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no TECHSWITCH (G10-S01)
             case TECHSWITCH:
+#endif
             case ALIENSWITCH:
                 if( switchtype == 0 && i == w ) wall[x].picnum++;
                 else if( wall[x].hitag == 0 ) correctdips++;
                 numdips++;
                 break;
             case DIPSWITCH+1:
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no TECHSWITCH (G10-S01)
             case TECHSWITCH+1:
+#endif
             case ALIENSWITCH+1:
                 if( switchtype == 0 && i == w ) wall[x].picnum--;
                 else if( wall[x].hitag == 1 ) correctdips++;
@@ -1688,7 +1698,11 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
         }
     }
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+   if( (wal->cstat&16) && wal->nextsector >= 0 ) // 1.0 (G10-S03)
+#else
    if( ( (wal->cstat&16) || wal->overpicnum == BIGFORCE ) && wal->nextsector >= 0 )
+#endif
 #if DUKE3D_GAMEVER < GAMEVER_13D
        if( wal->overpicnum >= 0 )
 #endif
@@ -1699,7 +1713,9 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
         case W_FORCEFIELD:
         case W_FORCEFIELD+1:
         case W_FORCEFIELD+2:
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 sets it after the ripple (G10-S03)
             wal->extra = 1; // tell the forces to animate
+#endif
         case BIGFORCE:
             updatesector(x,y,&sn);
             if( sn < 0 ) return;
@@ -1717,7 +1733,11 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
             SA = getangle(wal->x-wall[wal->point2].x,
                 wal->y-wall[wal->point2].y)-512;
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+            wal->extra = 1; // 1.0: BIGFORCE too, and no sound (G10-S03)
+#else
             spritesound(SOMETHINGHITFORCE,i);
+#endif
 
             return;
 
@@ -2007,7 +2027,11 @@ void checkplayerhurt(struct player_struct *p,short j)
             break;
 
         case BIGFORCE:
+#if DUKE3D_GAMEVER < GAMEVER_11
+            p->hurt_delay = 32; // 1.0 (G10-S04)
+#else
             p->hurt_delay = 26;
+#endif
             checkhitwall(p->i,j,
                 p->posx+(sintable[(p->ang+512)&2047]>>9),
                 p->posy+(sintable[p->ang&2047]>>9),
@@ -2349,6 +2373,37 @@ void checkhitsprite(short i,short sn)
             sprite[j].z = sector[SECT].floorz-(32<<8);
             break;
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+        // 1.0's MONK gibs on the first hit; its sound and spawn come after
+        // the blood. No SPACEMARINE case (G10-S02).
+        case MONK:
+            SA = TRAND&2047;
+            shoot(i,BLOODSPLAT1);
+            SA = TRAND&2047;
+            shoot(i,BLOODSPLAT2);
+            SA = TRAND&2047;
+            shoot(i,BLOODSPLAT3);
+            SA = TRAND&2047;
+            shoot(i,BLOODSPLAT4);
+            SA = TRAND&2047;
+            shoot(i,BLOODSPLAT1);
+            SA = TRAND&2047;
+            shoot(i,BLOODSPLAT2);
+            SA = TRAND&2047;
+            shoot(i,BLOODSPLAT3);
+            SA = TRAND&2047;
+            shoot(i,BLOODSPLAT4);
+            spritesound(SLT,i);
+            spawn(i,SHT);
+            guts(&sprite[i],JIBS1,1,-1);
+            guts(&sprite[i],JIBS2,2,-1);
+            guts(&sprite[i],JIBS3,3,-1);
+            guts(&sprite[i],JIBS4,4,-1);
+            guts(&sprite[i],JIBS5,1,-1);
+            guts(&sprite[i],JIBS3,6,-1);
+            deletesprite(i);
+            break;
+#else
         case MONK:
             spritesound(SLT,i);
             spawn(i,SHT);
@@ -2379,6 +2434,7 @@ void checkhitsprite(short i,short sn)
             guts(&sprite[i],JIBS3,6,-1);
             deletesprite(i);
             break;
+#endif
 
         // The strippers take damage, scream and die here (G11-S10).
         case NAKED1:
@@ -2452,9 +2508,11 @@ void checkhitsprite(short i,short sn)
             PN = BROKENCHAIR;
             CS = 0;
             break;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no CHAIR3 case (G10-S02)
         case CHAIR3:
             deletesprite(i);
             break;
+#endif
         case CLOCK:
             PN = BROKENCLOCK;
             spritesound(GLASS_BREAKING,i);
@@ -3097,12 +3155,14 @@ void cheatkeys(short snum)
 
     if(p->cheat_phase == 1) return;
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no aim mode (G10-S06)
     if( sb_snum&(1<<23) )
     {
         p->aim_mode = !p->aim_mode;
         if(p->aim_mode == 0)
             p->return_to_center = 9;
     }
+#endif
 
     if( sb_snum < 0xff )
     {
@@ -3143,10 +3203,23 @@ void cheatkeys(short snum)
             case 3: sb_snum |= (1<<24);break;
             case 5: sb_snum |= (1<<15);break;
             case 1: sb_snum |= (1<<16);break;
+#if DUKE3D_GAMEVER < GAMEVER_11
+            // 1.0: steroids only from the inventory, with no icon store,
+            // quote or return; no Steroids bit (G10-S06).
+            case 2:
+                if(p->steroids_amount == 400 )
+                {
+                    p->steroids_amount--;
+                    spritesound(DUKE_TAKEPILLS,p->i);
+                }
+                break;
+#else
             case 2: sb_snum |= (1<<12);break;
+#endif
         }
     }
 
+#if DUKE3D_GAMEVER >= GAMEVER_11
     if( (sb_snum&(1<<12)) )
     {
         if(p->steroids_amount == 400 )
@@ -3158,6 +3231,7 @@ void cheatkeys(short snum)
         }
         return;
     }
+#endif
 
     if(p->newowner == -1)
         if( sb_snum&(1<<20) || sb_snum&(1<<27) || p->refresh_inventory)
@@ -3350,6 +3424,14 @@ void cheatkeys(short snum)
             }
         }
     }
+
+#if DUKE3D_GAMEVER < GAMEVER_11
+    if( sb_snum&(1<<17) ) // 1.0's per-player AutoRun (G10-S06)
+    {
+        p->auto_run = !p->auto_run;
+        FTA(85+p->auto_run,p);
+    }
+#endif
 
     if( sb_snum&(1<<24) && p->newowner == -1 )
     {
@@ -4039,6 +4121,7 @@ void checksectors(short snum)
     if( ud.cashman && sync[snum].bits&(1<<29) )
         lotsofmoney(&sprite[p->i],2);
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 leaves the camera by the open key only (G10-S05)
     if(p->newowner >= 0)
     {
 #if DUKE3D_GAMEVER < GAMEVER_13D // 1.1 leaves the camera only on forward motion
@@ -4051,6 +4134,7 @@ void checksectors(short snum)
             goto CLEARCAMERAS;
         }
     }
+#endif
 
     if( !(sync[snum].bits&(1<<29)) && !(sync[snum].bits&(1<<31)))
         p->toggle_key_flag = 0;
@@ -4228,7 +4312,11 @@ void checksectors(short snum)
                     break;
 #if DUKE3D_GAMEVER < GAMEVER_13D
                 case PODFEM1:
+#if DUKE3D_GAMEVER < GAMEVER_11
+                    if(Sound[KILLME].num == 0) // 1.0: no lockout test (G10-S05)
+#else
                     if(ud.lockout == 0 && Sound[KILLME].num == 0)
+#endif
                         spritesound(KILLME,neartagsprite);
                     break;
                 // 1.1 lets the player tip the strippers (G11-S15).

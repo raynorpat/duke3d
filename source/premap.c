@@ -591,7 +591,9 @@ void resetweapons(short snum)
     p->gotweapon[KNEE_WEAPON] = 1;
     p->ammo_amount[PISTOL_WEAPON] = 48;
     p->gotweapon[HANDREMOTE_WEAPON] = 1;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 does it in resetinventory (G10-P02)
     p->last_weapon = -1;
+#endif
 
     p->show_empty_weapon= 0;
     p->last_pissed_time = 0;
@@ -620,6 +622,9 @@ void resetinventory(short snum)
     p->spacesuit_on = 0;
 #endif
     p->inven_icon = 0;
+#if DUKE3D_GAMEVER < GAMEVER_11
+    p->last_weapon = -1; // 1.0 (G10-P02)
+#endif
 }
 
 
@@ -644,7 +649,9 @@ void resetprestat(short snum,char g)
     p->lastrandomspot = 0;
     p->weapon_pos = 6;
     p->kickback_pic = 5;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 clears it only with the inventory or the remote (G10-P01)
     p->last_weapon = -1;
+#endif
     p->weapreccnt = 0;
     p->show_empty_weapon= 0;
     p->holster_weapon = 0;
@@ -669,6 +676,30 @@ void resetprestat(short snum,char g)
     numinterpolations = 0;
     startofdynamicinterpolations = 0;
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+    // 1.0: a level left with timebeforeexit at 1 loses the pistol and keeps
+    // the inventory (G10-P01).
+    if( (g&MODE_EOL) == MODE_EOL && p->timebeforeexit != 1 )
+    {
+        if(p->curr_weapon == HANDREMOTE_WEAPON)
+        {
+            p->ammo_amount[HANDBOMB_WEAPON]++;
+            p->curr_weapon = HANDBOMB_WEAPON;
+            p->last_weapon = -1;
+        }
+    }
+    else
+    {
+        resetweapons(snum);
+        if(p->timebeforeexit == 1)
+        {
+            p->gotweapon[PISTOL_WEAPON] = 0;
+            p->ammo_amount[PISTOL_WEAPON] = 0;
+            p->curr_weapon = KNEE_WEAPON;
+        }
+        else resetinventory(snum);
+    }
+#else
 #if DUKE3D_GAMEVER < GAMEVER_13D
     // 1.1 tests only for the end of a level, so dukematch keeps the weapons.
     if( (g&MODE_EOL) != MODE_EOL )
@@ -684,6 +715,7 @@ void resetprestat(short snum,char g)
         p->ammo_amount[HANDBOMB_WEAPON]++;
         p->curr_weapon = HANDBOMB_WEAPON;
     }
+#endif
 
     p->timebeforeexit   = 0;
     p->customexitsound  = 0;
@@ -1114,7 +1146,11 @@ void newgame(char vn,char ln,char sk)
     parallaxyscale = 0;
 #endif
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+    p->last_weapon = -1; // 1.0 keeps last_level (G10-P02)
+#else
     ud.last_level = -1;
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14
     lastsavedpos = -1;
 #endif

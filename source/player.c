@@ -29,6 +29,12 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <stdint.h>
 #include "duke3d.h"
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+// 1.0's gamestartup has no friction: its code uses 0xcb00, and 0xcb00
+//  less 0x2000 and 0x2900 (G10-L03).
+#define dukefriction 0xcb00
+#endif
+
 int32 turnheldtime; //MED
 int32 lastcontroltime; //MED
 
@@ -602,7 +608,11 @@ void shoot(short i,short atwith)
                 }
                 else
                 {
+#if DUKE3D_GAMEVER < GAMEVER_11
+                    sa += 32-(TRAND&63); // 1.0 (G10-L10)
+#else
                     sa += 24-(TRAND%48);
+#endif
                     if(j == -1) zvel = (100-ps[p].horiz-ps[p].horizoff)<<5;
                     zvel += 256-(TRAND&511);
                 }
@@ -830,7 +840,11 @@ void shoot(short i,short atwith)
 
             if( s->extra >= 0 ) s->shade = -96;
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+            vel = 612; // 1.0 (G10-L11)
+#else
             vel = 644;
+#endif
 
             j = -1;
 
@@ -844,7 +858,11 @@ void shoot(short i,short atwith)
                     if( sprite[j].picnum != RECON )
                         sa = getangle(sprite[j].x-sx,sprite[j].y-sy);
                 }
+#if DUKE3D_GAMEVER < GAMEVER_11
+                else zvel = (100-ps[p].horiz-ps[p].horizoff)*80; // 1.0 (G10-L11)
+#else
                 else zvel = (100-ps[p].horiz-ps[p].horizoff)*81;
+#endif
                 spritesound(RPG_SHOOT,i);
             }
             else
@@ -2513,13 +2531,22 @@ void displayweapon(short snum)
 
 }
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+// 1.0's turning, in the units its processinput scales up by 4.5 (G10-L02):
+//  3 for the first 16 tics, then 6 (12 running), at most 108.
+#define TURBOTURNTIME 17
+#define NORMALTURN   6
+#define PREAMBLETURN 3
+#define MAXANGVEL    108
+#else
 #define TURBOTURNTIME (TICRATE/8) // 7
 #define NORMALTURN   15
 #define PREAMBLETURN 5
+#define MAXANGVEL    127
+#endif
 #define NORMALKEYMOVE 40
 #define MAXVEL       ((NORMALKEYMOVE*2)+10)
 #define MAXSVEL      ((NORMALKEYMOVE*2)+10)
-#define MAXANGVEL    127
 #define MAXHORIZ     127
 
 int32_t myaimmode = 0, myaimstat = 0, omyaimstat = 0;
@@ -2636,7 +2663,13 @@ void getinput(short snum)
     #endif
 
     loc.bits |=   j<<8;
+#if DUKE3D_GAMEVER < GAMEVER_11
+    // 1.0 has no Steroids bit; bit 17 is AutoRun, which cheatkeys toggles
+    // per player (G10-S06).
+    loc.bits |=   BUTTON(gamefunc_AutoRun)<<17;
+#else
     loc.bits |=   BUTTON(gamefunc_Steroids)<<12;
+#endif
     loc.bits |=   BUTTON(gamefunc_Look_Up)<<13;
     loc.bits |=   BUTTON(gamefunc_Look_Down)<<14;
     loc.bits |=   BUTTON(gamefunc_NightVision)<<15;
@@ -2660,7 +2693,11 @@ void getinput(short snum)
     loc.bits |=   BUTTON(gamefunc_Inventory)<<30;
     loc.bits |=   KB_KeyPressed(sc_Escape)<<31;
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+    running = BUTTON(gamefunc_Run)|p->auto_run; // 1.0: per player (G10-S06)
+#else
     running = BUTTON(gamefunc_Run)|ud.auto_run;
+#endif
     svel = vel = angvel = horiz = 0;
 
     if( CONTROL_JoystickEnabled )
@@ -2668,7 +2705,11 @@ void getinput(short snum)
 
     if( BUTTON(gamefunc_Strafe) )
        svel = -info.dyaw/8;
+#if DUKE3D_GAMEVER < GAMEVER_11
+    else angvel = info.dyaw>>8; // 1.0 (G10-L02)
+#else
     else angvel = info.dyaw/64;
+#endif
 
     // Account for which mode we're in. (1, 2 or 7)
     switch(ControllerType)
@@ -2919,10 +2960,16 @@ char doincrements(struct player_struct *p)
 
     if( p->holoduke_on >= 0 )
     {
+#if DUKE3D_GAMEVER < GAMEVER_11
+        p->holoduke_amount -= 2; // 1.0 (G10-L13)
+#else
         p->holoduke_amount--;
+#endif
         if(p->holoduke_amount <= 0)
         {
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 is silent (G10-L97)
             spritesound(TELEPORTER,p->i);
+#endif
             p->holoduke_on = -1;
             checkavailinven(p);
         }
@@ -3091,6 +3138,18 @@ void checkweapons(struct player_struct *p)
         SHOTGUNSPRITE, CHAINGUNSPRITE, RPGSPRITE, HEAVYHBOMB, SHRINKERSPRITE,
         FLAMETHROWERSPRITE, TRIPBOMBSPRITE, HEAVYHBOMB };
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+    // 1.0: the knee drops too, and a dropped RPG or pipe bomb also kills
+    // the player (G10-L05).
+    if(TRAND&1)
+        spawn(p->i,weapon_sprites11[cw]);
+    else if(cw == RPG_WEAPON || cw == HANDBOMB_WEAPON)
+    {
+        spawn(p->i,EXPLOSION2);
+        quickkill(p);
+    }
+    return;
+#endif
     if(cw)
     {
         if(TRAND&1)
@@ -3234,7 +3293,9 @@ void processinput(short snum)
         }
         else if(badguy(&sprite[j]) && sprite[j].xrepeat > 24 && klabs(s->z-sprite[j].z) < (84<<8) )
         {
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_11
+            // 1.0 has no push here; C10-005's getglobalz has it (G10-L01).
+#elif DUKE3D_GAMEVER < GAMEVER_13D
             // 1.1 pushes along the badguy's own angle.
             p->posxv += sintable[(sprite[j].ang+1536)&2047]<<6;
             p->posyv += sintable[(sprite[j].ang+1024)&2047]<<6;
@@ -3331,7 +3392,7 @@ void processinput(short snum)
                 ps[i].gm = MODE_EOL;
             p->fist_incs = 0;
 
-#if DUKE3D_GAMEVER >= GAMEVER_14
+#if DUKE3D_GAMEVER >= GAMEVER_14 || DUKE3D_GAMEVER < GAMEVER_11 // 1.0 returns too (G10-L06)
             return;
 #endif
         }
@@ -3569,8 +3630,10 @@ void processinput(short snum)
         p->oang = p->ang;
         p->opyoff = p->pyoff;
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 leaves the view pitch (G10-L04)
         p->horiz = 100;
         p->horizoff = 0;
+#endif
 
         updatesector(p->posx,p->posy,&p->cursectnum);
 
@@ -3582,6 +3645,16 @@ void processinput(short snum)
         if( fz > cz+(16<<8) && s->pal != 1)
 #endif
             p->rotscrnang = (p->dead_flag + ( (fz+p->posz)>>7))&2047;
+
+#if DUKE3D_GAMEVER < GAMEVER_11
+        // 1.0 lets a dead player turn while there is room (G10-L04).
+        if( sync[snum].avel && klabs(fz-cz) > (8<<8) )
+        {
+            p->ang += sync[snum].avel;
+            hittype[pi].owner = pi;
+            p->wackedbyactor = -1;
+        }
+#endif
 
         p->on_warping_sector = 0;
 
@@ -3605,6 +3678,7 @@ void processinput(short snum)
         p->posz = SZ;
         p->ang =  SA;
         p->posxv = p->posyv = s->xvel = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 just returns (G10-L07)
         p->look_ang = 0;
         p->rotscrnang = 0;
 
@@ -3613,6 +3687,7 @@ void processinput(short snum)
 #endif
 
         if(p->curr_weapon == HANDREMOTE_WEAPON) goto SHOOTINCODE;
+#endif
 
         return;
     }
@@ -4122,7 +4197,11 @@ void processinput(short snum)
     {                         //ENGINE calculates angvel for you
         int32_t tempang;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_11
+        // 1.0 scales avel by 9/8 and the tic length (G10-L02).
+        tempang = sync[snum].avel;
+        p->angvel = (tempang+(tempang>>3))*doubvel;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
         // 1.1 turns at avel itself, the same in water.
         tempang = sync[snum].avel;
         p->angvel = tempang*sgn(doubvel);
@@ -4530,7 +4609,9 @@ void processinput(short snum)
         if(p->knee_incs > 18)
         {
             p->knee_incs = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 keeps it (G10-L12)
             p->holster_weapon = 0;
+#endif
             if(p->weapon_pos < 0)
                 p->weapon_pos = -p->weapon_pos;
             // 1.1 squishes at any distance, and only gibs and deletes.
@@ -4644,8 +4725,14 @@ void processinput(short snum)
     if(shrunk || p->tipincs || p->access_incs)
         sb_snum &= ~(1<<2);
 #endif
+#if DUKE3D_GAMEVER < GAMEVER_11
+    // 1.0 fires during the nuke button's fade too (G10-L06).
+    else if ( shrunk == 0 && (sb_snum&(1<<2)) && (*kb) == 0 &&
+         p->last_weapon == -1 && ( p->weapon_pos == 0 || p->holster_weapon == 1 ) )
+#else
     else if ( shrunk == 0 && (sb_snum&(1<<2)) && (*kb) == 0 && p->fist_incs == 0 &&
          p->last_weapon == -1 && ( p->weapon_pos == 0 || p->holster_weapon == 1 ) )
+#endif
     {
 
 #if DUKE3D_GAMEVER >= GAMEVER_14
@@ -4692,8 +4779,8 @@ void processinput(short snum)
                     (*kb)=1;
                 break;
 // 1.1 builds are always VOLUMEONE: 1.1 can't start the shrinker, flamethrower
-// or tripbomb either (G11-L20).
-#ifndef VOLUMEONE
+// or tripbomb either (G11-L20). 1.0 can (G10-L08).
+#if !defined(VOLUMEONE) || DUKE3D_GAMEVER < GAMEVER_11
             case TRIPBOMB_WEAPON:
                 if ( p->ammo_amount[TRIPBOMB_WEAPON] > 0 )
                 {
@@ -4766,7 +4853,9 @@ void processinput(short snum)
                 if( p->ammo_amount[DEVISTATOR_WEAPON] > 0 )
                 {
                     (*kb) = 1;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0's flamethrower doesn't toggle it (G10-L08)
                     p->hbomb_hold_delay = !p->hbomb_hold_delay;
+#endif
                     spritesound(CAT_FIRE,pi);
                 }
                 break;
@@ -4802,12 +4891,14 @@ void processinput(short snum)
                 {
                     p->ammo_amount[HANDBOMB_WEAPON]--;
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 always throws high (G10-L09)
                     if(p->on_ground && (sb_snum&2) )
                     {
                         k = 15;
                         i = ((p->horiz+p->horizoff-100)*20);
                     }
                     else
+#endif
                     {
                         k = 140;
                         i = -512-((p->horiz+p->horizoff-100)*20);
@@ -4940,16 +5031,20 @@ void processinput(short snum)
                     case 15:
                         spritesound(SHOTGUN_COCK,pi);
                         break;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no extra steps (G10-L10)
                     case 17:
                     case 20:
                         p->kickback_pic++;
                         break;
+#endif
                     case 24:
                         j = spawn(pi,SHOTGUNSHELL);
                         sprite[j].ang += 1024;
                         ssp(j,CLIPMASK0);
                         sprite[j].ang += 1024;
+#if DUKE3D_GAMEVER >= GAMEVER_11
                         p->kickback_pic++;
+#endif
                         break;
                     case 31:
                         *kb = 0;

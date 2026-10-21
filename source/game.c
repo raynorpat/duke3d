@@ -2681,8 +2681,10 @@ void displayrest(int32_t smoothratio)
         }
     }
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no crosshair (G10-G07)
     if(ps[myconnectindex].newowner == -1 && ud.overhead_on == 0 && ud.crosshair && ud.camerasprite == -1)
         rotatesprite((160-(ps[myconnectindex].look_ang>>1))<<16,100L<<16,65536L,0,CROSSHAIR,0,0,2+1,windowx1,windowy1,windowx2,windowy2);
+#endif
 
     if(ps[myconnectindex].gm&MODE_TYPE)
         typemode();
@@ -3465,8 +3467,10 @@ char wallswitchcheck(short i)
         case DIPSWITCH+1:
         case DIPSWITCH2:
         case DIPSWITCH2+1:
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no TECHSWITCH (G10-G04)
         case TECHSWITCH:
         case TECHSWITCH+1:
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_13D
         case DIPSWITCH3:
         case DIPSWITCH3+1:
@@ -3948,7 +3952,9 @@ short spawn( short j, short pn )
                 hittype[i].temp_data[2] = 0;
                 hittype[i].temp_data[5] = sp->ang;
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no case for it (G10-G01)
             case SPACEMARINE:
+#endif
                 if(sp->picnum == SPACEMARINE)
                 {
                     sp->extra = 20;
@@ -3970,7 +3976,9 @@ short spawn( short j, short pn )
             case GRATE1:
             case CHAIR1:
             case CHAIR2:
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no case for it (G10-G01)
             case CHAIR3:
+#endif
             case BOTTLE1:
             case BOTTLE2:
             case BOTTLE3:
@@ -4318,7 +4326,12 @@ short spawn( short j, short pn )
                     break;
                 }
 #endif
+#if DUKE3D_GAMEVER < GAMEVER_11
+                sp->xrepeat = sp->yrepeat = 0; // 1.0 hides it by size, not cstat bit 15 (G10-G02)
+                sp->cstat = 0;
+#else
                 sp->cstat = (short)32768;
+#endif
                 changespritestat(i,11);
                 break;
 
@@ -4524,7 +4537,11 @@ short spawn( short j, short pn )
                     break;
                 }
             case WATERBUBBLEMAKER:
+#if DUKE3D_GAMEVER < GAMEVER_11
+                sp->xrepeat = sp->yrepeat = 0; // 1.0 hides it by size, not cstat bit 15 (G10-G02)
+#else
                 sp->cstat |= 32768;
+#endif
                 changespritestat(i,6);
                 break;
             case BOLT1:
@@ -4540,8 +4557,12 @@ short spawn( short j, short pn )
                 T1 = sp->xrepeat;
                 T2 = sp->yrepeat;
             case MASTERSWITCH:
+#if DUKE3D_GAMEVER < GAMEVER_11
+                sp->xrepeat = sp->yrepeat = 0; // 1.0 hides it by size, the BOLT1s too (G10-G02)
+#else
                 if(sp->picnum == MASTERSWITCH)
                     sp->cstat |= 32768;
+#endif
                 sp->yvel = 0;
                 changespritestat(i,6);
                 break;
@@ -4641,6 +4662,7 @@ short spawn( short j, short pn )
                 // every enemy is shaded -20.
                 if( sp->picnum == BOSS1 || sp->picnum == BOSS1STAYPUT || sp->picnum == BOSS2 )
                 {
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0's are always the big ones (G10-G03)
                     if(sp->picnum == BOSS1 && ud.volume_number > 0)
                     {
                         sp->clipdist = 80;
@@ -4649,6 +4671,7 @@ short spawn( short j, short pn )
                         sp->extra >>= 2;
                     }
                     else
+#endif
                     {
                         sp->xrepeat = 80;
                         sp->yrepeat = 80;
@@ -4750,13 +4773,21 @@ short spawn( short j, short pn )
                 break;
 
             case LOCATORS:
+#if DUKE3D_GAMEVER < GAMEVER_11
+                sp->xrepeat = sp->yrepeat = 0; // 1.0 hides it by size, not cstat bit 15 (G10-G02)
+#else
                 sp->cstat |= 32768;
+#endif
                 changespritestat(i,7);
                 break;
 
             case ACTIVATORLOCKED:
             case ACTIVATOR:
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+                sp->xrepeat = sp->yrepeat = 0; // 1.0 hides it by size, not cstat bit 15 (G10-G02)
+                if(sp->picnum == ACTIVATORLOCKED)
+                    sector[sp->sectnum].lotag ^= 16384;
+#elif DUKE3D_GAMEVER < GAMEVER_14
                 sp->cstat |= (short) 32768;
                 if(sp->picnum == ACTIVATORLOCKED)
                     sector[sp->sectnum].lotag ^= 16384;
@@ -5046,7 +5077,9 @@ short spawn( short j, short pn )
 
             case SECTOREFFECTOR:
                 sp->yvel = sector[sect].extra;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 hides it by size alone (G10-G02)
                 sp->cstat |= 32768;
+#endif
                 sp->xrepeat = sp->yrepeat = 0;
 
                 switch(sp->lotag)
@@ -5123,7 +5156,9 @@ short spawn( short j, short pn )
                         if(ud.recstat == 1)
                         {
                             sp->xrepeat=sp->yrepeat=64;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 sets the size only (G10-G02)
                             sp->cstat &= 32767;
+#endif
                         }
                         break;
                     case 12:
@@ -5520,7 +5555,11 @@ short spawn( short j, short pn )
                 sp->shade = -16;
                 if(sp->xrepeat <= 8)
                 {
+#if DUKE3D_GAMEVER < GAMEVER_11
+                    sp->cstat = 0; // 1.0 (G10-G02)
+#else
                     sp->cstat = (short)32768;
+#endif
                     sp->xrepeat=sp->yrepeat=0;
                 }
                 else sp->cstat = 1+256;
@@ -6349,8 +6388,12 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
 
 #if DUKE3D_GAMEVER < GAMEVER_13D
 // 1.1's 21 codes. Only letters and digits can be typed, so the '_' ones are
-// unreachable, and "xxxxxx" has no case.
+// unreachable, and "xxxxxx" has no case. 1.0 has 20: no "clip" (G10-G05).
+#if DUKE3D_GAMEVER < GAMEVER_11
+#define NUMCHEATCODES 20
+#else
 #define NUMCHEATCODES 21
+#endif
 char cheatquotes[NUMCHEATCODES][14] = {
     {"cornholio"},
     {"stuff"},
@@ -6372,7 +6415,9 @@ char cheatquotes[NUMCHEATCODES][14] = {
     {"______"},
     {"kroz"},
     {"allen"},
+#if DUKE3D_GAMEVER >= GAMEVER_11
     {"clip"}
+#endif
 };
 #else
 #define NUMCHEATCODES 26
@@ -6610,7 +6655,11 @@ void cheats(void)
                         ps[myconnectindex].boot_amount          =    200;
                         ps[myconnectindex].shield_amount =           100;
                         ps[myconnectindex].scuba_amount =            6400;
+#if DUKE3D_GAMEVER < GAMEVER_11
+                        ps[myconnectindex].holoduke_amount =         1600; // 1.0 (G10-G05)
+#else
                         ps[myconnectindex].holoduke_amount =         2400;
+#endif
                         ps[myconnectindex].jetpack_amount =          1600;
                         ps[myconnectindex].firstaid_amount =         max_player_health;
 
@@ -6622,7 +6671,9 @@ void cheats(void)
 //                        FTA(21,&ps[myconnectindex]);
                         ps[myconnectindex].cheat_phase = 0;
                         KB_FlushKeyboardQueue();
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 leaves inven_icon (G10-G05)
                         ps[myconnectindex].inven_icon = 1;
+#endif
                         return;
 
                     case 2:
@@ -6806,7 +6857,11 @@ void cheats(void)
                         ps[myconnectindex].boot_amount          =    200;
                         ps[myconnectindex].shield_amount =           100;
                         ps[myconnectindex].scuba_amount =            6400;
+#if DUKE3D_GAMEVER < GAMEVER_11
+                        ps[myconnectindex].holoduke_amount =         1600; // 1.0 (G10-G05)
+#else
                         ps[myconnectindex].holoduke_amount =         2400;
+#endif
                         ps[myconnectindex].jetpack_amount =          1600;
 
                         ps[myconnectindex].firstaid_amount =         max_player_health;
@@ -6975,12 +7030,14 @@ void nonsharedkeys(void)
         FTA(82-ud.showweapons,&ps[screenpeek]);
     }
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no crosshair (G10-G07)
     if( BUTTON(gamefunc_Toggle_Crosshair) )
     {
         CONTROL_ClearButton(gamefunc_Toggle_Crosshair);
         ud.crosshair = 1-ud.crosshair;
         FTA(21-ud.crosshair,&ps[screenpeek]);
     }
+#endif
 
     if(ud.overhead_on && BUTTON(gamefunc_Map_Follow_Mode) )
     {
@@ -7339,12 +7396,14 @@ void nonsharedkeys(void)
         vscrn();
     }
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0's AutoRun is a synced input bit (G10-G07)
     if( BUTTON(gamefunc_AutoRun) )
     {
         CONTROL_ClearButton(gamefunc_AutoRun);
         ud.auto_run = 1-ud.auto_run;
         FTA(85+ud.auto_run,&ps[myconnectindex]);
     }
+#endif
 
     if( BUTTON(gamefunc_Map) )
     {

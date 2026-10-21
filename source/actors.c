@@ -27,6 +27,18 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <stdint.h>
 #include "duke3d.h"
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+// 1.0's gamestartup has no item time or blast radii: its code uses
+//  these constants (G10-A06).
+#define respawnitemtime respawnactortime
+#define rpgblastradius 1780
+#define pipebombblastradius 2560
+#define morterblastradius 2560
+#define bouncemineblastradius 2560
+#define tripbombblastradius 3880
+#define seenineblastradius 2048
+#endif
+
 extern char numenvsnds,actor_tog;
 
 // this should be a proper prototype included from a header file
@@ -144,7 +156,11 @@ void addweapon( struct player_struct *p,short weapon)
     {
         p->weapon_pos = 10;
         p->holster_weapon = 0;
+#if DUKE3D_GAMEVER < GAMEVER_11
+        p->last_weapon = p->curr_weapon; // 1.0 (G10-A01)
+#else
         p->last_weapon = -1;
+#endif
     }
 
     p->kickback_pic = 0;
@@ -692,7 +708,11 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
     SKIPWALLCHECK:
 #endif
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+    q = s->zvel < 0 ? (32<<8) : -(12<<8); // 1.0: no krand (G10-A02)
+#else
     q = -(16<<8)+(TRAND&((32<<8)-1));
+#endif
 
     for(x = 0;x<7;x++)
     {
@@ -801,7 +821,11 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
                     }
                     else if(s->extra == 0) hittype[j].extra = 0;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_11
+                    // 1.0 has no SPACEMARINE here (G10-A02).
+                    if( sj->picnum == QUEBALL || sj->picnum == STRIPEBALL )
+                        checkhitsprite( j, i );
+#elif DUKE3D_GAMEVER < GAMEVER_13D
                     // 1.1 hits these after the damage branch, also for SHRINKSPARK.
                     if( sj->picnum == SPACEMARINE || sj->picnum == QUEBALL || sj->picnum == STRIPEBALL )
                         checkhitsprite( j, i );
@@ -810,6 +834,7 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
                     if ( sj->picnum != RADIUSEXPLOSION &&
                         s->owner >= 0 && sprite[s->owner].statnum < MAXSTATUS )
                     {
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 doesn't restore a camera view (G10-A02)
                         if(sj->picnum == APLAYER)
                         {
                             p = sj->yvel;
@@ -834,6 +859,7 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
                                 }
                             }
                         }
+#endif
                         hittype[j].owner = s->owner;
                     }
                 }
@@ -876,7 +902,11 @@ short movesprite(short spritenum, int32_t xchange, int32_t ychange, int32_t zcha
 
 #if DUKE3D_GAMEVER < GAMEVER_13D
         // 1.1: a wide clip only for the bosses; actorstayput is the one rule.
+#if DUKE3D_GAMEVER < GAMEVER_11
+        if( sprite[spritenum].picnum == BOSS1 || sprite[spritenum].picnum == BOSS2 ) // 1.0: any size (G10-A03)
+#else
         if( ( sprite[spritenum].picnum == BOSS1 || sprite[spritenum].picnum == BOSS2 ) && sprite[spritenum].xrepeat > 60 )
+#endif
             cd = 1024L;
         else cd = 192L;
 
@@ -1341,7 +1371,11 @@ short ifhitbyweapon(short sn)
 
             if(npc->picnum == APLAYER)
             {
+#if DUKE3D_GAMEVER < GAMEVER_11
+                if(ud.god) return -1; // 1.0: god mode ignores every hit (G10-A04)
+#else
                 if(ud.god && hittype[sn].picnum != SHRINKSPARK ) return -1;
+#endif
 
                 p = npc->yvel;
                 j = hittype[sn].owner;
@@ -1636,7 +1670,11 @@ void moveplayers(void) //Players
 
                     p->newowner = -1;
 
-                    if( p->wackedbyactor >= 0 && sprite[p->wackedbyactor].statnum < MAXSTATUS )
+                    if( p->wackedbyactor >= 0 && sprite[p->wackedbyactor].statnum < MAXSTATUS
+#if DUKE3D_GAMEVER < GAMEVER_11
+                        && dist(&sprite[p->wackedbyactor],s) > 348 // 1.0 (G10-A05)
+#endif
+                        )
                     {
                         p->ang += getincangle(p->ang,getangle(sprite[p->wackedbyactor].x-p->posx,sprite[p->wackedbyactor].y-p->posy))>>1;
                         p->ang &= 2047;
@@ -1796,7 +1834,9 @@ void movefx(void)
                         {
                             j = s->lotag+((unsigned)global_random%(s->hitag+1));
                             sound(j);
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_11
+                            T5 =  26*50 + (global_random%(26*50)); // 1.0 (G10-A97)
+#elif DUKE3D_GAMEVER < GAMEVER_13D
                             T5 =  26*20 + (global_random%(26*20));
 #else
                             T5 =  26*40 + (global_random%(26*40));
@@ -3210,7 +3250,9 @@ void moveweapons(void)
                         if(s->zvel < 0)
                         {
                             if( sector[s->sectnum].ceilingstat&1 )
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0: any parallax ceiling (G10-A08)
                                 if(sector[s->sectnum].ceilingpal == 0)
+#endif
                                     KILLIT(i);
 
                             checkhitceiling(s->sectnum);
@@ -3235,7 +3277,11 @@ void moveweapons(void)
                             {
                                 if( s->zvel > 0)
                                     spawn(i,EXPLOSION2BOT);
+#if DUKE3D_GAMEVER < GAMEVER_11
+                                else { sprite[k].cstat |= 8; sprite[k].z += (72<<8); } // 1.0 (G10-A08)
+#else
                                 else { sprite[k].cstat |= 8; sprite[k].z += (48<<8); }
+#endif
                             }
                         }
                         else if(s->picnum == SHRINKSPARK)
@@ -4584,6 +4630,7 @@ void moveactors(void)
                 if( s->z < sector[sect].ceilingz+(32<<8) )
                     s->z = sector[sect].ceilingz+(32<<8);
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0's monsters cheat does nothing (G10-G05)
                 if( ud.multimode < 2 )
                 {
                     if( actor_tog == 1)
@@ -4593,6 +4640,7 @@ void moveactors(void)
                     }
                     else if(actor_tog == 2) s->cstat = 257;
                 }
+#endif
                 IFHIT
                 {
                     if( s->extra < 0 && t[0] != -1 )
@@ -5535,7 +5583,11 @@ void moveactors(void)
 
                 p = findplayer(s,&x);
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+                if( x < 1024 ) s->cstat &= ~257; // 1.0 (G10-A07)
+#else
                 if( x < 1220 ) s->cstat &= ~257;
+#endif
                 else s->cstat |= 257;
 
                 if(t[3] == 0 )
@@ -5623,7 +5675,9 @@ void moveactors(void)
                 {
                     j &= (MAXWALLS-1);
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 doesn't hit the wall (G10-A07)
                     checkhitwall(i,j,s->x,s->y,s->z,s->picnum);
+#endif
 
                     k = getangle(
                         wall[wall[j].point2].x-wall[j].x,
@@ -5977,6 +6031,7 @@ void moveactors(void)
 
 
 // #ifndef VOLOMEONE
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0's monsters cheat does nothing (G10-G05)
         if( ud.multimode < 2 && badguy(s) )
         {
             if( actor_tog == 1)
@@ -5986,6 +6041,7 @@ void moveactors(void)
             }
             else if(actor_tog == 2) s->cstat = 257;
         }
+#endif
 // #endif
 
         p = findplayer(s,&x);
@@ -6913,7 +6969,9 @@ void moveeffectors(void)   //STATNUM 3
                             if( Sound[SUBWAY].num == 0 )
                                 spritesound(SUBWAY,i);
                         }
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_11
+                        else if( rnd(64) ) // 1.0 (G10-A09)
+#elif DUKE3D_GAMEVER < GAMEVER_13D
                         else if( rnd(32) )
 #else
                         else if( rnd(8) )
@@ -6931,6 +6989,15 @@ void moveeffectors(void)   //STATNUM 3
                         {
 #endif
                             p = findplayer(s,&x);
+#if DUKE3D_GAMEVER < GAMEVER_11
+                            if(x < 8192) // 1.0: nearer, and a FIRELASER (G10-A09)
+                            {
+                                j = s->ang;
+                                s->ang = getangle(s->x-ps[p].posx,s->y-ps[p].posy);
+                                shoot(i,FIRELASER);
+                                s->ang = j;
+                            }
+#else
                             if(x < 20480)
                             {
                                 j = s->ang;
@@ -6938,6 +7005,7 @@ void moveeffectors(void)   //STATNUM 3
                                 shoot(i,RPG);
                                 s->ang = j;
                             }
+#endif
                         }
                     }
 
@@ -8046,7 +8114,11 @@ void moveeffectors(void)   //STATNUM 3
                                 ps[p].posx += sprite[j].x-s->x;
                                 ps[p].posy += sprite[j].y-s->y;
                                 ps[p].posz = sector[sprite[j].sectnum].floorz-PHEIGHT;
+#if DUKE3D_GAMEVER < GAMEVER_11
+                                updatesector(sprite[j].x,sprite[j].y,&ps[p].cursectnum); // 1.0 (G10-A09)
+#else
                                 updatesectorz(sprite[j].x,sprite[j].y,sprite[j].z,&ps[p].cursectnum);
+#endif
                                 setsprite(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz+PHEIGHT);
                                 ps[p].oposx = ps[p].posx;
                                 ps[p].oposy = ps[p].posy;

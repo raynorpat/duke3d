@@ -493,6 +493,9 @@ struct player_struct
     char spacesuit_used, spacesuit_on;
     int32_t burn_time; // set when a THROWFLAME hits the player
 #endif
+#if DUKE3D_GAMEVER < GAMEVER_11
+    char auto_run; // 1.0: per player, toggled by input bit 17 (G10-S06)
+#endif
 };
 
 extern unsigned char tempbuf[2048], packbuf[576];
