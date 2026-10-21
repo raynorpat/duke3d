@@ -7401,6 +7401,11 @@ void moveeffectors(void)   //STATNUM 3
                             sprite[j].x+=m;
                             sprite[j].y+=x;
                             setsprite(j,sprite[j].x,sprite[j].y,sprite[j].z);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                            // 1.1 takes the next sprite after setsprite, so a sprite
+                            // shaken into another sector carries the walk there (G11-A34).
+                            nextj = nextspritesect[j];
+#endif
                         }
                         j = nextj;
                     }
