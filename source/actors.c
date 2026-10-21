@@ -177,12 +177,25 @@ void checkavailinven( struct player_struct *p )
         p->inven_icon = 5;
     else if(p->scuba_amount > 0)
         p->inven_icon = 6;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    else if(p->spacesuit_amount > 0)
+        p->inven_icon = 7;
+    else if(p->boot_amount > 0)
+        p->inven_icon = 8;
+#else
     else if(p->boot_amount > 0)
         p->inven_icon = 7;
+#endif
     else p->inven_icon = 0;
 }
 
 #if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+#define SCANWEAPONS 10 // 1.1 has ten weapons
+#else
+#define SCANWEAPONS 11
+#endif
+
 // 1.3D picks the next weapon by scanning up and down from the current one
 // (the older algorithm kept commented out below), with no expander.
 void checkavailweapon( struct player_struct *p )
@@ -218,7 +231,7 @@ void checkavailweapon( struct player_struct *p )
     CHECK_SHOOT:
     if(check_shoot)
     {
-        for(i = p->curr_weapon+1; i < 11;i++)
+        for(i = p->curr_weapon+1; i < SCANWEAPONS;i++)
             switch(i)
             {
                 case PISTOL_WEAPON:
@@ -288,7 +301,7 @@ void checkavailweapon( struct player_struct *p )
                     break;
             }
 
-        for(i = p->curr_weapon+1; i < 11;i++)
+        for(i = p->curr_weapon+1; i < SCANWEAPONS;i++)
             switch(i)
             {
                 case HANDBOMB_WEAPON:
@@ -553,7 +566,9 @@ int32_t ifsquished(short i, short p)
     sc = &sector[SECT];
     floorceildist = sc->floorz - sc->ceilingz;
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    squishme = floorceildist < (6<<8) && (sc->lotag&32768) == 0;
+#elif DUKE3D_GAMEVER < GAMEVER_14
     squishme = floorceildist < (sprite[i].pal == 1 ? (32<<8) : (6<<8)) && (sc->lotag&32768) == 0;
 #else
     if(sc->lotag != 23)
@@ -572,12 +587,14 @@ int32_t ifsquished(short i, short p)
 
         if(badguy(&sprite[i])) sprite[i].xvel = 0;
 
+#if DUKE3D_GAMEVER >= GAMEVER_13D
         if(sprite[i].pal == 1)
         {
             hittype[i].picnum = SHOTSPARK1;
             hittype[i].extra = 1;
             return 0;
         }
+#endif
 
         return 1;
     }
@@ -596,6 +613,36 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
 
     s = &sprite[i];
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1 tests every sector's ceiling and every wall, walls by true distance.
+    if(s->picnum != SHRINKSPARK)
+    {
+        sect = -1;
+        for(dasect=0;dasect<numsectors;dasect++)
+            if(((sector[dasect].ceilingz-s->z)>>8) < r)
+        {
+            d = klabs(wall[sector[dasect].wallptr].x-s->x)+klabs(wall[sector[dasect].wallptr].y-s->y);
+            if(d < r)
+                checkhitceiling(dasect);
+            else
+            {
+                d = klabs(wall[wall[wall[sector[dasect].wallptr].point2].point2].x-s->x)+klabs(wall[wall[wall[sector[dasect].wallptr].point2].point2].y-s->y);
+                if(d < r)
+                    checkhitceiling(dasect);
+            }
+        }
+
+        for(x=0,wal=wall;x<numwalls;x++,wal++)
+            if( FindDistance2D(wal->x-s->x,wal->y-s->y) < r )
+        {
+            x1 = (((wal->x+wall[wal->point2].x)>>1)+s->x)>>1;
+            y1 = (((wal->y+wall[wal->point2].y)>>1)+s->y)>>1;
+            updatesector(x1,y1,&sect);
+            if( sect >= 0 && cansee(x1,y1,s->z,sect,s->x,s->y,s->z,s->sectnum ) )
+                checkhitwall(i,x,wal->x,wal->y,s->z,s->picnum);
+        }
+    }
+#else
     if(s->picnum == RPG && s->xrepeat < 11) goto SKIPWALLCHECK;
 
     if(s->picnum != SHRINKSPARK)
@@ -643,6 +690,7 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
     }
 
     SKIPWALLCHECK:
+#endif
 
     q = -(16<<8)+(TRAND&((32<<8)-1));
 
@@ -666,7 +714,11 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
             }
             else if( sj->extra >= 0 && sj != s && ( sj->picnum == TRIPBOMB || badguy(sj) || sj->picnum == QUEBALL || sj->picnum == STRIPEBALL || (sj->cstat&257) || sj->picnum == DUKELYINGDEAD ) )
             {
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                if( s->picnum == SHRINKSPARK && ( j == s->owner || sj->xrepeat < 40 ) )
+#else
                 if( s->picnum == SHRINKSPARK && sj->picnum != SHARK && ( j == s->owner || sj->xrepeat < 24 ) )
+#endif
                 {
                     j = nextj;
                     continue;
@@ -712,7 +764,9 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
                             hittype[j].extra = hp1 + (TRAND%(hp2-hp1));
                         }
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        if( sprite[j].picnum != ROTATEGUN && sprite[j].picnum != RECON && sprite[j].picnum != BOSS1 && sprite[j].picnum != BOSS2 )
+#elif DUKE3D_GAMEVER < GAMEVER_14
                         if( sprite[j].picnum != ROTATEGUN && sprite[j].picnum != RECON && sprite[j].picnum != BOSS1 && sprite[j].picnum != BOSS2 && sprite[j].picnum != BOSS3 )
 #else
                         if( sprite[j].picnum != TANK && sprite[j].picnum != ROTATEGUN && sprite[j].picnum != RECON && sprite[j].picnum != BOSS1 && sprite[j].picnum != BOSS2 && sprite[j].picnum != BOSS3 && sprite[j].picnum != BOSS4 )
@@ -726,6 +780,12 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
 #endif
                         }
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        if( sj->picnum == PODFEM1 || sj->picnum == FEM1 ||
+                            sj->picnum == FEM2 || sj->picnum == FEM3 ||
+                            sj->picnum == FEM4 )
+                                checkhitsprite( j, i );
+#else
                         if( sj->picnum == PODFEM1 || sj->picnum == FEM1 ||
                             sj->picnum == FEM2 || sj->picnum == FEM3 ||
                             sj->picnum == FEM4 || sj->picnum == FEM5 ||
@@ -737,8 +797,15 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
                             sj->picnum == STATUE ||
                             sj->picnum == STATUEFLASH || sj->picnum == SPACEMARINE || sj->picnum == QUEBALL || sj->picnum == STRIPEBALL)
                                 checkhitsprite( j, i );
+#endif
                     }
                     else if(s->extra == 0) hittype[j].extra = 0;
+
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    // 1.1 hits these after the damage branch, also for SHRINKSPARK.
+                    if( sj->picnum == SPACEMARINE || sj->picnum == QUEBALL || sj->picnum == STRIPEBALL )
+                        checkhitsprite( j, i );
+#endif
 
                     if ( sj->picnum != RADIUSEXPLOSION &&
                         s->owner >= 0 && sprite[s->owner].statnum < MAXSTATUS )
@@ -753,8 +820,10 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
                                 ps[p].posy = ps[p].oposy;
                                 ps[p].posz = ps[p].oposz;
                                 ps[p].ang = ps[p].oang;
+#if DUKE3D_GAMEVER >= GAMEVER_13D
                                 updatesector(ps[p].posx,ps[p].posy,&ps[p].cursectnum);
                                 setpal(&ps[p]);
+#endif
 
                                 k = headspritestat[1];
                                 while(k >= 0)
@@ -805,6 +874,27 @@ short movesprite(short spritenum, int32_t xchange, int32_t ychange, int32_t zcha
         oldx = sprite[spritenum].x;
         oldy = sprite[spritenum].y;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        // 1.1: a wide clip only for the bosses; actorstayput is the one rule.
+        if( ( sprite[spritenum].picnum == BOSS1 || sprite[spritenum].picnum == BOSS2 ) && sprite[spritenum].xrepeat > 60 )
+            cd = 1024L;
+        else cd = 192L;
+
+        retval = clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),cd,(4<<8),(4<<8),cliptype);
+
+        if( dasectnum >= 0 && hittype[spritenum].actorstayput >= 0 && hittype[spritenum].actorstayput != dasectnum )
+        {
+            if( sprite[spritenum].extra > 0 )
+            {
+                sprite[spritenum].x = oldx;
+                sprite[spritenum].y = oldy;
+                sprite[spritenum].ang = (TRAND&2047);
+                setsprite(spritenum,oldx,oldy,sprite[spritenum].z);
+                return (16384+dasectnum);
+            }
+            hittype[spritenum].actorstayput = -1;
+        }
+#else
         if( sprite[spritenum].xrepeat > 60 )
             retval = clipmove(&sprite[spritenum].x,&sprite[spritenum].y,&daz,&dasectnum,((xchange*TICSPERFRAME)<<11),((ychange*TICSPERFRAME)<<11),1024L,(4<<8),(4<<8),cliptype);
         else
@@ -839,6 +929,7 @@ short movesprite(short spritenum, int32_t xchange, int32_t ychange, int32_t zcha
                 if(dasectnum < 0) dasectnum = 0;
                 return (16384+dasectnum);
         }
+#endif
         if( (retval&49152) >= 32768 && (hittype[spritenum].cgg==0) ) sprite[spritenum].ang += 768;
     }
     else
@@ -960,8 +1051,10 @@ void guts(spritetype *s,short gtype, short n, short p)
     if( gutz > ( floorz-(8<<8) ) )
         gutz = floorz-(8<<8);
 
+#if DUKE3D_GAMEVER >= GAMEVER_13D
     if(s->picnum == COMMANDER)
         gutz -= (24<<8);
+#endif
 
     if( badguy(s) && s->pal == 6)
         pal = 6;
@@ -969,12 +1062,27 @@ void guts(spritetype *s,short gtype, short n, short p)
 
     for(j=0;j<n;j++)
     {
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        // 1.1 throws head, arm and leg pieces away from the player.
+        if( p >= 0 && ( gtype == HEADJIB1 || gtype == ARMJIB1 || gtype == LEGJIB1 ||
+            gtype == LIZMANHEAD1 || gtype == LIZMANARM1 || gtype == LIZMANLEG1 ) )
+        {
+            a = getangle(s->x-ps[p].posx,s->y-ps[p].posy)+1024;
+            a += (TRAND&127)-256;
+        }
+        else
+#endif
         a = TRAND&2047;
         {
             // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
             int32_t r_zv = -512-(TRAND&2047);
             int32_t r_vel = 48+(TRAND&31);
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+            // 1.1's guts have owner 0.
+            i = EGS(s->sectnum,s->x,s->y,gutz,gtype,-32,sx,sy,a,r_vel,r_zv,0,5);
+        }
+        continue;
+#elif DUKE3D_GAMEVER < GAMEVER_14
             // 1.3D: guts start exactly at the body, and keep their size and colour.
             i = EGS(s->sectnum,s->x,s->y,gutz,gtype,-32,sx,sy,a,r_vel,r_zv,ps[p].i,5);
         }
@@ -1170,7 +1278,11 @@ void movefta(void)
                         case CANWITHSOMETHING4:
 #endif
                         case FIREBARREL:
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        case EGG:
+#else
                         case FIREVASE:
+#endif
                         case NUKEBARREL:
                         case NUKEBARRELDENTED:
                         case NUKEBARRELLEAKED:
@@ -1246,7 +1358,11 @@ short ifhitbyweapon(short sn)
 
                 if(j >= 0)
                 {
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    if(npc->extra <= 0)
+#else
                     if(npc->extra <= 0 && hittype[sn].picnum != FREEZEBLAST)
+#endif
                     {
                         npc->extra = 0;
 
@@ -1266,7 +1382,9 @@ short ifhitbyweapon(short sn)
                     case HYDRENT:
                     case HEAVYHBOMB:
                     case SEENINE:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
                     case OOZFILTER:
+#endif
                     case EXPLODINGBARREL:
                         ps[p].posxv +=
                             hittype[sn].extra*(sintable[(hittype[sn].ang+512)&2047])<<2;
@@ -1283,13 +1401,24 @@ short ifhitbyweapon(short sn)
             }
             else
             {
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                if(hittype[sn].extra == 0 )
+                    if( hittype[sn].picnum == SHRINKSPARK && npc->xrepeat < 40 )
+                        return -1;
+#else
                 if(hittype[sn].extra == 0 )
                     if( hittype[sn].picnum == SHRINKSPARK && npc->xrepeat < 24 )
                         return -1;
+#endif
 
                 npc->extra -= hittype[sn].extra;
                 if(npc->picnum != RECON && npc->owner >= 0 && sprite[npc->owner].statnum < MAXSTATUS )
                     npc->owner = hittype[sn].owner;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1: flames darken the badguys they hit.
+                if( badguy(npc) && hittype[sn].picnum == THROWFLAME && npc->shade < 48 )
+                    npc->shade += 24;
+#endif
             }
 
             hittype[sn].extra = -1;
@@ -1428,6 +1557,24 @@ void moveplayers(void) //Players
 
                 execute(i,s->yvel,otherx);
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1: a big player kicks a shrunk one, and the kick kills.
+                if(ud.multimode > 1)
+                    if( sprite[ps[otherp].i].extra > 0 )
+                        if( s->xrepeat > 32 && sprite[ps[otherp].i].xrepeat < 32 && otherx < 1280 )
+                {
+                    if( p->knee_incs == 10 )
+                    {
+                        ps[otherp].frag_ps = s->yvel;
+                        quickkill(&ps[otherp]);
+                    }
+                    else if( p->knee_incs == 0 )
+                    {
+                        p->knee_incs = 1;
+                        p->weapon_pos = -1;
+                    }
+                }
+#else
                 if(ud.multimode > 1)
                     if( sprite[ps[otherp].i].extra > 0 )
                 {
@@ -1441,6 +1588,7 @@ void moveplayers(void) //Players
                         }
                     }
                 }
+#endif
                 if(ud.god)
                 {
                     s->extra = max_player_health;
@@ -1453,11 +1601,31 @@ void moveplayers(void) //Players
                 {
                     hittype[i].owner = i;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    // 1.1's space suit: put on when there is one, hurt once it ran out.
+                    if( p->spacesuit_on == 0 && ( ceilingspace(s->sectnum) || floorspace(s->sectnum) ) )
+                    {
+                        if( p->spacesuit_used == 1 )
+                            p->extra_extra8 += 32;
+                        else
+                        {
+                            if( p->spacesuit_amount > 0 )
+                            {
+                                p->spacesuit_on = 1;
+                                p->inven_icon = 1;
+                                FTA(77,p);
+                            }
+                            else s->extra = 0;
+                            goto BOLT; // 1.1 skips the rest of the tic here
+                        }
+                    }
+#else
 #if DUKE3D_GAMEVER >= GAMEVER_14
                     if(ud.god == 0)
 #endif
                         if( ceilingspace(s->sectnum) || floorspace(s->sectnum) )
                             quickkill(p);
+#endif
                 }
                 else
                 {
@@ -1476,6 +1644,10 @@ void moveplayers(void) //Players
 
                 }
                 s->ang = p->ang;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                if( p->burn_time && s->extra < max_player_health/10 )
+                    s->shade = 10;
+#endif
             }
         }
         else
@@ -1500,10 +1672,14 @@ void moveplayers(void) //Players
             else
             {
                 s->yrepeat = 36;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                makeitfall(i);
+#else
                 if(sector[s->sectnum].lotag != 2)
                     makeitfall(i);
                 if(s->zvel == 0 && sector[s->sectnum].lotag == 1)
                     s->z += (32<<8);
+#endif
             }
 
             if(s->extra < 8)
@@ -1620,7 +1796,11 @@ void movefx(void)
                         {
                             j = s->lotag+((unsigned)global_random%(s->hitag+1));
                             sound(j);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                            T5 =  26*20 + (global_random%(26*20));
+#else
                             T5 =  26*40 + (global_random%(26*40));
+#endif
                         }
                     }
                 }
@@ -1986,6 +2166,24 @@ void movestandables(void)
                     else KILLIT(i);
                 }
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1: the burnt thing shrinks to a stump and stays; no spreading.
+                j = s->xrepeat-(TRAND&7);
+                if(j < 10)
+                {
+                    j = 10;
+                    T1 = 2;
+                }
+                s->xrepeat = j;
+
+                j = s->yrepeat-(TRAND&7);
+                if(j < 4)
+                {
+                    j = 4;
+                    T1 = 2;
+                }
+                s->yrepeat = j;
+#else
                 j = s->xrepeat-(TRAND&7);
                 if(j < 10)
                 {
@@ -2018,6 +2216,7 @@ void movestandables(void)
                 j = s->yrepeat-(TRAND&7);
                 if(j < 4) { KILLIT(i); }
                 s->yrepeat = j;
+#endif
             }
 #if DUKE3D_GAMEVER >= GAMEVER_14
             if(s->picnum == BOX)
@@ -2184,6 +2383,21 @@ void movestandables(void)
             j = ifhitbyweapon(i);
             if( j == -1 ) goto BOLT;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+            // 1.1's debris: 15 pieces stacked up from the floor.
+            for(k=0;k<15;k++)
+            {
+                {
+                    // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                    int32_t r_zv = -(TRAND&511)-256;
+                    int32_t r_vel = (TRAND&127)+64;
+                    int32_t r_ang = TRAND&2047;
+                    int32_t r_pn = SCRAP1+(TRAND&15);
+                    j = EGS(SECT,SX,SY,sector[SECT].floorz-(12<<8)-(k<<9),r_pn,-8,64,64,r_ang,r_vel,r_zv,i,5);
+                }
+                sprite[j].pal = 2;
+            }
+#else
             for(k=0;k<16;k++)
             {
                 {
@@ -2197,6 +2411,7 @@ void movestandables(void)
                 }
                 sprite[j].pal = 2;
             }
+#endif
 
             spawn(i,EXPLOSION2);
             spritesound(PIPEBOMB_EXPLODE,i);
@@ -2215,7 +2430,11 @@ void movestandables(void)
 
                 x = s->extra;
                 spawn(i,EXPLOSION2);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                hitradius( i, 2048,x>>2, x-(x>>1),x-(x>>2), x);
+#else
                 hitradius( i, pipebombblastradius,x>>2, x-(x>>1),x-(x>>2), x);
+#endif
                 spritesound(PIPEBOMB_EXPLODE,i);
 
                 goto DETONATE;
@@ -2533,7 +2752,17 @@ void movestandables(void)
                     {
                         s->cstat |= 32768;
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        // 1.1 plays the drip only for drips that come back (below).
+                        if(sprite[s->owner].picnum != WATERDRIP)
+                        {
+                            KILLIT(i);
+                        }
+                        hittype[i].bposz = s->z = t[0];
+                        t[1] = 48+(TRAND&31);
+                        spritesound(SOMETHING_DRIPPING,i);
+                        goto BOLT;
+#elif DUKE3D_GAMEVER < GAMEVER_14
                         if(s->pal != 2)
 #else
                         if(s->pal != 2 && s->hitag == 0)
@@ -2667,14 +2896,20 @@ void movestandables(void)
             case HORSEONSIDE:
             case FLOORFLAME:
             case FIREBARREL:
+#if DUKE3D_GAMEVER < GAMEVER_13D
+            case EGG:
+#else
             case FIREVASE:
+#endif
             case NUKEBARREL:
             case NUKEBARRELDENTED:
             case NUKEBARRELLEAKED:
             case TOILETWATER:
             case RUBBERCAN:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case STEAM:
             case CEILINGSTEAM:
+#endif
                 p = findplayer(s, &x);
                 execute(i,p,x);
                 goto BOLT;
@@ -2728,6 +2963,326 @@ void bounce(short i)
     s->ang = getangle(xvect,yvect);
 }
      
+#if DUKE3D_GAMEVER < GAMEVER_13D
+// 1.1's projectiles. 1.1 has THROWFLAME and CHAINGUN in place of FREEZEBLAST,
+// and differs from 1.3D throughout (G11-A15 to A18), so it is a separate function.
+void moveweapons(void)
+{
+    short i, j, k, nexti, p, q;
+    int32_t dax,day,daz, x, ll;
+    uint32_t qq;
+    spritetype *s;
+
+    i = headspritestat[4];
+    while(i >= 0)
+    {
+        nexti = nextspritestat[i];
+        s = &sprite[i];
+
+        if(s->sectnum < 0) KILLIT(i);
+
+        hittype[i].bposx = s->x;
+        hittype[i].bposy = s->y;
+        hittype[i].bposz = s->z;
+
+        switch(s->picnum)
+        {
+            case RADIUSEXPLOSION:
+            case KNEE:
+                KILLIT(i);
+            case TONGUE:
+                T1 = sintable[(T2)&2047]>>9;
+                T2 += 32;
+                if(T2 > 2047) KILLIT(i);
+
+                if(sprite[s->owner].statnum == MAXSTATUS)
+                    if(badguy(&sprite[s->owner]) == 0)
+                        KILLIT(i);
+
+                s->ang = sprite[s->owner].ang;
+                s->x = sprite[s->owner].x;
+                s->y = sprite[s->owner].y;
+                if(sprite[s->owner].picnum == APLAYER)
+                    s->z = sprite[s->owner].z-(34<<8);
+                for(k=0;k<T1;k++)
+                {
+                    q = EGS(s->sectnum,
+                        s->x+((k*sintable[(s->ang+512)&2047])>>9),
+                        s->y+((k*sintable[s->ang&2047])>>9),
+                        s->z+((k*ksgn(s->zvel))*klabs(s->zvel/12)),TONGUE,-40+(k<<1),
+                        8,8,0,0,0,i,5);
+                    sprite[q].cstat = 128;
+                    sprite[q].pal = 8;
+                }
+                q = EGS(s->sectnum,
+                    s->x+((k*sintable[(s->ang+512)&2047])>>9),
+                    s->y+((k*sintable[s->ang&2047])>>9),
+                    s->z+((k*ksgn(s->zvel))*klabs(s->zvel/12)),INNERJAW,-40,
+                    32,32,0,0,0,i,5);
+                sprite[q].cstat = 128;
+                if( T2 > 512 && T2 < (1024) )
+                    sprite[q].picnum = INNERJAW+1;
+
+                goto BOLT;
+
+            case SHRINKSPARK:
+            case RPG:
+            case FIRELASER:
+            case SPIT:
+            case COOLEXPLOSION1:
+            case THROWFLAME:
+            case CHAINGUN:
+
+                if( s->picnum == COOLEXPLOSION1 )
+                    if( Sound[WIERDSHOT_FLY].num == 0 )
+                        spritesound(WIERDSHOT_FLY,i);
+
+                p = -1;
+
+                if(s->picnum == RPG && sector[s->sectnum].lotag == 2)
+                {
+                    k = s->xvel>>1;
+                    ll = s->zvel>>1;
+                }
+                else
+                {
+                    k = s->xvel;
+                    ll = s->zvel;
+                }
+
+                dax = s->x; day = s->y; daz = s->z;
+
+                getglobalz(i);
+
+                // No smoke trail behind an RPG in 1.1 (G11-A18).
+                switch(s->picnum)
+                {
+                    case COOLEXPLOSION1:
+                    case FIRELASER:
+                    case SHRINKSPARK:
+                    case THROWFLAME:
+                        qq = CLIPMASK1;
+                        break;
+                    default:
+                        qq = CLIPMASK0;
+                        break;
+                }
+
+                j = movesprite(i,
+                    (k*(sintable[(s->ang+512)&2047]))>>14,
+                    (k*(sintable[s->ang&2047]))>>14,ll,qq);
+
+                if(s->picnum == RPG && s->yvel >= 0)
+                    if( FindDistance2D(s->x-sprite[s->yvel].x,s->y-sprite[s->yvel].y) < 256 )
+                        j = 49152|s->yvel;
+
+                if(s->sectnum < 0) { KILLIT(i); }
+
+                // 1.1 tests the floor and ceiling even after a sprite hit.
+                if(s->z < hittype[i].ceilingz)
+                {
+                    j = 16384|(s->sectnum);
+                    s->zvel = -1;
+                }
+                else if( s->z > hittype[i].floorz )
+                {
+                    j = 16384|(s->sectnum);
+                    if(sector[s->sectnum].lotag != 1)
+                        s->zvel = 1;
+                }
+
+                if(s->picnum == FIRELASER)
+                {
+                    s->xrepeat = s->yrepeat = 8;
+                    for(k=-3;k<2;k++)
+                    {
+                        x = EGS(s->sectnum,
+                            s->x+((k*sintable[(s->ang+512)&2047])>>9),
+                            s->y+((k*sintable[s->ang&2047])>>9),
+                            s->z+((k*ksgn(s->zvel))*klabs(s->zvel/24)),FIRELASER,-40+(k<<2),
+                            10,10,0,0,0,s->owner,5);
+
+                        sprite[x].cstat = 128;
+                        sprite[x].pal = s->pal;
+                    }
+                }
+                else if(s->picnum == THROWFLAME)
+                {
+                    if(sector[s->sectnum].lotag == 2)
+                    {
+                        spawn(i,SMALLSMOKE);
+                        KILLIT(i);
+                    }
+                    s->ang = sprite[s->owner].ang;
+                    if(s->shade > -36 && sprite[s->owner].statnum != 1)
+                        s->zvel += 384;
+                    if(s->shade > 31) KILLIT(i);
+                    s->shade += 6;
+                }
+                else if(s->picnum == SPIT) if(s->zvel < 6144)
+                    s->zvel += gc-112;
+
+                if( j != 0 )
+                {
+                    if(s->picnum == COOLEXPLOSION1)
+                    {
+                        if( (j&49152) == 49152 && sprite[j&(MAXSPRITES-1)].picnum != APLAYER)
+                            goto BOLT;
+                        s->xvel = 0;
+                        s->zvel = 0;
+                    }
+
+                    if( (j&49152) == 49152 )
+                    {
+                        j &= (MAXSPRITES-1);
+
+                        checkhitsprite(j,i);
+
+                        if(sprite[j].picnum == APLAYER)
+                        {
+                            p = sprite[j].yvel;
+                            spritesound(PISTOL_BODYHIT,j);
+
+                            if(s->picnum == THROWFLAME)
+                            {
+                                // The burning itself is processinput's (G11-L06).
+                                if(ps[p].burn_time == 0)
+                                    ps[p].randomflamex = TRAND%120+100;
+                                ps[p].burn_time = 120;
+                            }
+                            else if(s->picnum == SPIT)
+                            {
+                                ps[p].horiz += 32;
+                                ps[p].return_to_center = 8;
+
+                                if(ps[p].loogcnt == 0)
+                                {
+                                    if(Sound[DUKE_LONGTERM_PAIN].num < 1)
+                                        spritesound(DUKE_LONGTERM_PAIN,ps[p].i);
+
+                                    j = 3+(TRAND&3);
+                                    ps[p].numloogs = j;
+                                    ps[p].loogcnt = 24*4;
+                                    for(x=0;x < j;x++)
+                                    {
+                                        ps[p].loogiex[x] = TRAND%xdim;
+                                        ps[p].loogiey[x] = TRAND%ydim;
+                                    }
+                                }
+                                KILLIT(i);
+                            }
+                        }
+                    }
+                    else if( (j&49152) == 32768 )
+                    {
+                        j &= (MAXWALLS-1);
+
+                        if(s->picnum != RPG && s->picnum != SPIT && ( wall[j].overpicnum == MIRROR || wall[j].picnum == MIRROR ) )
+                        {
+                            k = getangle(
+                                    wall[wall[j].point2].x-wall[j].x,
+                                    wall[wall[j].point2].y-wall[j].y);
+                            s->ang = ((k<<1) - s->ang)&2047;
+                            s->owner = i;
+                            spawn(i,TRANSPORTERSTAR);
+                            goto BOLT;
+                        }
+                        else
+                        {
+                            setsprite(i,dax,day,daz);
+                            checkhitwall(i,j,s->x,s->y,s->z,s->picnum);
+
+                            if(s->picnum == THROWFLAME)
+                            {
+                                k = spawn(i,EXPLOSION2);
+                                sprite[k].x = dax;
+                                sprite[k].y = day;
+                                sprite[k].xrepeat = sprite[k].yrepeat = 16;
+                                sprite[k].z = daz;
+                                KILLIT(i);
+                            }
+                        }
+                    }
+                    else if( (j&49152) == 16384)
+                    {
+                        // No setsprite back to the old position in 1.1.
+                        if(s->zvel < 0)
+                        {
+                            if( sector[s->sectnum].ceilingstat&1 )
+                                if(sector[s->sectnum].ceilingpal == 0)
+                                    KILLIT(i);
+
+                            checkhitceiling(s->sectnum);
+                        }
+                        else if(s->picnum == THROWFLAME)
+                        {
+                            if(TRAND&1) spawn(i,FIRE);
+                            else spawn(i,FIRE2);
+                        }
+                    }
+
+                    if(s->picnum != SPIT)
+                    {
+                        if(s->picnum == RPG)
+                        {
+                            k = spawn(i,EXPLOSION2);
+                            sprite[k].x = dax;
+                            sprite[k].y = day;
+                            sprite[k].z = daz;
+
+                            if( (j&49152) == 16384)
+                            {
+                                if( s->zvel > 0)
+                                    spawn(i,EXPLOSION2BOT);
+                                else { sprite[k].cstat |= 8; sprite[k].z += (48<<8); }
+                            }
+                        }
+                        else if(s->picnum == SHRINKSPARK)
+                        {
+                            spawn(i,SHRINKEREXPLOSION);
+                            spritesound(SHRINKER_HIT,i);
+                            hitradius(i,2048,0,0,0,0);
+                        }
+                        else if( s->picnum != COOLEXPLOSION1 && s->picnum != THROWFLAME && s->picnum != FIRELASER)
+                        {
+                            k = spawn(i,EXPLOSION2);
+                            sprite[k].xrepeat = sprite[k].yrepeat = s->xrepeat>>1;
+                            if( (j&49152) == 16384)
+                            {
+                                if( s->zvel < 0)
+                                    { sprite[k].cstat |= 8; sprite[k].z += (72<<8); }
+                            }
+                        }
+                        if( s->picnum == RPG )
+                        {
+                            spritesound(RPG_EXPLODE,i);
+                            x = s->extra;
+                            hitradius( i,rpgblastradius, x>>2,x>>1,x-(x>>2),x);
+                        }
+                    }
+                    if(s->picnum != COOLEXPLOSION1) KILLIT(i);
+                }
+                if(s->picnum == COOLEXPLOSION1)
+                {
+                    s->shade++;
+                    if(s->shade >= 40) KILLIT(i);
+                }
+                else if(s->picnum == RPG && sector[s->sectnum].lotag == 2 && rnd(192))
+                    spawn(i,WATERBUBBLE);
+
+                goto BOLT;
+
+
+            case SHOTSPARK1:
+                p = findplayer(s,&x);
+                execute(i,p,x);
+                goto BOLT;
+        }
+        BOLT:
+        i = nexti;
+    }
+}
+#else
 void moveweapons(void)
 {
     short i, j, k, nexti, p, q, tempsect;
@@ -3087,6 +3642,7 @@ void moveweapons(void)
         i = nexti;
     }
 }
+#endif
 
 
 #if DUKE3D_GAMEVER < GAMEVER_14
@@ -3181,7 +3737,12 @@ void movetransports(void)
 
                         k = 0;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        // 1.1 changes water levels 1<<8 closer to the surface.
+                        if( onfloorz && sectlotag == 1 && ps[p].posz > (sector[sect].floorz-(5<<8)) )
+#else
                         if( onfloorz && sectlotag == 1 && ps[p].posz > (sector[sect].floorz-(6<<8)) )
+#endif
                         {
                             k = 1;
                             if(screenpeek == p)
@@ -3191,10 +3752,18 @@ void movetransports(void)
                             }
                             spritesound(DUKE_UNDERWATER,ps[p].i);
                             ps[p].oposz = ps[p].posz =
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                                sector[sprite[OW].sectnum].ceilingz+(6<<8);
+#else
                                 sector[sprite[OW].sectnum].ceilingz+(7<<8);
+#endif
                         }
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        if( onfloorz && sectlotag == 2 && ps[p].posz < (sector[sect].ceilingz+(5<<8)) && sprite[ps[p].i].extra > 0 )
+#else
                         if( onfloorz && sectlotag == 2 && ps[p].posz < (sector[sect].ceilingz+(6<<8)) && sprite[ps[p].i].extra > 0 )
+#endif
                         {
                             k = 1;
                             if(screenpeek == p)
@@ -3205,7 +3774,11 @@ void movetransports(void)
                             spritesound(DUKE_GASP,j);
 
                             ps[p].oposz = ps[p].posz =
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                                sector[sprite[OW].sectnum].floorz-(6<<8);
+#else
                                 sector[sprite[OW].sectnum].floorz-(7<<8);
+#endif
                         }
 
                         if(k == 1)
@@ -3851,6 +4424,16 @@ void moveactors(void)
                     s->xvel+=2;
                 s->ang += (TRAND&3)-6;
                 break;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+            case FEM1:
+                // 1.1's tip timer; the tipping is in checksectors (G11-S15).
+                if(t[0])
+                {
+                    t[0]++;
+                    if(t[0] > 64) t[0] = 0;
+                }
+                break;
+#endif
             case QUEBALL:
             case STRIPEBALL:
                 if(s->xvel)
@@ -3866,7 +4449,11 @@ void moveactors(void)
                     j = clipmove(&s->x,&s->y,&s->z,&s->sectnum,
                         (((s->xvel*(sintable[(s->ang+512)&2047]))>>14)*TICSPERFRAME)<<11,
                         (((s->xvel*(sintable[s->ang&2047]))>>14)*TICSPERFRAME)<<11,
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        6L,(4<<8),(4<<8),CLIPMASK1);
+#else
                         24L,(4<<8),(4<<8),CLIPMASK1);
+#endif
 
                     if(j&49152)
                     {
@@ -3987,9 +4574,11 @@ void moveactors(void)
 
                 getglobalz(i);
 
+#if DUKE3D_GAMEVER >= GAMEVER_13D
                 if (sector[s->sectnum].ceilingstat&1)
                    s->shade += (sector[s->sectnum].ceilingshade-s->shade)>>1;
                 else s->shade += (sector[s->sectnum].floorshade-s->shade)>>1;
+#endif
 
                 if( s->z < sector[sect].ceilingz+(32<<8) )
                     s->z = sector[sect].ceilingz+(32<<8);
@@ -4029,7 +4618,9 @@ void moveactors(void)
                             RANDOMSCRAP;
                         spritesound(LASERTRIP_EXPLODE,i);
                         spawn(i,PIGCOP);
+#if DUKE3D_GAMEVER >= GAMEVER_13D
                         ps[myconnectindex].actors_killed++;
+#endif
                         KILLIT(i);
                     }
                     goto BOLT;
@@ -4180,6 +4771,315 @@ void moveactors(void)
 
                 goto BOLT;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+            // 1.1's slime (G11-A26). Firing shakes it off the player, it can't
+            // be hit while on him, it dies by shrinking, and it keeps its
+            // victim in owner.
+            case GREENSLIME:
+            case GREENSLIME+1:
+            case GREENSLIME+2:
+            case GREENSLIME+3:
+            case GREENSLIME+4:
+            case GREENSLIME+5:
+            case GREENSLIME+6:
+            case GREENSLIME+7:
+
+                t[1]+=128;
+
+                if(sector[sect].floorstat&1)
+                    KILLIT(i);
+
+                p = findplayer(s,&x);
+
+                if(t[0] == -4)
+                    s->cstat = 0;
+                else s->cstat = 257;
+
+                if(t[0] == -4) //On the player
+                {
+                    setsprite(i,s->x,s->y,s->z);
+
+                    s->ang = ps[p].ang;
+
+                    if( sync[p].bits&4 )
+                    {
+                        ps[p].kickback_pic = 0;
+                        s->xvel = 128;
+                        s->zvel = ((100-ps[p].horiz)<<4)-512;
+                        t[0] = 0;
+                        ps[p].somethingonplayer = -1;
+                    }
+
+                    s->z = ps[p].posz+ps[p].pyoff-t[2]+(8<<8);
+
+                    s->z += (100-ps[p].horiz)<<4;
+
+                    if( t[2] > 512)
+                        t[2] -= 128;
+
+                    if( t[2] < 348)
+                        t[2] += 128;
+
+                    if(t[3]>0)
+                    {
+                        short frames[] = {5,5,6,6,7,7,6,5};
+
+                        s->picnum = GREENSLIME+frames[t[3]];
+
+                        if( t[3] == 5 )
+                        {
+                            sprite[ps[p].i].extra -= 5;
+                            spritesound(SLIM_ATTACK,i);
+                        }
+
+                        if(t[3] < 7) t[3]++;
+                        else t[3] = 0;
+
+                    }
+                    else
+                    {
+                        s->picnum = GREENSLIME+5;
+                        if(rnd(32))
+                            t[3] = 1;
+                    }
+
+                    s->xrepeat = 20+(sintable[t[1]&2047]>>13);
+                    s->yrepeat = 15+(sintable[t[1]&2047]>>13);
+
+                    s->x = ps[p].posx + (sintable[(ps[p].ang+512)&2047]>>7);
+                    s->y = ps[p].posy + (sintable[ps[p].ang&2047]>>7);
+
+                    goto BOLT;
+                }
+
+                if(s->xvel < 64 && x < 768)
+                {
+                    if(ps[p].somethingonplayer == -1)
+                    {
+                        ps[p].somethingonplayer = i;
+                        if(t[0] == 3 || t[0] == 2) //Falling downward
+                            t[2] = (12<<8);
+                        else t[2] = -(13<<8); //Climbing up duke
+                        t[0] = -4;
+                    }
+                }
+
+                if(t[0] == -3) //Dying: shrinks, spilling gibs each tic
+                {
+                    if(s->xrepeat > 4) s->xrepeat -= 4;
+                    if(s->yrepeat <= 4) KILLIT(i);
+                    s->yrepeat -= 4;
+
+                    for(x=0;x<8;x++)
+                    {
+                        {
+                            // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                            int32_t r_zv = -(TRAND&4095)-(s->zvel>>2);
+                            int32_t r_vel = (TRAND&63)+64;
+                            int32_t r_ang = TRAND&2047;
+                            int32_t r_pn = SCRAP3+(TRAND&3);
+                            j = EGS(sect,s->x,s->y,s->z-(8<<8),r_pn,-8,48,48,r_ang,r_vel,r_zv,i,5);
+                        }
+                        sprite[j].pal = 8;
+                    }
+                    goto BOLT;
+                }
+
+                IFHIT
+                {
+                    if(s->extra < 0)
+                    {
+                        spritesound(SLIM_DYING,i);
+                        ps[p].actors_killed ++;
+                        t[0] = -3;
+                        goto BOLT;
+                    }
+                    spritesound(148,i); // 1.1's SLIM_PAIN
+                }
+
+                if(t[0] == -1) //Shrinking down
+                {
+                    makeitfall(i);
+
+                    s->cstat &= 65535-8;
+                    s->picnum = GREENSLIME+4;
+
+                    if(s->yrepeat > 62)
+                        guts(s,JIBS6,5,-1);
+
+                    if(s->xrepeat > 32) s->xrepeat -= TRAND&7;
+                    if(s->yrepeat > 16) s->yrepeat -= TRAND&7;
+                    else
+                    {
+                        s->xrepeat = 40;
+                        s->yrepeat = 16;
+                        s->owner = -1;
+                        t[0] = 0;
+                    }
+
+                    goto BOLT;
+                }
+
+                if(t[0] == -2) //On top of somebody
+                {
+                    makeitfall(i);
+                    sprite[s->owner].xvel = 0;
+
+                    l = sprite[s->owner].ang;
+
+                    s->z = sprite[s->owner].z;
+                    s->x = sprite[s->owner].x+(sintable[(l+512)&2047]>>11);
+                    s->y = sprite[s->owner].y+(sintable[l&2047]>>11);
+
+                    s->picnum =  GREENSLIME+2+(global_random&1);
+
+                    if(s->yrepeat < 64) s->yrepeat+=2;
+                    else
+                    {
+                        if(s->xrepeat < 32) s->xrepeat += 4;
+                        else
+                        {
+                            t[0] = -1;
+                            x = ldist(s,&sprite[s->owner]);
+                            if(x < 768) deletesprite(s->owner);
+                        }
+                    }
+
+                    goto BOLT;
+                }
+
+                //Check randomly to see of there is an actor near
+                if(rnd(32))
+                {
+                    j = headspritesect[sect];
+                    while(j>=0)
+                    {
+                        switch(sprite[j].picnum)
+                        {
+                            case DUMMYDUKE:
+                            case LIZTROOP:
+                            case 1820: // JELLYFISH in 1.1's DEFS.CON
+                            case PIGCOP:
+                            case LIZMAN:
+                                if( ldist(s,&sprite[j]) < 768 && (klabs(s->z-sprite[j].z)<8192) ) //Gulp them
+                                {
+                                    s->owner = j;
+                                    t[0] = -2;
+                                    t[1] = 0;
+                                    goto BOLT;
+                                }
+                        }
+
+                        j = nextspritesect[j];
+                    }
+                }
+
+                //Moving on the ground or ceiling
+
+                if(t[0] == 0 || t[0] == 2)
+                {
+                    s->picnum = GREENSLIME;
+
+                    if( (TRAND&255) == 0 )
+                        spritesound(SLIM_ROAM,i);
+
+                    if(t[0]==2)
+                    {
+                        s->zvel = 0;
+                        s->cstat &= (65535-8);
+
+                        if( (sector[sect].ceilingz+6144) < s->z)
+                        {
+                            s->z += 2048;
+                            t[0] = 3;
+                            goto BOLT;
+                        }
+                    }
+                    else
+                    {
+                        s->cstat |= 8;
+                        makeitfall(i);
+                    }
+
+                    // 1.1 moves the slime with its water sector's lotag cleared.
+                    k = 0;
+                    if(sector[s->sectnum].lotag == 1)
+                    {
+                        sector[s->sectnum].lotag = 0;
+                        k = 1;
+                    }
+                    ssp(i,CLIPMASK0);
+                    if(k) sector[s->sectnum].lotag = 1;
+
+                    if(s->xvel > 96)
+                    {
+                        s->xvel -= 2;
+                        goto BOLT;
+                    }
+                    else
+                    {
+                        if(s->xvel < 32) s->xvel += 4;
+                        s->xvel = 64 - (sintable[(t[1]+512)&2047]>>9);
+
+                        s->ang += getincangle(s->ang,
+                               getangle(ps[p].posx-s->x,ps[p].posy-s->y))>>3;
+                    }
+
+                    s->xrepeat = 36 + (sintable[(t[1]+512)&2047]>>11);
+                    s->yrepeat = 16 + (sintable[t[1]&2047]>>13);
+
+                    if(rnd(4) && (sector[sect].ceilingstat&1) == 0 &&
+                        klabs(sector[sect].floorz-sector[sect].ceilingz)
+                            < (192<<8) )
+                            {
+                                s->zvel = 0;
+                                t[0]++;
+                            }
+
+                }
+
+                if(t[0]==1)
+                {
+                    s->picnum = GREENSLIME;
+                    if(s->yrepeat < 40) s->yrepeat+=8;
+                    if(s->xrepeat > 8) s->xrepeat-=4;
+                    if(s->zvel > -(2048+1024))
+                        s->zvel -= 348;
+                    s->z += s->zvel;
+                    if(s->z < sector[sect].ceilingz+4096)
+                    {
+                        s->z = sector[sect].ceilingz+4096;
+                        s->xvel = 0;
+                        t[0] = 2;
+                    }
+                }
+
+                if(t[0]==3)
+                {
+                    s->picnum = GREENSLIME+1;
+
+                    makeitfall(i);
+
+                    if(s->z > sector[sect].floorz-(8<<8))
+                    {
+                        s->yrepeat-=4;
+                        s->xrepeat+=2;
+                    }
+                    else
+                    {
+                        if(s->yrepeat < (40-4)) s->yrepeat+=8;
+                        if(s->xrepeat > 8) s->xrepeat-=4;
+                    }
+
+                    if(s->z > sector[sect].floorz-2048)
+                    {
+                        s->z = sector[sect].floorz-2048;
+                        t[0] = 0;
+                        s->xvel = 0;
+                    }
+                }
+                goto BOLT;
+#else
             case GREENSLIME:
             case GREENSLIME+1:
             case GREENSLIME+2:
@@ -4611,6 +5511,7 @@ void moveactors(void)
                     }
                 }
                 goto BOLT;
+#endif
 
             case BOUNCEMINE:
             case MORTER:
@@ -4782,11 +5683,17 @@ void moveactors(void)
                         }
                     }
                 }
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                else if(s->picnum == HEAVYHBOMB && x < 512 && t[0] > 7 && s->xvel == 0)
+#else
                 else if(s->picnum == HEAVYHBOMB && x < 788 && t[0] > 7 && s->xvel == 0)
+#endif
                     if( cansee(s->x,s->y,s->z-(8<<8),s->sectnum,ps[p].posx,ps[p].posy,ps[p].posz,ps[p].cursectnum) )
                         if(ps[p].ammo_amount[HANDBOMB_WEAPON] < max_ammo_amount[HANDBOMB_WEAPON] )
                 {
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    // 1.1 keeps no record of the bombs taken.
+#elif DUKE3D_GAMEVER < GAMEVER_14
                     // 1.3D records which bomb sprite was taken, from any owner.
                     if(ud.coop >= 1)
                     {
@@ -4824,6 +5731,13 @@ void moveactors(void)
                         ps[p].pals_time = 32;
                     }
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    // 1.1 just hides a respawning bomb, with no marker.
+                    if( !( hittype[s->owner].picnum == HEAVYHBOMB && ud.respawn_items && sprite[s->owner].picnum != APLAYER ) )
+                        KILLIT(i);
+                    t[2] = respawnitemtime;
+                    s->cstat = (short) 32768;
+#else
 #if DUKE3D_GAMEVER < GAMEVER_14
                     if( !( hittype[s->owner].picnum == HEAVYHBOMB && ud.respawn_items && sprite[s->owner].picnum != APLAYER ) )
                     {
@@ -4845,9 +5759,15 @@ void moveactors(void)
                         spawn(i,RESPAWNMARKERRED);
                         s->cstat = (short) 32768;
                     }
+#endif
                 }
 
                 if(t[0] < 8) t[0]++;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1's pipe bombs pulse.
+                s->shade = (sintable[t[1]&2047]>>11)-8;
+                t[1] += 64;
+#endif
                 goto BOLT;
 
             case REACTORBURNT:
@@ -4900,6 +5820,7 @@ void moveactors(void)
 
                 if( x < 4096 )
                 {
+#if DUKE3D_GAMEVER >= GAMEVER_13D
                     if( (TRAND&255) < 16 )
                     {
                         if(Sound[DUKE_LONGTERM_PAIN].num < 1)
@@ -4913,6 +5834,7 @@ void moveactors(void)
                         ps[p].pals[1] = 0;
                         ps[p].pals[2] = 0;
                     }
+#endif
                     t[0] += 128;
                     if( t[3] == 0 )
                         t[3] = 1;
@@ -4935,6 +5857,23 @@ void moveactors(void)
                                        impact_damage<<2,
                                        impact_damage<<2,
                                        impact_damage<<2 );
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                            // 1.1 still sets off the flashing effectors.
+                            j = headspritestat[3];
+                            while(j>=0)
+                            {
+                                if( sprite[j].lotag  == 3 )
+                                    hittype[j].temp_data[4]=1;
+                                else if(sprite[j].lotag == 12)
+                                {
+                                    hittype[j].temp_data[4] = 1;
+                                    sprite[j].lotag = 3;
+                                    sprite[j].owner = 0;
+                                    hittype[j].temp_data[0] = s->shade;
+                                }
+                                j = nextspritestat[j];
+                            }
+#endif
 /*
                             j = headspritestat[3];
                             while(j>=0)
@@ -5004,6 +5943,7 @@ void moveactors(void)
                 if( t[0] == 0 )
                 {
                     t[1]+=8;
+#if DUKE3D_GAMEVER >= GAMEVER_13D
                     if(camerashitable)
                     {
                         IFHIT
@@ -5014,6 +5954,7 @@ void moveactors(void)
                             goto BOLT;
                         }
                     }
+#endif
 
                     if(s->hitag > 0)
                     {
@@ -5168,8 +6109,10 @@ void moveexplosions(void)  // STATNUM 5
                 t[0]++;
                 if(t[0] == 1 )
                 {
+#if DUKE3D_GAMEVER >= GAMEVER_13D
                     if(sector[sect].lotag != 1 && sector[sect].lotag != 2)
                         KILLIT(i);
+#endif
 /*                    else
                     {
                         l = getflorzofslope(sect,s->x,s->y)-s->z;
@@ -5641,6 +6584,9 @@ void moveexplosions(void)  // STATNUM 5
                 }
                 else
                 {
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    // 1.1's scrap spawns nothing when it lands.
+#else
 #if DUKE3D_GAMEVER < GAMEVER_14
                     if(s->picnum == SCRAP1 && s->yvel >= 0)
 #else
@@ -5652,6 +6598,7 @@ void moveexplosions(void)  // STATNUM 5
                         getglobalz(j);
                         sprite[j].hitag = sprite[j].lotag = 0;
                     }
+#endif
                     KILLIT(i);
                 }
                 goto BOLT;
@@ -5797,11 +6744,16 @@ void moveeffectors(void)   //STATNUM 3
                                 ps[p].posx,ps[p].posy,(q*l),
                                 &m,&x);
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                            ps[p].oposx = ps[p].posx = m;
+                            ps[p].oposy = ps[p].posy = x;
+#else
                             ps[p].bobposx += m-ps[p].posx;
                             ps[p].bobposy += x-ps[p].posy;
 
                             ps[p].posx = m;
                             ps[p].posy = x;
+#endif
 
 #if DUKE3D_GAMEVER >= GAMEVER_14
                             if(sprite[ps[p].i].extra <= 0)
@@ -5960,7 +6912,11 @@ void moveeffectors(void)   //STATNUM 3
                             if( Sound[SUBWAY].num == 0 )
                                 spritesound(SUBWAY,i);
                         }
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        else if( rnd(32) )
+#else
                         else if( rnd(8) )
+#endif
                         {
 #else
                     if(s->xvel == sc->extra )
@@ -5990,6 +6946,51 @@ void moveeffectors(void)   //STATNUM 3
 #else
                         stopsound(hittype[i].lastvx);
 #endif
+
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    // 1.1: no crushing, and nothing rides unless the SE's own
+                    // extra is set (G11-A28).
+                    m = (s->xvel*sintable[(s->ang+512)&2047])>>14;
+                    x = (s->xvel*sintable[s->ang&2047])>>14;
+
+                    for(p = connecthead;p >= 0;p=connectpoint2[p])
+                        if(s->sectnum == sprite[ps[p].i].sectnum && s->extra != 0)
+                    {
+                        rotatepoint(s->x,s->y,ps[p].posx,ps[p].posy,q,&ps[p].posx,&ps[p].posy);
+
+                        ps[p].posx += m;
+                        ps[p].posy += x;
+
+                        ps[p].oposx = ps[p].posx;
+                        ps[p].oposy = ps[p].posy;
+
+                        ps[p].ang += q;
+
+                        setsprite(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz+PHEIGHT);
+                    }
+
+                    j = headspritesect[s->sectnum];
+                    while(j >= 0)
+                    {
+                        if (sprite[j].picnum != SECTOREFFECTOR && sprite[j].picnum != LOCATORS && sprite[j].picnum != APLAYER && s->extra != 0)
+                        {
+                            rotatepoint(s->x,s->y,
+                                sprite[j].x,sprite[j].y,q,
+                                &sprite[j].x,&sprite[j].y);
+
+                            sprite[j].x+= m;
+                            sprite[j].y+= x;
+
+                            sprite[j].ang+=q;
+
+                            setsprite(j,sprite[j].x,sprite[j].y,sprite[j].z);
+                        }
+                        j = nextspritesect[j];
+                    }
+
+                    ms(i);
+                    setsprite(i,s->x,s->y,s->z);
+#else
 
                     if( (sc->floorz-sc->ceilingz) < (108<<8) )
                     {
@@ -6127,6 +7128,7 @@ void moveeffectors(void)   //STATNUM 3
                             j = l;
                         }
                     }
+#endif
                 }
 
                 break;
@@ -6168,7 +7170,9 @@ void moveeffectors(void)   //STATNUM 3
                             s->owner = -1;
                             s->ang += 1024;
                             t[4] = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_13D
                             operateforcefields(i,s->hitag);
+#endif
 
                             j = headspritesect[s->sectnum];
                             while(j >= 0)
@@ -6190,6 +7194,32 @@ void moveeffectors(void)   //STATNUM 3
                     l = (s->xvel*sintable[(s->ang+512)&2047])>>14;
                     x = (s->xvel*sintable[s->ang&2047])>>14;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    // 1.1: no crushing; carries the players standing in the sector.
+                    for(p = connecthead;p >= 0;p = connectpoint2[p])
+                        if( ps[p].cursectnum == s->sectnum )
+                    {
+                        ps[p].posx += l;
+                        ps[p].posy += x;
+
+                        ps[p].oposx = ps[p].posx;
+                        ps[p].oposy = ps[p].posy;
+                    }
+
+                    j = headspritesect[s->sectnum];
+                    while(j >= 0)
+                    {
+                        if(sprite[j].picnum != SECTOREFFECTOR)
+                        {
+                            sprite[j].x += l;
+                            sprite[j].y += x;
+                        }
+                        j = nextspritesect[j];
+                    }
+
+                    ms(i);
+                    setsprite(i,s->x,s->y,s->z);
+#else
                     if( (sc->floorz-sc->ceilingz) < (108<<8) )
                         if(ud.clipping == 0)
                             for(p=connecthead;p>=0;p=connectpoint2[p])
@@ -6303,6 +7333,7 @@ void moveeffectors(void)   //STATNUM 3
                             j = l;
                         }
                     }
+#endif
                 }
 
                 break;
@@ -6351,8 +7382,13 @@ void moveeffectors(void)   //STATNUM 3
                             ps[p].posx += m;
                             ps[p].posy += x;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                            ps[p].oposx = ps[p].posx;
+                            ps[p].oposy = ps[p].posy;
+#else
                             ps[p].bobposx += m;
                             ps[p].bobposy += x;
+#endif
                         }
 
                     j = headspritesect[s->sectnum];
@@ -6919,6 +7955,105 @@ void moveeffectors(void)   //STATNUM 3
 
                 break;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+            case 17:
+                // 1.1's elevator (G11-A31): it moves only statnum < 3 sprites
+                // with it, and on arrival moves actors and standables, then the
+                // players standing in it, to the other floor.
+                q = t[0]*(SP<<2);
+
+                sc->ceilingz += q;
+                sc->floorz += q;
+
+                j = headspritesect[s->sectnum];
+                while(j >= 0)
+                {
+                    if(sprite[j].statnum == 10)
+                    {
+                        p = sprite[j].yvel;
+                        ps[p].posz += q;
+                        ps[p].oposz += q;
+                    }
+                    if(sprite[j].statnum < 3)
+                    {
+                        sprite[j].z += q;
+                        hittype[j].floorz += q;
+                    }
+                    j = nextspritesect[j];
+                }
+
+                if(t[0]) //If in motion
+                {
+                    if( klabs(sc->floorz-t[2]) <= SP)
+                    {
+                        activatewarpelevators(i,0);
+                        break;
+                    }
+
+                    if(t[0]==-1)
+                    {
+                        if( sc->floorz > t[3] )
+                            break;
+                    }
+                    else if( sc->ceilingz < t[4] ) break;
+
+                    if( t[1] == 0 ) break;
+                    t[1] = 0;
+
+                    // As in 1.1, the next sprite is read after setsprite, so the
+                    // walk follows a moved sprite into its new sector.
+                    k = headspritesect[s->sectnum];
+                    while(k >= 0)
+                    {
+                        if(sprite[k].statnum == 1 || sprite[k].statnum == 6)
+                        {
+                            j = headspritestat[3];
+                            while(j >= 0)
+                            {
+                                if( sprite[j].lotag == 17 && (sc->hitag-t[0]) == sector[sprite[j].sectnum].hitag && sh == sprite[j].hitag )
+                                {
+                                    sprite[k].x += sprite[j].x-s->x;
+                                    sprite[k].y += sprite[j].y-s->y;
+                                    // 1.1 reads sector[j], j being the SE's sprite
+                                    // number. Past the sector array it uses the
+                                    // destination floor.
+                                    if(j < MAXSECTORS)
+                                        sprite[k].z = sector[j].floorz;
+                                    else sprite[k].z = sector[sprite[j].sectnum].floorz;
+                                    setsprite(k,sprite[k].x,sprite[k].y,sprite[k].z);
+                                    break;
+                                }
+                                j = nextspritestat[j];
+                            }
+                        }
+                        k = nextspritesect[k];
+                    }
+
+                    for(p=connecthead;p>=0;p=connectpoint2[p])
+                        if(ps[p].cursectnum == s->sectnum)
+                    {
+                        j = headspritestat[3];
+                        while(j >= 0)
+                        {
+                            if( sprite[j].lotag == 17 && (sc->hitag-t[0]) == sector[sprite[j].sectnum].hitag && sh == sprite[j].hitag )
+                            {
+                                ps[p].posx += sprite[j].x-s->x;
+                                ps[p].posy += sprite[j].y-s->y;
+                                ps[p].posz = sector[sprite[j].sectnum].floorz-PHEIGHT;
+                                updatesectorz(sprite[j].x,sprite[j].y,sprite[j].z,&ps[p].cursectnum);
+                                setsprite(ps[p].i,ps[p].posx,ps[p].posy,ps[p].posz+PHEIGHT);
+                                ps[p].oposx = ps[p].posx;
+                                ps[p].oposy = ps[p].posy;
+                                ps[p].oposz = ps[p].posz;
+                                break;
+                            }
+                            j = nextspritestat[j];
+                        }
+                    }
+                }
+                break;
+#endif
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case 17:
 
                 q = t[0]*(SP<<2);
@@ -7042,6 +8177,7 @@ void moveeffectors(void)   //STATNUM 3
                     }
                 }
                 break;
+#endif
 
 #if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D has no such effector
             case 18:
@@ -7361,8 +8497,13 @@ void moveeffectors(void)   //STATNUM 3
                         case 6:
                             if(sprite[j].picnum == TRIPBOMB) break;
                         case 1:
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                            // 1.1 carries no statnum 0 sprites and has no cstat&16 test.
+                            if( !(sprite[j].picnum >= CRANE && sprite[j].picnum <= (CRANE+3)) )
+#else
                         case 0:
                             if( !(sprite[j].picnum >= CRANE && sprite[j].picnum <= (CRANE+3)) && !(sprite[j].cstat&16) )
+#endif
                             {
                                 if( sprite[j].z > (hittype[j].floorz-(16<<8)) )
                                 {
@@ -7444,7 +8585,9 @@ void moveeffectors(void)   //STATNUM 3
 
                 p = myconnectindex;
                 if(ps[p].cursectnum == s->sectnum && ps[p].on_ground)
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    if( klabs(ps[p].posz-hittype[ps[p].i].floorz) < PHEIGHT+(8<<8) )
+#elif DUKE3D_GAMEVER < GAMEVER_14
                     if( klabs(ps[p].posz-ps[p].truefz) < PHEIGHT+(8<<8) )
 #else
                     if( klabs(ps[p].posz-ps[p].truefz) < PHEIGHT+(9<<8) )
@@ -8069,7 +9212,11 @@ void moveeffectors(void)   //STATNUM 3
                 if( t[0] )
                 {
                     if( t[0] == 1 )
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        shoot(i,SHRINKER);
+#else
                         shoot(i,sc->extra);
+#endif
                     else if( t[0] == 26*5 )
                         t[0] = 0;
                     t[0]++;

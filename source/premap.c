@@ -477,6 +477,10 @@ void resetplayerstats(short snum)
     p->weapon_sway      = 0;
 //    p->select_dir       = 0;
     p->extra_extra8     = 0;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    p->spacesuit_used   = 0;
+    p->burn_time        = 0;
+#endif
     p->show_empty_weapon= 0;
     p->dummyplayersprite=-1;
     p->crack_time       = 0;
@@ -611,6 +615,10 @@ void resetinventory(short snum)
     p->holoduke_amount =    0;
     p->firstaid_amount = 0;
     p->steroids_amount = 0;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    p->spacesuit_amount = 0;
+    p->spacesuit_on = 0;
+#endif
     p->inven_icon = 0;
 }
 

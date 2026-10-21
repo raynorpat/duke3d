@@ -166,6 +166,8 @@ struct player_struct;
 #define BODYSUIT 58
 #define DUMMYDUKE 1425
 #define BIGDUMMYDUKE 1430
+#define SPACESUIT_ICON 2466
+#define THROWFLAME 2500
 #endif
 
 #include "build/engine.h"
@@ -286,8 +288,15 @@ struct player_struct;
 #define SHRINKER_WEAPON      6
 #define DEVISTATOR_WEAPON    7
 #define TRIPBOMB_WEAPON      8
+#if DUKE3D_GAMEVER < GAMEVER_13D
+// 1.1's DEFS.CON numbering: 7 is the flamethrower and 9 the remote. 1.1 has
+//  no freezer, so it gets slot 10, which nothing gives.
+#define HANDREMOTE_WEAPON    9
+#define FREEZE_WEAPON        10
+#else
 #define FREEZE_WEAPON        9
 #define HANDREMOTE_WEAPON    10
+#endif
 #define GROW_WEAPON          11
 
 #define T1  hittype[i].temp_data[0]
@@ -479,7 +488,8 @@ struct player_struct
     char max_actors_killed,actors_killed,return_to_center;
 #if DUKE3D_GAMEVER < GAMEVER_13D
     short spacesuit_amount; // 1.1's inventory item 5, the space suit
-    char spacesuit_used;
+    char spacesuit_used, spacesuit_on;
+    int32_t burn_time; // set when a THROWFLAME hits the player
 #endif
 };
 

@@ -1567,7 +1567,12 @@ void displayinventory(struct player_struct *p)
     n |= ( p->holoduke_amount > 0)<<2; if(n&4) j++;
     n |= (p->firstaid_amount > 0); if(n&1) j++;
     n |= (p->heat_amount > 0)<<4; if(n&16) j++;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    n |= (p->spacesuit_amount > 0)<<6; if(n&64) j++;
+    n |= (p->boot_amount > 0)<<7; if(n&128) j++;
+#else
     n |= (p->boot_amount > 0)<<6; if(n&64) j++;
+#endif
 
     xoff = 160-(j*11);
 
@@ -1602,8 +1607,15 @@ void displayinventory(struct player_struct *p)
                 rotatesprite(xoff<<16,y<<16,65536L,0,HEAT_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
                 case  32:
                 rotatesprite(xoff<<16,y<<16,65536L,0,AIRTANK_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                case 64:
+                rotatesprite(xoff<<16,y<<16,65536L,0,SPACESUIT_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
+                case 128:
+                rotatesprite(xoff<<16,y<<16,65536L,0,BOOT_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
+#else
                 case 64:
                 rotatesprite(xoff<<16,(y-1)<<16,65536L,0,BOOT_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
+#endif
             }
 
             xoff += 22;
@@ -1732,7 +1744,12 @@ void coolgaugetext(short snum)
                 case 4: i = JETPACK_ICON; break;
                 case 5: i = HEAT_ICON; break;
                 case 6: i = AIRTANK_ICON; break;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                case 7: i = SPACESUIT_ICON; break;
+                case 8: i = BOOT_ICON; break;
+#else
                 case 7: i = BOOT_ICON; break;
+#endif
                 default: i = -1;
             }
             if (i >= 0) rotatesprite((231-o)<<16,(200-21)<<16,65536L,0,i,0,0,10+16+permbit,0,0,xdim-1,ydim-1);
@@ -1748,7 +1765,12 @@ void coolgaugetext(short snum)
                 case 4: i = ((p->jetpack_amount+15)>>4); j = p->jetpack_on; break;
                 case 5: i = p->heat_amount/12; j = p->heat_on; break;
                 case 6: i = ((p->scuba_amount+63)>>6); break;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                case 7: i = ((p->spacesuit_amount+15)>>4); break;
+                case 8: i = (p->boot_amount>>1); break;
+#else
                 case 7: i = (p->boot_amount>>1); break;
+#endif
             }
             invennum(284-30-o,200-6,(char)i,0,10+permbit);
             if (j > 0) minitext(288-30-o,180,"ON",0,10+16+permbit);
@@ -1876,7 +1898,12 @@ void coolgaugetext(short snum)
                     case 4: i = JETPACK_ICON; break;
                     case 5: i = HEAT_ICON; break;
                     case 6: i = AIRTANK_ICON; break;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    case 7: i = SPACESUIT_ICON; break;
+                    case 8: i = BOOT_ICON; break;
+#else
                     case 7: i = BOOT_ICON; break;
+#endif
                 }
                 rotatesprite((231-o)<<16,(200-21)<<16,65536L,0,i,0,0,10+16+permbit,0,0,xdim-1,ydim-1);
                 minitext(292-30-o,190,"%",6,10+16+permbit);
@@ -1904,7 +1931,12 @@ void coolgaugetext(short snum)
                     case 4: i = ((p->jetpack_amount+15)>>4); break;
                     case 5: i = p->heat_amount/12; break;
                     case 6: i = ((p->scuba_amount+63)>>6); break;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    case 7: i = ((p->spacesuit_amount+15)>>4); break;
+                    case 8: i = (p->boot_amount>>1); break;
+#else
                     case 7: i = (p->boot_amount>>1); break;
+#endif
                 }
                 invennum(284-30-o,200-6,(char)i,0,10+permbit);
             }
