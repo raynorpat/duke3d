@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include "duke3d.h"
 #include "glext.h"
+#include "displaymode.h"
 #if PLATFORM_WIN32
 #include <direct.h>
 #define mkdir(d, m) _mkdir(d)
@@ -150,7 +151,8 @@ int main(void)
         fputs("[Screen Setup]\nRenderer = 7\nGLTextureMipLevel = 99\n"
               "ScreenshotFormat = \"JPG\"\nGLDrawPath = \"Shader\"\n"
               "GLInternalWidth = -5\nGLInternalHeight = 99999\n"
-              "GLContrast = \"9.5\"\nGLSaturation = \"-1\"\n", f);
+              "GLContrast = \"9.5\"\nGLSaturation = \"-1\"\n"
+              "DisplayMode = \"Exclusive\"\nVSync = 0\n", f);
         fclose(f);
         CONFIG_GetSetupFilename();
         CONFIG_ReadSetup();
@@ -162,6 +164,8 @@ int main(void)
         check("cfg GLInternalHeight 99999", GLInternalHeight, 4320);
         check("cfg GLContrast 9.5", GLContrast == GL_CONTRAST_MAX, 1);
         check("cfg GLSaturation -1", GLSaturation == GL_SATURATION_MIN, 1);
+        check("cfg DisplayMode Exclusive", DisplayMode, DISPLAY_EXCLUSIVE);
+        check("cfg VSync 0", VSync, 0);
         CONFIG_WriteSetup();
         f = fopen(cfg, "r");
         n = fread(text, 1, sizeof(text) - 1, f);
@@ -175,11 +179,14 @@ int main(void)
         check("cfg writes GLInternalHeight 4320", strstr(text, "GLInternalHeight = 4320") != NULL, 1);
         check("cfg writes GLContrast 1.5", strstr(text, "GLContrast = \"1.5\"") != NULL, 1);
         check("cfg writes GLSaturation 0", strstr(text, "GLSaturation = \"0\"") != NULL, 1);
+        check("cfg writes DisplayMode exclusive", strstr(text, "DisplayMode = \"exclusive\"") != NULL, 1);
+        check("cfg writes VSync 0", strstr(text, "VSync = 0") != NULL, 1);
 
         f = fopen(cfg, "w");
         fputs("[Screen Setup]\nRenderer = -2\nGLTextureMipLevel = -3\n"
               "GLDrawPath = \"bogus\"\nGLInternalWidth = 320\n"
-              "GLContrast = \"0.75\"\nGLSaturation = \"1.25x\"\n", f);
+              "GLContrast = \"0.75\"\nGLSaturation = \"1.25x\"\n"
+              "DisplayMode = \"bogus\"\nVSync = 7\n", f);
         fclose(f);
         CONFIG_ReadSetup();
         check("cfg Renderer -2", RendererSetting, 0);
@@ -188,6 +195,8 @@ int main(void)
         check("cfg GLInternalWidth 320", GLInternalWidth, 320);
         check("cfg GLContrast 0.75", GLContrast == 0.75, 1);
         check("cfg GLSaturation 1.25x (not a number)", GLSaturation == 1.0, 1);
+        check("cfg DisplayMode bogus", DisplayMode, DISPLAY_BORDERLESS);
+        check("cfg VSync 7", VSync, 1);
         CONFIG_WriteSetup();
         CONFIG_ReadSetup();
         check("cfg GLContrast 0.75 round trip", GLContrast == 0.75, 1);
@@ -200,6 +209,8 @@ int main(void)
         fclose(f);
         CONFIG_ReadSetup();
         check("cfg GLContrast 1.25 unquoted", GLContrast == 1.0, 1);
+        check("cfg DisplayMode unset: borderless", DisplayMode, DISPLAY_BORDERLESS);
+        check("cfg VSync unset: on", VSync, 1);
         check("cfg GLSaturation 2 unquoted", GLSaturation == 1.0, 1);
         CONFIG_WriteSetup();
         f = fopen(cfg, "r");
@@ -208,6 +219,8 @@ int main(void)
         text[n] = 0;
         check("cfg writes GLContrast quoted over a number", strstr(text, "GLContrast = \"1\"") != NULL, 1);
         check("cfg writes GLSaturation quoted over a number", strstr(text, "GLSaturation = \"1\"") != NULL, 1);
+        check("cfg writes DisplayMode borderless", strstr(text, "DisplayMode = \"borderless\"") != NULL, 1);
+        check("cfg writes VSync 1", strstr(text, "VSync = 1") != NULL, 1);
         CONFIG_ReadSetup();
         check("cfg GLContrast after", GLContrast == 1.0, 1);
         remove(cfg);

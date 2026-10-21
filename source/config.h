@@ -49,6 +49,7 @@ extern int32 GLTextureMipLevel;
 extern int32 GLDrawPath;
 extern int32 GLInternalWidth, GLInternalHeight;
 extern double GLContrast, GLSaturation;
+extern int32 DisplayMode, VSync;
 extern char ScreenshotFormat[4];
 extern int32 ScreenWidth;
 extern int32 ScreenHeight;

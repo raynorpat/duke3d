@@ -30,6 +30,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "savegame.h"
 #include "animlib.h"
 #include "glext.h"
+#include "displaymode.h"
 
 /* this should be a proper prototype included from a header file */
 #if PLATFORM_UNIX
@@ -2828,7 +2829,8 @@ void menus(void)
 
         case 710:
             // VIDEO: the look of renderer 3's GL 2.1 shader path (greyed
-            // elsewhere). Rows from y 50, 16 apart, as SOUNDS: room for more.
+            // elsewhere), then the display mode and vsync, which change at
+            // once. Rows from y 50, 16 apart, as SOUNDS.
             {
                 int32 shader = 0;
                 short was;
@@ -2840,8 +2842,18 @@ void menus(void)
                 menutext(320>>1,24,0,0,"VIDEO");
                 onbar = ( probey == 0 || probey == 1 );
 
-                x = probe(c,50,16,2);
+                x = probe(c,50,16,4);
                 if(x == -1) cmenu(200);
+                else if(x == 2)
+                {
+                    DisplayMode = (DisplayMode+1)%DISPLAY_COUNT;
+                    setvideodisplaymode(DisplayMode);
+                }
+                else if(x == 3)
+                {
+                    VSync = !VSync;
+                    setvideovsync(VSync);
+                }
 
                 // Slider positions 0..60, 1.0 at 30: contrast 0.5..1.5 in
                 // steps of 0.1, saturation 0..2 in steps of 0.1. The setting
@@ -2862,6 +2874,17 @@ void menus(void)
                 glcontrast = GLContrast;
                 glsaturation = GLSaturation;
 #endif
+
+                menutext(c,50+16+16,SHX(-4),PHX(-4),"DISPLAY");
+                switch(DisplayMode)
+                {
+                    case DISPLAY_WINDOWED: menutext(c+110,50+16+16,0,0,"WINDOWED");break;
+                    case DISPLAY_BORDERLESS: menutext(c+110,50+16+16,0,0,"BORDERLESS");break;
+                    default: menutext(c+110,50+16+16,0,0,"EXCLUSIVE");break;
+                }
+
+                menutext(c,50+16+16+16,SHX(-5),PHX(-5),"VSYNC");
+                menutext(c+110,50+16+16+16,0,0,VSync ? "ON" : "OFF");
                 if(!shader)
                 {
                     gametext(160,170,"CONTRAST AND SATURATION NEED",0,2+8+16);

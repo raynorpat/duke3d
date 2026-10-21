@@ -8222,6 +8222,8 @@ int main(int argc,char **argv)
     // -renderer N picks the renderer for this run only; duke3d.cfg keeps its own.
     i = CheckParm("RENDERER");
     gamerenderer = clamprenderer(i ? ((i+1 < _argc) ? atoi(_argv[i+1]) : 0) : RendererSetting);
+    setvideodisplaymode(DisplayMode);  // the VIDEO menu changes them as it goes
+    setvideovsync(VSync);
 
     if( setgamemoderenderer() < 0 )
     {
