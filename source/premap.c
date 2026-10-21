@@ -498,7 +498,11 @@ void resetplayerstats(short snum)
     p->rapid_fire_hold  = 0;
     p->toggle_key_flag  = 0;
     p->access_spritenum = -1;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    if(ud.multimode > 1 && ud.coop == 0 ) // 1.1: dukematch only
+#else
     if(ud.multimode > 1 && ud.coop != 1 )
+#endif
         p->got_access = 7;
     else p->got_access      = 0;
     p->random_club_frame= 0;
@@ -1352,11 +1356,18 @@ void genspriteremaps(void)
     kclose(fp);
 }
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+char waitabort; // 1.1: Escape ended the last wait for players
+#endif
+
 void waitforeverybody()
 {
     int32_t i;
 
     if (numplayers < 2) return;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    waitabort = 0;
+#endif
     packbuf[0] = 250;
     for(i=connecthead;i>=0;i=connectpoint2[i])
     {
@@ -1368,6 +1379,13 @@ void waitforeverybody()
     do
     {
         _idle();  /* let input queue run... */
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        if(KB_KeyPressed(sc_Escape))
+        {
+            waitabort = 1;
+            return;
+        }
+#endif
         getpackets();
         for(i=connecthead;i>=0;i=connectpoint2[i])
         {
@@ -1653,6 +1671,15 @@ void enterlevel(char g)
 #endif
 
      clearfrags();
+
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     // 1.1: after an Escape out of the wait, the level opens on the main menu.
+     if(waitabort == 1)
+     {
+         current_menu = 0;
+         ps[myconnectindex].gm |= MODE_MENU;
+     }
+#endif
 
      resettimevars();  // Here we go
 

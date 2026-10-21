@@ -160,6 +160,14 @@ struct player_struct;
 
 #include "names.h"
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+// 1.1 tiles from its DEFS.CON that names.h doesn't name.
+#define FUELCAN 45
+#define BODYSUIT 58
+#define DUMMYDUKE 1425
+#define BIGDUMMYDUKE 1430
+#endif
+
 #include "build/engine.h"
 
 #define TICRATE (120)
@@ -507,6 +515,9 @@ extern int32 VoiceToggle,AmbienceToggle;
 extern SOUNDOWNER SoundOwner[NUM_SOUNDS][4];
 
 extern char playerreadyflag[MAXPLAYERS],playerquitflag[MAXPLAYERS];
+#if DUKE3D_GAMEVER < GAMEVER_13D
+extern char waitabort;
+#endif
 extern char sounds[NUM_SOUNDS][14];
 
 extern int32_t script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;

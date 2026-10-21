@@ -2476,7 +2476,11 @@ void processinput(short snum)
             if(p->buttonpalette && ud.from_bonus == 0)
             {
                 ud.from_bonus = ud.level_number+1;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                ud.level_number = 5; // 1.1's secret level is always E1L6
+#else
                 if(ud.secretlevel > 0 && ud.secretlevel < 12) ud.level_number = ud.secretlevel-1;
+#endif
                 ud.m_level_number = ud.level_number;
             }
             else

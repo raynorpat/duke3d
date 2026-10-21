@@ -52,7 +52,11 @@ int main(void)
     /* 1.3D CONs have no definevolumename or defineskillname. */
     check_str("volume_names[0]", volume_names[0], "L.A. MELTDOWN");
     check_str("volume_names[1]", volume_names[1], "LUNAR APOCALYPSE");
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    check_str("volume_names[2]", volume_names[2], "SCHRAPNEL CITY"); /* the 1.1 EXE's spelling */
+#else
     check_str("volume_names[2]", volume_names[2], "SHRAPNEL CITY");
+#endif
     check_str("skill_names[0]", skill_names[0], "PIECE OF CAKE");
     check_str("skill_names[1]", skill_names[1], "LET'S ROCK");
     check_str("skill_names[2]", skill_names[2], "COME GET SOME");
@@ -89,7 +93,11 @@ int main(void)
         checkcommandline(2, v9);
         check("/v9 episode in range", ud.m_volume_number >= 0 && ud.m_volume_number < vols, 1);
         checkcommandline(2, q16);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        check("/q16 players", ud.multimode, 1); /* 1.1 reads one digit */
+#else
         check("/q16 players", ud.multimode, MAXPLAYERS);
+#endif
         checkcommandline(2, q0);
         check("/q0 players", ud.multimode, 1);
         ud.multimode = 1;
