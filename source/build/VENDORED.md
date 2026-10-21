@@ -91,6 +91,11 @@ BUILDLIC.TXT LICENSE.md
 - `engine.c`: version-guarded 1.1 and 1.0 engine logic, on `BUILD_ENGINEREV`:
   the early `inside`, which compares the two products and keeps a one-byte
   count (see ledger E11-001)
+- `engine.c`: version-guarded 1.0 engine logic, on `BUILD_ENGINEREV <
+  19960220L`: `cansee`'s side test and `lintersect`; `hitscan` without a
+  cliptype (always `CLIPMASK1`) that resets only `*hitsect`; `clipmove`
+  accepting a bad sector and gathering every listed sector's walls before
+  their sprites (see ledger E10-001 to E10-004)
 - `a.c`, `a.h`: the C line drawers are JFBuild's `src/a-c.c` (Ken Silverman's
   own C port of `A.ASM` from `BUILDC.ZIP`, made 64-bit clean), from
   <https://github.com/jonof/jfbuild> commit
