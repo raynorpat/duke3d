@@ -109,7 +109,15 @@ int main(void)
     check("grpcrc32(\"123456789\")", (int)grpcrc32(0, (const unsigned char *)"123456789", 9), (int)0xCBF43926);
     check("unknown GRP", grpmismatch(123456, 0x12345678) != NULL, 0);
     check("modded GRP the size of a release", grpmismatch(26524524, 0x12345678) != NULL, 0);
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+    check("1.0 shareware GRP", grpmismatch(10429258, 0xA28AA589) != NULL, 0);
+    check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
+    check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+    check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 0);
+    check("1.0 shareware GRP", grpmismatch(10429258, 0xA28AA589) != NULL, 1);
+    check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
+#elif DUKE3D_GAMEVER < GAMEVER_14
 #ifdef VOLUMEONE
     check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 0);
     check("1.3D full GRP", grpmismatch(26524524, 0xBBC9CE44) != NULL, 1);
@@ -127,7 +135,9 @@ int main(void)
     check("1.4 GRP", grpmismatch(44348015, 0xF514A6AC) != NULL, 1);
     check("1.3D full GRP", grpmismatch(26524524, 0xBBC9CE44) != NULL, 1);
 #endif
+#if DUKE3D_GAMEVER >= GAMEVER_13D
     check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
+#endif
 
 #if PLATFORM_UNIX
     /* duke3d.cfg values out of range, or in capitals, are read and written

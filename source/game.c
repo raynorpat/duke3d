@@ -45,7 +45,11 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <sys/stat.h>
 
 // The release the build plays as (DUKE3D_VERSION), as its startup banner shows it.
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+    #define VERSION "1.0"
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+    #define VERSION "1.1"
+#elif DUKE3D_GAMEVER < GAMEVER_14
     #define VERSION "1.3D"
 #elif DUKE3D_GAMEVER < GAMEVER_15
     #define VERSION "1.4"
@@ -7590,7 +7594,7 @@ void checkcommandline(int argc,char **argv)
                     c++;
                     if(*c == 'e' || *c == 'E')
                     {
-                        printf("Duke Nukem 3D v%s\n","1.1");
+                        printf("Duke Nukem 3D v%s\n",VERSION);
                         exit(0);
                     }
                     ud.warp_on = 1;
@@ -8474,16 +8478,16 @@ void copyprotect(void)
 }
 
 
-// Which build plays a GRP: none, 1.3D full, 1.3D shareware, 1.4 or 1.5.
-enum { GRP_NONE, GRP_13D, GRP_13DSW, GRP_14, GRP_15 };
+// Which build plays a GRP: none, 1.0 or 1.1 shareware, 1.3D full, 1.3D shareware, 1.4 or 1.5.
+enum { GRP_NONE, GRP_10SW, GRP_11SW, GRP_13D, GRP_13DSW, GRP_14, GRP_15 };
 
 // The release DUKE3D.GRPs, by size and CRC-32 (the EDuke32 wiki FAQ's table;
 // the 1.3D and Atomic values were also measured from the original files).
 static const struct { int32_t size; uint32_t crc; int build; const char *name; } knowngrps[] =
 {
     {  9690241, 0x02F18900, GRP_NONE,  "the 0.99 shareware release" },
-    { 10429258, 0xA28AA589, GRP_NONE,  "the 1.0 shareware release" },
-    { 10442980, 0x912E1E8D, GRP_NONE,  "the 1.1 shareware release" },
+    { 10429258, 0xA28AA589, GRP_10SW,  "the 1.0 shareware release" },
+    { 10442980, 0x912E1E8D, GRP_11SW,  "the 1.1 shareware release" },
     { 11035779, 0x983AD923, GRP_13DSW, "the 1.3D shareware release" },
     { 10444391, 0xC5F71561, GRP_NONE,  "the 1.5 Mac shareware release" },
     { 26524524, 0xBBC9CE44, GRP_13D,   "the 1.3D full release" },
@@ -8491,7 +8495,11 @@ static const struct { int32_t size; uint32_t crc; int build; const char *name; }
     { 44356548, 0xFD3DCFF1, GRP_15,    "the 1.5 Atomic Edition" },
 };
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+#define OWNGRP GRP_10SW
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+#define OWNGRP GRP_11SW
+#elif DUKE3D_GAMEVER < GAMEVER_14
 #ifdef VOLUMEONE
 #define OWNGRP GRP_13DSW
 #else
@@ -9012,7 +9020,7 @@ char opendemoread(char which_demo) // 0 = mine
          if( vol > 2 || lev > 10 || skill > 4 || mm < 1 || mm > MAXPLAYERS )
 #endif
          {
-            printf("%s isn't a Duke Nukem 3D 1.1 demo; refused.\n",fname);
+            printf("%s isn't a Duke Nukem 3D %s demo; refused.\n",fname,VERSION);
             kclose(recfilep);
             return 0;
          }
