@@ -560,9 +560,8 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
               -P "${CMAKE_CURRENT_SOURCE_DIR}/game_boot_v13d.cmake")
     set_tests_properties(game_boot_${_vold_name} PROPERTIES TIMEOUT 240)
   endif()
-  # The original demos, played to the end and compared with the DOS state
-  # (1.1 only so far; 1.0 is Task 16).
-  if(_vold_data AND _vold_edition STREQUAL "sw11")
+  # The original demos, played to the end and compared with the DOS state.
+  if(_vold_data)
     foreach(_demo 1 2 3)
       add_test(NAME demo_sync_${_vold_name}_${_demo}
         COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
@@ -574,7 +573,7 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
       set_tests_properties(demo_sync_${_vold_name}_${_demo} PROPERTIES TIMEOUT 400)
     endforeach()
     # A 1.5 demo, and the 1.3D shareware one when that folder is set, must be
-    # refused. A 1.0 demo can't be told from a 1.1 one (F11-001).
+    # refused. 1.0 and 1.1 demos can't be told apart (F11-001, F11-007).
     set(_vold_others "")
     if(DUKE3D_V13D_SW_DATA_DIR)
       set(_vold_others "${DUKE3D_V13D_SW_DATA_DIR}/DEMO1.DMO")

@@ -9226,6 +9226,37 @@ void opendemowrite(void)
     ud.reccnt = 0;
 }
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+// 1.0's demo record is fvel, svel, avel (all s16) and bits, with no horz
+// (F10-001). Both are 10 bytes, so the buffer is converted in place. 1.0's
+// getinput keeps avel within +-108, so our s8 holds it.
+static void demo10_fromdos(input *in, int32_t n)
+{
+    for (; n > 0; n--, in++)
+    {
+        unsigned char *b = (unsigned char *)in;
+        short fvel = (short)(b[0]|(b[1]<<8)), svel = (short)(b[2]|(b[3]<<8));
+        short avel = (short)(b[4]|(b[5]<<8));
+        uint32_t bits = b[6]|(b[7]<<8)|(b[8]<<16)|((uint32_t)b[9]<<24);
+        in->fvel = fvel; in->svel = svel; in->avel = (signed char)avel;
+        in->horz = 0; in->bits = bits;
+    }
+}
+
+static void demo10_todos(input *in, int32_t n)
+{
+    for (; n > 0; n--, in++)
+    {
+        unsigned char *b = (unsigned char *)in;
+        short fvel = in->fvel, svel = in->svel, avel = in->avel;
+        uint32_t bits = in->bits;
+        b[0] = fvel; b[1] = fvel>>8; b[2] = svel; b[3] = svel>>8;
+        b[4] = avel; b[5] = avel>>8;
+        b[6] = bits; b[7] = bits>>8; b[8] = bits>>16; b[9] = bits>>24;
+    }
+}
+#endif
+
 void record(void)
 {
     short i;
@@ -9237,7 +9268,9 @@ void record(void)
         totalreccnt++;
         if (ud.reccnt >= RECSYNCBUFSIZ)
         {
-            #if PLATFORM_BIGENDIAN
+            #if DUKE3D_GAMEVER < GAMEVER_11
+            demo10_todos(recsync,ud.reccnt);
+            #elif PLATFORM_BIGENDIAN
             input *inptr = recsync;
             int i;
             for (i = 0; i < ud.reccnt; i++)
@@ -9262,7 +9295,9 @@ void closedemowrite(void)
     {
         if (ud.reccnt > 0)
         {
-            #if PLATFORM_BIGENDIAN
+            #if DUKE3D_GAMEVER < GAMEVER_11
+            demo10_todos(recsync,ud.reccnt);
+            #elif PLATFORM_BIGENDIAN
             input *inptr = recsync;
             int i;
             for (i = 0; i < ud.reccnt; i++)
@@ -9325,7 +9360,9 @@ int demoverify(int n, char *dumpname)
             l = min(ud.reccnt,RECSYNCBUFSIZ);
             cnt = l/ud.multimode;
             kdfread(recsync,sizeof(input)*ud.multimode,cnt,recfilep);
-            #if PLATFORM_BIGENDIAN
+            #if DUKE3D_GAMEVER < GAMEVER_11
+            demo10_fromdos(recsync,cnt*ud.multimode);
+            #elif PLATFORM_BIGENDIAN
             {
                 input *inptr = (input *) recsync;
                 for (j = 0; j < cnt*ud.multimode; j++)
@@ -9446,7 +9483,9 @@ int32_t playback(void)
                 l = min(ud.reccnt,RECSYNCBUFSIZ);
                 cnt = l/ud.multimode;
                 kdfread(recsync,sizeof(input)*ud.multimode,cnt,recfilep);
-                #if PLATFORM_BIGENDIAN
+                #if DUKE3D_GAMEVER < GAMEVER_11
+                demo10_fromdos(recsync,cnt*ud.multimode);
+                #elif PLATFORM_BIGENDIAN
                 {
                     input *inptr = (input *) recsync;
                     cnt *= ud.multimode;

@@ -1,4 +1,4 @@
-# Plays one original 1.3D or 1.1 demo headless with -demoverify and compares the
+# Plays one original 1.3D, 1.1 or 1.0 demo headless with -demoverify and compares the
 # final state with the values measured from the DOS executable
 # (tests/data/v13d_demo_refs.cmake). MODE refuse instead hands the build a
 # demo with a 1.5 header, and then each demo file in OTHERS, and expects every
@@ -6,7 +6,7 @@
 # hands a shareware build an episode 2 demo header and expects the refusal to
 # say it needs the full version.
 #
-#   cmake -DDUKE3D=<exe> -DDATA=<data dir> -DEDITION=<full|sw|sw11>
+#   cmake -DDUKE3D=<exe> -DDATA=<data dir> -DEDITION=<full|sw|sw11|sw10>
 #         -DDEMO=<n> -DREFS=<v13d_demo_refs.cmake> -DWORK=<scratch dir>
 #         [-DMODE=refuse [-DOTHERS=<demo files>]] -P demo_sync_v13d.cmake
 include("${CMAKE_CURRENT_LIST_DIR}/v13d_data.cmake")
