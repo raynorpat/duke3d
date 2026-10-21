@@ -499,7 +499,7 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
       COMMAND "${CMAKE_COMMAND}"
               "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_v13d_data}"
               "-DB=$<TARGET_FILE:duke3d>" "-DB_DATA=${_v13d_data}"
-              -DPORT=${_net_port} -DMODE=connect
+              -DPORT=${_net_port} -DMODE=connect "-DARGS=/v1 /l1"
               "-DWORK=${CMAKE_BINARY_DIR}/nc13"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
     set_tests_properties(net_connect_v13d_${_v13d_edition} PROPERTIES TIMEOUT 90)

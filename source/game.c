@@ -7551,6 +7551,9 @@ void checkcommandline(int argc,char **argv)
                     ud.warp_on = 1;
                     c++;
                     ud.m_level_number = ud.level_number = atol(c)-1;
+                    // Fix: /l0 and /l50 gave a level the game indexes level_file_names with.
+                    if( ud.m_level_number < 0 ) ud.m_level_number = ud.level_number = 0;
+                    if( ud.m_level_number > 10 ) ud.m_level_number = ud.level_number = 10;
                     ud.m_player_skill = ud.player_skill = 2;
                     break;
                 case 'm':
@@ -7576,6 +7579,9 @@ void checkcommandline(int argc,char **argv)
                 case 'S':
                     c++;
                     ud.m_player_skill = ud.player_skill = atol(c)-1;
+                    // Fix: /s0 and /s9 gave a skill the game indexes skill_names with.
+                    if( ud.m_player_skill < 0 ) ud.m_player_skill = ud.player_skill = 0;
+                    if( ud.m_player_skill > 3 ) ud.m_player_skill = ud.player_skill = 3;
                     break;
                 case 't':
                 case 'T':
@@ -9001,8 +9007,9 @@ char opendemoread(char which_demo) // 0 = mine
      // ud.multimode as a short (F11-001). It has no version, so a 1.0 demo
      // can't be told apart; a 1.3D or later header fails the range checks.
      {
-         char vol, lev, skill;
-         short mm;
+         // Fix: a truncated header left these uninitialized; start them out of range so it is refused.
+         char vol = 127, lev = 127, skill = 127;
+         short mm = 0;
 
          kread8(recfilep,&vol);
          kread8(recfilep,&lev);
