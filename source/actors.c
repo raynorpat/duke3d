@@ -6807,7 +6807,12 @@ void moveeffectors(void)   //STATNUM 3
                                 ps[p].posx,ps[p].posy,(q*l),
                                 &m,&x);
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_11
+                            // 1.0 leaves oposx/oposy, so the turn counts
+                            // toward the player sprite's xvel (G10-A11).
+                            ps[p].posx = m;
+                            ps[p].posy = x;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
                             ps[p].oposx = ps[p].posx = m;
                             ps[p].oposy = ps[p].posy = x;
 #else
