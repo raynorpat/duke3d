@@ -154,7 +154,16 @@ extern void polymost_unbind_shader(void);
 extern unsigned char *getbasepalette(void);
 extern void gltexinvalidateall(void);
 extern void polymost_buildshaderamp(void);
-static SDL_GLContext sdl_glcontext = NULL;  /* non-NULL while in renderer 3 */
+/*
+ * Made at the first renderer 3 and kept, with its window, until shutdown:
+ *  Apple's GL on Metal can leave the heap damaged when a context is deleted.
+ *  The 8-bit modes are shown through it from then on.
+ */
+static SDL_GLContext sdl_glcontext = NULL;
+static int gl_drawing = 0;  /* renderer 3 is drawing in it */
+static GLuint gl8tex = 0;  /* an 8-bit mode's frame, as shown through it */
+static int gl8tex_w, gl8tex_h;  /* its texture size */
+static float gl8xrel = 0, gl8yrel = 0;  /* mouse motion under a pixel, carried */
 static char gl_davidoption = 1;
 static int gl_window_w = 640;  /* windowed size: the last 8-bit mode's, unclamped */
 static int gl_window_h = 480;
@@ -291,9 +300,20 @@ static void output_driver_info(void)
 } /* output_driver_info */
 
 
+#ifdef USE_OPENGL
+static void gl_present8(void);
+#endif
+
 /* Push the 8-bit surface through the palette to the window. */
 static void present_surface(void)
 {
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+    {
+        gl_present8();
+        return;
+    } /* if */
+#endif
     if ((surface == NULL) || (sdl_texture == NULL))
         return;
 
@@ -308,6 +328,12 @@ static void present_surface(void)
 
 static void free_video_surfaces(void)
 {
+#ifdef USE_OPENGL
+    if (gl8tex != 0)  /* the context is current while there is one */
+        glDeleteTextures(1, &gl8tex);
+    gl8tex = 0;
+#endif
+
     if (sdl_texture != NULL)
     {
         SDL_DestroyTexture(sdl_texture);
@@ -329,11 +355,10 @@ static void free_video_surfaces(void)
 
 
 #ifdef USE_OPENGL
-/* Leave renderer 3: drop the GL textures while the context is current,
- *  then the context and its window. The 8-bit path recreates a window. */
-static void destroy_gl_window(void)
+/* Leave renderer 3: drop its GL textures. The context and window stay. */
+static void gl_leave(void)
 {
-    if (sdl_glcontext == NULL)
+    if (!gl_drawing)
         return;
 
     polymost_glreset();
@@ -342,18 +367,118 @@ static void destroy_gl_window(void)
         glDeleteTextures(1, &lastframe);
     lastframe = 0;
     framedrawn = 0;
-    /* let the driver finish with the context before it goes (Apple's
-     *  GL-on-Metal can complete its command buffers after the delete). */
-    glFinish();
-    SDL_GL_MakeCurrent(sdl_window, NULL);
-    SDL_GL_DeleteContext(sdl_glcontext);
-    sdl_glcontext = NULL;
-    SDL_DestroyWindow(sdl_window);
-    sdl_window = NULL;
+    gl_drawing = 0;
     bpp = 8;
     numpages = 0;
     setrendermode(0);
-} /* destroy_gl_window */
+} /* gl_leave */
+
+
+/* The texture an 8-bit mode's w by h frame is shown from (GL 1.1 without
+ *  GL_ARB_texture_non_power_of_two: rounded up to powers of two). */
+static void gl_alloc8(int w, int h)
+{
+    gl8tex_w = w;
+    gl8tex_h = h;
+    if (!glinfo.texnpot)
+    {
+        for (gl8tex_w = 1; gl8tex_w < w; gl8tex_w <<= 1) ;
+        for (gl8tex_h = 1; gl8tex_h < h; gl8tex_h <<= 1) ;
+    } /* if */
+    glGenTextures(1, &gl8tex);
+    glBindTexture(GL_TEXTURE_2D, gl8tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, gl8tex_w, gl8tex_h, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    gl8xrel = gl8yrel = 0;
+} /* gl_alloc8 */
+
+
+/*
+ * Shows the 8-bit surface through the GL context, as the SDL renderer did:
+ *  through its palette (faded and brightened as the engine set it), scaled
+ *  to fit the drawable, nearest pixel, with black bars. Renderer 3 may have
+ *  left any state, so what the draw depends on is set here.
+ */
+static void gl_present8(void)
+{
+    int32_t r[4];
+    int dw, dh;
+    float u, v;
+
+    if ((surface == NULL) || (gl8tex == 0) || (gl_drawing))
+        return;
+
+    SDL_BlitSurface(surface, NULL, sdl_rgbsurface, NULL);  /* the palette applied */
+    SDL_GL_GetDrawableSize(sdl_window, &dw, &dh);
+    gl_fitrect(surface->w, surface->h, dw, dh, r);
+    u = (float) surface->w / (float) gl8tex_w;
+    v = (float) surface->h / (float) gl8tex_h;
+
+    if (bglBindFramebuffer != NULL)
+        bglBindFramebuffer(GL_FRAMEBUFFER, 0);
+    if (bglUseProgram != NULL)
+        bglUseProgram(0);
+    if (bglActiveTexture != NULL)
+        bglActiveTexture(GL_TEXTURE0);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glDisable(GL_ALPHA_TEST);
+    glDisable(GL_FOG);
+    glColorMask(1, 1, 1, 1);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    glViewport(0, 0, dw, dh);
+    glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glViewport(r[0], r[1], r[2], r[3]);
+
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, gl8tex);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, surface->w, surface->h,
+                    GL_RGBA, GL_UNSIGNED_BYTE, sdl_rgbsurface->pixels);
+    glColor4f(1, 1, 1, 1);
+    glBegin(GL_QUADS);  /* the surface's top row at the top */
+    glTexCoord2f(0, v); glVertex2f(-1, -1);
+    glTexCoord2f(u, v); glVertex2f(1, -1);
+    glTexCoord2f(u, 0); glVertex2f(1, 1);
+    glTexCoord2f(0, 0); glVertex2f(-1, 1);
+    glEnd();
+    SDL_GL_SwapWindow(sdl_window);
+} /* gl_present8 */
+
+
+/*
+ * An 8-bit mode shown through the GL context: a mouse motion's window
+ *  points to the frame's pixels, as the SDL renderer's logical size did,
+ *  the relative motion's part pixel carried to the next.
+ */
+static void gl_mouse8(SDL_MouseMotionEvent *m)
+{
+    int32_t r[4];
+    int ww, wh;
+    float sx, sy;
+
+    SDL_GetWindowSize(sdl_window, &ww, &wh);
+    gl_fitrect(surface->w, surface->h, ww, wh, r);
+    if ((r[2] <= 0) || (r[3] <= 0))
+        return;
+    sx = (float) surface->w / (float) r[2];
+    sy = (float) surface->h / (float) r[3];
+    m->x = (Sint32) ((m->x - r[0]) * sx);
+    m->y = (Sint32) ((m->y - r[1]) * sy);
+    gl8xrel += m->xrel * sx;
+    gl8yrel += m->yrel * sy;
+    m->xrel = (Sint32) gl8xrel;
+    m->yrel = (Sint32) gl8yrel;
+    gl8xrel -= m->xrel;
+    gl8yrel -= m->yrel;
+} /* gl_mouse8 */
 #endif
 
 
@@ -361,7 +486,16 @@ static void shutdown_video(void)
 {
     free_video_surfaces();
 #ifdef USE_OPENGL
-    destroy_gl_window();
+    gl_leave();
+    if (sdl_glcontext != NULL)
+    {
+        /* let the driver finish with the context before it goes (Apple's
+         *  GL-on-Metal can complete its command buffers after the delete). */
+        glFinish();
+        SDL_GL_MakeCurrent(sdl_window, NULL);
+        SDL_GL_DeleteContext(sdl_glcontext);
+        sdl_glcontext = NULL;
+    } /* if */
 #endif
 
     if (sdl_renderer != NULL)
@@ -581,7 +715,7 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
 
     free_video_surfaces();
 #ifdef USE_OPENGL
-    destroy_gl_window();  /* an SDL_Renderer can't share the GL window. */
+    gl_leave();  /* the GL window, if there is one, shows the 8-bit mode */
 #endif
 
     /* low-res modes get a bigger window so they aren't a postage stamp. */
@@ -629,15 +763,27 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
             sdl_displaymode = set_window_display(sdl_window, sdl_displaymode, sdl_displaymode);
     } /* else */
 
-    SDL_RenderSetLogicalSize(sdl_renderer, w, h);
-
     surface = SDL_CreateRGBSurface(0, w, h, 8, 0, 0, 0, 0);
-    sdl_rgbsurface = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32,
-                                                    SDL_PIXELFORMAT_ARGB8888);
-    sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_ARGB8888,
-                                    SDL_TEXTUREACCESS_STREAMING, w, h);
-    if ((surface == NULL) || (sdl_rgbsurface == NULL) || (sdl_texture == NULL))
-        goto vidmode_failed;
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)  /* shown through the GL context: gl_present8 */
+    {
+        sdl_rgbsurface = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32,
+                                                        SDL_PIXELFORMAT_RGBA32);
+        if ((surface == NULL) || (sdl_rgbsurface == NULL))
+            goto vidmode_failed;
+        gl_alloc8(w, h);
+    } /* if */
+    else
+#endif
+    {
+        SDL_RenderSetLogicalSize(sdl_renderer, w, h);
+        sdl_rgbsurface = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32,
+                                                        SDL_PIXELFORMAT_ARGB8888);
+        sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_ARGB8888,
+                                        SDL_TEXTUREACCESS_STREAMING, w, h);
+        if ((surface == NULL) || (sdl_rgbsurface == NULL) || (sdl_texture == NULL))
+            goto vidmode_failed;
+    } /* else */
 
     /* the engine assumes bytesperline == width. */
     assert(surface->pitch == surface->w);
@@ -793,7 +939,7 @@ void _glframereplayed(void)
  */
 void _glpalettefade(void)
 {
-    if ((sdl_glcontext == NULL) || (framedrawn))
+    if ((!gl_drawing) || (framedrawn))
         return;
     if (polymost_present_shader(gl_showrect, gl_draw_w, gl_draw_h))  /* the GL 2.1 tier keeps the frame */
     {
@@ -946,41 +1092,47 @@ int setgamemode_gl(char davidoption)
     if ((SDL_WasInit(SDL_INIT_VIDEO) == 0) && (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0))
         return(-1);
 
-    /*
-     * Make the GL window before dropping the old one, so a failure leaves
-     *  the 8-bit (or GL) mode as it was. SDL2 can't add GL to a window that
-     *  has an SDL_Renderer, so it's a new window.
-     */
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    window = create_window(gl_window_w, gl_window_h,
-                           SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI);
-    context = (window != NULL) ? SDL_GL_CreateContext(window) : NULL;
-    if (context == NULL)
+    if (sdl_glcontext != NULL)  /* the run's GL window: set its size again */
     {
-        if (window != NULL)
-            SDL_DestroyWindow(window);
-        /* a backend may have dropped the old context in the attempt. */
-        if (sdl_glcontext != NULL)
-            SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
-        return(-1);
+        free_video_surfaces();
+        gl_leave();
+        SDL_SetWindowSize(sdl_window, gl_window_w, gl_window_h);
+        if (sdl_displaymode == DISPLAY_WINDOWED)
+            SDL_SetWindowPosition(sdl_window, SDL_WINDOWPOS_CENTERED,
+                                  SDL_WINDOWPOS_CENTERED);
+        else  /* exclusive keeps the game mode's display mode. */
+            sdl_displaymode = set_window_display(sdl_window, sdl_displaymode, sdl_displaymode);
     } /* if */
+    else
+    {
+        /*
+         * Make the GL window before dropping the 8-bit one, so a failure
+         *  leaves that mode as it was. SDL2 can't add GL to a window that
+         *  has an SDL_Renderer, so it's a new window.
+         */
+        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+        window = create_window(gl_window_w, gl_window_h,
+                               SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI);
+        context = (window != NULL) ? SDL_GL_CreateContext(window) : NULL;
+        if (context == NULL)
+        {
+            if (window != NULL)
+                SDL_DestroyWindow(window);
+            return(-1);
+        } /* if */
 
-    if (sdl_glcontext != NULL)  /* already in GL: drop it, its context current. */
-    {
-        SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
-        destroy_gl_window();
-    } /* if */
-    free_video_surfaces();
-    if (sdl_renderer != NULL)
-    {
-        SDL_DestroyRenderer(sdl_renderer);
-        sdl_renderer = NULL;
-    } /* if */
-    if (sdl_window != NULL)
-        SDL_DestroyWindow(sdl_window);
-    sdl_window = window;
-    sdl_glcontext = context;
+        free_video_surfaces();
+        if (sdl_renderer != NULL)
+        {
+            SDL_DestroyRenderer(sdl_renderer);
+            sdl_renderer = NULL;
+        } /* if */
+        if (sdl_window != NULL)
+            SDL_DestroyWindow(sdl_window);
+        sdl_window = window;
+        sdl_glcontext = context;
+    } /* else */
 
     /* destroying an SDL_Renderer can leave no context current. */
     SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
@@ -1016,6 +1168,7 @@ int setgamemode_gl(char davidoption)
 
     bpp = 32;
     numpages = 2;  /* as JFBuild: permanent rotatesprites go on both pages. */
+    gl_drawing = 1;
     gl_davidoption = davidoption;
     init_gl_res_vars(1);
     setrendermode(3);
@@ -1042,7 +1195,7 @@ int setgamemode_gl(char davidoption)
 void glredrawlastframe(void)
 {
 #ifdef USE_OPENGL
-    if ((sdl_glcontext != NULL) && (lastframe_set))
+    if ((gl_drawing) && (lastframe_set))
         gl_draw_lastframe();
 #endif
 } /* glredrawlastframe */
@@ -1112,7 +1265,7 @@ static int sdl_mouse_wheel_filter(SDL_MouseWheelEvent const *event)
 static void mouse_area(int *w, int *h)
 {
 #ifdef USE_OPENGL
-    if (sdl_glcontext != NULL)
+    if (gl_drawing)
     {
         SDL_GetWindowSize(sdl_window, w, h);
         return;
@@ -1128,7 +1281,7 @@ void getmousearea(int *w, int *h)
     mouse_area(w, h);
 #ifdef USE_OPENGL
     /* drawn at an internal size: the frame's part of the window, in points. */
-    if ((sdl_glcontext != NULL) && (gl_scaled) && (gl_draw_w > 0) && (gl_draw_h > 0))
+    if ((gl_drawing) && (gl_scaled) && (gl_draw_w > 0) && (gl_draw_h > 0))
     {
         *w = (int) (((int64_t) gl_showrect[2] * *w + gl_draw_w / 2) / gl_draw_w);
         *h = (int) (((int64_t) gl_showrect[3] * *h + gl_draw_h / 2) / gl_draw_h);
@@ -1140,9 +1293,22 @@ void getmousearea(int *w, int *h)
 static int sdl_mouse_motion_filter(SDL_Event const *event)
 {
     int w, h;
+#ifdef USE_OPENGL
+    SDL_Event scaled;
+#endif
 
     if (sdl_window == NULL)
         return(0);
+
+#ifdef USE_OPENGL
+    if ((event->type == SDL_MOUSEMOTION) && (sdl_glcontext != NULL) &&
+        (!gl_drawing) && (surface != NULL))
+    {
+        scaled = *event;
+        gl_mouse8(&scaled.motion);
+        event = &scaled;
+    } /* if */
+#endif
 
     if (event->type == SDL_JOYBALLMOTION)
     {
@@ -1190,13 +1356,17 @@ static void show_display_mode(int mode)
 
     sdl_displaymode = set_window_display(sdl_window, sdl_displaymode, mode);
 #ifdef USE_OPENGL
-    if (sdl_glcontext != NULL)
+    if (gl_drawing)
     {
         gl_resize();  /* macOS may report the new size later, as an event. */
         return;
     } /* if */
 #endif
     output_surface_info(surface);
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+        present_surface();  /* the GL window shows it again at the new size */
+#endif
 } /* show_display_mode */
 
 
@@ -1383,8 +1553,11 @@ static int root_sdl_event_filter(const SDL_Event *event)
                 present_surface();
 #ifdef USE_OPENGL
             else if ((event->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) &&
-                     (sdl_glcontext != NULL))
+                     (gl_drawing))
                 gl_resize();
+            else if ((event->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) &&
+                     (sdl_glcontext != NULL))
+                present_surface();  /* an 8-bit mode, at the new size */
 #endif
             return(0);
         case SDL_QUIT:
@@ -2121,7 +2294,7 @@ int screencapture(char *_filename, char inverseit)
         return -1;
 
 #ifdef USE_OPENGL
-    if (sdl_glcontext != NULL)
+    if (gl_drawing)
         rgb = gl_screencapture(&w, &h);
     else
 #endif
@@ -2537,7 +2710,7 @@ int VBE_setPalette(int32_t start, int32_t num, char *palettebuffer)
     assert( (start + num) <= (sizeof (fmt_swap) / sizeof (SDL_Color)) );
 
 #ifdef USE_OPENGL
-    if (sdl_glcontext != NULL)  /* 6-bit BGR0 to 8-bit, then retexture. */
+    if (gl_drawing)  /* 6-bit BGR0 to 8-bit, then retexture. */
     {
         palette_t newpal[256];
 
@@ -2593,7 +2766,7 @@ int VBE_getPalette(int32_t start, int32_t num, char *palettebuffer)
     int i;
 
 #ifdef USE_OPENGL
-    if (sdl_glcontext != NULL)
+    if (gl_drawing)
     {
         for (i = start; i < start + num; i++)
         {
@@ -2695,7 +2868,7 @@ void _nextpage(void)
     handle_events();
 
 #ifdef USE_OPENGL
-    if (sdl_glcontext != NULL)
+    if (gl_drawing)
         gl_swap();
     else
 #endif

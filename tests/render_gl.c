@@ -88,7 +88,10 @@
  *  isn't shown scaled to fit with black bars (after a resize too), or
  *  doesn't validate the size or ignore it off the shader path; or whose
  *  contrast and saturation aren't gl_colorcorrect's on the frame shown and
- *  its screenshots, or change the frame at 1.
+ *  its screenshots, or change the frame at 1; or, once OpenGL is set, whose
+ *  8-bit modes aren't shown through its context as the SDL renderer showed
+ *  them before it (palette, fade, brightness, black bars), or that drops or
+ *  remakes the window or context between renderers 0 and 3.
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
  *
@@ -1626,6 +1629,146 @@ done:
     return ok;
 }
 
+/* An 8-bit frame of every palette index, each pixel unlike its neighbours
+ *  (so filtering shows), shown with the game's palette (c 0), faded to red
+ *  (1) or at brightness 8 (2). */
+static void present8_frame(int c)
+{
+    int32_t x, y;
+
+    setbrightness((c == 2) ? 8 : 0, palette);
+    for (y = 0; y < ydim; y++)
+        for (x = 0; x < xdim; x++)
+            ((unsigned char *) frameplace)[y * bytesperline + x] = (unsigned char) (x + y * 3);
+    if (c == 1) setpalettefade(63, 0, 0, 32);
+    nextpage();
+}
+
+/* The window's picture (*ow by *oh, bottom-up rows): through the SDL
+ *  renderer before OpenGL (sdl), else the context's front buffer. */
+static unsigned char *present8_read(SDL_Window *win, int sdl, int *ow, int *oh)
+{
+    SDL_Renderer *r;
+    unsigned char *buf, *tmp;
+    int y;
+
+    if (!sdl) return read_shown(ow, oh);
+    nextpage();  /* the same again: the read is of the back buffer, the frame before */
+    r = SDL_GetRenderer(win);
+    SDL_RenderSetLogicalSize(r, 0, 0);  /* all of it, bars too */
+    SDL_GetRendererOutputSize(r, ow, oh);
+    buf = malloc((size_t) *ow * *oh * 3);
+    tmp = malloc((size_t) *ow * 3);
+    SDL_RenderReadPixels(r, NULL, SDL_PIXELFORMAT_RGB24, buf, *ow * 3);
+    SDL_RenderSetLogicalSize(r, xdim, ydim);
+    for (y = 0; y < *oh / 2; y++)
+    {
+        memcpy(tmp, buf + (size_t) y * *ow * 3, *ow * 3);
+        memcpy(buf + (size_t) y * *ow * 3, buf + (size_t) (*oh - 1 - y) * *ow * 3, *ow * 3);
+        memcpy(buf + (size_t) (*oh - 1 - y) * *ow * 3, tmp, *ow * 3);
+    }
+    free(tmp);
+    return buf;
+}
+
+/* The frame through the 8-bit surface's palette, top-down RGB. */
+static unsigned char *present8_expected(void)
+{
+    const SDL_Color *pal = surface->format->palette->colors;
+    unsigned char *rgb = malloc((size_t) xdim * ydim * 3), *p = rgb;
+    long i;
+
+    for (i = 0; i < (long) xdim * ydim; i++, p += 3)
+    {
+        const SDL_Color *c = &pal[((unsigned char *) frameplace)[i]];
+        p[0] = c->r; p[1] = c->g; p[2] = c->b;
+    }
+    return rgb;
+}
+
+/*
+ * One OpenGL context for the run, with the 8-bit modes shown through it.
+ *  The frames of present8_frame, shown by the SDL renderer before OpenGL
+ *  is set and through the context after it (the 8-bit mode set again), each
+ *  read back from the window, are the frame through the 8-bit palette,
+ *  scaled to fit, nearest pixel, with black bars: in the 640x400 window
+ *  and in one resized to 900x400. Renderer 0 -> 3 -> 0 -> 3 keeps the
+ *  window and the context, current. 1: pass, 0: fail, 77: no OpenGL.
+ */
+#define P8CASES 3
+static int present8_check(void)
+{
+    static const char *const casename[P8CASES] = { "palette", "fade", "brightness 8" };
+    SDL_Window *win = NULL;
+    SDL_GLContext ctx;
+    Uint32 winid;
+    unsigned char *shown, *want;
+    int c, gl, wide, ow, oh, ok = 1;
+    long bars;
+    double d[2][2][P8CASES];
+    Uint32 id;
+
+    for (gl = 0; gl < 2; gl++)
+    {
+        if (_setgamemode(1, 320, 200) != 0) { fprintf(stderr, "FAIL: _setgamemode(320x200)\n"); return 0; }
+        if ((gl) && (SDL_GL_GetCurrentContext() == NULL))
+            { fprintf(stderr, "FAIL: an 8-bit mode after OpenGL dropped the context\n"); return 0; }
+        if (!gl)
+            for (id = 1; (id < 1000) && (win == NULL); id++)
+                win = SDL_GetWindowFromID(id);
+        for (wide = 0; wide < 2; wide++)
+        {
+            if (wide)
+                SDL_SetWindowSize(win, 900, 400);
+            for (id = SDL_GetTicks(); SDL_GetTicks() - id < 300; SDL_Delay(10))  /* shown, at its size */
+                _handle_events();
+            for (c = 0; c < P8CASES; c++)
+            {
+                present8_frame(c);
+                want = present8_expected();
+                shown = present8_read(win, !gl, &ow, &oh);
+                d[gl][wide][c] = shown_diff(shown, ow, oh, want, xdim, ydim, &bars);
+                printf("8-bit present, %s, %s, %dx%d window: mean |diff| %.3f, %ld bar pixels not black\n",
+                       gl ? "OpenGL" : "SDL renderer", casename[c], ow, oh, d[gl][wide][c], bars);
+                if ((d[gl][wide][c] > 0.5) || (bars != 0))
+                {
+                    fprintf(stderr, "FAIL: 8-bit present, %s, %s, %dx%d: diff %.3f, %ld bar pixels\n",
+                            gl ? "OpenGL" : "SDL renderer", casename[c], ow, oh, d[gl][wide][c], bars);
+                    ok = 0;
+                }
+                free(shown);
+                free(want);
+            }
+        }
+        if (gl) break;
+        if (setgamemode_gl(1) != 0)
+        {
+            printf("SKIP: no OpenGL (%s)\n", SDL_GetError());
+            return 77;
+        }
+        win = SDL_GL_GetCurrentWindow();
+    }
+
+    /* 0 -> 3 -> 0 -> 3: the same window and context throughout. */
+    ctx = SDL_GL_GetCurrentContext();
+    winid = SDL_GetWindowID(win);
+    for (c = 0; c < 2; c++)
+    {
+        if ((setgamemode_gl(1) != 0) || (getrendermode() != 3))
+            { fprintf(stderr, "FAIL: renderer 3 again\n"); return 0; }
+        if ((SDL_GL_GetCurrentContext() != ctx) || (SDL_GL_GetCurrentWindow() == NULL) ||
+            (SDL_GetWindowID(SDL_GL_GetCurrentWindow()) != winid))
+            { fprintf(stderr, "FAIL: renderer 3 again made a new window or context\n"); ok = 0; }
+        if (_setgamemode(1, 320, 200) != 0) { fprintf(stderr, "FAIL: _setgamemode(320x200)\n"); return 0; }
+        if ((SDL_GL_GetCurrentContext() != ctx) || (SDL_GetWindowFromID(winid) == NULL) ||
+            (SDL_GetRenderer(SDL_GetWindowFromID(winid)) != NULL))
+            { fprintf(stderr, "FAIL: an 8-bit mode after OpenGL dropped the window or context\n"); ok = 0; }
+    }
+    printf("renderer 0 -> 3 -> 0 -> 3: window %u, context %p kept: %s\n", (unsigned) winid, ctx,
+           ok ? "yes" : "no");
+    return ok;
+}
+
 int main(int argc, char **argv)
 {
     int32_t posx, posy, posz;
@@ -1699,6 +1842,8 @@ int main(int argc, char **argv)
     setup_la_backdrop();
 
     _platform_init(argc, argv, "render_gl", "render");
+    i = present8_check();
+    if (i != 1) return (i == 77) ? 77 : 1;
     i = classic_compare(argv[2]);
     if (i != 1) return (i == 77) ? 77 : 1;
     if (_setgamemode(1, 320, 200) != 0) { fprintf(stderr, "FAIL: _setgamemode(320x200)\n"); return 1; }
