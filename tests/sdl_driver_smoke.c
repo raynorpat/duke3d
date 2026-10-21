@@ -176,6 +176,17 @@ static int displaymode_setter(int argc, char **argv)
     SMOKE_CHECK("borderless kept by a mode set", (getvideodisplaymode() == DISPLAY_BORDERLESS) &&
                                                  (smoke_fsflags() == SDL_WINDOW_FULLSCREEN_DESKTOP));
 
+    /* no display mode fits: borderless for this run (the dummy display is 1024x768) */
+    setvideodisplaymode(DISPLAY_EXCLUSIVE);
+    SMOKE_CHECK("exclusive at 640x400", getvideodisplaymode() == DISPLAY_EXCLUSIVE);
+    if (_setgamemode(1, 1600, 1200) != 0)
+    {
+        fprintf(stderr, "FAIL: _setgamemode(1600x1200)\n");
+        return 1;
+    }
+    SMOKE_CHECK("exclusive falls back to borderless", (getvideodisplaymode() == DISPLAY_BORDERLESS) &&
+                                                      (smoke_fsflags() == SDL_WINDOW_FULLSCREEN_DESKTOP));
+
     setvideovsync(0);
     SMOKE_CHECK("vsync off", (getvideovsync() == 0) && !smoke_vsynced());
     setvideovsync(1);

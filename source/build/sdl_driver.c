@@ -525,8 +525,8 @@ static int set_window_display(SDL_Window *window, int now, int mode)
         if ((SDL_GetClosestDisplayMode(SDL_GetWindowDisplayIndex(window), &want, &got) == NULL) ||
             (SDL_SetWindowDisplayMode(window, &got) != 0))
         {
-            fprintf(stderr, "BUILDSDL: no exclusive fullscreen mode for %dx%d [%s]; borderless instead.\n",
-                    exclusive_w, exclusive_h, SDL_GetError());
+            printf("No exclusive fullscreen display mode fits %dx%d (%s); using borderless.\n",
+                   exclusive_w, exclusive_h, SDL_GetError());
             return(set_window_display(window, now, DISPLAY_BORDERLESS));
         } /* if */
         sdldebug("exclusive fullscreen at %dx%d, %d Hz.", got.w, got.h, got.refresh_rate);
@@ -1217,7 +1217,8 @@ void setvideovsync(int on)
 #endif
 #if SDL_VERSION_ATLEAST(2, 0, 18)
     if (sdl_renderer != NULL)
-        SDL_RenderSetVSync(sdl_renderer, sdl_vsync);
+        if (SDL_RenderSetVSync(sdl_renderer, sdl_vsync) != 0)
+            sdldebug("SDL_RenderSetVSync() failed: [%s].", SDL_GetError());
 #endif  /* older SDL: at the next window's renderer. */
 } /* setvideovsync */
 
