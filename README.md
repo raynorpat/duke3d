@@ -5,7 +5,7 @@ started as the icculus.org port (the first Linux/Mac/Windows one) and now builds
 with CMake for 64-bit Windows, macOS and Linux. Video, input and audio go
 through SDL2; music is played by an emulated OPL3, so no MIDI device or
 SDL_mixer is needed. The same source builds the 1.5 (Atomic Edition) game, 1.4,
-and 1.3D, plus the 1.3D shareware release.
+1.3D, and the 1.3D, 1.1 and 1.0 shareware releases.
 
 No game data is included. You need your own copy of the game (see
 [Game data](#game-data)).
@@ -58,6 +58,8 @@ matter. The data must match the version you built:
 | `DUKE3D_VERSION=1.4` | 1.4 |
 | `DUKE3D_VERSION=1.3D` | 1.3D full release |
 | `DUKE3D_VERSION=1.3D` with `DUKE3D_SHAREWARE=ON` | 1.3D shareware |
+| `DUKE3D_VERSION=1.1` with `DUKE3D_SHAREWARE=ON` | 1.1 shareware |
+| `DUKE3D_VERSION=1.0` with `DUKE3D_SHAREWARE=ON` | 1.0 shareware |
 
 At startup the game checks `DUKE3D.GRP` against the release GRPs (1.3D, 1.4,
 1.5 Atomic Edition and the shareware releases, by size and CRC-32) and prints a
@@ -69,7 +71,8 @@ such as modified ones, aren't checked.
 `DUKE3D_VERSION` selects which release's game logic and file formats are built.
 It affects saves, demos and multiplayer: a build only plays with peers of the
 same version and edition, and refuses others. Details of the 1.3D and 1.4
-variants are in [docs/v13d/reference.md](docs/v13d/reference.md).
+variants are in [docs/v13d/reference.md](docs/v13d/reference.md), and of 1.0 and
+1.1 in [docs/v10-v11/reference.md](docs/v10-v11/reference.md).
 
 Use a separate build directory for each variant:
 
@@ -79,10 +82,17 @@ cmake --build build-v13d
 
 cmake -S . -B build-v13dsw -DDUKE3D_VERSION=1.3D -DDUKE3D_SHAREWARE=ON
 cmake --build build-v13dsw
+
+cmake -S . -B build-v11sw -DDUKE3D_VERSION=1.1 -DDUKE3D_SHAREWARE=ON
+cmake --build build-v11sw
+
+cmake -S . -B build-v10sw -DDUKE3D_VERSION=1.0 -DDUKE3D_SHAREWARE=ON
+cmake --build build-v10sw
 ```
 
-`DUKE3D_SHAREWARE=ON` with 1.4 or 1.5 is rejected at configure time: only 1.3D
-had a shareware release.
+`DUKE3D_SHAREWARE=ON` with 1.4 or 1.5 is rejected at configure time: only 1.3D,
+1.1 and 1.0 had a shareware release. The reverse holds for 1.1 and 1.0: they
+exist here only as shareware builds.
 
 ### Playing 1.3D
 
@@ -98,14 +108,35 @@ loads saves made by the DOS 1.3D executable of the same
 edition (copy them into the save folder as `game0.sav` to `game9.sav`). Its
 own saves use the same DOS 1.3D layout.
 
+### Playing 1.1 and 1.0
+
+Both were only released as shareware. A 1.1 or 1.0 build needs `DUKE3D.GRP`, the three
+CON files, `DUKE.RTS` and the demos from the matching shareware release in its working
+directory. The release comes as a zip holding `DUKE3DS._1` to `DUKE3DS._4` and an
+`INSTALL.EXE`, which won't run here. Instead, join the four parts and extract them
+(7-Zip's `7zz` reads the result):
+
+```
+cat DUKE3DS._1 DUKE3DS._2 DUKE3DS._3 DUKE3DS._4 > all.bin
+7zz x -o<dest> all.bin
+```
+
+Details are in [docs/v10-v11/reference.md](docs/v10-v11/reference.md).
+
+Each build plays its own release's CON scripts and its three demos, and loads saves made
+by the DOS executable of the same release (copy them into the save folder as `game0.sav`
+to `game9.sav`). 1.0 saves carry no version field, so the 1.0 build recognises them by
+their layout. Its own saves use the DOS layout of its release. Multiplayer works between
+our builds of the same release only.
+
 ## Build options
 
 Pass these with `-D` when configuring.
 
 | Option | Default | Effect |
 |---|---|---|
-| `DUKE3D_VERSION` | `1.5` | Game version: `1.3D`, `1.4` or `1.5` |
-| `DUKE3D_SHAREWARE` | `OFF` | Build the 1.3D shareware version (`VOLUMEONE`); needs `DUKE3D_VERSION=1.3D` |
+| `DUKE3D_VERSION` | `1.5` | Game version: `1.0`, `1.1`, `1.3D`, `1.4` or `1.5` |
+| `DUKE3D_SHAREWARE` | `OFF` | Build a shareware version (`VOLUMEONE`); needs `DUKE3D_VERSION=1.3D`, `1.1` or `1.0` (1.1 and 1.0 are always shareware) |
 | `DUKE3D_POLYMOST` | `ON` | Build the Polymost renderers (see [Renderers](#renderers)); needs OpenGL. `OFF` builds the classic renderer only |
 | `DUKE3D_CONTROLS_MENU` | `ON` | In-game controls configuration menu |
 | `DUKE3D_FETCH_SDL` | `AUTO` | `AUTO` uses installed SDL2 and fetches it if missing; `ON` always builds SDL2 2.32.10 from source; `OFF` fails if SDL2 isn't installed |
@@ -309,7 +340,14 @@ Tests that need game data are only registered when you point CMake at it:
 | `DUKE3D_ATOMIC_GRP` and `DUKE3D_DOS_SAVES_DIR` | `dos_save_*`: loads original DOS 1.5 saves and compares with an independent decoder (`tests/dos_save_decode.py`). 1.5 builds only; needs Python 3 |
 | `DUKE3D_V13D_DATA_DIR` | In 1.3D builds: CON compile, game boot, demo playback, multiplayer and edition checks against the 1.3D full release. With DOS reference saves in its `refsaves/` folder (listed in `tests/data/v13d_save_refs.cmake`), also `dos_save_v13d_*` and `save_refuse_v13d_*`; needs Python 3 |
 | `DUKE3D_V13D_SW_DATA_DIR` | The same for a 1.3D shareware build |
-| `DUKE3D_NET_PEERS` | 1.3D builds: other builds, as `<exe>=<data folder>` entries, to check that multiplayer refuses mismatched versions |
+| `DUKE3D_V11_SW_DATA_DIR`, `DUKE3D_V10_SW_DATA_DIR` | The same for a 1.1 or 1.0 shareware build, using that release's folder. DOS reference saves go in its `refsaves/` folder |
+| `DUKE3D_NET_PEERS` | 1.3D, 1.1 and 1.0 builds: other builds, as `<exe>=<data folder>` entries, to check that multiplayer refuses mismatched versions |
+
+A 1.5 refusal peer (`net_refuse_v10_sw_3`) can't run on the shareware data, so it needs a
+data folder of its own. Make one in a git-ignored build directory, for example
+`build-v15/netpeer`: a symlink to a 1.5 `DUKE3D.GRP`, plus copies of `testdata/*.con`.
+Then list the 1.5 executable with it in `DUKE3D_NET_PEERS`, for example
+`-DDUKE3D_NET_PEERS="build-v15/bin/duke3d=build-v15/netpeer"` (use absolute paths).
 
 For example:
 
@@ -346,6 +384,7 @@ only the data-free tests run there.
 | `testdata/` | The 1.5 CON scripts used by tests |
 | `tools/` | Save extraction and 1.3D reference scripts |
 | `docs/v13d/` | Notes on the 1.3D and 1.4 variants |
+| `docs/v10-v11/` | Reference, rulings and notes for the 1.0 and 1.1 shareware variants |
 
 # Duke Nukem 3D (v1.5 CD Version) Source Code Release - April 1, 2003
 

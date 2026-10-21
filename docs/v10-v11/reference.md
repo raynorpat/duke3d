@@ -203,7 +203,7 @@ Everything here is read from `opendemoread`, `opendemowrite`, `record`, `playbac
 in the Address map, plus `closedemowrite` at 1.0 `0x1f470` and 1.1 `0x1f840`). The 1.3D
 formats they are compared with are in `docs/v13d/reference.md`, "Formats". All
 multi-byte fields are little-endian. The ledger rows are F11-001 to F11-006 and F10-001
-to F10-004.
+to F10-005.
 
 ### Compression
 
@@ -250,7 +250,8 @@ The body is a chain of `kdfread` blocks, the same as 1.3D: `playback` reads
 `min(reccnt, 2520) / multimode` groups of `multimode` records per `kdfread` call
 (`0x1faa1`–`0x1fae8` in 1.1), and `record` flushes with `dfwrite` once 2520 records are
 buffered. Each block is a 2-byte stored length, then an LZW block that decodes to at most
-16380 bytes (whole records), delta-coded against the previous record.
+16380 bytes (whole records). The delta coding restarts for every 2520-record
+`kdfread`/`dfwrite` call, not for every LZW block.
 
 `playback` runs one `domovethings` per 4 `totalclock` ticks, as in 1.3D. Its demo
 counter (`which_demo`) wraps from 4 back to 1 in both releases (1.1 `0x1f8d0`:
@@ -274,7 +275,7 @@ per-field packet decoding in `getpackets`:
 1.0 has no `horz` field at all. Its packet 0 carries 4 flag bits per player (fvel, svel,
 avel as 2 bytes each, bits), where 1.1 carries 5 (fvel, svel, avel 1 byte, bits, horz).
 The decoded 1.0 demos fit the 1.0 layout: `avel` stays within ±108 in all three, and
-`fvel`/`svel` reach about ±4000 to ±5900. The 1.1 demos, read with the 1.1 layout, have
+`fvel`/`svel` peak at about ±4074. The 1.1 demos, read with the 1.1 layout, have
 `avel` up to ±127 as a byte and `fvel` within ±3621.
 
 ### Telling the demo headers apart

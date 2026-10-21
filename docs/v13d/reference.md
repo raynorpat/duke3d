@@ -5,6 +5,9 @@ This file records the reference material for the 1.3D and 1.4 build variants (sp
 themselves are in this repository. Only their locations, checksums and the values
 measured from them are.
 
+The 1.1 and 1.0 shareware variants have their own reference, rulings and notes in
+`docs/v10-v11/` (`reference.md`, `rulings.md`, `notes/`).
+
 ## Data locations
 
 | Edition | Local path | Origin |
