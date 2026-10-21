@@ -168,6 +168,8 @@ struct player_struct;
 #define BIGDUMMYDUKE 1430
 #define SPACESUIT_ICON 2466
 #define THROWFLAME 2500
+#define FLAMETHROWERSPRITE 24 // 1.3D's FREEZESPRITE tile
+#define FLAMETHROWER 2548 // 1.3D's FREEZE tile
 #endif
 
 #include "build/engine.h"
