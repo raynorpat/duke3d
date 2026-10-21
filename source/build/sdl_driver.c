@@ -352,6 +352,10 @@ static void destroy_gl_window(void)
         glDeleteTextures(1, &lastframe);
     lastframe = 0;
     framedrawn = 0;
+    /* let the driver finish with the context before it goes (Apple's
+     *  GL-on-Metal can complete its command buffers after the delete). */
+    glFinish();
+    SDL_GL_MakeCurrent(sdl_window, NULL);
     SDL_GL_DeleteContext(sdl_glcontext);
     sdl_glcontext = NULL;
     SDL_DestroyWindow(sdl_window);
