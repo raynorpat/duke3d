@@ -37,7 +37,8 @@
  *   <dir>/resized.bmp  the last frame shown again after a window resize
  *   <dir>/cmp_<view>_<r0|immediate|vbo|shader>.bmp
  *                      E1L1 viewpoints at horiz 100, 640x480, in renderer 0
- *                      and in renderer 3 on the immediate, vbo and shader paths
+ *                      and in renderer 3 on the immediate, vbo and shader paths;
+ *                      views "corpse" and "pit" are dead troopers by walls
  *   <dir>/shframe_<hud|water|fade|camera>_<shader|r0>.bmp
  *                      the start view with the HUD's gun, the status bar,
  *                      menu letters, text, a line and a pixel (in the water
@@ -67,7 +68,13 @@
  *  crosshair and translucent HUD tiles, the map view's floor sprites) are
  *  further than 8 from renderer 0's over their boxes, whose frames change
  *  when every draw is flushed or when all the frame is copied for every
- *  translucent draw, whose 2D frames are far from immediate
+ *  translucent draw, or that loses more than a tenth of a dead trooper
+ *  lying against a wall (its picture reaching through the wall, as classic
+ *  draws it), draws more than a tenth more of it or of one in a pit than
+ *  classic (over a live trooper in front, over the pit's rim) or, on the
+ *  shader path, shades it further than 7.5 from classic, or whose map view fills a sector
+ *  translucent in 3D (floorstat 256, 384) translucent, whose 2D frames are
+ *  far from immediate
  *  mode's, whose view smaller than the screen isn't where vbo draws it or
  *  loses the border, whose frame doesn't fade or capture, or that doesn't fall back to
  *  vbo, drawing as vbo does, when its shader or framebuffer fails; or whose
@@ -115,6 +122,8 @@ extern SDL_Surface *surface;  /* sdl_driver.c: the 8-bit frame */
 #define EXPLOSION2 1890  /* names.h */
 #define SMALLSMOKE 2329  /* names.h */
 #define CROSSHAIR 2523  /* names.h */
+#define LIZTROOP 1680  /* names.h */
+#define TROOPDEAD 1734  /* LIZTROOP's frame 54: GAME.CON's ATROOPDEAD */
 
 /* polymost.c, which engine.c includes: the editor's tile picker, and the
  * texture cache reset. */
@@ -583,11 +592,185 @@ static long off_palette(const unsigned char *gl)
     return n;
 }
 
+/* Dead troopers and where they're seen from: corpse_find's against a wall
+ *  (with a live trooper in front of it), and one at the bottom of the E1L1
+ *  pit past the start (sector 131, its floor 4096 below the corridor's),
+ *  seen from the corridor (sector 128): what classic shows of it, the pit's
+ *  rim and the walls in front hide in Polymost too, wherever it's drawn
+ *  (classic shows two slivers of it between them, Polymost none). */
+#define NCORPSES 2
+static struct { int32_t x, y, z, cx, cy, cz; short sect, csect, ang; } corpse[NCORPSES] = {
+    { 0 }, { 26464, 47040, 0, 26464, 48440, 0, 0, 0, 1536 },  /* corpse_find fills in the rest */
+};
+static const char *const corpsename[NCORPSES] = { "corpse", "pit" };
+
+/* A dead trooper as the 1.3D demos leave one (a face sprite, xrepeat 40,
+ *  256 above the floor) 96 in from the middle of sector sect's longest
+ *  solid wall, seen from 900 away at 50 degrees off the wall's normal, from
+ *  eye height. Its flat picture, 640 wide, reaches through the wall, which
+ *  classic draws it over: the wall is behind it. 1 if there's such a view. */
+static int corpse_at(short sect)
+{
+    int32_t w, best = -1, dx, dy, s, t;
+    double len, bestlen = 0, nx = 0, ny = 0;
+
+    for (w = sector[sect].wallptr; w < sector[sect].wallptr + sector[sect].wallnum; w++)
+    {
+        if (wall[w].nextsector >= 0) continue;
+        dx = wall[wall[w].point2].x - wall[w].x; dy = wall[wall[w].point2].y - wall[w].y;
+        len = sqrt((double) dx * dx + (double) dy * dy);
+        if (len > bestlen) { bestlen = len; best = w; }
+    }
+    if (bestlen < 1024) return 0;
+    dx = wall[wall[best].point2].x - wall[best].x; dy = wall[wall[best].point2].y - wall[best].y;
+    for (s = -1; s <= 1; s += 2)  /* the normal into the sector */
+    {
+        nx = -dy * s / bestlen; ny = dx * s / bestlen;
+        corpse[0].x = (wall[best].x + wall[wall[best].point2].x) / 2 + (int32_t) (nx * 96);
+        corpse[0].y = (wall[best].y + wall[wall[best].point2].y) / 2 + (int32_t) (ny * 96);
+        if (inside(corpse[0].x, corpse[0].y, sect) == 1) break;
+    }
+    if (s > 1) return 0;
+    corpse[0].sect = sect;
+    corpse[0].z = sector[sect].floorz - 256;
+    corpse[0].cz = sector[sect].floorz - 9889;  /* the demo's eye height */
+    for (t = -1; t <= 1; t += 2)
+    {
+        corpse[0].cx = corpse[0].x + (int32_t) (900 * (nx * 0.643 + dx * t / bestlen * 0.766));
+        corpse[0].cy = corpse[0].y + (int32_t) (900 * (ny * 0.643 + dy * t / bestlen * 0.766));
+        corpse[0].csect = sect;
+        updatesector(corpse[0].cx, corpse[0].cy, &corpse[0].csect);
+        if ((corpse[0].csect >= 0) && (corpse[0].cz > sector[corpse[0].csect].ceilingz) &&
+            cansee(corpse[0].cx, corpse[0].cy, corpse[0].cz, corpse[0].csect, corpse[0].x, corpse[0].y, corpse[0].z - 1024, sect))
+        {
+            corpse[0].ang = getangle(corpse[0].x - corpse[0].cx, corpse[0].y - corpse[0].cy);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* corpse_at the first sector it finds a view in, and the pit's sectors and
+ *  heights from where it and the corridor are; 0 if either isn't there (the
+ *  pit's floor not well below the corridor's). */
+static int corpse_find(void)
+{
+    short sect;
+
+    corpse[1].sect = corpse[1].csect = 0;
+    updatesector(corpse[1].x, corpse[1].y, &corpse[1].sect);
+    updatesector(corpse[1].cx, corpse[1].cy, &corpse[1].csect);
+    if ((corpse[1].sect < 0) || (corpse[1].csect < 0) ||
+        (sector[corpse[1].sect].floorz < sector[corpse[1].csect].floorz + 2048))
+        return 0;
+    corpse[1].z = sector[corpse[1].sect].floorz - 256;
+    corpse[1].cz = sector[corpse[1].csect].floorz - 9889;
+    for (sect = 0; sect < numsectors; sect++)
+        if (!(sector[sect].floorstat & 3) && corpse_at(sect))
+        {
+            printf("classic comparison: a dead trooper in sector %d at %d,%d seen from %d,%d; "
+                   "one in the pit, sector %d, seen from sector %d\n", sect,
+                   (int) corpse[0].x, (int) corpse[0].y, (int) corpse[0].cx, (int) corpse[0].cy,
+                   corpse[1].sect, corpse[1].csect);
+            return 1;
+        }
+    return 0;
+}
+
+/* Draws dead trooper c's view, with it or without; buf gets the frame (gl
+ *  0: renderer 0's, CMPW by CMPH, top-down; 1: read_front's). Its sector is
+ *  made eight times as misty, so its distance shade shows, and for the one
+ *  against a wall a live trooper stands 40 in front of it, a little to the
+ *  side, drawn over it as classic draws the nearer sprite last. */
+static void corpse_shot(unsigned char *buf, int c, int with, int gl)
+{
+    short s = -1, live = -1;
+    int x, y;
+    unsigned char vis = sector[corpse[c].sect].visibility;
+    double d = sqrt((double) (corpse[c].x - corpse[c].cx) * (corpse[c].x - corpse[c].cx) +
+                    (double) (corpse[c].y - corpse[c].cy) * (corpse[c].y - corpse[c].cy));
+
+    if (with)
+    {
+        s = insertsprite(corpse[c].sect, 0);
+        sprite[s].x = corpse[c].x; sprite[s].y = corpse[c].y; sprite[s].z = corpse[c].z;
+        sprite[s].picnum = TROOPDEAD;
+        sprite[s].cstat = 0;
+        sprite[s].xrepeat = sprite[s].yrepeat = 40;
+        sprite[s].xoffset = sprite[s].yoffset = 0;
+        sprite[s].shade = 0;
+        sprite[s].pal = 0;
+        sprite[s].ang = corpse[c].ang;
+    }
+    if (c == 0) live = insertsprite(corpse[c].sect, 0);
+    if (live >= 0)
+    {
+        sprite[live].x = corpse[c].x - (int32_t) ((corpse[c].x - corpse[c].cx) * 40 / d) - (int32_t) ((corpse[c].y - corpse[c].cy) * 160 / d);
+        sprite[live].y = corpse[c].y - (int32_t) ((corpse[c].y - corpse[c].cy) * 40 / d) + (int32_t) ((corpse[c].x - corpse[c].cx) * 160 / d);
+        sprite[live].z = sector[corpse[c].sect].floorz;
+        sprite[live].picnum = LIZTROOP;
+        sprite[live].cstat = 0;
+        sprite[live].xrepeat = sprite[live].yrepeat = 40;
+        sprite[live].xoffset = sprite[live].yoffset = 0;
+        sprite[live].shade = 0;
+        sprite[live].pal = 0;
+        sprite[live].ang = corpse[c].ang;
+    }
+    sector[corpse[c].sect].visibility = 112;
+    clearallviews(0);
+    drawrooms(corpse[c].cx, corpse[c].cy, corpse[c].cz, corpse[c].ang, 100, corpse[c].csect);
+    drawmasks();
+    nextpage();
+    sector[corpse[c].sect].visibility = vis;
+    if (gl)
+        read_front(buf);
+    else
+        for (y = 0; y < CMPH; y++)
+            for (x = 0; x < CMPW; x++)
+            {
+                SDL_Color *c = &surface->format->palette->colors[((unsigned char *) surface->pixels)[y * surface->pitch + x]];
+                buf[(y * CMPW + x) * 3] = c->r; buf[(y * CMPW + x) * 3 + 1] = c->g; buf[(y * CMPW + x) * 3 + 2] = c->b;
+            }
+    if (s >= 0) deletesprite(s);
+    if (live >= 0) deletesprite(live);
+}
+
+/* Of the dead trooper's pixels in renderer 0 (where its frames with and
+ *  without it differ), the share whose GL pixel (nearest) doesn't change;
+ *  colour gets the mean |GL - renderer 0| per channel over the others, and
+ *  extra the GL pixels that change where renderer 0's don't, as a share of
+ *  renderer 0's. */
+static double corpse_missing(unsigned char *const r0[2], unsigned char *const gl[2], double *colour, double *extra)
+{
+    long x, y, i, j, k, n = 0, missing = 0, d = 0, more = 0;
+
+    for (y = 0; y < CMPH; y++)
+        for (x = 0; x < CMPW; x++)
+        {
+            i = (y * CMPW + x) * 3;
+            j = ((ydim - 1 - y * ydim / CMPH) * xdim + x * xdim / CMPW) * 3;
+            if (memcmp(&r0[0][i], &r0[1][i], 3) == 0)
+            {
+                if (memcmp(&gl[0][j], &gl[1][j], 3) != 0) more++;
+                continue;
+            }
+            n++;
+            if (memcmp(&gl[0][j], &gl[1][j], 3) == 0) { missing++; continue; }
+            for (k = 0; k < 3; k++) d += abs((int) gl[1][j + k] - (int) r0[1][i + k]);
+        }
+    *colour = (n > missing) ? (double) d / ((n - missing) * 3) : 0;
+    *extra = n ? (double) more / n : 1.0;
+    return n ? (double) missing / n : 1.0;
+}
+
 /* Draws the comparison views in renderer 0, then in renderer 3 on the
  *  immediate (vertex arrays), vbo and shader paths, and checks them against
- *  the limits; the shader path's views must be all palette colours.
- *  Captures go to <dir>/cmp_<view>_<r0|immediate|vbo|shader>.bmp. 0: fail,
- *  77: no OpenGL. */
+ *  the limits; the shader path's views must be all palette colours. Then
+ *  the dead troopers by walls: on each path at most a tenth of renderer 0's
+ *  pixels of the one against a wall may be missing, at most a tenth more may
+ *  be drawn of either, and on the shader path the rest may be at most 7.5
+ *  from renderer 0's. Captures go to
+ *  <dir>/cmp_<view>_<r0|immediate|vbo|shader>.bmp. 0: fail, 77: no OpenGL. */
 static int classic_compare(const char *dir)
 {
     static const struct { int32_t path; const char *name; } cmppath[] = {
@@ -601,6 +784,8 @@ static int classic_compare(const char *dir)
     long off;
     uint32_t copies;
     SDL_Surface *s;
+    unsigned char *corpse0[NCORPSES][2], *corpse3[NCORPSES][2];
+    int c;
 
     for (v = 0; v < MAXSPRITES; v++)
     {
@@ -631,6 +816,19 @@ static int classic_compare(const char *dir)
             }
         s = SDL_CreateRGBSurfaceWithFormatFrom(classic[v], CMPW, CMPH, 24, CMPW * 3, SDL_PIXELFORMAT_RGB24);
         snprintf(path, sizeof (path), "%s/cmp_%s_r0.bmp", dir, cmpview[v].name);
+        SDL_SaveBMP(s, path);
+        SDL_FreeSurface(s);
+    }
+    if (!corpse_find()) { fprintf(stderr, "FAIL: no view of a dead trooper against a wall or in the pit\n"); return 0; }
+    for (c = 0; c < NCORPSES; c++)
+    {
+        for (v = 0; v < 2; v++)
+        {
+            corpse0[c][v] = malloc(CMPW * CMPH * 3);
+            corpse_shot(corpse0[c][v], c, v, 0);
+        }
+        s = SDL_CreateRGBSurfaceWithFormatFrom(corpse0[c][1], CMPW, CMPH, 24, CMPW * 3, SDL_PIXELFORMAT_RGB24);
+        snprintf(path, sizeof (path), "%s/cmp_%s_r0.bmp", dir, corpsename[c]);
         SDL_SaveBMP(s, path);
         SDL_FreeSurface(s);
     }
@@ -696,11 +894,30 @@ static int classic_compare(const char *dir)
             }
         }
         free(gl);
+        for (c = 0; c < NCORPSES; c++)
+        {
+            for (v = 0; v < 2; v++)
+            {
+                corpse3[c][v] = malloc((size_t) xdim * ydim * 3);
+                corpse_shot(corpse3[c][v], c, v, 1);
+            }
+            snprintf(path, sizeof (path), "%s/cmp_%s_%s.bmp", dir, corpsename[c], cmppath[p].name);
+            save_front(path, &rs, &gs);
+            d = corpse_missing(corpse0[c], corpse3[c], &m3, &m0);
+            printf("classic comparison, %s: %s dead trooper %.1f%% missing%s, %.1f%% extra (most 10%%), "
+                   "the rest mean |r3 - r0| %.2f\n", cmppath[p].name, corpsename[c], 100 * d,
+                   c ? "" : " (most 10%)", 100 * m0, m3);
+            if (((c == 0) && (d > 0.1)) || (m0 > 0.1)) ok = 0;
+            if (sh && (m3 > 7.5)) ok = 0;  /* the shader path's shade is classic's */
+            for (v = 0; v < 2; v++) free(corpse3[c][v]);
+        }
         if (glGetError() != GL_NO_ERROR) { fprintf(stderr, "FAIL: GL error in the classic comparison\n"); return 0; }
     }
     gldrawpathrequest = GLPATH_AUTO;
     polymosttexfullbright = 256;
     for (v = 0; v < NCMPVIEWS; v++) free(classic[v]);
+    for (c = 0; c < NCORPSES; c++)
+        for (v = 0; v < 2; v++) free(corpse0[c][v]);
     for (v = 0; v < MAXSPRITES; v++) sprite[v].shade = savedshade[v];
     if (!ok) fprintf(stderr, "FAIL: renderer 3 is further from renderer 0 than pinned\n");
     return ok;
@@ -914,6 +1131,20 @@ static int shader_frames(const char *dir, int32_t x, int32_t y, int32_t z, short
         }
         if (f == 2) setpalettefade(0, 0, 0, 0);
     }
+    /* The map view fills a sector translucent in 3D (floorstat 256, 384)
+     * opaque, as classic's drawmapview does: the same frame. */
+    buf = malloc((size_t) n * 3);
+    for (i = 0; i < 2; i++)
+    {
+        sector[sect].floorstat |= i ? 384 : 256;
+        shader_frame(4, x, y, z, a, sect);
+        sector[sect].floorstat &= ~384;
+        read_front(buf);
+        d = front_diff(buf, gl[4]);
+        printf("shader frames: map view mean |sector floorstat %d - 0| %.2f\n", i ? 384 : 256, d);
+        if (d != 0) { fprintf(stderr, "FAIL: the shader path's map view fills a translucent sector translucent\n"); ok = 0; }
+    }
+    free(buf);
     polymost_precache(FIRSTGUN, 0, 1);
     polymost_precache(BOTTOMSTATUSBAR, 2, 0);
     printf("shader frames: %u RGB textures made, %u retexturings (palettes, a fade, precaching)\n",
@@ -1125,7 +1356,7 @@ int main(int argc, char **argv)
     Uint32 t0;
     short floorspr, unlit, litspr;
     unsigned char *map512, *over[2], *artcopy, *glowshot[2];
-    double mapdiff512, glow[3];
+    double mapdiff512, maptrans[2], glow[3];
     static const char *glowname[3] = { "neither", "masked", "translucent" };
     int overtop, startw, starth, artsize, gamepal, askh;
     SDL_Rect usable;
@@ -1333,6 +1564,18 @@ int main(int argc, char **argv)
     read_front(map512);
     mapdiff512 = front_diff(map512, map[hasnpot]);
     sprite[floorspr].cstat = 32|2;
+    /* A sector translucent in 3D (floorstat 256, 384) is filled opaque in the
+     * map view, as classic's drawmapview does: the same frame. */
+    for (i = 0; i < 2; i++)
+    {
+        sector[sectnum].floorstat |= i ? 384 : 256;
+        clearview(0);
+        drawmapview(posx, posy, 2048, ang);
+        nextpage();
+        read_front(map512);
+        maptrans[i] = front_diff(map512, map[hasnpot]);
+        sector[sectnum].floorstat &= ~384;
+    }
     for (i = 0; i < 2; i++)
     {
         clearview(0);
@@ -1351,6 +1594,7 @@ int main(int argc, char **argv)
         printf("map view npot %d: mean red+green/2 %.1f\n", npot, mapmean[npot]);
     printf("map view: mean |floor sprite cstat 512 - 2| %.2f; a 2D picture over it %s\n",
            mapdiff512, overtop ? "is on top" : "isn't on top");
+    printf("map view: mean |sector floorstat 256 - 0| %.2f, |384 - 0| %.2f\n", maptrans[0], maptrans[1]);
     if (hasnpot)
         printf("map view: mean |npot 1 - npot 0| %.2f\n", front_diff(map[0], map[1]));
     printf("3D view: mean |after map - before map| %.2f\n", front_diff(view3d[0], view3d[1]));
@@ -1538,6 +1782,8 @@ int main(int argc, char **argv)
             { fprintf(stderr, "FAIL: the map view is blank (npot %d)\n", npot); return 1; }
     if (mapdiff512 == 0)
         { fprintf(stderr, "FAIL: the map view's cstat 512 floor sprite looks as cstat 2\n"); return 1; }
+    if ((maptrans[0] != 0) || (maptrans[1] != 0))
+        { fprintf(stderr, "FAIL: the map view fills a sector with floorstat 256 or 384 translucent\n"); return 1; }
     if (!overtop)
         { fprintf(stderr, "FAIL: a 2D picture drawn after the map view isn't on top\n"); return 1; }
     if (memcmp(view3d[0], view3d[1], (size_t) xdim * ydim * 3) != 0)
