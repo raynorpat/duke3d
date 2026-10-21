@@ -184,7 +184,7 @@ domovethings' call sequence after krand is the same as 1.3D, with 19 calls in ea
 | 1.3D sw | 14 (`0x0e`) | getpackets `0x11038`, saveplayer `0x3bb03` (for comparison) |
 
 The 1.0 and 1.1 demo headers carry no version either. opendemoread reads `reccnt`,
-volume, level, skill and a 2-byte field (5 reads, against 10 in 1.3D).
+volume, level, skill and `ud.multimode` (5 reads, against 10 in 1.3D; see "Formats").
 
 The ruling is in `docs/v10-v11/rulings.md`.
 
@@ -195,3 +195,211 @@ The ruling is in `docs/v10-v11/rulings.md`.
 remain before the code object's last page ends. A 1.0 capture tool must check at most
 `0x560` bytes, or use another cave. The playback demo-end pattern
 (`cmp [reccnt],0 / jg / cmp byte [esp+4],0 / jnz`) matches exactly once in each EXE.
+
+## Formats
+
+Everything here is read from `opendemoread`, `opendemowrite`, `record`, `playback`,
+`closedemowrite`, `saveplayer`, `loadplayer`, `loadpheader` and `getpackets` (addresses
+in the Address map, plus `closedemowrite` at 1.0 `0x1f470` and 1.1 `0x1f840`). The 1.3D
+formats they are compared with are in `docs/v13d/reference.md`, "Formats". All
+multi-byte fields are little-endian. The ledger rows are F11-001 to F11-006 and F10-001
+to F10-004.
+
+### Compression
+
+`compress` and `uncompress` are the 1996 LZW of E-012 in both releases (E11-014: both
+fmatch exactly against 1.3D sw). They are also checked on data: the first `kdfread` block
+of each original demo decodes with `tests/v13d_save_decode.py`'s `uncompress` to the
+16380 bytes its block header announces (1638 records), and every demo's block chain
+decodes to exactly `reccnt` records and ends exactly at the end of the file:
+
+| Demo | Header bytes | `reccnt` | Volume / level | Skill | `multimode` | First block (stored → decoded) | Blocks |
+|---|---|---|---|---|---|---|---|
+| 1.0 DEMO1 | `08 13 00 00 00 00 02 01 00` | 4872 | 0 / 0 | 2 | 1 | 6803 → 16380 | 4 |
+| 1.0 DEMO2 | `bf 11 00 00 00 01 02 01 00` | 4543 | 0 / 1 | 2 | 1 | 5975 → 16380 | 4 |
+| 1.0 DEMO3 | `37 0f 00 00 00 02 02 01 00` | 3895 | 0 / 2 | 2 | 1 | 7103 → 16380 | 3 |
+| 1.1 DEMO1 | `75 0b 00 00 00 01 02 01 00` | 2933 | 0 / 1 | 2 | 1 | 4243 → 16380 | 3 |
+| 1.1 DEMO2 | `6d 06 00 00 00 05 02 01 00` | 1645 | 0 / 5 | 2 | 1 | 5340 → 16380 | 2 |
+| 1.1 DEMO3 | `fa 0f 00 00 00 00 02 01 00` | 4090 | 0 / 0 | 2 | 1 | 5837 → 16380 | 3 |
+
+The 1.3D shareware demos store skill 4 at the same place; the 1.0 and 1.1 demos store 2.
+
+### Demo file
+
+The header is 9 bytes in both releases, with no version field (1.3D: 24 bytes):
+
+| Offset | Size | Field | 1.1 | 1.0 |
+|---|---|---|---|---|
+| 0 | 4 | `ud.reccnt` (records, all players) | `0x130562` | `0x130ebb` |
+| 4 | 1 | `ud.volume_number` | `0x1305ce` | `0x130f27` |
+| 5 | 1 | `ud.level_number` | `0x1305ca` | `0x130f23` |
+| 6 | 1 | `ud.player_skill` | `0x1305c6` | `0x130f1f` |
+| 7 | 2 | `ud.multimode` | `0x13053e` | `0x130e97` |
+
+The 1-byte fields are read into the low byte of 4-byte `ud` fields, as in 1.3D.
+`ud.multimode` is identified by its use: `record` and `playback` size each record group
+as `multimode * 10` and divide `reccnt` by it (1.1 `0x1fabb`–`0x1fae8`). The header has
+no `m_coop`, `m_monsters_off` or `m_respawn_*` fields, so a multiplayer demo plays with
+whatever those settings are. `opendemoread` calls `newgame(volume, level, skill)` straight
+after the header (1.1 `0x49bf0`, 1.0 `0x49180`). `opendemowrite` writes a zero `reccnt`
+placeholder, and `closedemowrite` flushes the last block, seeks to 0 and writes the total
+record count, as in 1.3D. The two releases' demo code is the same apart from addresses
+(normalized decompile diff of `record`, `playback` and `closedemowrite`).
+
+The body is a chain of `kdfread` blocks, the same as 1.3D: `playback` reads
+`min(reccnt, 2520) / multimode` groups of `multimode` records per `kdfread` call
+(`0x1faa1`–`0x1fae8` in 1.1), and `record` flushes with `dfwrite` once 2520 records are
+buffered. Each block is a 2-byte stored length, then an LZW block that decodes to at most
+16380 bytes (whole records), delta-coded against the previous record.
+
+`playback` runs one `domovethings` per 4 `totalclock` ticks, as in 1.3D. Its demo
+counter (`which_demo`) wraps from 4 back to 1 in both releases (1.1 `0x1f8d0`:
+`which_demo == 4`), not from 10 as in 1.3D. That is attract-mode behavior, not format;
+it is left to the game rows.
+
+### Input record
+
+Both releases use a 10-byte record, but the fields differ in 1.0. The layouts come from
+`processinput`'s reads of `sync[]` (1.1 `0x1072e8`, 1.0 `0x102eb8`) and from the
+per-field packet decoding in `getpackets`:
+
+| Offset | 1.1 (= 1.3D) | 1.0 |
+|---|---|---|
+| 0 | `avel` s8 (`0x46747`) | `fvel` s16 (`0x45fc9`) |
+| 1 | `horz` s8 (`0x47276`: `horiz += horz >> 1`) | (high byte of `fvel`) |
+| 2 | `fvel` s16 (`0x46b6b`) | `svel` s16 (`0x45fe5`) |
+| 4 | `svel` s16 (`0x46b87`) | `avel` s16 (`0x45ba6`, added to `ang` at `0x45bc8`) |
+| 6 | `bits` u32 (`0x44d3e`) | `bits` u32 (`0x4422e`) |
+
+1.0 has no `horz` field at all. Its packet 0 carries 4 flag bits per player (fvel, svel,
+avel as 2 bytes each, bits), where 1.1 carries 5 (fvel, svel, avel 1 byte, bits, horz).
+The decoded 1.0 demos fit the 1.0 layout: `avel` stays within ±108 in all three, and
+`fvel`/`svel` reach about ±4000 to ±5900. The 1.1 demos, read with the 1.1 layout, have
+`avel` up to ±127 as a byte and `fvel` within ±3621.
+
+### Telling the demo headers apart
+
+- **1.0 from 1.1: not possible from the header.** The two layouts are identical and carry
+  no version. Only the body differs (the record layout above), and nothing in it marks
+  the release. Each build has to assume its own release, so a 1.0 demo played in the 1.1
+  build (or the reverse) desyncs rather than being refused.
+- **1.0 or 1.1 from 1.3D: yes, by `multimode`.** A 1.3D header read as 1.0/1.1 gives
+  `multimode = m_coop | (low byte of 1.3D multimode << 8)`, which is at least 256 for any
+  real demo (the 1.3D sw demos give `0x0100`). A 1.0/1.1 header read as 1.3D gives
+  `multimode` = (high byte of `multimode`, 0) | (low byte of the first block length
+  << 8), a multiple of 256 and so never 1 to 8 (1.0 DEMO1 gives `0x9300`, which is
+  negative as the signed short the 1.3D build reads). So the range check
+  `1 <= multimode <= 8` (`MAXPLAYERS` is 8 in both releases) refuses each in the other's
+  build. The 1.3D build's existing check (`mm < 1 || mm > MAXPLAYERS`) already refuses
+  all six 1.0/1.1 demos.
+
+### Save file
+
+Every field is written with `dfwrite`, so every field is its own E-012 LZW block. In
+write order (1.1 `saveplayer` `0x38f60`, 1.0 `0x388d0`; `loadplayer` reads in the same
+order):
+
+| # | Field | 1.1 | 1.0 | 1.3D sw |
+|---|---|---|---|---|
+| 1 | `BYTEVERSION` (4) | 12 (`0x38f73`) | **absent** | 14 |
+| 2 | save name (19) | yes | yes (first field, `0x3890c`) | yes |
+| 3 | `ud.volume_number`, `level_number`, `player_skill` (4 each) | yes | yes | yes |
+| 4 | thumbnail (160 × 100) | yes | yes | yes |
+| 5 | `numwalls` (2), `wall` (32 each) | 8192 walls (`0x3904f`) | **`numwalls` walls** (`0x3899a`) | 8192 |
+| 6 | `numsectors` (2), `sector` (40 each) | 1024 sectors | **`numsectors` sectors** (`0x389c8`) | 1024 |
+| 7 | `sprite[4096]` (44 each) | yes | yes | yes |
+| 8 | `headspritesect[1025]`, `prevspritesect`, `nextspritesect`, `headspritestat[1025]`, `prevspritestat`, `nextspritestat` (2 each) | yes | yes | yes |
+| 9 | `numcyclers` (2), `cyclers[256]` (12 each) | yes | yes | yes |
+| 10 | `ps[]` | **8 × `0x34e`** | **8 × `0x34e`** | 16 × `0x552` |
+| 11 | `po[]` (16 each) | **8** | **8** | 16 |
+| 12 | `hittype[2048]` (71 each), raw | no | **here, raw, no bitmap** (`0x38ac8`) | no |
+| 13 | `numanimwalls` (2), `animwall` (3072 bytes) | yes | yes | yes |
+| 14 | `msx[2048]`, `msy[2048]` (4 each) | yes | yes | yes |
+| 15 | `spriteqloc` (2), `spriteq[64]` (2 each) | yes | yes | yes |
+| 16 | `mirrorcnt` (2), `mirrorwall[64]`, `mirrorsector[64]` (2 each) | yes | yes | yes |
+| 17 | `show2dsector[128]` | yes | yes | yes |
+| 18 | script bitmap, `script[]` (4 each) | **10240** | **10240** | 20000 |
+| 19 | `actorscrptr[4096]` (4 each) | yes | yes | yes |
+| 20 | hittype bitmap (2048), `hittype[2048]` (71 each) | yes | **no** (see 12) | yes |
+| 21 | `lockclock` (4), `pskybits` (2), `pskyoff[256]` (2 each) | yes | yes | yes |
+| 22 | `animatecnt` (4), `animatesect[64]` (2), `animateptr[64]` (4), `animategoal[64]` (4), `animatevel[64]` (4) | yes | yes | yes |
+| 23 | trailing scalars | 7 (below) | 4 (below) | 12 |
+
+Trailing scalars, in order:
+
+- **1.1 (7):** `earthquaketime` (1, `0x131580`), `ud.from_bonus` (2, `0x130538`),
+  `ud.respawn_monsters` (4, `0x130592`), `ud.respawn_items` (4, `0x130596`), `ud.god`
+  (1, `0x1301f0`), `ud.auto_run` (**1**, `0x130532`), `ud.crosshair` (**1**, `0x1301f3`).
+  There is no `secretlevel`, `respawn_inventory`, `monsters_off`, `last_level` or `eog`,
+  and `auto_run` and `crosshair` are bytes (4 bytes in 1.3D).
+- **1.0 (4):** `earthquaketime` (1, `0x130f68`), `ud.from_bonus` (2, `0x130e91`),
+  `ud.respawn_monsters` (4, `0x130eeb`), `ud.respawn_items` (4, `0x130eef`).
+
+How the 1.1 names were settled: `from_bonus` is set to `level_number + 1` on the secret
+exit in `processinput` (`0x4524a`–`0x4526c`; 1.1 jumps to the fixed level 5, so it has
+no `secretlevel`). `auto_run` is toggled by `gamefunc_AutoRun` (8) with quote 85+ in
+`0x1d4f0` (`0x1e0ed`–`0x1e128`) and doubles the speed in `getinput` (`0x43f20`).
+`crosshair` is toggled by `gamefunc_Toggle_Crosshair` (47) with quote 20+ in the same
+function (`0x1e14b`–`0x1e186`).
+`respawn_monsters` and `respawn_items` are packet 5 bytes 5 and 6, the bytes 1.3D's
+packet 5 puts in the same two fields, and they have the same set of referencing
+functions as their 1.3D counterparts (`getpackets`, `parse`, `execute`, `newgame`
+setup, plus `moveactors` for `respawn_items`); `loadplayer` copies each into its `m_`
+field. `god` is the byte that `0x1e530` clears with its neighbors and that
+`moveplayers` reads; it also sits where 1.3D's `god` sits in the list. The 1.0 fields
+sit at the same offsets from `ud.reccnt` as the 1.1 ones (−`0x2a`, +`0x30`, +`0x34`),
+and 1.0 `earthquaketime` is the byte `domovethings` counts down (`0x20ae0`).
+
+`loadpheader` reads the version (1.1 only, compared with 12), the name, the three `ud`
+longs and the thumbnail, as in 1.3D (1.1 `0x38600`, 1.0 `0x38130`). The save name slot
+stride is `0x16` in both.
+
+### Script pointers in saves
+
+**1.1: offsets, the 1.3D scheme.** `saveplayer` converts and `loadplayer` converts back:
+
+- `script[]`: an entry `v` with `0x107388 <= v < 0x111388` (signed, `0x39270`/`0x39278`;
+  that is `script` to `script + 0xa000`) is stored as `v - 0x107388` and marked in a
+  10240-byte bitmap written before it.
+- `actorscrptr[]`: every non-zero entry is stored as an offset from `script`
+  (`0x39304`–`0x39316`).
+- `hittype[]`: for sprites `i < 2048` whose `actorscrptr[sprite[i].picnum]` is non-zero
+  (`0x39385`), `temp_data[1]`, `[4]` and `[5]` (hittype `+0x33`, `+0x3f`, `+0x43`) are
+  converted when inside `script[]`; bits 0, 1 and 2 of a 2048-byte bitmap mark them.
+- `animateptr[]`: offsets from `sector` (`0x21f330`; `0x3959e`).
+
+**1.0: mixed.**
+
+- `script[]`: offsets with a bitmap, but the test is only `v >= 0x102f08` (signed, no
+  upper bound: `cmp ..,0x102f08 / jl` at `0x38bc5`). Any word at or above the base is
+  converted, which round-trips in DOS. Neither 1.0 CON file contains a 7-digit
+  constant, so in practice only pointers are marked.
+- `actorscrptr[]`: **every** entry, zero included, is stored as `v - 0x102f08`
+  (`0x38c4a`–`0x38c58`), and `loadplayer` adds the base back to every entry. An empty
+  slot is stored as `0xffefd0f8`.
+- `hittype[]`: written **raw**, as item 12 above, with no bitmap and no conversion. So
+  `temp_data[1]`, `[4]` and `[5]` hold **raw DOS addresses** inside 1.0's `script[]`
+  (`0x102f08`–`0x10cf07`). 1.0 `execute` (`0x377f0`) uses `temp_data[4]` (`0xda3af`) as a
+  pointer into the script (it reads `*(t[4] + 0x10)`), so these are live pointers. A 1.0
+  loader must translate a value `v` in `[0x102f08, 0x10cf08)` to `v - 0x102f08` for the
+  sprites whose picnum has an actor script, as the 1.1 saver does. Those sprites'
+  other `temp_data` slots are left alone.
+- `animateptr[]`: offsets from `sector` (`0x21f01c`; `0x38d1a`), as in 1.1.
+
+### Network packets
+
+Network play against the DOS executables is outside the spec, so these are recorded only
+as far as `getpackets` shows them. Both releases' packets differ from 1.3D:
+
+- 1.1 handles packet types 0, 1, 4, 5, 6, 7, 8, 17 and 250. 1.3D also handles 16 and
+  255.
+- Packet 0 (master to slaves) packs per-player flag bits (5 per player in 1.1, 4 in 1.0)
+  and writes straight into a per-player input array (1.1 `0x107298`), not into the 1.3D
+  move FIFO.
+- Packet 5 (new game) has 7 data bytes in 1.1 (level, volume, skill, `monsters_off`,
+  `respawn_monsters`, `respawn_items`, `coop`); 1.3D has 9 (adds `respawn_inventory` and
+  `marker`). Packet 8 (new game with a user map) carries the same 7 bytes, but its bytes
+  5 and 6 go to `respawn_items` and `respawn_monsters` (`0x10d49`–`0x10d6c`), the reverse
+  of packet 5 (`0x10c7e`–`0x10c94`).
+- Packet 6 (name) has `BYTEVERSION` at byte 1 in 1.1 (`0x10dc6`), names from byte 2. In
+  1.0 the name starts at byte 1, with no version.
