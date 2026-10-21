@@ -4197,7 +4197,7 @@ void polymost_fillpolygon (int32_t npoints)
 		}
 		shb[0] = max(shb[0]-1,0); shb[1] = max(shb[1]-1,0);
 		shb[2] = min(shb[2]+1,glshfbox); shb[3] = min(shb[3]+1,glshfboy);
-		k = (globalorientation>>7)&3; if ((k < 2) || (!glshtrans)) k = 1;
+		k = (globalpolytype)?((globalorientation>>7)&3):0; if ((k < 2) || (!glshtrans)) k = 1;
 		if (k >= 2) polymost_transread(shb);
 		polymost_shprog((k >= 2) ? 2 : 1);
 		glsub_color((float)globalshade,(float)(palookup[globalpal]?globalpal:0),0.f,(float)k);
@@ -4210,7 +4210,7 @@ void polymost_fillpolygon (int32_t npoints)
 	glBindTexture(GL_TEXTURE_2D,glpic[gltexcache(globalpicnum,globalpal,0)]);
 
 	f = polymost_shaderamp(globalpicnum,globalshade,&zero);
-	switch ((globalorientation>>7)&3) {
+	switch ((globalpolytype)?((globalorientation>>7)&3):0) {
 		case 0:
 		case 1: a = 1.0; glDisable(GL_BLEND); break;
 		case 2: a = 0.66; glEnable(GL_BLEND); break;
