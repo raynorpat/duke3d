@@ -129,6 +129,16 @@
 - [ ] Steps 2–4: implement for 8-bit and GL windows in game and editor; vsync via `SDL_GL_SetSwapInterval(0/1)` (GL) and recreating the SDL renderer with/without `SDL_RENDERER_PRESENTVSYNC` (8-bit); game video menu entries; suites pass; manual check on the Mac: each display mode in renderer 0 and 3, vsync on/off (fps capped vs uncapped), Alt+Enter.
 - [ ] Step 5: commits, e.g. `engine: add borderless and exclusive fullscreen and a vsync switch`, `game: add display mode and vsync settings`, `editor: add displaymode and vsync to build.cfg`.
 
+### Task 11: one GL context for the session (addendum)
+
+**Files:** Modify `source/build/sdl_driver.c` (window/context lifetime, 8-bit present, mode sets, Alt+Enter, resize, screenshots), `source/build/polymost.c`/`glext.c` only as needed; README. Tests: `tests/sdl_driver_smoke.c`, `tests/render_gl.c`.
+
+**Interfaces:** once created, the GL window and context live until shutdown. Renderers 0–2 and the editor's 2D mode upload the 8-bit frame (`frameplace`, xdim×ydim) as a texture and present it through the context with the current (faded, brightness-adjusted) palette — on 2.1 via the existing present shader path's palette lookup, on 1.1/1.5 by converting to RGB on upload — with today's letterboxing and nearest scaling. Renderer 3 entry/exit just switches drawing. Without any GL (POLYMOST off, or no GL driver), the SDL_Renderer present stays exactly as today. Remove the macOS SDL_HINT_RENDER_DRIVER workaround if it is no longer needed.
+
+- [ ] Step 1: failing tests: smoke — after 0→3→0→3 the GL context pointer is unchanged and never deleted; render_gl — an 8-bit frame presented through the context matches the SDL_Renderer present (read back the window) for a palette, a fade and a brightness level.
+- [ ] Steps 2–4: implement; editor Alt+K loop ≥ 30 runs × 12 switches with zero crashes, plus 2D↔3D, display modes, Alt+Enter, vsync, HiDPI, internal size, screenshots in every renderer; classic pins unchanged; fps for renderer 0 with vsync on/off not worse than now.
+- [ ] Step 5: commits, e.g. `engine: keep one GL context and present 8-bit modes through it`.
+
 ### Task 10: docs, matrix, speed and hand-over
 
 **Files:** Modify `README.md`.

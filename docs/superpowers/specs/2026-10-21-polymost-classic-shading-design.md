@@ -96,6 +96,14 @@ Side-by-side captures of E1L1, classic vs renderer 3 at the same camera (session
 - **EDuke32 ports** *(user)*: 27d32c7c (classic voxel `drawslab` palette lookup hoisted, output identical) and an adaptation of 5924cd30: Duke's 8-level brightness stays; the shader path's present pass adds contrast and saturation (EDuke32's formula and ranges, default identity), with `GLContrast`/`GLSaturation` settings. *(User chose keeping britable.)*
 - **Display mode and vsync** *(user)*: windowed / borderless (today's desktop fullscreen, the default for fullscreen users) / exclusive fullscreen at the configured resolution, and vsync on/off (default on), in game and editor, all renderers, with config keys and game menu entries; Alt+Enter toggles windowed and the chosen full-screen style; `BUILD_WINDOWED` still forces a window.
 
+- **One GL context for the session** *(user: "the real fix" for the editor's Alt+K crash in Apple's
+  GL-on-Metal driver, and groundwork for phase 4's renderer switching from the video menu)*: once
+  an OpenGL context exists it is never deleted on a renderer or mode change. Renderers 0–2 (and the
+  editor's 2D mode) present their 8-bit frame through that context (palette applied on upload or
+  in a shader), so switching renderer or 2D/3D only changes what is drawn, not the window or
+  context. Without GL (or with GL unavailable) the SDL_Renderer present stays. Window size, display
+  mode, vsync, letterboxing, nearest scaling, fades and brightness look as today.
+
 ## Non-goals
 
 - Classic's look-up/down shearing (true perspective stays).
