@@ -412,7 +412,7 @@ every fmatch-paired function of `sw11.bin` with `sw13.bin` and voting on the `ps
 pairs in matching instructions (processinput, shoot, doincrements, displayweapon,
 resetplayerstats, resetweapons, resetinventory, cheatkeys and the rest). The fields that
 have no 1.3D partner were then read at every use. 1.0 has the same `0x34e` stride; its map
-was not checked. Field names are this tree's. "1.3D" is the 1.3D offset. Ledger rows quote
+is in "player_struct (1.0)" below. Field names are this tree's. "1.3D" is the 1.3D offset. Ledger rows quote
 these names.
 
 Compared with 1.3D, 1.1:
@@ -560,3 +560,55 @@ Inventory items (`inven_icon`, checkavailinven order):
 - 6 scuba
 - 7 space suit
 - 8 boots
+
+### player_struct (1.0)
+
+`ps[]` is 8 × `0x34e` bytes at `0x112ab0`. The map was derived the same way as the 1.1
+map, by aligning every fmatch-paired function of `sw10.bin` with `sw11.bin` (1200 pairs,
+`tools/fmatch.py`) and voting on `ps` offset pairs. The two bytes 1.0 has and 1.1 lacks
+were then read at every use. Every field below has a clear majority. A few offsets also
+get one stray vote from a misaligned instruction, such as the one noted under `aim_mode`.
+
+Offsets `0x000`–`0x321` are the same as 1.1, from `zoom` through `inven_icon`. That
+includes the 1.1-only fields `burn_time`, `spacesuit_amount` and `on_sector_effector`;
+`0x321` `inven_icon` has 39 votes (1.1 `0x13343` / 1.0 `0x132f3`). From `0x322` on, 1.0
+differs:
+- it adds one byte at `0x322` and one at `0x34c`
+- it has no `no_autoaim` (1.1 `0x326`) and no `aim_mode` (1.1 `0x32f`)
+
+1.0 has no mouse-aim mode at all: getinput has no `horz` and no aim bit (Formats, "Input
+record"), cheatkeys has no aim toggle and resetplayerstats, newgame and resetpspritevars
+never touch an aim field.
+
+| 1.0 | Size | Field | 1.1 | Evidence (1.1 / 1.0) |
+|---|---|---|---|---|
+| `0x000`–`0x321` | | `zoom` … `inven_icon` | same | every voted offset maps to itself |
+| `0x322` | 1 | unnamed (1.0 only) | — | read only by displayrest (`0x156c3`): when non-zero it calls the 1.0-only `0x37f30`, which draws every other player as an APLAYER tile around the screen centre. No code writes it, so it is 0 unless a save sets it |
+| `0x323` | 1 | `buttonpalette` | `0x322` | secret-exit test `0x45241` / `0x44682` |
+| `0x324` | 1 | `jetpack_on` | `0x323` | 25 votes (`0x139cf` / `0x13976`) |
+| `0x325` | 1 | `spritebridge` | `0x324` | 9 votes (`0x16cd9` / `0x16c68`) |
+| `0x326` | 1 | `lastrandomspot` | `0x325` | pickrandomspot `0x487e1` / `0x47d51` |
+| — | | (no `no_autoaim`) | `0x326` | 1.0 aim (`0x3ee40`) has no gate, and resetplayerstats has no clear |
+| `0x327`–`0x32e` | | `spacesuit_on` … `frag_ps` | same | `spacesuit_on` 8 votes, `scuba_on` 11, `frag_ps` 9 |
+| — | | (no `aim_mode`) | `0x32f` | the one vote for `0x32f`→`0x313` (`0x44ebe` / `0x443ab`) pairs 1.1's `aim_mode` test with 1.0's `on_ground` test in the slope-look code, which has no aim gate in 1.0 |
+| `0x32f` | 10 | `gotweapon[10]` | `0x330` | 13 votes (`0x13bfa` / `0x13ba1`); `gotweapon[k]` at `0x32f+k` |
+| `0x339` | 1 | `refresh_inventory` | `0x33a` | cheatkeys `0x50945` / `0x4fcb6` |
+| `0x33a` | 4 | `palette` | `0x33b` | 22 votes (`0x14a80` / `0x14a7b`) |
+| `0x33e` | 1 | `toggle_key_flag` | `0x33f` | `0x2e845` / `0x2e126` |
+| `0x33f` | 1 | `knuckle_incs` | `0x340` | `0x41dfb` / `0x413fb` |
+| `0x340` | 1 | `select_dir` | `0x341` | processinput SE17 block `0x453d8` / `0x44821` |
+| `0x341` | 1 | `walking_snd_toggle` | `0x342` | `0x46a6d` / `0x45ec1` |
+| `0x342` | 1 | `interface_toggle_flag` | `0x343` | cheatkeys debounce `0x507cc` / `0x4fb6c` |
+| `0x343` | 1 | `palookup` | `0x344` | `0x18ae5` / `0x18a18` |
+| `0x344` | 1 | `hard_landing` | `0x345` | 14 votes (`0x20063` / `0x1fc93`) |
+| `0x345` | 1 | `max_secret_rooms` | `0x346` | `0x227c8` / `0x22290` |
+| `0x346` | 1 | `secret_rooms` | `0x347` | `0x2275e` / `0x22226` |
+| `0x347` | 3 | `pals[3]` | `0x348` | 13 votes each (`0x14ec3` / `0x14ec3`), plus one stray vote |
+| `0x34a` | 1 | `max_actors_killed` | `0x34b` | `0x19511` / `0x19415` |
+| `0x34b` | 1 | `actors_killed` | `0x34c` | `0x22610` / `0x220d8` |
+| `0x34c` | 1 | `auto_run` (1.0 only; per player) | — | toggled by cheatkeys on input bit 17 with quote 85 + value (`0x5026a`–`0x5028b`); read by getinput to pick the running speeds (`0x4390a`). 1.1 keeps `ud.auto_run` instead (Save file, trailing scalars) |
+| `0x34d` | 1 | `return_to_center` | `0x34d` | 7 votes (`0x2006f` / `0x1fc9f`) |
+
+`0x322` is unnamed because nothing in 1.0 sets it. `auto_run` is named from its toggle
+quote and its use; it is game state in 1.0, because cheatkeys runs it from the synced
+input bits.
