@@ -169,8 +169,10 @@ struct player_struct;
 
 #define NUM_SOUNDS 450
 
-// Sounds the game logic may name: 1.3D's sound table held 348.
-#if DUKE3D_GAMEVER < GAMEVER_14
+// Sounds the game logic may name: 1.1's sound table held 255, 1.3D's 348.
+#if DUKE3D_GAMEVER < GAMEVER_13D
+#define GAME_NUM_SOUNDS 255
+#elif DUKE3D_GAMEVER < GAMEVER_14
 #define GAME_NUM_SOUNDS 348
 #else
 #define GAME_NUM_SOUNDS NUM_SOUNDS

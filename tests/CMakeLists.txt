@@ -548,6 +548,12 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
               "-DWORK=${CMAKE_BINARY_DIR}/cc_${_vold_name}"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/con_compile_v13d.cmake")
     set_tests_properties(con_compile_${_vold_name} PROPERTIES TIMEOUT 120)
+    add_test(NAME game_boot_${_vold_name}
+      COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
+              "-DDATA=${_vold_data}" "-DEDITION=${_vold_edition}"
+              "-DWORK=${CMAKE_BINARY_DIR}/gb_${_vold_name}"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/game_boot_v13d.cmake")
+    set_tests_properties(game_boot_${_vold_name} PROPERTIES TIMEOUT 240)
   endif()
   # The edition check must refuse the 1.0 and 1.3D shareware as 1.1.
   if(_vold_edition STREQUAL "sw11" AND DUKE3D_V10_SW_DATA_DIR AND DUKE3D_V13D_SW_DATA_DIR)
