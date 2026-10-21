@@ -8,6 +8,7 @@
 #include "duke3d.h"
 #include "glext.h"
 #include "displaymode.h"
+#include "videoopts.h"
 #if PLATFORM_WIN32
 #include <direct.h>
 #define mkdir(d, m) _mkdir(d)
@@ -170,7 +171,8 @@ int main(void)
               "ScreenshotFormat = \"JPG\"\nGLDrawPath = \"Shader\"\n"
               "GLInternalWidth = -5\nGLInternalHeight = 99999\n"
               "GLContrast = \"9.5\"\nGLSaturation = \"-1\"\n"
-              "DisplayMode = \"Exclusive\"\nVSync = 0\n", f);
+              "DisplayMode = \"Exclusive\"\nVSync = 0\n"
+              "Supersampling = \"8K\"\nGLTextureFilter = \"Trilinear\"\n", f);
         fclose(f);
         CONFIG_GetSetupFilename();
         CONFIG_ReadSetup();
@@ -184,6 +186,8 @@ int main(void)
         check("cfg GLSaturation -1", GLSaturation == GL_SATURATION_MIN, 1);
         check("cfg DisplayMode Exclusive", DisplayMode, DISPLAY_EXCLUSIVE);
         check("cfg VSync 0", VSync, 0);
+        check("cfg Supersampling 8K", GLSupersampling, SS_8K);
+        check("cfg GLTextureFilter Trilinear", GLTextureFilter, TEXFILTER_TRILINEAR);
         CONFIG_WriteSetup();
         f = fopen(cfg, "r");
         n = fread(text, 1, sizeof(text) - 1, f);
@@ -199,12 +203,15 @@ int main(void)
         check("cfg writes GLSaturation 0", strstr(text, "GLSaturation = \"0\"") != NULL, 1);
         check("cfg writes DisplayMode exclusive", strstr(text, "DisplayMode = \"exclusive\"") != NULL, 1);
         check("cfg writes VSync 0", strstr(text, "VSync = 0") != NULL, 1);
+        check("cfg writes Supersampling 8k", strstr(text, "Supersampling = \"8k\"") != NULL, 1);
+        check("cfg writes GLTextureFilter trilinear", strstr(text, "GLTextureFilter = \"trilinear\"") != NULL, 1);
 
         f = fopen(cfg, "w");
         fputs("[Screen Setup]\nRenderer = -2\nGLTextureMipLevel = -3\n"
               "GLDrawPath = \"bogus\"\nGLInternalWidth = 320\n"
               "GLContrast = \"0.75\"\nGLSaturation = \"1.25x\"\n"
-              "DisplayMode = \"bogus\"\nVSync = 7\n", f);
+              "DisplayMode = \"bogus\"\nVSync = 7\n"
+              "Supersampling = \"16k\"\nGLTextureFilter = \"bogus\"\n", f);
         fclose(f);
         CONFIG_ReadSetup();
         check("cfg Renderer -2", RendererSetting, 0);
@@ -215,6 +222,8 @@ int main(void)
         check("cfg GLSaturation 1.25x (not a number)", GLSaturation == 1.0, 1);
         check("cfg DisplayMode bogus", DisplayMode, DISPLAY_BORDERLESS);
         check("cfg VSync 7", VSync, 1);
+        check("cfg Supersampling 16k", GLSupersampling, SS_OFF);
+        check("cfg GLTextureFilter bogus", GLTextureFilter, TEXFILTER_NEAREST);
         CONFIG_WriteSetup();
         CONFIG_ReadSetup();
         check("cfg GLContrast 0.75 round trip", GLContrast == 0.75, 1);

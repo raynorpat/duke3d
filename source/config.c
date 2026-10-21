@@ -44,6 +44,7 @@ extern int stricmp(const char *x, const char *y);
 #include "scriplib.h"
 #include "glext.h"
 #include "displaymode.h"
+#include "videoopts.h"
 
 
 // we load this in to get default button and key assignments
@@ -86,6 +87,8 @@ int32 GLInternalWidth, GLInternalHeight;  // renderer 3's size, 0: the window's
 double GLContrast, GLSaturation;  // renderer 3's shader path's, 1: as it is
 int32 DisplayMode;  // DISPLAY_*: borderless by default
 int32 VSync;
+int32 GLSupersampling;  // SS_*: renderer 3's, "off", "2k", "4k" or "8k" in the file
+int32 GLTextureFilter;  // TEXFILTER_*: "nearest", "bilinear" or "trilinear" in the file
 char ScreenshotFormat[4];  // png, jpg or bmp
 int32 ScreenWidth;
 int32 ScreenHeight;
@@ -350,6 +353,8 @@ void CONFIG_SetDefaults( void )
    GLSaturation = 1.0;
    DisplayMode = DISPLAY_BORDERLESS;
    VSync = 1;
+   GLSupersampling = SS_OFF;
+   GLTextureFilter = TEXFILTER_NEAREST;
    strcpy(ScreenshotFormat, "png");
    ScreenWidth = 320;
    ScreenHeight = 200;
@@ -753,6 +758,14 @@ void CONFIG_ReadSetup( void )
    SCRIPT_GetNumber( scripthandle, "Screen Setup", "VSync",&VSync);
    VSync = (VSync != 0);
    temp[0] = 0;
+   SCRIPT_GetString( scripthandle, "Screen Setup", "Supersampling",temp);
+   GLSupersampling = videoopts_ssfromname(temp);
+   if (GLSupersampling < 0) GLSupersampling = SS_OFF;
+   temp[0] = 0;
+   SCRIPT_GetString( scripthandle, "Screen Setup", "GLTextureFilter",temp);
+   GLTextureFilter = videoopts_filterfromname(temp);
+   if (GLTextureFilter < 0) GLTextureFilter = TEXFILTER_NEAREST;
+   temp[0] = 0;
    SCRIPT_GetString( scripthandle, "Screen Setup", "ScreenshotFormat",temp);
    if (stricmp(temp, "jpg") == 0)
       strcpy(ScreenshotFormat, "jpg");
@@ -901,6 +914,8 @@ void CONFIG_WriteSetup( void )
    CONFIG_PutDecimal( "GLSaturation", GLSaturation );
    SCRIPT_PutString( scripthandle, "Screen Setup", "DisplayMode",(char *)display_modename(DisplayMode));
    SCRIPT_PutNumber( scripthandle, "Screen Setup", "VSync",VSync,false,false);
+   SCRIPT_PutString( scripthandle, "Screen Setup", "Supersampling",(char *)videoopts_ssname(GLSupersampling));
+   SCRIPT_PutString( scripthandle, "Screen Setup", "GLTextureFilter",(char *)videoopts_filtername(GLTextureFilter));
    SCRIPT_PutString( scripthandle, "Screen Setup", "ScreenshotFormat",ScreenshotFormat);
    SCRIPT_PutNumber( scripthandle, "Misc", "Executions",ud.executions,false,false);
    SCRIPT_PutNumber( scripthandle, "Misc", "RunMode",ud.auto_run,false,false);

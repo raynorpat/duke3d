@@ -15,7 +15,8 @@ add_library(duke3d_game OBJECT
   savegame.c
   scriplib.c
   sector.c
-  sounds.c)
+  sounds.c
+  videoopts.c)
 
 # "build/engine.h" etc. resolve against this directory.
 target_include_directories(duke3d_game PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -38,7 +39,7 @@ endif()
 
 # The map editor. The target isn't called "build", so it can't clash with
 # the build/ binary directory; the executable still is.
-add_executable(buildeditor astub.c build/build.c buildcfg.c editormode.c)
+add_executable(buildeditor astub.c build/build.c buildcfg.c editormode.c videoopts.c)
 set_target_properties(buildeditor PROPERTIES OUTPUT_NAME build)
 target_include_directories(buildeditor PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(buildeditor PRIVATE

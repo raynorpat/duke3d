@@ -712,7 +712,8 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
 endif()
 
 # The editor build.cfg reader and writer; engine-free, so it runs everywhere.
-add_executable(build_cfg build_cfg.c "${PROJECT_SOURCE_DIR}/source/buildcfg.c")
+add_executable(build_cfg build_cfg.c "${PROJECT_SOURCE_DIR}/source/buildcfg.c"
+  "${PROJECT_SOURCE_DIR}/source/videoopts.c")
 target_include_directories(build_cfg PRIVATE "${PROJECT_SOURCE_DIR}/source")
 add_test(NAME build_cfg COMMAND build_cfg)
 
@@ -724,3 +725,9 @@ add_test(NAME editor_mode COMMAND editor_mode)
 set_tests_properties(editor_mode PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
   TIMEOUT 30)
+
+# The VIDEO page's resolution list, draw size, supersampling and save
+# tracking; engine-free.
+add_executable(video_opts video_opts.c "${PROJECT_SOURCE_DIR}/source/videoopts.c")
+target_include_directories(video_opts PRIVATE "${PROJECT_SOURCE_DIR}/source")
+add_test(NAME video_opts COMMAND video_opts)

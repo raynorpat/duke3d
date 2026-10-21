@@ -3,6 +3,7 @@
 #include "buildcfg.h"
 #include "build/glext.h"
 #include "build/displaymode.h"
+#include "videoopts.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -45,6 +46,8 @@ void buildcfg_defaults(buildcfg_t *c)
     c->glinternalheight = 0;
     c->glcontrast = 1.0;
     c->glsaturation = 1.0;
+    c->supersampling = SS_OFF;
+    c->gltexturefilter = TEXFILTER_NEAREST;
 }
 
 static int32_t clamp_int(long v, long lo, long hi)
@@ -96,6 +99,16 @@ static void apply(buildcfg_t *c, const char *name, const char *val)
     }
     if (!strcmp(name, "gldrawpath")) {
         c->gldrawpath = gl_pathfromname(val);
+        return;
+    }
+    if (!strcmp(name, "supersampling")) {
+        i = videoopts_ssfromname(val);
+        c->supersampling = (i >= 0) ? i : SS_OFF;
+        return;
+    }
+    if (!strcmp(name, "gltexturefilter")) {
+        i = videoopts_filterfromname(val);
+        c->gltexturefilter = (i >= 0) ? i : TEXFILTER_NEAREST;
         return;
     }
     for (i = 0; i < BUILDCFG_NUMKEYS; i++) {
@@ -184,6 +197,8 @@ int buildcfg_write(const buildcfg_t *c, const char *path)
     fprintf(f, "glinternalheight = %d\n", (int)c->glinternalheight);
     fprintf(f, "glcontrast = %g\n", c->glcontrast);
     fprintf(f, "glsaturation = %g\n", c->glsaturation);
+    fprintf(f, "supersampling = %s\n", videoopts_ssname(c->supersampling));
+    fprintf(f, "gltexturefilter = %s\n", videoopts_filtername(c->gltexturefilter));
     fprintf(f, "mousesensitivity = %g\n", c->mousesensitivity);
     for (i = 0; i < BUILDCFG_NUMKEYS; i++)
         fprintf(f, "%s = %02x\n", key_names[i], c->keys[i]);
