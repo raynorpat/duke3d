@@ -119,6 +119,10 @@ int main(void)
     if (f) fclose(f);
     text[n] = '\0';
     CHECK(strstr(text, "displaymode = exclusive\n") && strstr(text, "vsync = 0\n"));
+    /* the editor saves what it read: exclusive stays exclusive */
+    CHECK(buildcfg_read(&c, cfg) == 0 && c.displaymode == DISPLAY_EXCLUSIVE);
+    CHECK(buildcfg_write(&c, cfg) == 0);
+    CHECK(buildcfg_read(&c, cfg) == 0 && c.displaymode == DISPLAY_EXCLUSIVE);
     putstr(cfg, "displaymode = bogus\nvsync = 5\n");
     CHECK(buildcfg_read(&c, cfg) == 0);
     CHECK(c.displaymode == DISPLAY_BORDERLESS && c.vsync == 1);

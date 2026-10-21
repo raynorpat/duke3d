@@ -1853,9 +1853,8 @@ static void savebuildcfg(void)
 
    if (saved || (buildcfgpath[0] == 0)) return;
    saved = 1;
-   // BUILD_WINDOWED forces a window for this run only; keep build.cfg's choice.
-   if (getenv(BUILD_WINDOWED) == NULL)
-       buildcfg.displaymode = getvideodisplaymode();  // Alt+Enter's is kept
+   // displaymode stays build.cfg's: Alt+Enter, BUILD_WINDOWED and an
+   // exclusive that fell back to borderless last for this run only.
    // Alt+K's renderer is kept; -renderer's alone isn't.
    if (editorrendererpicked)
        buildcfg.renderer = editormode.renderer;
