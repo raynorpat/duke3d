@@ -622,6 +622,47 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
               -P "${CMAKE_CURRENT_SOURCE_DIR}/dos_save_v13d.cmake")
     set_tests_properties(save_refuse_${_vold_name} PROPERTIES TIMEOUT 120)
   endif()
+  # Two copies of the 1.1 build must meet over UDP on localhost, and both
+  # peers must refuse each DUKE3D_NET_PEERS build (1.0, 1.3D sw, ...) by
+  # BYTEVERSION alone (rulings.md). 1.0 is Task 16.
+  if(_vold_data AND _vold_edition STREQUAL "sw11")
+    set(DUKE3D_NET_PEERS "" CACHE STRING "Other duke3d builds to test multiplayer refusal against")
+    # DukeMatch (the default) and co-op (/c), both put straight into E1L1.
+    set(_net_port 23800)
+    foreach(_mode dm coop)
+      if(_mode STREQUAL "dm")
+        set(_net_args "/v1 /l1")
+        set(_net_test net_connect_${_vold_name})
+      else()
+        set(_net_args "/v1 /l1 /c")
+        set(_net_test net_connect_${_vold_name}_coop)
+      endif()
+      add_test(NAME ${_net_test}
+        COMMAND "${CMAKE_COMMAND}"
+                "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_vold_data}"
+                "-DB=$<TARGET_FILE:duke3d>" "-DB_DATA=${_vold_data}"
+                -DPORT=${_net_port} -DMODE=connect "-DARGS=${_net_args}"
+                "-DWORK=${CMAKE_BINARY_DIR}/nc_${_vold_name}_${_mode}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
+      set_tests_properties(${_net_test} PROPERTIES TIMEOUT 90)
+      math(EXPR _net_port "${_net_port} + 2")
+    endforeach()
+    set(_net_n 0)
+    foreach(_peer IN LISTS DUKE3D_NET_PEERS)
+      string(REGEX REPLACE "=.*" "" _peer_exe "${_peer}")
+      string(REGEX REPLACE "^[^=]*=" "" _peer_data "${_peer}")
+      math(EXPR _net_n "${_net_n} + 1")
+      math(EXPR _net_port "${_net_port} + 2")
+      add_test(NAME net_refuse_${_vold_name}_${_net_n}
+        COMMAND "${CMAKE_COMMAND}"
+                "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_vold_data}"
+                "-DB=${_peer_exe}" "-DB_DATA=${_peer_data}"
+                -DPORT=${_net_port} -DMODE=refuse
+                "-DWORK=${CMAKE_BINARY_DIR}/nr_${_vold_name}_${_net_n}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
+      set_tests_properties(net_refuse_${_vold_name}_${_net_n} PROPERTIES TIMEOUT 90)
+    endforeach()
+  endif()
   # The edition check must refuse the 1.0 and 1.3D shareware as 1.1.
   if(_vold_edition STREQUAL "sw11" AND DUKE3D_V10_SW_DATA_DIR AND DUKE3D_V13D_SW_DATA_DIR)
     add_test(NAME v11_edition_mismatch

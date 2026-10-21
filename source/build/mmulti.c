@@ -1160,7 +1160,8 @@ static int connect_to_everyone(gcomtype *gcom, int myip, int bcast)
     for (i = 1; i <= gcom->numplayers; i++)
     {
         ip = allowed_addresses[i].host;
-        if (ip == myip)
+        /* Fix: match the port too, or peers sharing an IP all take the last slot. */
+        if ((ip == myip) && (allowed_addresses[i].port == udpport))
             gcom->myconnectindex = i;
 
         printf("%s is player #%d.\n", static_ipstring(ip), i);

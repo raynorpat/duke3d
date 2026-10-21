@@ -1024,6 +1024,15 @@ void checksync(void)
 
       if (syncstat)
       {
+          static char syncreported;
+
+          // Also report it once on stdout, so a log shows it.
+          if (!syncreported)
+          {
+              syncreported = 1;
+              printf("Out Of Sync - Please restart game\n");
+              fflush(stdout);
+          }
           printext256(4L,130L,31,0,"Out Of Sync - Please restart game",0);
           //printext256(4L,138L,31,0,"RUN DN3DHELP.EXE for information.",0);
       }

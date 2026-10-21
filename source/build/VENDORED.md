@@ -78,6 +78,9 @@ BUILDLIC.TXT LICENSE.md
   explicit casts
 - `mmulti.c`: `socklen_t` is `int` on Windows (it was `size_t`, which is 8
   bytes on Win64 while Winsock's `recvfrom` takes an `int *`)
+- `mmulti.c`: `connect_to_everyone` finds the local player's slot by port as
+  well as host, so peers sharing an IP (e.g. two on localhost) get their own
+  slots instead of both taking the last one
 - `pragmas.h`: `klabs` negates as unsigned, so `klabs(INT32_MIN)` gives
   `INT32_MIN` as x86 `neg` does instead of undefined behaviour (ledger E-009)
 - `engine.c`: version-guarded 1.4 engine logic, on `BUILD_ENGINEREV` (see
