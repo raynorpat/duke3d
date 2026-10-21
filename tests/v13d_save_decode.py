@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Independent decoder for Duke Nukem 3D 1.3D (DOS) saves.
+"""Independent decoder for Duke Nukem 3D 1.3D, 1.1 and 1.0 (DOS) saves.
 
-Written from the DOS file layout (docs/v13d/reference.md, "Save file"), not
-from the game's save code. 1.3D compresses each block with the 1996 LZW
-variant (ledger E-012), which this file implements itself.
+Written from the DOS file layouts (docs/v13d/reference.md and
+docs/v10-v11/reference.md, "Save file"), not from the game's save code. All
+three compress each block with the 1996 LZW variant (ledger E-012), which
+this file implements itself.
 
   v13d_save_decode.py compare <dos save> <our save>
       decompress both files block by block. Prints one line per block that
@@ -12,15 +13,19 @@ variant (ledger E-012), which this file implements itself.
 
   v13d_save_decode.py script <save> <out>
       write the compiled CON script the save holds, one "<name> <index> <value>"
-      line per word: "script" for script[0..20000) and "actor" for each
-      non-zero actorscrptr[0..4096) entry. Script addresses are byte offsets
-      from script[0], which is how 1.3D stores them.
+      line per word: "script" for script[0..20000) (1.1 and 1.0: 10240) and
+      "actor" for each non-zero actorscrptr[0..4096) entry. Script addresses
+      are byte offsets from script[0], which is how all three store them.
+      The save's layout is told from its first block: a 1.3D BYTEVERSION, 1.1's
+      BYTEVERSION 12, or 1.0's 19-byte save name (1.0 writes no version).
 """
 import struct
 import sys
 
 PLAYER_SIZE = 0x552
 BYTEVERSIONS = (103, 14)  # full, shareware
+BYTEVERSION_11 = 12
+PLAYER_SIZE_11 = 0x34e    # 1.1 and 1.0
 
 
 def uncompress(b):
@@ -86,21 +91,54 @@ class Reader:
 
 def read_script(path):
     r = Reader(open(path, 'rb').read())
+    first = r.block()
+    r.pos = 0
+    if len(first) == 19:
+        return read_script_10(r)
     version, = struct.unpack('<i', r.read(4, 1))
-    if version not in BYTEVERSIONS:
-        raise ValueError('not a 1.3D save (BYTEVERSION %d)' % version)
+    if version == BYTEVERSION_11:
+        psize, nplayers, nscript = PLAYER_SIZE_11, 8, 10240
+    elif version in BYTEVERSIONS:
+        psize, nplayers, nscript = PLAYER_SIZE, 16, 20000
+    else:
+        raise ValueError('not a 1.3D or 1.1 save (BYTEVERSION %d)' % version)
     # Everything saveplayer writes before the script, in order.
     for size, count in ((19, 1), (4, 1), (4, 1), (4, 1), (160, 100),
                         (2, 1), (32, 8192), (2, 1), (40, 1024), (44, 4096),
                         (2, 1025), (2, 4096), (2, 4096),
                         (2, 1025), (2, 4096), (2, 4096),
-                        (2, 1), (12, 256), (PLAYER_SIZE, 16), (16, 16),
+                        (2, 1), (12, 256), (psize, nplayers), (16, nplayers),
                         (2, 1), (3072, 1), (4, 2048), (4, 2048),
                         (2, 1), (2, 64), (2, 1), (2, 64), (2, 64), (1, 128)):
         r.read(size, count)
-    r.read(1, 20000)  # which words were addresses; they're offsets either way
-    script = struct.unpack('<20000i', r.read(4, 20000))
+    r.read(1, nscript)  # which words were addresses; they're offsets either way
+    script = struct.unpack('<%di' % nscript, r.read(4, nscript))
     actors = struct.unpack('<4096i', r.read(4, 4096))
+    return script, actors
+
+
+def read_script_10(r):
+    """1.0: no BYTEVERSION, only numwalls walls and numsectors sectors, and a
+    raw hittype[] before the animated walls."""
+    for size, count in ((19, 1), (4, 1), (4, 1), (4, 1), (160, 100)):
+        r.read(size, count)
+    numwalls, = struct.unpack('<h', r.read(2, 1))
+    r.read(32, numwalls)
+    numsectors, = struct.unpack('<h', r.read(2, 1))
+    r.read(40, numsectors)
+    for size, count in ((44, 4096),
+                        (2, 1025), (2, 4096), (2, 4096),
+                        (2, 1025), (2, 4096), (2, 4096),
+                        (2, 1), (12, 256), (PLAYER_SIZE_11, 8), (16, 8),
+                        (71, 2048),
+                        (2, 1), (3072, 1), (4, 2048), (4, 2048),
+                        (2, 1), (2, 64), (2, 1), (2, 64), (2, 64), (1, 128)):
+        r.read(size, count)
+    r.read(1, 10240)
+    script = struct.unpack('<10240i', r.read(4, 10240))
+    # Every entry is stored minus the script's run-time address, so an empty
+    # one comes out negative (-0x2d5f08 in the DOSBox saves).
+    actors = tuple(max(v, 0) for v in struct.unpack('<4096i', r.read(4, 4096)))
     return script, actors
 
 

@@ -1,9 +1,9 @@
-# Compiles the 1.3D CONs from a data folder with the game's compiler and
-# compares the bytecode with the script stored in a DOS save made by the
+# Compiles the 1.3D or 1.1 CONs from a data folder with the game's compiler
+# and compares the bytecode with the script stored in a DOS save made by the
 # original executable. Then it does the same with copies converted to LF line
 # endings (as git or a package may leave them), which must compile the same.
 #
-#   cmake -DDATA=<data dir> -DEDITION=<full|sw> -DCON_COMPILE=<exe>
+#   cmake -DDATA=<data dir> -DEDITION=<full|sw|sw11|sw10> -DCON_COMPILE=<exe>
 #         -DPYTHON=<python3> -DDECODER=<v13d_save_decode.py> -DWORK=<scratch>
 #         -P con_compile_v13d.cmake
 include("${CMAKE_CURRENT_LIST_DIR}/v13d_data.cmake")

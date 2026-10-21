@@ -467,6 +467,10 @@ struct player_struct
     char walking_snd_toggle, palookup, hard_landing;
     char max_secret_rooms,secret_rooms,/*fire_flag,*/pals[3];
     char max_actors_killed,actors_killed,return_to_center;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    short spacesuit_amount; // 1.1's inventory item 5, the space suit
+    char spacesuit_used;
+#endif
 };
 
 extern unsigned char tempbuf[2048], packbuf[576];

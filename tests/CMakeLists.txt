@@ -518,6 +518,40 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
   endif()
 endif()
 
+# 1.1 and 1.0 shareware builds: the same scripts as the 1.3D tests, with the
+# editions sw11 and sw10 (docs/v10-v11/reference.md).
+set(DUKE3D_V11_SW_DATA_DIR "" CACHE PATH "Duke Nukem 3D 1.1 shareware folder")
+set(DUKE3D_V10_SW_DATA_DIR "" CACHE PATH "Duke Nukem 3D 1.0 shareware folder")
+if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpreter_FOUND)
+  if(DUKE3D_VERSION STREQUAL "1.1")
+    set(_vold_edition sw11)
+    set(_vold_name v11_sw)
+    set(_vold_data "${DUKE3D_V11_SW_DATA_DIR}")
+  else()
+    set(_vold_edition sw10)
+    set(_vold_name v10_sw)
+    set(_vold_data "${DUKE3D_V10_SW_DATA_DIR}")
+  endif()
+  if(_vold_data)
+    add_test(NAME con_compile_${_vold_name}
+      COMMAND "${CMAKE_COMMAND}"
+              "-DDATA=${_vold_data}" "-DEDITION=${_vold_edition}"
+              "-DCON_COMPILE=$<TARGET_FILE:con_compile>"
+              "-DPYTHON=${Python3_EXECUTABLE}"
+              "-DDECODER=${CMAKE_CURRENT_SOURCE_DIR}/v13d_save_decode.py"
+              "-DWORK=${CMAKE_BINARY_DIR}/cc_${_vold_name}"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/con_compile_v13d.cmake")
+    set_tests_properties(con_compile_${_vold_name} PROPERTIES TIMEOUT 120)
+  endif()
+  # The edition check must refuse the 1.0 and 1.3D shareware as 1.1.
+  if(_vold_edition STREQUAL "sw11" AND DUKE3D_V10_SW_DATA_DIR AND DUKE3D_V13D_SW_DATA_DIR)
+    add_test(NAME v11_edition_mismatch
+      COMMAND "${CMAKE_COMMAND}" -DEDITION=sw11
+              "-DOTHERS=${DUKE3D_V10_SW_DATA_DIR}$<SEMICOLON>${DUKE3D_V13D_SW_DATA_DIR}"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/v13d_check.cmake")
+  endif()
+endif()
+
 # The editor build.cfg reader and writer; engine-free, so it runs everywhere.
 add_executable(build_cfg build_cfg.c "${PROJECT_SOURCE_DIR}/source/buildcfg.c")
 target_include_directories(build_cfg PRIVATE "${PROJECT_SOURCE_DIR}/source")
