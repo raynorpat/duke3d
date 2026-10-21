@@ -6,19 +6,24 @@ if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type" FORCE)
 endif()
 
-option(DUKE3D_SHAREWARE "Build the 1.3D shareware (VOLUMEONE) version" OFF)
-# Which release's game logic to build. 1.3D and 1.4 need their own data; see
-# docs/v13d/reference.md.
-set(DUKE3D_VERSION "1.5" CACHE STRING "Game version to build: 1.3D, 1.4 or 1.5")
-set_property(CACHE DUKE3D_VERSION PROPERTY STRINGS 1.3D 1.4 1.5)
-if(NOT DUKE3D_VERSION MATCHES "^(1\\.3D|1\\.4|1\\.5)$")
+option(DUKE3D_SHAREWARE "Build the shareware (VOLUMEONE) version: 1.3D, 1.1 or 1.0" OFF)
+# Which release's game logic to build. 1.3D, 1.4, 1.1 and 1.0 need their own
+# data; see docs/v13d/reference.md.
+set(DUKE3D_VERSION "1.5" CACHE STRING "Game version to build: 1.0, 1.1, 1.3D, 1.4 or 1.5")
+set_property(CACHE DUKE3D_VERSION PROPERTY STRINGS 1.0 1.1 1.3D 1.4 1.5)
+if(NOT DUKE3D_VERSION MATCHES "^(1\\.0|1\\.1|1\\.3D|1\\.4|1\\.5)$")
   message(FATAL_ERROR
-    "DUKE3D_VERSION is \"${DUKE3D_VERSION}\"; it must be one of 1.3D, 1.4, 1.5")
+    "DUKE3D_VERSION is \"${DUKE3D_VERSION}\"; it must be one of 1.0, 1.1, 1.3D, 1.4, 1.5")
 endif()
-if(DUKE3D_SHAREWARE AND NOT DUKE3D_VERSION STREQUAL "1.3D")
+if(DUKE3D_SHAREWARE AND NOT DUKE3D_VERSION MATCHES "^(1\\.0|1\\.1|1\\.3D)$")
   message(FATAL_ERROR
-    "DUKE3D_SHAREWARE is ON with DUKE3D_VERSION ${DUKE3D_VERSION}, but only 1.3D "
-    "had a shareware release; use DUKE3D_VERSION 1.3D or turn DUKE3D_SHAREWARE off")
+    "DUKE3D_SHAREWARE is ON with DUKE3D_VERSION ${DUKE3D_VERSION}, but only 1.3D, 1.1 and 1.0 "
+    "had a shareware release; use DUKE3D_VERSION 1.3D, 1.1 or 1.0, or turn DUKE3D_SHAREWARE off")
+endif()
+if(NOT DUKE3D_SHAREWARE AND DUKE3D_VERSION MATCHES "^(1\\.0|1\\.1)$")
+  message(FATAL_ERROR
+    "DUKE3D_VERSION ${DUKE3D_VERSION} is only supported as shareware: 1.1 and 1.0 only exist as shareware "
+    "builds here; turn DUKE3D_SHAREWARE on or use DUKE3D_VERSION 1.3D, 1.4 or 1.5")
 endif()
 option(DUKE3D_CONTROLS_MENU "Enable the in-game controls config menu" ON)
 option(DUKE3D_POLYMOST "Build Ken Silverman's Polymost renderers (needs OpenGL)" ON)

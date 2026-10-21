@@ -106,7 +106,14 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define MAXSLEEPDIST  16384
 #define SLEEPTIME 24*64
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+    // 1.0: the shareware release has no version field; 10 is unused by any
+    //  release and only guards this build's net handshake and saves.
+    #define BYTEVERSION 10
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1: the shareware release's own value, from its EXE.
+    #define BYTEVERSION 12
+#elif DUKE3D_GAMEVER < GAMEVER_14
     // 1.3D: the shareware and full releases' own values.
     #ifdef VOLUMEONE
         #define BYTEVERSION 14

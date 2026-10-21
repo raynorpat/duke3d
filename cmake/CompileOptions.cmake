@@ -9,7 +9,13 @@ target_compile_definitions(duke3d_compile_options INTERFACE USE_SDL=1)
 
 # Game and engine revisions for DUKE3D_VERSION, as dates in the form the
 # gamesrc-ver-recreation project uses. The engine sees BUILD_ENGINEREV too.
-if(DUKE3D_VERSION STREQUAL "1.3D")
+if(DUKE3D_VERSION STREQUAL "1.0")
+  set(_gamever 199601290L)
+  set(_enginerev 19960129L)
+elseif(DUKE3D_VERSION STREQUAL "1.1")
+  set(_gamever 199602200L)
+  set(_enginerev 19960220L)
+elseif(DUKE3D_VERSION STREQUAL "1.3D")
   set(_gamever 199604190L)
   set(_enginerev 19960419L)
 elseif(DUKE3D_VERSION STREQUAL "1.4")

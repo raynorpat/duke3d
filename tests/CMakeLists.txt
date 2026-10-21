@@ -21,6 +21,8 @@ set_tests_properties(sdl_driver_smoke_gl_fallback sdl_driver_smoke_fullscreen_se
 # Checks DUKE3D_GAMEVER, BUILD_ENGINEREV, BYTEVERSION and the volume macros
 # against this configuration's DUKE3D_VERSION. The table is kept here, apart
 # from the one that sets them, so a mistake in either shows up.
+set(_vexp_1.0_sw  199601290 19960129 10  0)
+set(_vexp_1.1_sw  199602200 19960220 12  0)
 set(_vexp_1.3D    199604190 19960419 103 0)
 set(_vexp_1.3D_sw 199604190 19960419 14  0)
 set(_vexp_1.4     199610210 19960820 116 1)
@@ -274,8 +276,9 @@ file(READ "${PROJECT_SOURCE_DIR}/testdata/game.con" _game_con)
 file(WRITE "${_con_dir}/prefix.con"
   "action CONCOMPILE_PREFIX 0 1 1 1 1\r\n${_game_con}")
 
-# The in-repo CONs are 1.5 scripts, which a 1.3D build can't compile.
-if(NOT DUKE3D_VERSION STREQUAL "1.3D")
+# The in-repo CONs are 1.5 scripts, which a 1.3D, 1.1 or 1.0 build can't
+# compile.
+if(NOT DUKE3D_VERSION MATCHES "^(1\\.3D|1\\.1|1\\.0)$")
   add_test(NAME con_compile COMMAND con_compile WORKING_DIRECTORY "${_con_dir}")
   set_tests_properties(con_compile PROPERTIES TIMEOUT 30)
 endif()
