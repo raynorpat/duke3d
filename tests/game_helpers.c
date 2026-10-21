@@ -192,6 +192,24 @@ int main(void)
         CONFIG_ReadSetup();
         check("cfg GLContrast 0.75 round trip", GLContrast == 0.75, 1);
         check("cfg GLSaturation 1 round trip", GLSaturation == 1.0, 1);
+
+        /* Unquoted decimals read as whole numbers in scriplib: ignored, and
+         * written back quoted over the number. */
+        f = fopen(cfg, "w");
+        fputs("[Screen Setup]\nGLContrast = 1.25\nGLSaturation = 2\n", f);
+        fclose(f);
+        CONFIG_ReadSetup();
+        check("cfg GLContrast 1.25 unquoted", GLContrast == 1.0, 1);
+        check("cfg GLSaturation 2 unquoted", GLSaturation == 1.0, 1);
+        CONFIG_WriteSetup();
+        f = fopen(cfg, "r");
+        n = fread(text, 1, sizeof(text) - 1, f);
+        fclose(f);
+        text[n] = 0;
+        check("cfg writes GLContrast quoted over a number", strstr(text, "GLContrast = \"1\"") != NULL, 1);
+        check("cfg writes GLSaturation quoted over a number", strstr(text, "GLSaturation = \"1\"") != NULL, 1);
+        CONFIG_ReadSetup();
+        check("cfg GLContrast after", GLContrast == 1.0, 1);
         remove(cfg);
         while ((slash = strrchr(cfg, '/')) != NULL) {
             *slash = 0;
