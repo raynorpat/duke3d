@@ -641,6 +641,52 @@ method (`docs/v13d/reference.md`, "Demo reference capture") and the same tools, 
 Every capture ended with `reccnt` 0. The captures are deterministic: 1.0 demo 3 and 1.1
 demo 1, captured a second time, gave byte-identical `STATE.BIN` files.
 
+## Scenario demos
+
+Task 12 checked the 1.1 weapons and enemies that the three original demos don't reach
+(the list is under "Coverage list (1.1)" in the plan's ledger). This is the 1.3D method
+(`docs/v13d/reference.md`, "Demo reference capture") with the `sw11` edition, and Task 16
+repeats it with `sw10`. Neither tool needed changes for 1.1: `startnear.py` only edits
+the map in the GRP, and `gendemo.py sw11` writes the 1.1 header.
+
+1. `tools/v13d/startnear.py <DUKE3D.GRP> <scratch>/DUKE3D.GRP <E1Ln.MAP> <picnum> <which>`
+   moves the player start onto the sprite. Picnums are the 1.1 `DEFS.CON` ones.
+2. `tools/v13d/gendemo.py sw11 <scratch>/DEMO1.DMO 0 <level-1> 2 3000 <seed> [weapon]`.
+3. DOS: copy the edited GRP, `DEMO1.DMO`, the 1.1 CONs, `DUKE.RTS`, `DEMO2.DMO`,
+   `DEMO3.DMO` and the 1.3D shareware `DUKE3D.CFG` into a directory, patch the EXE with
+   `mkcapture.py sw11 <DUKE3D.EXE> <dir>/DUKE3D.EXE 1`, and run it as in "Demo reference
+   capture" above. Each 3000-tic run takes about two minutes, and four can run at once.
+4. Ours: in another directory, link the edited GRP as `duke3d.grp`, copy the CONs and the
+   demo as `demo1.dmo`, and run `duke3d -demoverify 1 -demodump state.bin`.
+5. Compare the seed, `sprite[]` (skip slots free on both sides and byte 19) and `ps[0]`
+   field by field. `ps[0]` needs the 1.1 offsets from "player_struct (1.1)" and ours from
+   `offsetof` (a 1.1 build's `struct player_struct`). Skip `name` and the four fields our
+   struct doesn't have (`on_sector_effector`, `no_autoaim`, `select_dir`, `palette`).
+   `ps[0].visibility` always differs: drawing sets it and `-demoverify` doesn't draw.
+6. On a mismatch, cut the demo (its first long is the tic count) and capture both sides at
+   tic N to find the first differing tic, as in "Demo reference capture".
+
+Before a DOS run, pick a seed with a debug build of ours that logs which actors run and
+which weapons fire, so the walk reaches the target. Every scenario below uses skill 2 and
+3000 tics, and ended in sync after G11-A35:
+
+| Name | Map | Start on (picnum, which) | Seed | Weapon | Reaches |
+|---|---|---|---|---|---|
+| `rpg` | E1L1 | RPGSPRITE (23, 0) | 1 | 4 | RPG fired |
+| `pipe` | E1L1 | HBOMBAMMO (47, 0) | 1 | 5 | pipebombs thrown, then the remote fired |
+| `troopshoot` | E1L2 | LIZTROOPSHOOT (1715, 0) | 1 | — | LIZTROOPSHOOT |
+| `pigstay` | E1L2 | PIGCOPSTAYPUT (2001, 0) | 1 | — | PIGCOPSTAYPUT |
+| `fem1` | E1L2 | FEM1 (1312, 1) | 2 | — | FEM1 and FEM2 tipped and killed |
+| `fem2` | E1L2 | FEM2 (1317, 0) | 1 | — | FEM1 and FEM2 killed, FEM2 tipped |
+| `fem3` | E1L2 | FEM3 (1321, 0) | 1 | — | FEM3 tipped |
+| `jellystay` | E1L3 | JELLYFISHSTAYPUT (1821, 0) | 1 | — | JELLYFISHSTAYPUT, PIGCOPSTAYPUT |
+| `trip3` | E1L3 | TRIPBOMB (2566, 0) | 2 | — | 4 of the 11 placed tripbombs set off |
+| `trip4` | E1L4 | TRIPBOMB (2566, 0) | 1 | — | a placed tripbomb set off; SE24 conveyors (found G11-A35 at tic 268) |
+| `mine` | E1L4 | BOUNCEMINE (940, 0) | 1 | — | BOUNCEMINE |
+| `fem4tip` | E1L5 | FEM4 (1325, 0) | 1 | — | FEM4 tipped |
+| `fem4kill` | E1L5 | FEM4 (1325, 0) | 2 | — | FEM4 killed |
+| `podfem` | E1L1 | PODFEM1 (1294, 0) | 4 | — | PODFEM1 killed |
+
 ## DOS reference saves
 
 `tests/data/v13d_save_refs.cmake` rows with `_EDITION` `sw10` or `sw11` describe saves
