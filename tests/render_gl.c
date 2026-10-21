@@ -84,7 +84,10 @@
  *  textures or retextures (palette changes, fades, glsetgamepalette,
  *  precaching), whose holes in the level don't show what was cleared to,
  *  whose non-masked tiles don't draw index 255, or whose frame, shown or
- *  being drawn, a window resize loses.
+ *  being drawn, a window resize loses; or that at an internal size (320x200)
+ *  doesn't draw at it, is further than 8 from renderer 0's at 320x200,
+ *  isn't shown scaled to fit with black bars (after a resize too), or
+ *  doesn't validate the size or ignore it off the shader path.
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
  *
@@ -131,6 +134,7 @@ int32_t polymost_drawtilescreen(int32_t tilex, int32_t tiley, int32_t wallnum, i
 void polymost_glreset(void);
 void gltexinvalidateall(void);
 void getfadedpalette(palette_t *pal);  /* engine.c: the palette the shader path shows */
+unsigned char *polymost_capture_shader(void);  /* the shader path's frame, RGB, top-down */
 
 /* lookup.dat's water palette, after its palookups. */
 static unsigned char waterpal[768];
@@ -1324,6 +1328,240 @@ static int shader_frames(const char *dir, int32_t x, int32_t y, int32_t z, short
     return ok;
 }
 
+/* The internal-size frames: a view close up (bright, few texels to a
+ *  pixel) with the HUD's gun, the status bar and text, and a still screen
+ *  drawn only in 2D (twice, so the second is drawn after one is shown): a
+ *  logo, menu letters, the status bar and text. */
+#define INFRAMES 2
+static void internal_frame(int f)
+{
+    int i, j;
+
+    for (i = 0; i < 2; i++)
+    {
+        if (f == 0) cmp_draw(1);
+        else
+        {
+            clearview(0);
+            for (j = 4; j < 200; j += 8)  /* lines first: in the view the last present left */
+                drawline256(0, j<<12, 319<<12, j<<12, 31);
+            rotatesprite(160<<16, 80<<16, 65536, 0, THREEDEE, 0, 0, 2+8, 0, 0, xdim-1, ydim-1);
+            for (j = 0; j < 4; j++)
+                rotatesprite((120 + j * 16)<<16, 140<<16, 65536, 0, STARTALPHANUM + ("DUKE"[j] - '!'),
+                             (j & 1) ? 16 : 0, (j & 2) ? 2 : 0, 2+8+16, 0, 0, xdim-1, ydim-1);
+        }
+        if (f == 0) rotatesprite(160<<16, 130<<16, 65536, 0, FIRSTGUN, 0, 0, 2, 0, 0, xdim-1, ydim-1);
+        rotatesprite(0, (200 - tilesizy[BOTTOMSTATUSBAR])<<16, 65536, 0, BOTTOMSTATUSBAR, 4, 0,
+                     2+8+16+64, 0, 0, xdim-1, ydim-1);
+        printext256(16, 16, 31, 0, "INTERNAL SIZE", 0);
+        nextpage();
+        if (f == 0) return;
+    }
+}
+
+/* Mean absolute difference per channel of two top-down RGB frames, w by h. */
+static double rgb_diff(const unsigned char *a, const unsigned char *b, int w, int h)
+{
+    long i, n = (long) w * h * 3, d = 0;
+    for (i = 0; i < n; i++) d += abs((int) a[i] - (int) b[i]);
+    return (double) d / n;
+}
+
+/* The window shown (dw by dh, read bottom-up) against a top-down frame (w by
+ *  h) scaled into gl_fitrect's rectangle, nearest pixel: mean |difference|
+ *  inside it, and *bars the pixels outside it that aren't black. */
+static double shown_diff(const unsigned char *shown, int dw, int dh, const unsigned char *frame, int w, int h,
+                         long *bars)
+{
+    int32_t r[4];
+    long x, y, i, d = 0, n = 0;
+    const unsigned char *p;
+
+    gl_fitrect(w, h, dw, dh, r);
+    *bars = 0;
+    for (y = 0; y < dh; y++)
+        for (x = 0; x < dw; x++)
+        {
+            p = &shown[(y * dw + x) * 3];
+            if ((x < r[0]) || (x >= r[0] + r[2]) || (y < r[1]) || (y >= r[1] + r[3]))
+                { if (p[0] | p[1] | p[2]) (*bars)++; continue; }
+            for (i = 0; i < 3; i++)
+                d += abs((int) p[i] - (int) frame[(((r[1] + r[3] - 1 - y) * h / r[3]) * w + (x - r[0]) * w / r[2]) * 3 + i]);
+            n++;
+        }
+    return (n > 0) ? (double) d / ((double) n * 3) : 999;
+}
+
+/* Reads the whole drawable's front buffer (*dw by *dh, bottom-up) into a malloc'd buffer. */
+static unsigned char *read_shown(int *dw, int *dh)
+{
+    unsigned char *buf;
+
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), dw, dh);
+    buf = malloc((size_t) *dw * *dh * 3);
+    glReadBuffer(GL_FRONT);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, *dw, *dh, GL_RGB, GL_UNSIGNED_BYTE, buf);
+    glReadBuffer(GL_BACK);
+    return buf;
+}
+
+/* Sets OpenGL with draw path path at internal size w by h (and gl_forcefail
+ *  fail); 1 if it then draws at the size want (0: the drawable's). */
+static int internal_mode(int32_t path, int32_t w, int32_t h, int32_t fail, int32_t wantw, int32_t wanth,
+                         const char *what)
+{
+    int dw, dh, ok;
+
+    glinternalwidth = w; glinternalheight = h;
+    gldrawpathrequest = path;
+    gl_forcefail = fail;
+    if (setgamemode_gl(1) != 0) { fprintf(stderr, "FAIL: OpenGL at internal size %dx%d\n", (int) w, (int) h); return 0; }
+    gl_forcefail = 0;
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    if (!wantw) { wantw = dw; wanth = dh; }
+    ok = (xdim == wantw) && (ydim == wanth);
+    printf("internal size %dx%d, %s: path %s, drawn at %dx%d (drawable %dx%d)\n", (int) w, (int) h, what,
+           gl_pathname(gldrawpath), (int) xdim, (int) ydim, dw, dh);
+    if (!ok) fprintf(stderr, "FAIL: internal size %dx%d, %s: drawn at %dx%d, not %dx%d\n", (int) w, (int) h, what,
+                     (int) xdim, (int) ydim, (int) wantw, (int) wanth);
+    return ok;
+}
+
+/*
+ * The shader path at an internal size (GLInternalWidth/Height 320x200):
+ *  xdim/ydim are that size; its frames (3D view with the HUD, a 2D-only
+ *  screen drawn after a frame is shown) are within 8 of renderer 0's at
+ *  320x200; the window shows them scaled by the largest factor that fits,
+ *  nearest pixel, centred with black bars; screenshots are the internal
+ *  frame; a window resize keeps the size and shows the frame again scaled
+ *  to the new window; the mouse area is the frame's part of the window. A
+ *  width without a height draws at the window's size, a size under 320x200
+ *  at 320x200; the vbo path, and the shader path when it fails, ignore it.
+ *  1: pass, 0: fail, 77: no shader path.
+ */
+static int internal_frames(const char *dir)
+{
+    unsigned char *classic[INFRAMES], *cap, *shown;
+    char path[1024];
+    int f, ok = 1, dw, dh, winw, winh, ww, wh, mw, mh, oldw;
+    int32_t r[4];
+    long bars, i;
+    double d, sd;
+    Uint32 t0;
+    SDL_Surface *s;
+
+    /* renderer 0 at 320x200 (its window 640x400, as the GL window's) */
+    if (_setgamemode(1, 320, 200) != 0) { fprintf(stderr, "FAIL: _setgamemode(320x200)\n"); return 0; }
+    polymosttexfullbright = 240;
+    for (f = 0; f < INFRAMES; f++)
+    {
+        internal_frame(f);
+        classic[f] = malloc(320 * 200 * 3);
+        for (i = 0; i < 320 * 200; i++)
+        {
+            SDL_Color *c = &surface->format->palette->colors[((unsigned char *) surface->pixels)[(i / 320) * surface->pitch + i % 320]];
+            classic[f][i * 3] = c->r; classic[f][i * 3 + 1] = c->g; classic[f][i * 3 + 2] = c->b;
+        }
+        s = SDL_CreateRGBSurfaceWithFormatFrom(classic[f], 320, 200, 24, 320 * 3, SDL_PIXELFORMAT_RGB24);
+        snprintf(path, sizeof (path), "%s/internal%d_r0.bmp", dir, f);
+        SDL_SaveBMP(s, path);
+        SDL_FreeSurface(s);
+    }
+
+    if (!internal_mode(GLPATH_SHADER, 320, 200, 0, 320, 200, "shader"))
+    {
+        if (gldrawpath != GLPATH_SHADER) { printf("internal size: no shader path, skipped\n"); ok = 77; }
+        else ok = 0;
+        goto done;
+    }
+    setbrightness(0, palette);
+    for (f = 0; f < INFRAMES; f++)
+    {
+        internal_frame(f);
+        snprintf(path, sizeof (path), "%s/internal%d_shader0000.bmp", dir, f);
+        remove(path);
+        snprintf(path, sizeof (path), "%s/internal%d_shaderxxxx.bmp", dir, f);
+        i = screencapture(path, 0);
+        snprintf(path, sizeof (path), "%s/internal%d_shader0000.bmp", dir, f);
+        s = (i == 0) ? SDL_LoadBMP(path) : NULL;
+        if ((s == NULL) || (s->w != 320) || (s->h != 200))
+            { fprintf(stderr, "FAIL: a screenshot at an internal size isn't 320x200\n"); ok = 0; }
+        SDL_FreeSurface(s);
+        cap = polymost_capture_shader();
+        shown = read_shown(&dw, &dh);
+        d = rgb_diff(cap, classic[f], 320, 200);
+        sd = shown_diff(shown, dw, dh, cap, 320, 200, &bars);
+        gl_fitrect(320, 200, dw, dh, r);
+        printf("internal size 320x200, frame %d: mean |shader - r0| %.2f (most 8.00); shown at %d,%d %dx%d "
+               "of %dx%d, mean |shown - frame| %.2f, %ld bar pixels not black\n",
+               f, d, (int) r[0], (int) r[1], (int) r[2], (int) r[3], dw, dh, sd, bars);
+        if ((d > 8) || (sd > 0.5) || bars) ok = 0;
+        free(cap);
+        free(shown);
+    }
+
+    /* a resize: the same size, shown again scaled to the new window */
+    cap = polymost_capture_shader();
+    SDL_GetWindowSize(SDL_GL_GetCurrentWindow(), &winw, &winh);
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &oldw, &dh);
+    SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), 800, 520);
+    for (t0 = SDL_GetTicks(), dw = oldw; (dw == oldw) && (SDL_GetTicks() - t0 < 3000); SDL_Delay(10))
+    {
+        _handle_events();
+        SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    }
+    _handle_events();
+    shown = read_shown(&dw, &dh);
+    sd = shown_diff(shown, dw, dh, cap, 320, 200, &bars);
+    getmousearea(&mw, &mh);
+    gl_fitrect(320, 200, dw, dh, r);
+    SDL_GetWindowSize(SDL_GL_GetCurrentWindow(), &ww, &wh);
+    printf("internal size 320x200 after a resize to %dx%d: drawn at %dx%d, shown %dx%d, mean |shown - frame| %.2f, "
+           "%ld bar pixels not black; mouse area %dx%d of window %dx%d\n", dw, dh, (int) xdim, (int) ydim,
+           (int) r[2], (int) r[3], sd, bars, mw, mh, ww, wh);
+    if ((dw == oldw) || (xdim != 320) || (ydim != 200) || (sd > 0.5) || bars)
+        { fprintf(stderr, "FAIL: a resize at an internal size\n"); ok = 0; }
+    if ((abs(mw - (int) ((int64_t) r[2] * ww / dw)) > 1) || (abs(mh - (int) ((int64_t) r[3] * wh / dh)) > 1))
+        { fprintf(stderr, "FAIL: the mouse area isn't the frame's part of the window\n"); ok = 0; }
+    free(cap);
+    free(shown);
+    for (f = 0; f < 2; f++)  /* the bars are black whatever the window's back buffer held */
+    {
+        glClearColor(1, 1, 1, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        rotatesprite(0, (200 - tilesizy[BOTTOMSTATUSBAR])<<16, 65536, 0, BOTTOMSTATUSBAR, 4, 0,
+                     2+8+16+64, 0, 0, xdim-1, ydim-1);
+        nextpage();
+    }
+    cap = polymost_capture_shader();
+    shown = read_shown(&dw, &dh);
+    sd = shown_diff(shown, dw, dh, cap, 320, 200, &bars);
+    printf("internal size 320x200 over a white back buffer: mean |shown - frame| %.2f, %ld bar pixels not black\n",
+           sd, bars);
+    if ((sd > 0.5) || bars) { fprintf(stderr, "FAIL: the bars at an internal size\n"); ok = 0; }
+    free(cap);
+    free(shown);
+    SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), winw, winh);
+    if (glGetError() != GL_NO_ERROR) { fprintf(stderr, "FAIL: GL error at an internal size\n"); ok = 0; }
+
+    /* the setting's checks, and the paths that ignore it */
+    ok &= internal_mode(GLPATH_SHADER, 320, 0, 0, 0, 0, "no height");
+    ok &= internal_mode(GLPATH_SHADER, 100, 50, 0, 320, 200, "too small");
+    ok &= internal_mode(GLPATH_VBO, 320, 200, 0, 0, 0, "vbo");
+    ok &= internal_mode(GLPATH_SHADER, 320, 200, 3, 0, 0, "incomplete framebuffer");
+    if (glGetError() != GL_NO_ERROR) { fprintf(stderr, "FAIL: GL error at an internal size\n"); ok = 0; }
+
+done:
+    glinternalwidth = glinternalheight = 0;
+    gldrawpathrequest = GLPATH_AUTO;
+    gl_forcefail = 0;
+    polymosttexfullbright = 256;
+    for (f = 0; f < INFRAMES; f++) free(classic[f]);
+    if (!ok) fprintf(stderr, "FAIL: the shader path at an internal size\n");
+    return ok;
+}
+
 int main(int argc, char **argv)
 {
     int32_t posx, posy, posz;
@@ -2026,6 +2264,8 @@ int main(int argc, char **argv)
     }
 
     i = shader_frames(argv[2], posx, posy, posz, ang, sectnum, zerotile);
+    if (i == 0) return 1;
+    i = internal_frames(argv[2]);
     if (i == 0) return 1;
 
     /* A mode over the 8-bit 1600x1200 limit (it changes xdim and ydim, so

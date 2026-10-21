@@ -14,6 +14,30 @@ static void check(const char *what, int got, int want)
     }
 }
 
+static void checksize(const char *what, int32_t w, int32_t h, int32_t wantw, int32_t wanth, int want)
+{
+    int32_t ow = -1, oh = -1;
+    int got = gl_internalsize(w, h, &ow, &oh);
+
+    if ((got != want) || (ow != wantw) || (oh != wanth)) {
+        printf("FAIL %s: %dx%d, %d (expected %dx%d, %d)\n", what, (int) ow, (int) oh, got,
+               (int) wantw, (int) wanth, want);
+        fails++;
+    }
+}
+
+static void checkrect(int32_t w, int32_t h, int32_t dw, int32_t dh, int32_t x, int32_t y, int32_t rw, int32_t rh)
+{
+    int32_t r[4];
+
+    gl_fitrect(w, h, dw, dh, r);
+    if ((r[0] != x) || (r[1] != y) || (r[2] != rw) || (r[3] != rh)) {
+        printf("FAIL %dx%d in %dx%d: %d,%d %dx%d (expected %d,%d %dx%d)\n", (int) w, (int) h, (int) dw, (int) dh,
+               (int) r[0], (int) r[1], (int) r[2], (int) r[3], (int) x, (int) y, (int) rw, (int) rh);
+        fails++;
+    }
+}
+
 int main(void)
 {
     int r;
@@ -53,6 +77,26 @@ int main(void)
     for (r = GLPATH_AUTO; r < GLPATH_COUNT; r++)
         check(gl_pathname(r), gl_pathfromname(gl_pathname(r)), r);
     check("name 9", gl_pathname(9) == gl_pathname(GLPATH_AUTO), 1);
+
+    /* the internal size: both or neither, at least 320x200 */
+    checksize("0x0", 0, 0, 0, 0, 0);
+    checksize("320x200", 320, 200, 320, 200, 0);
+    checksize("640x400", 640, 400, 640, 400, 0);
+    checksize("320x0", 320, 0, 0, 0, 1);
+    checksize("0x200", 0, 200, 0, 0, 1);
+    checksize("5x5", 5, 5, 320, 200, 2);
+    checksize("100x400", 100, 400, 320, 400, 2);
+    checksize("800x10", 800, 10, 800, 200, 2);
+
+    /* where it shows: the largest scale that fits, square pixels, centred */
+    checkrect(320, 200, 2560, 1600, 0, 0, 2560, 1600);
+    checkrect(640, 400, 2560, 1600, 0, 0, 2560, 1600);
+    checkrect(320, 200, 1920, 1080, 96, 0, 1728, 1080);
+    checkrect(640, 480, 2560, 1600, 213, 0, 2133, 1600);
+    checkrect(320, 200, 1000, 1000, 0, 187, 1000, 625);
+    checkrect(320, 240, 1280, 800, 106, 0, 1067, 800);
+    checkrect(1280, 800, 1280, 800, 0, 0, 1280, 800);
+    checkrect(1920, 1200, 1280, 800, 0, 0, 1280, 800);
 
     if (fails)
         return 1;
