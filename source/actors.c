@@ -6394,7 +6394,13 @@ void moveexplosions(void)  // STATNUM 5
                         if( (sector[s->sectnum].floorstat&2) ) { KILLIT(i); }
                         t[2]++;
                     }
+#if DUKE3D_GAMEVER < GAMEVER_11
+                    // 1.0 lands on the floor of the sector it was in before
+                    // setsprite (G10-A10).
+                    l = getflorzofslope(sect,s->x,s->y);
+#else
                     l = getflorzofslope(s->sectnum,s->x,s->y);
+#endif
 
                     s->z = l-(2<<8);
                     s->xvel = 0;
