@@ -1110,6 +1110,8 @@ int setgamemode_gl(char davidoption)
          *  leaves that mode as it was. SDL2 can't add GL to a window that
          *  has an SDL_Renderer, so it's a new window.
          */
+        int displaymode = sdl_displaymode;  /* create_window may change it */
+
         SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         window = create_window(gl_window_w, gl_window_h,
@@ -1119,6 +1121,7 @@ int setgamemode_gl(char davidoption)
         {
             if (window != NULL)
                 SDL_DestroyWindow(window);
+            sdl_displaymode = displaymode;  /* the 8-bit window's, still */
             if (gl_forcefail == 4)
                 SDL_SetError("no context (gl_forcefail 4)");
             return(-1);
