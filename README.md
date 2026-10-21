@@ -158,9 +158,13 @@ JFBuild:
 
 Set `Renderer` under `[Screen Setup]` in `duke3d.cfg`, or use `-renderer N`
 for one run (the config keeps its own value). A number outside 0-3 is taken
-as the nearest one. Renderer 3 draws at the window's real pixel size and
-uses a legacy (fixed-function) OpenGL context. Windowed, it opens at the size
-asked for, even over the 1600x1200 the 8-bit modes stop at. If OpenGL isn't
+as the nearest one. Renderer 3 draws at the window's real pixel size
+(unless `GLInternalWidth`/`GLInternalHeight` is set on the 2.1 path) and
+uses a legacy (non-core) OpenGL context. Windowed, it opens at the size
+asked for, even over the 1600x1200 the 8-bit modes stop at. Once renderer 3
+has been used, its window and context stay until the program exits, and
+renderers 0-2 and the editor's 2D mode are shown through them, looking as
+before (switching renderer doesn't make a new window). If OpenGL isn't
 available, the game prints a message and uses renderer 0. The map editor has
 its own settings (see [Map editor](#map-editor)).
 
@@ -170,9 +174,11 @@ no OpenGL); using the classic renderer.`
 
 Other settings, all under `[Screen Setup]`:
 
-- Widescreen and tallscreen: modes wider than 4:3 get a wider view and a 4:3
-  status bar and HUD with the sides left empty. This applies to every
-  renderer. 320x200, 640x400 and other 4:3 modes draw as before.
+- Widescreen and tallscreen: modes wider than 4:3 get a wider view. The
+  status bar's artwork is carried out to both screen edges, while its
+  numbers and icons and the rest of the HUD stay in the 4:3 area. This
+  applies to every renderer. 320x200, 640x400 and other 4:3 modes draw as
+  before.
 - `GLTextureMipLevel` (default 0, at most 15): in renderer 3, drop this many
   mipmap levels from every texture. Over 0 looks blocky.
 - `ScreenshotFormat`: `png` (default), `jpg` or `bmp`. Screenshots are named
@@ -180,14 +186,70 @@ Other settings, all under `[Screen Setup]`:
   under [Config and saves](#config-and-saves). They show the screen as it
   is, fades and flashes included, in every renderer.
 
+#### Renderer 3's draw paths
+
+Renderer 3 draws with one of three paths, each needing more of the driver:
+
+| Path | `GLDrawPath` | Needs | What it does |
+|---|---|---|---|
+| 1.1 | `immediate` | any OpenGL | Client vertex arrays, with fog and a per-texture approximation of classic's shade ramps |
+| 1.5 | `vbo` | OpenGL 1.5 vertex buffers | The same drawing, with the vertices in vertex buffer objects |
+| 2.1 | `shader` | OpenGL 2.1 with GLSL and framebuffer objects | Draws the whole frame as palette indices, then looks them up through the game's own shade tables and palette, so shading, palette swaps and fades follow classic. Translucent sprites, walls and tiles blend through the translucency table, as classic does |
+
+- `GLDrawPath` under `[Screen Setup]` in `duke3d.cfg` is `auto` (the default),
+  `immediate`, `vbo` or `shader`, in any case, written in quotes, such as
+  `GLDrawPath = "shader"` (unquoted, it reads as `auto`). `auto` takes the
+  best path the driver has. A named path the driver can't do falls back to the best it can,
+  with a message such as `OpenGL path shader unavailable; using vbo.`, and
+  every start prints the path in use (`OpenGL path: shader (2.1)`). A path
+  better than the one named is never used: `vbo` on a driver that has the
+  shader path uses `vbo`.
+- The 1.1 and 1.5 paths are closer to classic's shading than before, but not
+  exact. Only the 2.1 path matches classic's shading, palette changes and
+  translucency.
+- `GLInternalWidth` and `GLInternalHeight` (default 0, at most 7680 and 4320):
+  draw the 2.1 path at this size and scale the result up to the window,
+  keeping its aspect ratio, with black bars where it doesn't fill. 320 by 200
+  gives classic's own pixels. Both must be set, and a size under 320x200 is
+  raised to it. Otherwise, and on the 1.1 and 1.5 paths, the window's size is
+  used, with a message. `build.cfg` has `glinternalwidth` and
+  `glinternalheight` for the editor.
+- `GLContrast` (0.5 to 1.5) and `GLSaturation` (0 to 2), default 1.0: adjust
+  the 2.1 path's final image, and do nothing on the other paths. In
+  `duke3d.cfg` write them as quoted decimals, such as `GLContrast = "1.25"`;
+  an unquoted decimal is read as a whole number. `build.cfg` has `glcontrast`
+  and `glsaturation`; the editor has no control for them. The brightness
+  setting (`britable`, F11) is separate and works as before.
+
+#### Display mode and vsync
+
+- `DisplayMode` under `[Screen Setup]` is `windowed`, `borderless` (the
+  default) or `exclusive`, written in quotes, such as `DisplayMode =
+  "windowed"` (unquoted, it reads as borderless). Borderless is a desktop-sized window without a mode
+  change. Exclusive is true fullscreen: it switches the display to the
+  smallest mode at least as big as the game's size (so 640x400 may pick
+  1920x1200 and scale up). If the display has no such mode, it uses borderless
+  and prints a message. Unknown values read as borderless.
+- `VSync` is 1 (the default) or 0. With it off, renderer 3 runs as fast as it
+  can. The SDL renderer behind renderers 0-2 may still be held to the
+  display's rate by the system.
+- Alt+Enter toggles between a window and the chosen fullscreen style
+  (borderless if you chose windowed). That, and the exclusive-to-borderless
+  fallback, last for the run only and aren't saved. Setting the environment
+  variable `BUILD_WINDOWED` forces a window for that run, in the game and the
+  editor.
+- The VIDEO page, reached from OPTIONS, has CONTRAST and SATURATION sliders
+  (greyed unless renderer 3 is on the 2.1 path), and DISPLAY and VSYNC rows
+  that apply at once and are saved with the other settings.
+
 Known gaps:
 
-- Renderer 3 shades with fog instead of the palette ramps, so lighting
-  differs from classic (it matches JFBuild's 2004 Polymost).
-- Palette switches (underwater, slime, night vision, the title and ending
-  screens, cutscenes) and brightness changes rebuild the textures in
-  renderer 3, so they can stutter. Fades and flashes are drawn over the
-  frame and don't.
+- The 1.1 and 1.5 paths don't match classic's shading exactly.
+- On the 1.1 and 1.5 paths, palette switches (underwater, slime, night
+  vision, the title and ending screens, cutscenes) and brightness changes
+  rebuild the textures, so they can stutter. The 2.1 path doesn't. On the 1.1
+  and 1.5 paths fades and flashes are drawn over the frame; the 2.1 path
+  fades the palette.
 - No `.md2` models or hi-res texture replacement.
 - Polymost's own todo list applies (sprite sorting, the hall of mirrors near
   the zenith, ...).
@@ -206,7 +268,11 @@ working directory.
 |---|---|---|
 | `renderer` | 0 | 3D renderer, 0-3 as in the table above |
 | `xdim3d`, `ydim3d` | 640, 480 | 3D mode size; 320-7680 by 200-4320. Renderers 0-2 stop at 1600x1200, so a larger size only applies in renderer 3 |
-| `fullscreen` | 1 | Fullscreen or window |
+| `displaymode` | borderless | `windowed`, `borderless` or `exclusive`, as `DisplayMode` above |
+| `vsync` | 1 | Vsync on or off |
+| `gldrawpath` | auto | Renderer 3's draw path: `auto`, `immediate`, `vbo` or `shader` |
+| `glinternalwidth`, `glinternalheight` | 0, 0 | The 2.1 path's internal size, up to 7680 by 4320; 0 is the window's |
+| `glcontrast`, `glsaturation` | 1, 1 | The 2.1 path's contrast (0.5-1.5) and saturation (0-2) |
 | `gltexmiplevel` | 0 | Mipmap levels dropped in renderer 3, 0-15 |
 | `mousesensitivity` | 1 | Mouse speed, 0.1-10 |
 | `keyforward` ... `keychat` | see below | Keys, as two-digit hex scancodes |
@@ -226,8 +292,11 @@ its default.
   saved.
 - Alt+K cycles to the next renderer in the 3D view, skipping OpenGL when it
   isn't available. The choice is saved on exit.
+- Without a `displaymode` line, an old `fullscreen` key is read (1 is
+  borderless, 0 windowed) and is not written back.
 - Setting the environment variable `BUILD_WINDOWED` forces a window for that
-  run. It doesn't change `fullscreen` in `build.cfg`.
+  run. Neither it, Alt+Enter nor the exclusive-to-borderless fallback changes
+  `displaymode` in `build.cfg`.
 
 ## Running
 

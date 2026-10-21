@@ -38,6 +38,9 @@
 #include "engine.h"
 #ifdef USE_OPENGL
 #include "SDL_opengl.h"
+#include "glext.h"
+#define GLSUB_WRAP
+#include "glsubmit.h"
 #endif
 
 /* need VirtualProtect() from win32 API... */
@@ -142,8 +145,25 @@ int32_t bpp = 8;
 struct glinfo_t glinfo;
 char nofog = 0;
 extern void polymost_glreset(void);
+extern int32_t polymost_present_shader(const int32_t *r, int32_t dw, int32_t dh);
+extern void polymost_prepare_shader(void);
+extern unsigned char *polymost_capture_shader(void);
+extern GLuint polymost_takeframe_shader(void);
+extern void polymost_putframe_shader(GLuint tex);
+extern void polymost_unbind_shader(void);
+extern unsigned char *getbasepalette(void);
 extern void gltexinvalidateall(void);
-static SDL_GLContext sdl_glcontext = NULL;  /* non-NULL while in renderer 3 */
+extern void polymost_buildshaderamp(void);
+/*
+ * Made at the first renderer 3 and kept, with its window, until shutdown:
+ *  Apple's GL on Metal can leave the heap damaged when a context is deleted.
+ *  The 8-bit modes are shown through it from then on.
+ */
+static SDL_GLContext sdl_glcontext = NULL;
+static int gl_drawing = 0;  /* renderer 3 is drawing in it */
+static GLuint gl8tex = 0;  /* an 8-bit mode's frame, as shown through it */
+static int gl8tex_w, gl8tex_h;  /* its texture size */
+static float gl8xrel = 0, gl8yrel = 0;  /* mouse motion under a pixel, carried */
 static char gl_davidoption = 1;
 static int gl_window_w = 640;  /* windowed size: the last 8-bit mode's, unclamped */
 static int gl_window_h = 480;
@@ -152,6 +172,9 @@ static GLuint lastframe = 0;  /* the last swapped frame, before its fade */
 static int lastframe_set = 0;  /* lastframe holds a frame yet */
 static int swapped = 0;  /* a swap has shown something in this mode */
 static int lastframe_w, lastframe_h;  /* its texture size */
+static int gl_draw_w, gl_draw_h;  /* the drawable */
+static int gl_scaled = 0;  /* the shader path draws at its internal size (xres, yres)... */
+static int32_t gl_showrect[4];  /* ...shown here in the drawable (gl_fitrect) */
 #endif
 
 SDL_Surface *surface = NULL; /* This isn't static so that we can use it elsewhere AH */
@@ -160,20 +183,10 @@ static SDL_Renderer *sdl_renderer = NULL;
 static SDL_Texture *sdl_texture = NULL;
 static SDL_Surface *sdl_rgbsurface = NULL;  /* 32-bit staging copy of surface */
 static int debug_hall_of_mirrors = 0;
-static int sdl_fullscreen = 0;
-static int sdl_fullscreen_wanted = 1;  /* default: fullscreen unless BUILD_WINDOWED */
-
-void setvideofullscreen(int on)
-{
-    sdl_fullscreen_wanted = (on != 0);
-    sdl_fullscreen = sdl_fullscreen_wanted && (getenv(BUILD_WINDOWED) == NULL);
-} /* setvideofullscreen */
-
-
-int getvideofullscreen(void)
-{
-    return sdl_fullscreen;
-} /* getvideofullscreen */
+static int sdl_displaymode = DISPLAY_BORDERLESS;  /* the window's */
+static int sdl_displaymode_wanted = DISPLAY_BORDERLESS;  /* unless BUILD_WINDOWED */
+static int sdl_vsync = 1;
+static int exclusive_w = 0, exclusive_h = 0;  /* exclusive's size: the game mode's */
 static int32_t mouse_x = 0;
 static int32_t mouse_y = 0;
 static int32_t mouse_relative_x = 0;
@@ -263,7 +276,7 @@ static void output_surface_info(SDL_Surface *_surface)
 
     sdldebug("screen surface is (%dx%dx%dbpp), %s.",
             _surface->w, _surface->h, _surface->format->BitsPerPixel,
-            sdl_fullscreen ? "fullscreen" : "windowed");
+            display_modename(sdl_displaymode));
 
     if ((sdl_renderer != NULL) && (SDL_GetRendererInfo(sdl_renderer, &info) == 0))
         sdldebug("SDL renderer is \"%s\".", info.name);
@@ -287,9 +300,20 @@ static void output_driver_info(void)
 } /* output_driver_info */
 
 
+#ifdef USE_OPENGL
+static void gl_present8(void);
+#endif
+
 /* Push the 8-bit surface through the palette to the window. */
 static void present_surface(void)
 {
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+    {
+        gl_present8();
+        return;
+    } /* if */
+#endif
     if ((surface == NULL) || (sdl_texture == NULL))
         return;
 
@@ -304,6 +328,12 @@ static void present_surface(void)
 
 static void free_video_surfaces(void)
 {
+#ifdef USE_OPENGL
+    if (gl8tex != 0)  /* the context is current while there is one */
+        glDeleteTextures(1, &gl8tex);
+    gl8tex = 0;
+#endif
+
     if (sdl_texture != NULL)
     {
         SDL_DestroyTexture(sdl_texture);
@@ -325,26 +355,130 @@ static void free_video_surfaces(void)
 
 
 #ifdef USE_OPENGL
-/* Leave renderer 3: drop the GL textures while the context is current,
- *  then the context and its window. The 8-bit path recreates a window. */
-static void destroy_gl_window(void)
+/* Leave renderer 3: drop its GL textures. The context and window stay. */
+static void gl_leave(void)
 {
-    if (sdl_glcontext == NULL)
+    if (!gl_drawing)
         return;
 
     polymost_glreset();
+    glsub_uninit();
     if (lastframe != 0)
         glDeleteTextures(1, &lastframe);
     lastframe = 0;
     framedrawn = 0;
-    SDL_GL_DeleteContext(sdl_glcontext);
-    sdl_glcontext = NULL;
-    SDL_DestroyWindow(sdl_window);
-    sdl_window = NULL;
+    gl_drawing = 0;
     bpp = 8;
     numpages = 0;
     setrendermode(0);
-} /* destroy_gl_window */
+} /* gl_leave */
+
+
+/* The texture an 8-bit mode's w by h frame is shown from (GL 1.1 without
+ *  GL_ARB_texture_non_power_of_two: rounded up to powers of two). */
+static void gl_alloc8(int w, int h)
+{
+    gl8tex_w = w;
+    gl8tex_h = h;
+    if (!glinfo.texnpot)
+    {
+        for (gl8tex_w = 1; gl8tex_w < w; gl8tex_w <<= 1) ;
+        for (gl8tex_h = 1; gl8tex_h < h; gl8tex_h <<= 1) ;
+    } /* if */
+    glGenTextures(1, &gl8tex);
+    glBindTexture(GL_TEXTURE_2D, gl8tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, gl8tex_w, gl8tex_h, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    gl8xrel = gl8yrel = 0;
+} /* gl_alloc8 */
+
+
+/*
+ * Shows the 8-bit surface through the GL context, as the SDL renderer did:
+ *  through its palette (faded and brightened as the engine set it), scaled
+ *  to fit the drawable, nearest pixel, with black bars. Renderer 3 may have
+ *  left any state, so what the draw depends on is set here.
+ */
+static void gl_present8(void)
+{
+    int32_t r[4];
+    int dw, dh;
+    float u, v;
+
+    if ((surface == NULL) || (gl8tex == 0) || (gl_drawing))
+        return;
+
+    SDL_BlitSurface(surface, NULL, sdl_rgbsurface, NULL);  /* the palette applied */
+    SDL_GL_GetDrawableSize(sdl_window, &dw, &dh);
+    gl_fitrect(surface->w, surface->h, dw, dh, r);
+    u = (float) surface->w / (float) gl8tex_w;
+    v = (float) surface->h / (float) gl8tex_h;
+
+    if (bglBindFramebuffer != NULL)
+        bglBindFramebuffer(GL_FRAMEBUFFER, 0);
+    if (bglUseProgram != NULL)
+        bglUseProgram(0);
+    if (bglActiveTexture != NULL)
+        bglActiveTexture(GL_TEXTURE0);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glDisable(GL_ALPHA_TEST);
+    glDisable(GL_FOG);
+    glColorMask(1, 1, 1, 1);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    glViewport(0, 0, dw, dh);
+    glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glViewport(r[0], r[1], r[2], r[3]);
+
+    glEnable(GL_TEXTURE_2D);
+    glBindTexture(GL_TEXTURE_2D, gl8tex);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, surface->w, surface->h,
+                    GL_RGBA, GL_UNSIGNED_BYTE, sdl_rgbsurface->pixels);
+    glColor4f(1, 1, 1, 1);
+    glBegin(GL_QUADS);  /* the surface's top row at the top */
+    glTexCoord2f(0, v); glVertex2f(-1, -1);
+    glTexCoord2f(u, v); glVertex2f(1, -1);
+    glTexCoord2f(u, 0); glVertex2f(1, 1);
+    glTexCoord2f(0, 0); glVertex2f(-1, 1);
+    glEnd();
+    SDL_GL_SwapWindow(sdl_window);
+} /* gl_present8 */
+
+
+/*
+ * An 8-bit mode shown through the GL context: a mouse motion's window
+ *  points to the frame's pixels, as the SDL renderer's logical size did,
+ *  the relative motion's part pixel carried to the next.
+ */
+static void gl_mouse8(SDL_MouseMotionEvent *m)
+{
+    int32_t r[4];
+    int ww, wh;
+    float sx, sy;
+
+    SDL_GetWindowSize(sdl_window, &ww, &wh);
+    gl_fitrect(surface->w, surface->h, ww, wh, r);
+    if ((r[2] <= 0) || (r[3] <= 0))
+        return;
+    sx = (float) surface->w / (float) r[2];
+    sy = (float) surface->h / (float) r[3];
+    m->x = (Sint32) ((m->x - r[0]) * sx);
+    m->y = (Sint32) ((m->y - r[1]) * sy);
+    gl8xrel += m->xrel * sx;
+    gl8yrel += m->yrel * sy;
+    m->xrel = (Sint32) gl8xrel;
+    m->yrel = (Sint32) gl8yrel;
+    gl8xrel -= m->xrel;
+    gl8yrel -= m->yrel;
+} /* gl_mouse8 */
 #endif
 
 
@@ -352,7 +486,16 @@ static void shutdown_video(void)
 {
     free_video_surfaces();
 #ifdef USE_OPENGL
-    destroy_gl_window();
+    gl_leave();
+    if (sdl_glcontext != NULL)
+    {
+        /* let the driver finish with the context before it goes (Apple's
+         *  GL-on-Metal can complete its command buffers after the delete). */
+        glFinish();
+        SDL_GL_MakeCurrent(sdl_window, NULL);
+        SDL_GL_DeleteContext(sdl_glcontext);
+        sdl_glcontext = NULL;
+    } /* if */
 #endif
 
     if (sdl_renderer != NULL)
@@ -495,6 +638,71 @@ static void init_res_lookups(int davidoption, int framebuffer)
 } /* init_res_lookups */
 
 
+/*
+ * Moves a window from display mode now to mode, exclusive at the display
+ *  mode nearest exclusive_w by exclusive_h (borderless when there's none).
+ *  Between the full-screen styles it goes through windowed. Returns the mode
+ *  it's in. (Its flags can't always tell: under sdl2-compat the dummy
+ *  driver reports exclusive as desktop full screen.)
+ */
+static int set_window_display(SDL_Window *window, int now, int mode)
+{
+    SDL_DisplayMode want, got;
+    Uint32 flags = (mode == DISPLAY_EXCLUSIVE) ? SDL_WINDOW_FULLSCREEN :
+                   (mode == DISPLAY_BORDERLESS) ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
+
+    if (mode == DISPLAY_EXCLUSIVE)
+    {
+        memset(&want, '\0', sizeof (want));
+        want.w = exclusive_w;
+        want.h = exclusive_h;
+        if ((SDL_GetClosestDisplayMode(SDL_GetWindowDisplayIndex(window), &want, &got) == NULL) ||
+            (SDL_SetWindowDisplayMode(window, &got) != 0))
+        {
+            printf("No exclusive fullscreen display mode fits %dx%d (%s); using borderless.\n",
+                   exclusive_w, exclusive_h, SDL_GetError());
+            return(set_window_display(window, now, DISPLAY_BORDERLESS));
+        } /* if */
+        sdldebug("exclusive fullscreen at %dx%d, %d Hz.", got.w, got.h, got.refresh_rate);
+    } /* if */
+
+    if (now == mode)
+        return(mode);
+    if ((now != DISPLAY_WINDOWED) && (mode != DISPLAY_WINDOWED) &&
+        (SDL_SetWindowFullscreen(window, 0) == 0))
+        now = DISPLAY_WINDOWED;
+    if (SDL_SetWindowFullscreen(window, flags) != 0)
+    {
+        sdldebug("SDL_SetWindowFullscreen() failed: [%s].", SDL_GetError());
+        return(now);
+    } /* if */
+    return(mode);
+} /* set_window_display */
+
+
+/*
+ * A window in sdl_displaymode. An exclusive one is made hidden and shown
+ *  once its display mode is set, so the display changes mode only once.
+ */
+static SDL_Window *create_window(int w, int h, Uint32 flags)
+{
+    SDL_Window *window;
+
+    if (sdl_displaymode == DISPLAY_BORDERLESS)
+        flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    else if (sdl_displaymode == DISPLAY_EXCLUSIVE)
+        flags |= SDL_WINDOW_HIDDEN;
+    window = SDL_CreateWindow(titlelong,
+                    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
+    if ((window != NULL) && (sdl_displaymode == DISPLAY_EXCLUSIVE))
+    {
+        sdl_displaymode = set_window_display(window, DISPLAY_WINDOWED, DISPLAY_EXCLUSIVE);
+        SDL_ShowWindow(window);
+    } /* if */
+    return(window);
+} /* create_window */
+
+
 static void go_to_new_vid_mode(int vidoption, int w, int h)
 {
     int scale;
@@ -507,7 +715,7 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
 
     free_video_surfaces();
 #ifdef USE_OPENGL
-    destroy_gl_window();  /* an SDL_Renderer can't share the GL window. */
+    gl_leave();  /* the GL window, if there is one, shows the 8-bit mode */
 #endif
 
     /* low-res modes get a bigger window so they aren't a postage stamp. */
@@ -519,16 +727,26 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
     gl_window_h = h * scale;
 #endif
 
+    if (exclusive_w == 0)  /* no game mode yet (the editor's 2D) */
+    {
+        exclusive_w = w * scale;
+        exclusive_h = h * scale;
+    } /* if */
+
     if (sdl_window == NULL)
     {
-        sdl_window = SDL_CreateWindow(titlelong,
-                        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                        w * scale, h * scale,
-                        sdl_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+        sdl_window = create_window(w * scale, h * scale, 0);
         if (sdl_window == NULL)
             goto vidmode_failed;
 
-        sdl_renderer = SDL_CreateRenderer(sdl_window, -1, SDL_RENDERER_PRESENTVSYNC);
+        sdl_renderer = SDL_CreateRenderer(sdl_window, -1,
+                                          sdl_vsync ? SDL_RENDERER_PRESENTVSYNC : 0);
+        if (sdl_renderer == NULL)  /* the hinted driver may not be there. */
+        {
+            SDL_SetHint(SDL_HINT_RENDER_DRIVER, "");
+            sdl_renderer = SDL_CreateRenderer(sdl_window, -1,
+                                              sdl_vsync ? SDL_RENDERER_PRESENTVSYNC : 0);
+        } /* if */
         if (sdl_renderer == NULL)
             sdl_renderer = SDL_CreateRenderer(sdl_window, -1, 0);
         if (sdl_renderer == NULL)
@@ -538,20 +756,34 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
     {
         /* set the size even when fullscreen, so going windowed restores it. */
         SDL_SetWindowSize(sdl_window, w * scale, h * scale);
-        if (!sdl_fullscreen)
+        if (sdl_displaymode == DISPLAY_WINDOWED)
             SDL_SetWindowPosition(sdl_window, SDL_WINDOWPOS_CENTERED,
                                   SDL_WINDOWPOS_CENTERED);
+        else  /* exclusive keeps the game mode's display mode. */
+            sdl_displaymode = set_window_display(sdl_window, sdl_displaymode, sdl_displaymode);
     } /* else */
 
-    SDL_RenderSetLogicalSize(sdl_renderer, w, h);
-
     surface = SDL_CreateRGBSurface(0, w, h, 8, 0, 0, 0, 0);
-    sdl_rgbsurface = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32,
-                                                    SDL_PIXELFORMAT_ARGB8888);
-    sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_ARGB8888,
-                                    SDL_TEXTUREACCESS_STREAMING, w, h);
-    if ((surface == NULL) || (sdl_rgbsurface == NULL) || (sdl_texture == NULL))
-        goto vidmode_failed;
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)  /* shown through the GL context: gl_present8 */
+    {
+        sdl_rgbsurface = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32,
+                                                        SDL_PIXELFORMAT_RGBA32);
+        if ((surface == NULL) || (sdl_rgbsurface == NULL))
+            goto vidmode_failed;
+        gl_alloc8(w, h);
+    } /* if */
+    else
+#endif
+    {
+        SDL_RenderSetLogicalSize(sdl_renderer, w, h);
+        sdl_rgbsurface = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32,
+                                                        SDL_PIXELFORMAT_ARGB8888);
+        sdl_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_ARGB8888,
+                                        SDL_TEXTUREACCESS_STREAMING, w, h);
+        if ((surface == NULL) || (sdl_rgbsurface == NULL) || (sdl_texture == NULL))
+            goto vidmode_failed;
+    } /* else */
 
     /* the engine assumes bytesperline == width. */
     assert(surface->pitch == surface->w);
@@ -570,23 +802,6 @@ vidmode_failed:
 
 
 #ifdef USE_OPENGL
-/* Whole-word match in a GL_EXTENSIONS string. */
-static int gl_has_extension(const char *exts, const char *name)
-{
-    size_t len = strlen(name);
-    const char *p = exts;
-
-    while ((p = strstr(p, name)) != NULL)
-    {
-        if (((p == exts) || (p[-1] == ' ')) && ((p[len] == ' ') || (p[len] == '\0')))
-            return(1);
-        p += len;
-    } /* while */
-
-    return(0);
-} /* gl_has_extension */
-
-
 /*
  * The texture that keeps the last frame, for fades over a frame that isn't
  *  being redrawn. GL 1.1 has no non-power-of-two textures, so without
@@ -668,9 +883,21 @@ static void gl_draw_lastframe(void)
 } /* gl_draw_lastframe */
 
 
-/* Shows the back buffer: keeps it in lastframe, fades it, swaps. */
+/*
+ * Shows the back buffer: keeps it in lastframe, fades it, swaps. The GL 2.1
+ *  tier keeps the frame itself, and shows it through the faded palette.
+ */
 static void gl_swap(void)
 {
+    if (polymost_present_shader(gl_showrect, gl_draw_w, gl_draw_h))
+    {
+        SDL_GL_SwapWindow(sdl_window);
+        swapped = 1;
+        framedrawn = 0;
+        return;
+    } /* if */
+
+    glsub_flush();
     if ((framedrawn) && (lastframe != 0))
     {
         glBindTexture(GL_TEXTURE_2D, lastframe);
@@ -701,6 +928,7 @@ void _glframedrawn(void)
 void _glframereplayed(void)
 {
     framedrawn = 0;
+    polymost_unbind_shader();  /* the GL 2.1 tier's drawing went into its frame */
 } /* _glframereplayed */
 
 
@@ -711,7 +939,16 @@ void _glframereplayed(void)
  */
 void _glpalettefade(void)
 {
-    if ((sdl_glcontext == NULL) || (framedrawn) || (!lastframe_set))
+    if ((!gl_drawing) || (framedrawn))
+        return;
+    if (polymost_present_shader(gl_showrect, gl_draw_w, gl_draw_h))  /* the GL 2.1 tier keeps the frame */
+    {
+        SDL_GL_SwapWindow(sdl_window);
+        swapped = 1;
+        framedrawn = 0;
+        return;
+    } /* if */
+    if (!lastframe_set)
         return;
 
     gl_draw_lastframe();
@@ -723,21 +960,48 @@ void _glpalettefade(void)
 } /* _glpalettefade */
 
 
-/* xdim/ydim are the drawable size, clamped to what the engine's arrays hold. */
-static void init_gl_res_vars(void)
+/*
+ * xdim/ydim are the drawable size, clamped to what the engine's arrays hold,
+ *  or on the shader path its internal size (glinternalwidth/height), which
+ *  the present scales up to the drawable. say: tell why a setting isn't used.
+ */
+static void init_gl_res_vars(int say)
 {
-    int w, h;
+    int w, h, why;
+    int32_t iw, ih;
 
-    SDL_GL_GetDrawableSize(sdl_window, &w, &h);
-    if (w > MAXXDIM) w = MAXXDIM;
-    if (h > MAXYDIM) h = MAXYDIM;
+    SDL_GL_GetDrawableSize(sdl_window, &gl_draw_w, &gl_draw_h);
+    w = (gl_draw_w > MAXXDIM) ? MAXXDIM : gl_draw_w;
+    h = (gl_draw_h > MAXYDIM) ? MAXYDIM : gl_draw_h;
+
+    why = gl_internalsize(glinternalwidth, glinternalheight, &iw, &ih);
+    if ((say) && (why == 1))
+        printf("GL internal size %dx%d needs a width and a height; drawing at the window's size.\n",
+               (int) glinternalwidth, (int) glinternalheight);
+    else if ((say) && (why == 2))
+        printf("GL internal size %dx%d is under 320x200; drawing at %dx%d.\n",
+               (int) glinternalwidth, (int) glinternalheight, (int) iw, (int) ih);
+    if ((iw != 0) && (gldrawpath != GLPATH_SHADER))
+    {
+        if (say)
+            printf("GL internal size %dx%d needs draw path shader; drawing at the window's size.\n",
+                   (int) iw, (int) ih);
+        iw = 0;
+    } /* if */
+    gl_scaled = (iw != 0);
+    if (gl_scaled)
+    {
+        w = iw;
+        h = ih;
+    } /* if */
+    gl_fitrect(w, h, gl_draw_w, gl_draw_h, gl_showrect);
 
     xdim = xres = w;
     ydim = yres = h;
     bytesperline = w;
     qsetmode = 200;
     frameplace = 0;
-    sdldebug("OpenGL drawable is %dx%d.", w, h);
+    sdldebug("OpenGL drawable is %dx%d, drawn at %dx%d.", gl_draw_w, gl_draw_h, w, h);
 
     SDL_SetWindowTitle(sdl_window, titlelong);
     setupmouse();
@@ -756,18 +1020,31 @@ static void gl_resize(void)
 {
     int w, h;
     palette_t pal[256], fadergb;
-    unsigned char fadedelta;
-    GLuint old;
+    unsigned char fadedelta, base[768];
+    GLuint old, shframe;
     float oldu = 0, oldv = 0;
+    int drawn;
 
     SDL_GL_GetDrawableSize(sdl_window, &w, &h);
-    if (w > MAXXDIM) w = MAXXDIM;
-    if (h > MAXYDIM) h = MAXYDIM;
-    if ((w == xres) && (h == yres))
+    if ((w == gl_draw_w) && (h == gl_draw_h))
         return;
+    if (gl_scaled)  /* the internal size stays; only where it shows changes. */
+    {
+        gl_draw_w = w;
+        gl_draw_h = h;
+        gl_fitrect(xres, yres, w, h, gl_showrect);
+        if ((!framedrawn) && (polymost_present_shader(gl_showrect, w, h)))
+        {
+            SDL_GL_SwapWindow(sdl_window);  /* a still screen: shown again. */
+            swapped = 1;
+            framedrawn = 0;
+        } /* if */
+        return;
+    } /* if */
 
     /* init_res_lookups sets the base palette and drops the fade: keep both. */
     memcpy(pal, curpalette, sizeof (pal));
+    memcpy(base, getbasepalette(), sizeof (base));  /* the GL 2.1 tier fades it */
     fadergb = palfadergb;
     fadedelta = palfadedelta;
     old = 0;
@@ -778,14 +1055,23 @@ static void gl_resize(void)
         oldv = (float) yres / (float) lastframe_h;
         lastframe = 0;  /* keep it from gl_alloc_lastframe. */
     } /* if */
+    shframe = polymost_takeframe_shader();  /* the GL 2.1 tier's, drawn or being drawn */
     polymost_glreset();
-    init_gl_res_vars();
+    init_gl_res_vars(0);
     memcpy(curpalette, pal, sizeof (pal));
+    memcpy(getbasepalette(), base, sizeof (base));
     palfadergb = fadergb;
     palfadedelta = fadedelta;
     gltexinvalidateall();
 
-    if (old != 0)
+    if (shframe != 0)
+    {
+        drawn = framedrawn;
+        polymost_putframe_shader(shframe);
+        if (!drawn)
+            gl_swap();  /* a still screen: shown again at the new size. */
+    } /* if */
+    else if (old != 0)
     {
         gl_draw_frame(old, oldu, oldv);
         glDeleteTextures(1, &old);
@@ -806,49 +1092,52 @@ int setgamemode_gl(char davidoption)
     if ((SDL_WasInit(SDL_INIT_VIDEO) == 0) && (SDL_InitSubSystem(SDL_INIT_VIDEO) != 0))
         return(-1);
 
-    /*
-     * Make the GL window before dropping the old one, so a failure leaves
-     *  the 8-bit (or GL) mode as it was. SDL2 can't add GL to a window that
-     *  has an SDL_Renderer, so it's a new window.
-     */
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    window = SDL_CreateWindow(titlelong,
-                    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                    gl_window_w, gl_window_h,
-                    SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI |
-                    (sdl_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
-    context = (window != NULL) ? SDL_GL_CreateContext(window) : NULL;
-    if (context == NULL)
+    if (sdl_glcontext != NULL)  /* the run's GL window: set its size again */
     {
-        if (window != NULL)
-            SDL_DestroyWindow(window);
-        /* a backend may have dropped the old context in the attempt. */
-        if (sdl_glcontext != NULL)
-            SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
-        return(-1);
+        free_video_surfaces();
+        gl_leave();
+        SDL_SetWindowSize(sdl_window, gl_window_w, gl_window_h);
+        if (sdl_displaymode == DISPLAY_WINDOWED)
+            SDL_SetWindowPosition(sdl_window, SDL_WINDOWPOS_CENTERED,
+                                  SDL_WINDOWPOS_CENTERED);
+        else  /* exclusive keeps the game mode's display mode. */
+            sdl_displaymode = set_window_display(sdl_window, sdl_displaymode, sdl_displaymode);
     } /* if */
+    else
+    {
+        /*
+         * Make the GL window before dropping the 8-bit one, so a failure
+         *  leaves that mode as it was. SDL2 can't add GL to a window that
+         *  has an SDL_Renderer, so it's a new window.
+         */
+        SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+        SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+        window = create_window(gl_window_w, gl_window_h,
+                               SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI);
+        context = (window != NULL) ? SDL_GL_CreateContext(window) : NULL;
+        if (context == NULL)
+        {
+            if (window != NULL)
+                SDL_DestroyWindow(window);
+            return(-1);
+        } /* if */
 
-    if (sdl_glcontext != NULL)  /* already in GL: drop it, its context current. */
-    {
-        SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
-        destroy_gl_window();
-    } /* if */
-    free_video_surfaces();
-    if (sdl_renderer != NULL)
-    {
-        SDL_DestroyRenderer(sdl_renderer);
-        sdl_renderer = NULL;
-    } /* if */
-    if (sdl_window != NULL)
-        SDL_DestroyWindow(sdl_window);
-    sdl_window = window;
-    sdl_glcontext = context;
+        free_video_surfaces();
+        if (sdl_renderer != NULL)
+        {
+            SDL_DestroyRenderer(sdl_renderer);
+            sdl_renderer = NULL;
+        } /* if */
+        if (sdl_window != NULL)
+            SDL_DestroyWindow(sdl_window);
+        sdl_window = window;
+        sdl_glcontext = context;
+    } /* else */
 
     /* destroying an SDL_Renderer can leave no context current. */
     SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
-    if (SDL_GL_SetSwapInterval(1) != 0)
-        SDL_GL_SetSwapInterval(0);
+    if (SDL_GL_SetSwapInterval(sdl_vsync) != 0)
+        sdldebug("SDL_GL_SetSwapInterval() failed: [%s].", SDL_GetError());
 
     /* the state JFBuild sets after every GL mode change. */
     glEnable(GL_TEXTURE_2D);
@@ -856,6 +1145,7 @@ int setgamemode_gl(char davidoption)
     glClearColor(0, 0, 0, 0.5);
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+    glHint(GL_FOG_HINT, GL_NICEST);  /* fog per pixel, as classic darkens */
     glDisable(GL_DITHER);
 
     exts = (const char *) glGetString(GL_EXTENSIONS);
@@ -869,16 +1159,26 @@ int setgamemode_gl(char davidoption)
                           gl_has_extension(exts, "GL_SGIS_texture_edge_clamp"));
     glinfo.texcompr = gl_has_extension(exts, "GL_ARB_texture_compression");
     glinfo.texnpot = gl_has_extension(exts, "GL_ARB_texture_non_power_of_two");
-    sdldebug("OpenGL %s on %s: bgra %d, clamptoedge %d, texcompr %d, texnpot %d, maxanisotropy %g.",
+    gl_initdrawpath(exts);
+    glsub_init();
+    sdldebug("OpenGL %s on %s: bgra %d, clamptoedge %d, texcompr %d, texnpot %d, maxanisotropy %g, vbo %d, glsl %d, fbo %d.",
              (const char *) glGetString(GL_VERSION), (const char *) glGetString(GL_RENDERER),
-             glinfo.bgra, glinfo.clamptoedge, glinfo.texcompr, glinfo.texnpot, glinfo.maxanisotropy);
+             glinfo.bgra, glinfo.clamptoedge, glinfo.texcompr, glinfo.texnpot, glinfo.maxanisotropy,
+             glinfo.vbo, glinfo.glsl, glinfo.fbo);
 
     bpp = 32;
     numpages = 2;  /* as JFBuild: permanent rotatesprites go on both pages. */
+    gl_drawing = 1;
     gl_davidoption = davidoption;
-    init_gl_res_vars();
+    init_gl_res_vars(1);
     setrendermode(3);
     polymost_glreset();
+    if (gl_scaled)  /* the shader path failing now draws at the window's size. */
+    {
+        polymost_prepare_shader();
+        if (gldrawpath != GLPATH_SHADER)
+            init_gl_res_vars(1);
+    } /* if */
     last_render_ticks = SDL_GetTicks();
     return(0);
 #else
@@ -895,7 +1195,7 @@ int setgamemode_gl(char davidoption)
 void glredrawlastframe(void)
 {
 #ifdef USE_OPENGL
-    if ((sdl_glcontext != NULL) && (lastframe_set))
+    if ((gl_drawing) && (lastframe_set))
         gl_draw_lastframe();
 #endif
 } /* glredrawlastframe */
@@ -965,7 +1265,7 @@ static int sdl_mouse_wheel_filter(SDL_MouseWheelEvent const *event)
 static void mouse_area(int *w, int *h)
 {
 #ifdef USE_OPENGL
-    if (sdl_glcontext != NULL)
+    if (gl_drawing)
     {
         SDL_GetWindowSize(sdl_window, w, h);
         return;
@@ -979,15 +1279,36 @@ static void mouse_area(int *w, int *h)
 void getmousearea(int *w, int *h)
 {
     mouse_area(w, h);
+#ifdef USE_OPENGL
+    /* drawn at an internal size: the frame's part of the window, in points. */
+    if ((gl_drawing) && (gl_scaled) && (gl_draw_w > 0) && (gl_draw_h > 0))
+    {
+        *w = (int) (((int64_t) gl_showrect[2] * *w + gl_draw_w / 2) / gl_draw_w);
+        *h = (int) (((int64_t) gl_showrect[3] * *h + gl_draw_h / 2) / gl_draw_h);
+    } /* if */
+#endif
 } /* getmousearea */
 
 
 static int sdl_mouse_motion_filter(SDL_Event const *event)
 {
     int w, h;
+#ifdef USE_OPENGL
+    SDL_Event scaled;
+#endif
 
     if (sdl_window == NULL)
         return(0);
+
+#ifdef USE_OPENGL
+    if ((event->type == SDL_MOUSEMOTION) && (sdl_glcontext != NULL) &&
+        (!gl_drawing) && (surface != NULL))
+    {
+        scaled = *event;
+        gl_mouse8(&scaled.motion);
+        event = &scaled;
+    } /* if */
+#endif
 
     if (event->type == SDL_JOYBALLMOTION)
     {
@@ -1024,32 +1345,84 @@ static int sdl_mouse_motion_filter(SDL_Event const *event)
 } /* sdl_mouse_motion_filter */
 
 
-/* With SDL2 the surface survives the toggle, so no pointer fixups needed. */
+/* With SDL2 the surface survives the change, so no pointer fixups needed. */
+static void show_display_mode(int mode)
+{
+    if (sdl_window == NULL)
+    {
+        sdl_displaymode = mode;  /* the next mode set makes the window. */
+        return;
+    } /* if */
+
+    sdl_displaymode = set_window_display(sdl_window, sdl_displaymode, mode);
+#ifdef USE_OPENGL
+    if (gl_drawing)
+    {
+        gl_resize();  /* macOS may report the new size later, as an event. */
+        return;
+    } /* if */
+#endif
+    output_surface_info(surface);
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+        present_surface();  /* the GL window shows it again at the new size */
+#endif
+} /* show_display_mode */
+
+
+void setvideodisplaymode(int mode)
+{
+    if ((mode < 0) || (mode >= DISPLAY_COUNT))
+        mode = DISPLAY_BORDERLESS;
+    sdl_displaymode_wanted = mode;
+    show_display_mode((getenv(BUILD_WINDOWED) != NULL) ? DISPLAY_WINDOWED : mode);
+} /* setvideodisplaymode */
+
+
+int getvideodisplaymode(void)
+{
+    return(sdl_displaymode);
+} /* getvideodisplaymode */
+
+
+void setvideovsync(int on)
+{
+    sdl_vsync = (on != 0);
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+        if (SDL_GL_SetSwapInterval(sdl_vsync) != 0)
+            sdldebug("SDL_GL_SetSwapInterval() failed: [%s].", SDL_GetError());
+#endif
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+    if (sdl_renderer != NULL)
+        if (SDL_RenderSetVSync(sdl_renderer, sdl_vsync) != 0)
+            sdldebug("SDL_RenderSetVSync() failed: [%s].", SDL_GetError());
+#endif  /* older SDL: at the next window's renderer. */
+} /* setvideovsync */
+
+
+int getvideovsync(void)
+{
+    return(sdl_vsync);
+} /* getvideovsync */
+
+
+/* Alt+Enter: windowed, or the full-screen style set (borderless if none). */
 static int attempt_fullscreen_toggle(void)
 {
-    Uint32 flags = sdl_fullscreen ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP;
+    int mode = sdl_displaymode_wanted;
 
     sdldebug("attempting to toggle fullscreen flag...");
 
     if (sdl_window == NULL)
         return(0);
 
-    if (SDL_SetWindowFullscreen(sdl_window, flags) != 0)
-    {
-        sdldebug("SDL_SetWindowFullscreen() failed: [%s].", SDL_GetError());
-        return(0);
-    } /* if */
-
-    sdl_fullscreen = !sdl_fullscreen;
-#ifdef USE_OPENGL
-    if (sdl_glcontext != NULL)
-    {
-        gl_resize();  /* macOS may report the new size later, as an event. */
-        return(1);
-    } /* if */
-#endif
-    output_surface_info(surface);
-    return(1);
+    if (sdl_displaymode != DISPLAY_WINDOWED)
+        mode = DISPLAY_WINDOWED;
+    else if (mode == DISPLAY_WINDOWED)
+        mode = DISPLAY_BORDERLESS;
+    show_display_mode(mode);
+    return(sdl_displaymode == mode);
 } /* attempt_fullscreen_toggle */
 
 
@@ -1180,8 +1553,11 @@ static int root_sdl_event_filter(const SDL_Event *event)
                 present_surface();
 #ifdef USE_OPENGL
             else if ((event->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) &&
-                     (sdl_glcontext != NULL))
+                     (gl_drawing))
                 gl_resize();
+            else if ((event->window.event == SDL_WINDOWEVENT_SIZE_CHANGED) &&
+                     (sdl_glcontext != NULL))
+                present_surface();  /* an 8-bit mode, at the new size */
 #endif
             return(0);
         case SDL_QUIT:
@@ -1531,6 +1907,14 @@ static void set_sdl_renderer(void)
         _exit(1);
     } /* else */
 
+#if defined(__APPLE__) && defined(USE_OPENGL)
+    /* present the 8-bit modes (before any renderer 3) through SDL's GL
+       renderer, not Metal: it presents faster with vsync off and its
+       scaling keeps the palette's colours. A user's
+       SDL_RENDER_DRIVER still wins. */
+    SDL_SetHintWithPriority(SDL_HINT_RENDER_DRIVER, "opengl", SDL_HINT_DEFAULT);
+#endif
+
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == -1)
     {
         fprintf(stderr, "BUILDSDL: SDL_Init() failed!\n");
@@ -1605,7 +1989,7 @@ void _platform_init(int argc, char **argv, const char *title, const char *icon)
     else
         mouse_grabbed = 0;
 
-    sdl_fullscreen = sdl_fullscreen_wanted && (getenv(BUILD_WINDOWED) == NULL);
+    sdl_displaymode = (getenv(BUILD_WINDOWED) != NULL) ? DISPLAY_WINDOWED : sdl_displaymode_wanted;
 
     set_sdl_renderer();
 
@@ -1754,6 +2138,9 @@ static unsigned char *gl_screencapture(int *w, int *h)
 
     *w = xdim;
     *h = ydim;
+    rgb = polymost_capture_shader();  /* the GL 2.1 tier's frame, as shown */
+    if (rgb != NULL)
+        return(rgb);
     if (!framedrawn)
     {
         if (lastframe == 0)
@@ -1908,7 +2295,7 @@ int screencapture(char *_filename, char inverseit)
         return -1;
 
 #ifdef USE_OPENGL
-    if (sdl_glcontext != NULL)
+    if (gl_drawing)
         rgb = gl_screencapture(&w, &h);
     else
 #endif
@@ -1974,6 +2361,9 @@ int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim)
 #ifdef USE_OPENGL
     int32_t glw = daxdim, glh = daydim;
 #endif
+
+    exclusive_w = daxdim;  /* the size asked for, before the clamp */
+    exclusive_h = daydim;
 
     /* 8-bit modes keep the original limit; MAXXDIM/MAXYDIM grew for OpenGL. */
     if (daxdim > 1600 || daydim > 1200)
@@ -2321,7 +2711,7 @@ int VBE_setPalette(int32_t start, int32_t num, char *palettebuffer)
     assert( (start + num) <= (sizeof (fmt_swap) / sizeof (SDL_Color)) );
 
 #ifdef USE_OPENGL
-    if (sdl_glcontext != NULL)  /* 6-bit BGR0 to 8-bit, then retexture. */
+    if (gl_drawing)  /* 6-bit BGR0 to 8-bit, then retexture. */
     {
         palette_t newpal[256];
 
@@ -2336,7 +2726,11 @@ int VBE_setPalette(int32_t start, int32_t num, char *palettebuffer)
         if (memcmp(&curpalette[start], newpal, num * sizeof (palette_t)) != 0)
         {
             memcpy(&curpalette[start], newpal, num * sizeof (palette_t));
-            gltexinvalidateall();
+            if (gldrawpath != GLPATH_SHADER)  /* that one looks the palette up as it shows a frame */
+            {
+                gltexinvalidateall();
+                polymost_buildshaderamp();
+            } /* if */
         } /* if */
         return(1);
     } /* if */
@@ -2373,7 +2767,7 @@ int VBE_getPalette(int32_t start, int32_t num, char *palettebuffer)
     int i;
 
 #ifdef USE_OPENGL
-    if (sdl_glcontext != NULL)
+    if (gl_drawing)
     {
         for (i = start; i < start + num; i++)
         {
@@ -2475,7 +2869,7 @@ void _nextpage(void)
     handle_events();
 
 #ifdef USE_OPENGL
-    if (sdl_glcontext != NULL)
+    if (gl_drawing)
         gl_swap();
     else
 #endif

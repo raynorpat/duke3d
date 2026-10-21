@@ -235,8 +235,9 @@ extern unsigned char palfadedelta;
 	/* Bits per pixel of the video mode: 8 is software, more is OpenGL. */
 extern int32_t bpp;
 #ifdef USE_OPENGL
-	/* What the OpenGL driver supports, filled in by setgamemode_gl. */
-struct glinfo_t { float maxanisotropy; char bgra, clamptoedge, texcompr, texnpot; };
+	/* What the OpenGL driver supports, filled in by setgamemode_gl (vbo, glsl
+	 * and fbo: glext.h's entry points are loaded). */
+struct glinfo_t { float maxanisotropy; char bgra, clamptoedge, texcompr, texnpot, vbo, glsl, fbo; };
 extern struct glinfo_t glinfo;
 	/* polymost.c: log2 of the largest texture size (0: from GL_MAX_TEXTURE_SIZE
 	 * on the first upload), and how many mipmap levels every texture drops.

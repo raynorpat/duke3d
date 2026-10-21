@@ -42,6 +42,8 @@ extern int stricmp(const char *x, const char *y);
 #include <time.h>
 #include "duke3d.h"
 #include "scriplib.h"
+#include "glext.h"
+#include "displaymode.h"
 
 
 // we load this in to get default button and key assignments
@@ -79,6 +81,11 @@ int32 MouseAiming;
 int32 ScreenMode;
 int32 RendererSetting;
 int32 GLTextureMipLevel;
+int32 GLDrawPath;  // GLPATH_*: renderer 3's draw path, auto by default
+int32 GLInternalWidth, GLInternalHeight;  // renderer 3's size, 0: the window's
+double GLContrast, GLSaturation;  // renderer 3's shader path's, 1: as it is
+int32 DisplayMode;  // DISPLAY_*: borderless by default
+int32 VSync;
 char ScreenshotFormat[4];  // png, jpg or bmp
 int32 ScreenWidth;
 int32 ScreenHeight;
@@ -86,6 +93,29 @@ int32 ScreenHeight;
 static char setupfilename[MAX_PATH];
 static int32 scripthandle;
 static int32 setupread=0;
+
+// A decimal kept as a quoted string (scriplib reads unquoted numbers as
+// whole ones): *v clamped to lo..hi, or left as it is when it isn't one.
+static void CONFIG_GetDecimal( char * entryname, double * v, double lo, double hi )
+{
+   char temp[80], *end;
+   double d;
+
+   temp[0] = 0;
+   SCRIPT_GetString( scripthandle, "Screen Setup", entryname, temp );
+   d = strtod(temp, &end);
+   if (end == temp || *end != 0 || d != d)
+      return;
+   *v = (d < lo) ? lo : (d > hi) ? hi : d;
+}
+
+static void CONFIG_PutDecimal( char * entryname, double v )
+{
+   char temp[32];
+
+   sprintf(temp, "%g", v);
+   SCRIPT_PutString( scripthandle, "Screen Setup", entryname, temp );
+}
 /*
 ===================
 =
@@ -313,6 +343,13 @@ void CONFIG_SetDefaults( void )
    ScreenMode = 2;
    RendererSetting = 0;
    GLTextureMipLevel = 0;
+   GLDrawPath = GLPATH_AUTO;
+   GLInternalWidth = 0;
+   GLInternalHeight = 0;
+   GLContrast = 1.0;
+   GLSaturation = 1.0;
+   DisplayMode = DISPLAY_BORDERLESS;
+   VSync = 1;
    strcpy(ScreenshotFormat, "png");
    ScreenWidth = 320;
    ScreenHeight = 200;
@@ -701,6 +738,21 @@ void CONFIG_ReadSetup( void )
    // largest, 65536) and lowers this to its own GPU's limit when it uploads.
    GLTextureMipLevel = max(0,min(15,GLTextureMipLevel));
    temp[0] = 0;
+   SCRIPT_GetString( scripthandle, "Screen Setup", "GLDrawPath",temp);
+   GLDrawPath = gl_pathfromname(temp);
+   SCRIPT_GetNumber( scripthandle, "Screen Setup", "GLInternalWidth",&GLInternalWidth);
+   SCRIPT_GetNumber( scripthandle, "Screen Setup", "GLInternalHeight",&GLInternalHeight);
+   GLInternalWidth = max(0,min(7680,GLInternalWidth));
+   GLInternalHeight = max(0,min(4320,GLInternalHeight));
+   CONFIG_GetDecimal( "GLContrast", &GLContrast, GL_CONTRAST_MIN, GL_CONTRAST_MAX );
+   CONFIG_GetDecimal( "GLSaturation", &GLSaturation, GL_SATURATION_MIN, GL_SATURATION_MAX );
+   temp[0] = 0;
+   SCRIPT_GetString( scripthandle, "Screen Setup", "DisplayMode",temp);
+   DisplayMode = display_modefromname(temp);
+   if (DisplayMode < 0) DisplayMode = DISPLAY_BORDERLESS;
+   SCRIPT_GetNumber( scripthandle, "Screen Setup", "VSync",&VSync);
+   VSync = (VSync != 0);
+   temp[0] = 0;
    SCRIPT_GetString( scripthandle, "Screen Setup", "ScreenshotFormat",temp);
    if (stricmp(temp, "jpg") == 0)
       strcpy(ScreenshotFormat, "jpg");
@@ -842,6 +894,13 @@ void CONFIG_WriteSetup( void )
    SCRIPT_PutNumber( scripthandle, "Screen Setup", "ScreenGamma",ud.brightness,false,false);
    SCRIPT_PutNumber( scripthandle, "Screen Setup", "Renderer",RendererSetting,false,false);
    SCRIPT_PutNumber( scripthandle, "Screen Setup", "GLTextureMipLevel",GLTextureMipLevel,false,false);
+   SCRIPT_PutString( scripthandle, "Screen Setup", "GLDrawPath",(char *)gl_pathname(GLDrawPath));
+   SCRIPT_PutNumber( scripthandle, "Screen Setup", "GLInternalWidth",GLInternalWidth,false,false);
+   SCRIPT_PutNumber( scripthandle, "Screen Setup", "GLInternalHeight",GLInternalHeight,false,false);
+   CONFIG_PutDecimal( "GLContrast", GLContrast );
+   CONFIG_PutDecimal( "GLSaturation", GLSaturation );
+   SCRIPT_PutString( scripthandle, "Screen Setup", "DisplayMode",(char *)display_modename(DisplayMode));
+   SCRIPT_PutNumber( scripthandle, "Screen Setup", "VSync",VSync,false,false);
    SCRIPT_PutString( scripthandle, "Screen Setup", "ScreenshotFormat",ScreenshotFormat);
    SCRIPT_PutNumber( scripthandle, "Misc", "Executions",ud.executions,false,false);
    SCRIPT_PutNumber( scripthandle, "Misc", "RunMode",ud.auto_run,false,false);

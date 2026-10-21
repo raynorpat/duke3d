@@ -16,6 +16,7 @@
 #include "build.h"
 #include "display.h"
 #include "engine.h"
+#include "displaymode.h"
 
 /* Callbacks the game normally provides to the engine. */
 static volatile int timer_calls = 0;
@@ -71,46 +72,133 @@ static int gl_fallback(int argc, char **argv)
     return 0;
 }
 
+#if !PLATFORM_WIN32
+/* The engine's window: the only one. */
+static SDL_Window *smoke_window(void)
+{
+    Uint32 id;
+
+    for (id = 1; id < 1000; id++)
+        if (SDL_GetWindowFromID(id) != NULL)
+            return SDL_GetWindowFromID(id);
+    return NULL;
+}
+
+/* The window's full-screen flags: 0, SDL_WINDOW_FULLSCREEN or _DESKTOP. */
+static Uint32 smoke_fsflags(void)
+{
+    SDL_Window *w = smoke_window();
+    return (w != NULL) ? (SDL_GetWindowFlags(w) & SDL_WINDOW_FULLSCREEN_DESKTOP) : 0xffffffff;
+}
+
+static void smoke_alt_enter(void)
+{
+    SDL_Event ev;
+
+    memset(&ev, 0, sizeof(ev));
+    ev.type = SDL_KEYDOWN;
+    ev.key.state = SDL_PRESSED;
+    ev.key.keysym.scancode = SDL_SCANCODE_RETURN;
+    ev.key.keysym.sym = SDLK_RETURN;
+    ev.key.keysym.mod = KMOD_LALT;
+    SDL_PushEvent(&ev);
+    _handle_events();
+}
+
+/* The renderer presents on vsync. */
+static int smoke_vsynced(void)
+{
+    SDL_RendererInfo info;
+    SDL_Renderer *r = SDL_GetRenderer(smoke_window());
+
+    return (r != NULL) && (SDL_GetRendererInfo(r, &info) == 0) &&
+           ((info.flags & SDL_RENDERER_PRESENTVSYNC) != 0);
+}
+
+/* Full screen: sdl2-compat can report exclusive with the desktop flag. */
+#define SMOKE_EXCLUSIVE() ((smoke_fsflags() & SDL_WINDOW_FULLSCREEN) != 0)
+
+#define SMOKE_CHECK(what, cond) \
+    do { if (!(cond)) { fprintf(stderr, "FAIL: %s (mode %d, flags 0x%x)\n", what, \
+                                getvideodisplaymode(), (unsigned) smoke_fsflags()); return 1; } } while (0)
+#endif
+
 /*
- * setvideofullscreen picks fullscreen for the next mode set; BUILD_WINDOWED
- *  still wins over it.
+ * setvideodisplaymode: the window's flags for each mode, at once when there's
+ *  a window and at the next mode set when there isn't; BUILD_WINDOWED wins;
+ *  Alt+Enter toggles windowed and the chosen full-screen style. setvideovsync
+ *  sets the renderer's vsync. The dummy driver has a display mode of its own,
+ *  so going full screen here changes no real display.
  */
-static int fullscreen_setter(int argc, char **argv)
+static int displaymode_setter(int argc, char **argv)
 {
 #if !PLATFORM_WIN32
     unsetenv(BUILD_WINDOWED);
-    setvideofullscreen(1);
-    if (getvideofullscreen() != 1)
-    {
-        fprintf(stderr, "FAIL: setvideofullscreen(1) gave %d\n", getvideofullscreen());
-        return 1;
-    }
+    SMOKE_CHECK("borderless by default", getvideodisplaymode() == DISPLAY_BORDERLESS);
+    SMOKE_CHECK("vsync on by default", getvideovsync() == 1);
+    setvideodisplaymode(DISPLAY_WINDOWED);
+    SMOKE_CHECK("windowed asked for", getvideodisplaymode() == DISPLAY_WINDOWED);
 
-    setvideofullscreen(0);
+    /* a new window made exclusive */
+    setvideodisplaymode(DISPLAY_EXCLUSIVE);
     _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
     if (_setgamemode(1, 320, 200) != 0)
     {
         fprintf(stderr, "FAIL: _setgamemode(320x200)\n");
         return 1;
     }
+    SMOKE_CHECK("exclusive window", (getvideodisplaymode() == DISPLAY_EXCLUSIVE) && SMOKE_EXCLUSIVE());
+    SMOKE_CHECK("vsync on", smoke_vsynced());
 
-    if (getvideofullscreen() != 0)
+    setvideodisplaymode(DISPLAY_WINDOWED);
+    SMOKE_CHECK("windowed", (getvideodisplaymode() == DISPLAY_WINDOWED) && (smoke_fsflags() == 0));
+    smoke_alt_enter();  /* windowed set: borderless */
+    SMOKE_CHECK("Alt+Enter to borderless", (getvideodisplaymode() == DISPLAY_BORDERLESS) &&
+                                           (smoke_fsflags() == SDL_WINDOW_FULLSCREEN_DESKTOP));
+    smoke_alt_enter();
+    SMOKE_CHECK("Alt+Enter back to windowed", (getvideodisplaymode() == DISPLAY_WINDOWED) && (smoke_fsflags() == 0));
+
+    setvideodisplaymode(DISPLAY_EXCLUSIVE);
+    SMOKE_CHECK("exclusive", (getvideodisplaymode() == DISPLAY_EXCLUSIVE) && SMOKE_EXCLUSIVE());
+    smoke_alt_enter();
+    SMOKE_CHECK("Alt+Enter to windowed", (getvideodisplaymode() == DISPLAY_WINDOWED) && (smoke_fsflags() == 0));
+    smoke_alt_enter();
+    SMOKE_CHECK("Alt+Enter back to exclusive", (getvideodisplaymode() == DISPLAY_EXCLUSIVE) && SMOKE_EXCLUSIVE());
+
+    setvideodisplaymode(DISPLAY_BORDERLESS);
+    SMOKE_CHECK("borderless", (getvideodisplaymode() == DISPLAY_BORDERLESS) &&
+                              (smoke_fsflags() == SDL_WINDOW_FULLSCREEN_DESKTOP));
+    if (_setgamemode(1, 640, 400) != 0)
     {
-        fprintf(stderr, "FAIL: windowed request, fullscreen=%d\n", getvideofullscreen());
+        fprintf(stderr, "FAIL: _setgamemode(640x400)\n");
         return 1;
     }
+    SMOKE_CHECK("borderless kept by a mode set", (getvideodisplaymode() == DISPLAY_BORDERLESS) &&
+                                                 (smoke_fsflags() == SDL_WINDOW_FULLSCREEN_DESKTOP));
+
+    /* no display mode fits: borderless for this run (the dummy display is 1024x768) */
+    setvideodisplaymode(DISPLAY_EXCLUSIVE);
+    SMOKE_CHECK("exclusive at 640x400", getvideodisplaymode() == DISPLAY_EXCLUSIVE);
+    if (_setgamemode(1, 1600, 1200) != 0)
+    {
+        fprintf(stderr, "FAIL: _setgamemode(1600x1200)\n");
+        return 1;
+    }
+    SMOKE_CHECK("exclusive falls back to borderless", (getvideodisplaymode() == DISPLAY_BORDERLESS) &&
+                                                      (smoke_fsflags() == SDL_WINDOW_FULLSCREEN_DESKTOP));
+
+    setvideovsync(0);
+    SMOKE_CHECK("vsync off", (getvideovsync() == 0) && !smoke_vsynced());
+    setvideovsync(1);
+    SMOKE_CHECK("vsync back on", (getvideovsync() == 1) && smoke_vsynced());
 
     setenv(BUILD_WINDOWED, "1", 1);
-    setvideofullscreen(1);
-    if (getvideofullscreen() != 0)
-    {
-        fprintf(stderr, "FAIL: BUILD_WINDOWED did not win, fullscreen=%d\n", getvideofullscreen());
-        return 1;
-    }
+    setvideodisplaymode(DISPLAY_EXCLUSIVE);
+    SMOKE_CHECK("BUILD_WINDOWED wins", (getvideodisplaymode() == DISPLAY_WINDOWED) && (smoke_fsflags() == 0));
 
     _uninitengine();
 #endif
-    printf("PASS: fullscreen_setter\n");
+    printf("PASS: displaymode_setter\n");
     return 0;
 }
 
@@ -365,8 +453,8 @@ int main(int argc, char **argv)
 
     if ((argc > 1) && (strcmp(argv[1], "gl_fallback") == 0))
         return gl_fallback(argc, argv);
-    if ((argc > 1) && (strcmp(argv[1], "fullscreen_setter") == 0))
-        return fullscreen_setter(argc, argv);
+    if ((argc > 1) && (strcmp(argv[1], "displaymode_setter") == 0))
+        return displaymode_setter(argc, argv);
     if ((argc > 1) && (strcmp(argv[1], "palette_fade") == 0))
         return palette_fade(argc, argv);
     if ((argc > 1) && (strcmp(argv[1], "screencapture_formats") == 0))

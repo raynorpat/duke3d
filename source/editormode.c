@@ -6,6 +6,7 @@
 #include "build/build.h"
 #include "build/engine.h"
 #include "build/display.h"
+#include "build/glext.h"
 #include "editormode.h"
 #include "SDL.h"
 
@@ -60,6 +61,9 @@ int editorsetgamemode(const editormode_t *m)
     editorrendermode = editorclamprenderer(m->renderer);
 #ifdef USE_OPENGL
     gltexmiplevel = m->gltexmiplevel;  /* build.cfg: drop this many mipmap levels */
+    gldrawpathrequest = m->gldrawpath;  /* setgamemode_gl picks what the driver has */
+    glinternalwidth = m->glinternalwidth;
+    glinternalheight = m->glinternalheight;
 #endif
     if (editorrendermode == 3 && editorglfailed)
         editorrendermode = 0;

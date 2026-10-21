@@ -1,6 +1,8 @@
 /* Reader and writer for the map editor's build.cfg. Engine-free. */
 
 #include "buildcfg.h"
+#include "build/glext.h"
+#include "build/displaymode.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -33,10 +35,16 @@ void buildcfg_defaults(buildcfg_t *c)
     c->renderer = 0;
     c->xdim3d = 640;
     c->ydim3d = 480;
-    c->fullscreen = 1;
+    c->displaymode = DISPLAY_BORDERLESS;
+    c->vsync = 1;
     c->gltexmiplevel = 0;
     c->mousesensitivity = 1.0;
     memcpy(c->keys, default_keys, sizeof(c->keys));
+    c->gldrawpath = GLPATH_AUTO;
+    c->glinternalwidth = 0;
+    c->glinternalheight = 0;
+    c->glcontrast = 1.0;
+    c->glsaturation = 1.0;
 }
 
 static int32_t clamp_int(long v, long lo, long hi)
@@ -53,17 +61,41 @@ static int parse_long(const char *s, int base, long *out)
     return end != s && *end == '\0' && errno == 0;
 }
 
+/* Parses all of s as a decimal into *out, clamped to lo..hi; 0 on failure. */
+static int parse_decimal(const char *s, double lo, double hi, double *out)
+{
+    char *end;
+    double d = strtod(s, &end);
+    if (end == s || *end != '\0' || d != d)
+        return 0;
+    *out = d < lo ? lo : d > hi ? hi : d;
+    return 1;
+}
+
 static void apply(buildcfg_t *c, const char *name, const char *val)
 {
     long v;
     int i;
 
     if (!strcmp(name, "mousesensitivity")) {
-        char *end;
-        double d = strtod(val, &end);
-        if (end == val || *end != '\0' || d != d)
-            return;
-        c->mousesensitivity = d < 0.1 ? 0.1 : d > 10.0 ? 10.0 : d;
+        parse_decimal(val, 0.1, 10.0, &c->mousesensitivity);
+        return;
+    }
+    if (!strcmp(name, "glcontrast")) {
+        parse_decimal(val, GL_CONTRAST_MIN, GL_CONTRAST_MAX, &c->glcontrast);
+        return;
+    }
+    if (!strcmp(name, "glsaturation")) {
+        parse_decimal(val, GL_SATURATION_MIN, GL_SATURATION_MAX, &c->glsaturation);
+        return;
+    }
+    if (!strcmp(name, "displaymode")) {
+        i = display_modefromname(val);
+        c->displaymode = (i >= 0) ? i : DISPLAY_BORDERLESS;
+        return;
+    }
+    if (!strcmp(name, "gldrawpath")) {
+        c->gldrawpath = gl_pathfromname(val);
         return;
     }
     for (i = 0; i < BUILDCFG_NUMKEYS; i++) {
@@ -79,8 +111,10 @@ static void apply(buildcfg_t *c, const char *name, const char *val)
     if (!strcmp(name, "renderer")) c->renderer = clamp_int(v, 0, 3);
     else if (!strcmp(name, "xdim3d")) c->xdim3d = clamp_int(v, 320, 7680);
     else if (!strcmp(name, "ydim3d")) c->ydim3d = clamp_int(v, 200, 4320);
-    else if (!strcmp(name, "fullscreen")) c->fullscreen = v != 0;
+    else if (!strcmp(name, "vsync")) c->vsync = v != 0;
     else if (!strcmp(name, "gltexmiplevel")) c->gltexmiplevel = clamp_int(v, 0, 15);
+    else if (!strcmp(name, "glinternalwidth")) c->glinternalwidth = clamp_int(v, 0, 7680);
+    else if (!strcmp(name, "glinternalheight")) c->glinternalheight = clamp_int(v, 0, 4320);
 }
 
 static char *trim(char *s)
@@ -95,6 +129,8 @@ static char *trim(char *s)
 int buildcfg_read(buildcfg_t *c, const char *path)
 {
     char line[256];
+    long v;
+    int displaymode = 0, fullscreen = -1;  /* the old fullscreen key: without a displaymode */
     FILE *f = fopen(path, "r");
     if (!f)
         return -1;
@@ -110,10 +146,18 @@ int buildcfg_read(buildcfg_t *c, const char *path)
         *eq = '\0';
         name = trim(name);
         val = trim(eq + 1);
-        if (*name && *val)
+        if (!*name || !*val)
+            continue;
+        displaymode |= !strcmp(name, "displaymode");
+        if (!strcmp(name, "fullscreen")) {
+            if (parse_long(val, 10, &v))
+                fullscreen = v != 0;
+        } else
             apply(c, name, val);
     }
     fclose(f);
+    if (!displaymode && fullscreen >= 0)
+        c->displaymode = fullscreen ? DISPLAY_BORDERLESS : DISPLAY_WINDOWED;
     return 0;
 }
 
@@ -132,8 +176,14 @@ int buildcfg_write(const buildcfg_t *c, const char *path)
     fprintf(f, "renderer = %d\n", (int)c->renderer);
     fprintf(f, "xdim3d = %d\n", (int)c->xdim3d);
     fprintf(f, "ydim3d = %d\n", (int)c->ydim3d);
-    fprintf(f, "fullscreen = %d\n", (int)c->fullscreen);
+    fprintf(f, "displaymode = %s\n", display_modename(c->displaymode));
+    fprintf(f, "vsync = %d\n", (int)c->vsync);
     fprintf(f, "gltexmiplevel = %d\n", (int)c->gltexmiplevel);
+    fprintf(f, "gldrawpath = %s\n", gl_pathname(c->gldrawpath));
+    fprintf(f, "glinternalwidth = %d\n", (int)c->glinternalwidth);
+    fprintf(f, "glinternalheight = %d\n", (int)c->glinternalheight);
+    fprintf(f, "glcontrast = %g\n", c->glcontrast);
+    fprintf(f, "glsaturation = %g\n", c->glsaturation);
     fprintf(f, "mousesensitivity = %g\n", c->mousesensitivity);
     for (i = 0; i < BUILDCFG_NUMKEYS; i++)
         fprintf(f, "%s = %02x\n", key_names[i], c->keys[i]);
