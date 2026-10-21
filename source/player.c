@@ -29,12 +29,6 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <stdint.h>
 #include "duke3d.h"
 
-#if DUKE3D_GAMEVER < GAMEVER_11
-// 1.0's gamestartup has no friction: its code uses 0xcb00, and 0xcb00
-//  less 0x2000 and 0x2900 (G10-L03).
-#define dukefriction 0xcb00
-#endif
-
 int32 turnheldtime; //MED
 int32 lastcontroltime; //MED
 
@@ -2586,7 +2580,11 @@ void getinput(short snum)
     tics = totalclock-lastcontroltime;
     lastcontroltime = totalclock;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_11
+    // 1.0 has no mouse aiming: no bit 23 and no quote (sw10 0x43520).
+    aimtoggle = 0;
+    myaimmode = p->aim_mode;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
     // 1.1 keeps no aim state of its own: getinput reads ps.aim_mode (which
     // newgame clears) and sends bit 23 once per key edge that should flip it,
     // for cheatkeys to toggle. Holding mode flips on the edge that disagrees

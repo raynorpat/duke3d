@@ -183,7 +183,12 @@ signed char multiwho, multipos, multiwhat, multiflag;
 
 int32_t fakemovefifoplc,movefifoplc;
 int32_t myxbak[MOVEFIFOSIZ], myybak[MOVEFIFOSIZ], myzbak[MOVEFIFOSIZ];
+#if DUKE3D_GAMEVER < GAMEVER_11
+// 1.0 has no CON friction: its movement uses 0xcb00 (G10-L03).
+int32_t myhorizbak[MOVEFIFOSIZ],dukefriction = 0xcb00, show_shareware;
+#else
 int32_t myhorizbak[MOVEFIFOSIZ],dukefriction = 0xcc00, show_shareware;
+#endif
 
 short myangbak[MOVEFIFOSIZ];
 char myname[32],camerashitable,freezerhurtowner=0,lasermode;

@@ -1658,7 +1658,9 @@ static void non3dr_menus(void)
                 { "AIM UP", gamefunc_Aim_Up },
                 { "AIM DOWN", gamefunc_Aim_Down },
                 { "CENTER VIEW", gamefunc_Center_View },
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no mouse aiming
                 { "MOUSE AIM", gamefunc_Mouse_Aiming }
+#endif
             };
 
             DoKeybindMenu("MORE MOVEMENT", keybinds, ALEN(keybinds), MENU_CONTROLS);
@@ -1714,7 +1716,9 @@ static void non3dr_menus(void)
                 { "USE JETPACK", gamefunc_Jetpack },
                 { "USE NIGHTVISION", gamefunc_NightVision },
                 { "USE MEDKIT", gamefunc_MedKit },
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 sends no steroids bit (G10-S06)
                 { "USE STEROIDS", gamefunc_Steroids }
+#endif
             };
 
             DoKeybindMenu("INVENTORY", keybinds, ALEN(keybinds), MENU_CONTROLS);
