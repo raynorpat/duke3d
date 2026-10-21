@@ -8395,6 +8395,10 @@ void moveeffectors(void)   //STATNUM 3
                             sprite[j].x += x;
                             sprite[j].y += l;
                             setsprite(j,sprite[j].x,sprite[j].y,sprite[j].z);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                            // As in SE2, 1.1 reads the next sprite after setsprite (G11-A35).
+                            nextj = nextspritesect[j];
+#endif
                             if( sector[sprite[j].sectnum].floorstat&2 )
                                 if(sprite[j].statnum == 2)
                                     makeitfall(j);
@@ -8520,6 +8524,10 @@ void moveeffectors(void)   //STATNUM 3
                                     sprite[j].y += l>>1;
 
                                     setsprite(j,sprite[j].x,sprite[j].y,sprite[j].z);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                                    // As in SE2, 1.1 reads the next sprite after setsprite (G11-A35).
+                                    nextj = nextspritesect[j];
+#endif
 
                                     if( sector[sprite[j].sectnum].floorstat&2 )
                                         if(sprite[j].statnum == 2)
@@ -8702,6 +8710,10 @@ void moveeffectors(void)   //STATNUM 3
 
                         sprite[j].z += s->zvel;
                         setsprite(j,sprite[j].x,sprite[j].y,sprite[j].z);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        // As in SE2, 1.1 reads the next sprite after setsprite (G11-A35).
+                        nextj = nextspritesect[j];
+#endif
                     }
                     j = nextj;
                 }
