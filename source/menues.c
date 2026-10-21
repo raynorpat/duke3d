@@ -2699,6 +2699,7 @@ void menus(void)
 #if CONTROLS_CONFIG_MENU
             count++;
 #endif
+            count++;  // VIDEO..., the last row
             x = probe(c+6,31,15,count);
 
             if(x == -1)
@@ -2740,6 +2741,9 @@ void menus(void)
                     cmenu(MENU_CONTROLS);
                     break;
 #endif
+                default:
+                    if(x == count-1) cmenu(710);
+                    break;
             }
 
             if(ud.detail) menutext(c+160+40,31,0,0,"HIGH");
@@ -2819,6 +2823,51 @@ void menus(void)
 #if CONTROLS_CONFIG_MENU
             menutext(c,31+15+15+15+15+15+15+15+15+15+15,SHX(-11),PHX(-11),"CONTROLS...");
 #endif
+            menutext(c,31+15*(count-1),SHX(-12),PHX(-12),"VIDEO...");
+            break;
+
+        case 710:
+            // VIDEO: the look of renderer 3's GL 2.1 shader path (greyed
+            // elsewhere). Rows from y 50, 16 apart, as SOUNDS: room for more.
+            {
+                int32 shader = 0;
+                short was;
+#ifdef USE_OPENGL
+                shader = (getrendermode() == 3) && (gldrawpath == GLPATH_SHADER);
+#endif
+                c = (320>>1)-120;
+                rotatesprite(320<<15,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
+                menutext(320>>1,24,0,0,"VIDEO");
+                onbar = ( probey == 0 || probey == 1 );
+
+                x = probe(c,50,16,2);
+                if(x == -1) cmenu(200);
+
+                // Slider positions 0..60, 1.0 at 30: contrast 0.5..1.5 in
+                // steps of 0.1, saturation 0..2 in steps of 0.1. The setting
+                // changes only when its slider moves.
+                menutext(c,50,SHX(-2),!shader,"CONTRAST");
+                was = shorttmp = (short) ((GLContrast-GL_CONTRAST_MIN)*60.0+0.5);
+                bar(c+167+40,50,(short *)&shorttmp,6,shader && x==0,SHX(-2),!shader);
+                if(shorttmp != was)
+                    GLContrast = GL_CONTRAST_MIN+min(shorttmp,60)/60.0;
+
+                menutext(c,50+16,SHX(-3),!shader,"SATURATION");
+                was = shorttmp = (short) (GLSaturation*30.0+0.5);
+                bar(c+167+40,50+16,(short *)&shorttmp,3,shader && x==1,SHX(-3),!shader);
+                if(shorttmp != was)
+                    GLSaturation = min(shorttmp,60)/30.0;
+
+#ifdef USE_OPENGL
+                glcontrast = GLContrast;
+                glsaturation = GLSaturation;
+#endif
+                if(!shader)
+                {
+                    gametext(160,170,"CONTRAST AND SATURATION NEED",0,2+8+16);
+                    gametext(160,170+9,"THE OPENGL 2.1 SHADER PATH",0,2+8+16);
+                }
+            }
             break;
 
         case 700:
