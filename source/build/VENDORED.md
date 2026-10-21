@@ -424,7 +424,13 @@ Ported from later JFBuild commits, retyped as above:
   polygon's shade plus, in the 3D view, classic's distance shade for the
   pixel's eye z (`glfogshades`; the parallaxed sky's constant
   `polymost_skyshade`), with index 255 see-through when masked and no glow
-  pass. That's the 3D view, rotatesprite, the map view's floors and the
+  pass. Translucent masked walls, sprites, rotatesprites and map view
+  floor sprites blend as classic's do, through `transluc` (a 256x256
+  texture) at its two levels, with the index under them read from a copy
+  of the framebuffer (`glshdst`): `polymost_transread` copies the
+  polygon's box before it's drawn unless the copy holds it with nothing
+  drawn there since (`polymost_drawn` keeps the boxes drawn after a copy;
+  lines, text and clears drop it). That's the 3D view, rotatesprite, the map view's floors and the
   tile picker; lines, text, pixels and clears are the index itself
   (`polymost_2dcolor`). `polymost_shaderdraw` binds the framebuffer and
   the program for each; `polymost_drawrooms` clears only its depth, so a

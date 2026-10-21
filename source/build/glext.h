@@ -47,6 +47,10 @@ extern int32_t gl_forcefail;
 	/* Test hooks (polymost.c): RGB tile textures made, and times they were all
 	 * made dirty (gltexinvalidateall); the shader path makes none. */
 extern uint32_t gl_rgbtexloads, gl_rgbtexinvalidations;
+	/* Test hooks (polymost.c): copies of the shader path's frame made for
+	 * translucent draws, and nonzero to copy all of it before every one. */
+extern uint32_t gl_transcopies;
+extern int32_t gl_transcopyall;
 
 #ifdef USE_OPENGL
 #include "SDL_opengl.h"
