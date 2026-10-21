@@ -41,6 +41,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #include "duke3d.h"
 #include "glext.h"
+#include "displaymode.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -2172,14 +2173,18 @@ void binscreen(void)
 // page's; 0 if OpenGL failed.
 static int32_t gamerenderer;
 
+// The resolution for this run: duke3d.cfg's, or the VIDEO page's.
+static int32_t gamewidth = 320, gameheight = 200;
+
 // OpenGL failed in this run (at the start or a switch): not tried again.
 int32_t video_glunavailable;
 
-// Sets the video mode from ScreenMode/Width/Height, then OpenGL when the
-// renderer is 3, so the renderer survives a mode change.
-static int setgamemoderenderer(void)
+// Sets the video mode from ScreenMode and the run's resolution, then OpenGL
+// when the renderer is 3, so the renderer survives a mode change. If OpenGL
+// fails, the 8-bit mode just set stays, with renderer fallback.
+static int setgamemoderenderer(int32_t fallback)
 {
-    if (setgamemode(ScreenMode,ScreenWidth,ScreenHeight) < 0)
+    if (setgamemode(ScreenMode,gamewidth,gameheight) < 0)
         return -1;
 #ifdef USE_OPENGL
     gltexmiplevel = GLTextureMipLevel;  // duke3d.cfg: drop this many mipmap levels
@@ -2193,83 +2198,167 @@ static int setgamemoderenderer(void)
         gamerenderer = 0;
     if (gamerenderer == 3 && setgamemode_gl(ScreenMode) != 0)
     {
-        printf("OpenGL renderer unavailable (%s); using the classic renderer.\n", SDL_GetError());
-        setgamemode(ScreenMode,ScreenWidth,ScreenHeight);
-        gamerenderer = 0;
+        if (fallback == 0)
+            printf("OpenGL renderer unavailable (%s); using the classic renderer.\n", SDL_GetError());
+        else
+            printf("OpenGL renderer unavailable (%s); keeping renderer %d.\n", SDL_GetError(), (int)fallback);
+        gamerenderer = fallback;
         video_glunavailable = 1;
     }
     setrendermode(gamerenderer);
     return 0;
 }
 
-// Switches to renderer r now, keeping the window (the first switch to
-// OpenGL in a run that started in 0-2 makes it again, with GL); call it
-// between frames. If OpenGL fails, the renderer stays as it was. The mode
-// set drops the palette and the view: both are put back, with any fade.
-// RendererSetting, what duke3d.cfg keeps, is left alone. Returns the
-// renderer in effect.
-int video_setrenderer(int r)
-{
-    int32_t previous = gamerenderer;
 #ifdef POLYMOST
-    palette_t fadergb = palfadergb;
-    unsigned char fadedelta = palfadedelta;
-#else
-    r = 0;
+static palette_t video_fadergb;  // the fade before a mode set (video_keepfade)
+static unsigned char video_fadedelta;
 #endif
 
-    r = clamprenderer(r);
-    if (r == previous || (r == 3 && video_glunavailable))
-        return previous;
+// Before a mode set, which drops the fade: keep it for video_restoreview.
+static void video_keepfade(void)
+{
+#ifdef POLYMOST
+    video_fadergb = palfadergb;
+    video_fadedelta = palfadedelta;
+#endif
+}
 
-    gamerenderer = r;
-    if (setgamemoderenderer() < 0)
-    {
-        gamerenderer = previous;
-        setgamemoderenderer();
-    }
-    else if (gamerenderer != r)
-    {
-        printf("Keeping renderer %d.\n", (int)previous);
-        gamerenderer = previous;
-        setrendermode(gamerenderer);  // the 8-bit mode is set: 0-2 differ only in drawing
-    }
-
+// After a mode set: the palette and the fade (video_keepfade's) put back,
+// and the view, border and status bar laid out again.
+static void video_restoreview(void)
+{
     glresetgamepalette();
     if (getrendermode() == 3) glsetgamepalette();
     else setbrightness(ud.brightness>>2,(unsigned char *)gameviewpalette());
 #ifdef POLYMOST
-    if (fadedelta)
+    if (video_fadedelta)
     {
         if (getrendermode() == 3)
         {
             // shown with the next frame; setpalettefade would show one now
-            palfadergb = fadergb;
-            palfadedelta = fadedelta;
+            palfadergb = video_fadergb;
+            palfadedelta = video_fadedelta;
         }
-        else setpalettefade(fadergb.r>>2,fadergb.g>>2,fadergb.b>>2,
-                            (fadedelta == 255) ? 64 : (fadedelta>>2));
+        else setpalettefade(video_fadergb.r>>2,video_fadergb.g>>2,video_fadergb.b>>2,
+                            (video_fadedelta == 255) ? 64 : (video_fadedelta>>2));
     }
 #endif
 
     flushperms();
     vscrn();  // the view, and the border and status bar drawn again
+}
+
+// Switches to renderer r now, keeping the window (the first switch to
+// OpenGL in a run that started in 0-2 makes it again, with GL); call it
+// between frames. Among 0-2 only the drawing changes; to or from 3 it's a
+// mode set. If OpenGL fails, the renderer stays as it was. A mode set drops
+// the palette and the view: both are put back, with any fade.
+// RendererSetting, what duke3d.cfg keeps, is left alone. Returns the
+// renderer in effect.
+int video_setrenderer(int r)
+{
+    int32_t previous = gamerenderer;
+
+#ifndef POLYMOST
+    r = 0;
+#endif
+    r = clamprenderer(r);
+    if (r == previous || (r == 3 && video_glunavailable))
+        return previous;
+
+    gamerenderer = r;
+    if (r != 3 && previous != 3)
+    {
+        setrendermode(gamerenderer);  // the 8-bit mode stays
+        flushperms();
+        vscrn();
+        return gamerenderer;
+    }
+    video_keepfade();
+    if (setgamemoderenderer(previous) < 0)
+    {
+        gamerenderer = previous;
+        setgamemoderenderer(previous);
+    }
+    video_restoreview();
     return gamerenderer;
 }
 
-// A switch asked for mid-frame (the VIDEO page), made after the frame is shown.
+// Sets display mode displaymode (DISPLAY_*) and resolution w by h now, in
+// one mode set; call it between frames. Windowed: a w by h window;
+// fullscreen (exclusive): the display mode nearest w by h; borderless: the
+// desktop. Renderers 0-2 draw at that size up to 1600x1200 (borderless: the
+// desktop's), shown scaled; renderer 3 at the window's real size, in the
+// same GL context. The palette, fade and view are put back as for a renderer
+// switch. DisplayMode and ScreenWidth/Height, what duke3d.cfg keeps, are
+// left alone. Returns 0, or -1 if the mode set failed.
+int video_setmode(int displaymode, int w, int h)
+{
+    video_keepfade();
+    setvideodisplaymodenext(displaymode);
+    gamewidth = w;
+    gameheight = h;
+    if (setgamemoderenderer(0) < 0)
+        return -1;
+    video_restoreview();
+    return 0;
+}
+
+// The run's resolution, as last set (the display mode: getvideodisplaymode).
+void video_getmode(int32_t *w, int32_t *h)
+{
+    *w = gamewidth;
+    *h = gameheight;
+}
+
+// Changes asked for mid-frame (the VIDEO page), made after the frame is shown.
 static int32_t video_pendingrenderer = -1;
+static int32_t video_pendingmode = -1, video_pendingw, video_pendingh;
 
 void video_requestrenderer(int r)
 {
     video_pendingrenderer = r;
 }
 
+void video_requestmode(int displaymode, int w, int h)
+{
+    video_pendingmode = displaymode;
+    video_pendingw = w;
+    video_pendingh = h;
+}
+
 static void video_applypending(void)
 {
-    if (video_pendingrenderer < 0) return;
-    video_setrenderer(video_pendingrenderer);
-    video_pendingrenderer = -1;
+    if (video_pendingmode >= 0)
+        video_setmode(video_pendingmode,video_pendingw,video_pendingh);
+    if (video_pendingrenderer >= 0)
+        video_setrenderer(video_pendingrenderer);
+    video_pendingmode = video_pendingrenderer = -1;
+}
+
+// -videocycle n: video_teststep every n frames in the game loop (the net
+// sync test).
+static int32_t videocycle, videocycleframe;
+
+// The sync tests' stand-in for the VIDEO page (-demoswitch, -videocycle):
+// the next renderer (skipping OpenGL once it has failed), then the next of
+// a few display modes and resolutions, printed after tag.
+static void video_teststep(const char *tag)
+{
+    static const int32_t modes[][3] = {
+        { DISPLAY_WINDOWED, 640, 480 }, { DISPLAY_BORDERLESS, 800, 600 },
+        { DISPLAY_EXCLUSIVE, 1024, 768 }, { DISPLAY_WINDOWED, 2560, 1440 },
+        { DISPLAY_WINDOWED, 320, 200 }
+    };
+    static int32_t step;
+    int32_t r = gamerenderer, m = step++ % (int32_t)(sizeof(modes)/sizeof(modes[0]));
+    int32_t got = video_setrenderer((r == 2 && video_glunavailable) ? 0 : (r+1)&3);
+
+    video_setmode(modes[m][0],modes[m][1],modes[m][2]);
+    printf("%s renderer %d -> %d, %s %dx%d: display %s, drawn at %dx%d\n",tag,(int)r,(int)got,
+           display_modename(modes[m][0]),(int)modes[m][1],(int)modes[m][2],
+           display_modename(getvideodisplaymode()),(int)xdim,(int)ydim);
+    fflush(stdout);  // a killed run (the net test) still shows it
 }
 
 // Renderer 3 redraws the whole screen each frame: the border and status bar
@@ -2326,7 +2415,7 @@ void gameexit(char *msg)
         dobonus(1);
 // CTW - MODIFICATION
 //      setgamemode();
-        setgamemoderenderer();
+        setgamemoderenderer(0);
 // CTW END - MODIFICATION
     }
 
@@ -8913,14 +9002,16 @@ int main(int argc,char **argv)
     gamerenderer = clamprenderer(i ? ((i+1 < _argc) ? atoi(_argv[i+1]) : 0) : RendererSetting);
     setvideodisplaymode(DisplayMode);  // the VIDEO menu changes them as it goes
     setvideovsync(VSync);
+    gamewidth = ScreenWidth;
+    gameheight = ScreenHeight;
 
-    if( setgamemoderenderer() < 0 )
+    if( setgamemoderenderer(0) < 0 )
     {
         printf("\nVESA driver for ( %d * %d ) not found/supported!\n",xdim,ydim);
         ScreenMode = 2;
-        ScreenWidth = 320;
-        ScreenHeight = 200;
-        setgamemoderenderer();
+        gamewidth = ScreenWidth = 320;
+        gameheight = ScreenHeight = 200;
+        setgamemoderenderer(0);
     }
 // CTW END - MODIFICATION
 
@@ -8946,6 +9037,8 @@ int main(int argc,char **argv)
         exit(demoverify(atoi(_argv[i+1]),(j && j+1 < _argc) ? _argv[j+1] : NULL,
                         CheckParm("DEMODRAW") || l,(l && l+1 < _argc) ? atoi(_argv[l+1]) : 0));
     }
+    i = CheckParm("VIDEOCYCLE");
+    videocycle = (i && i+1 < _argc) ? atoi(_argv[i+1]) : 0;
 
     i = CheckParm("LOADVERIFY");
     if(i && i+1 < _argc)
@@ -9089,6 +9182,8 @@ int main(int argc,char **argv)
 #endif
         nextpage();
         video_applypending();
+        if(videocycle > 0 && ++videocycleframe%videocycle == 0)
+            video_teststep("VIDEOCYCLE");
     }
 
     gameexit(" ");
@@ -9467,7 +9562,7 @@ char in_menu = 0;
  */
 int demoverify(int n, char *dumpname, int draw, int switchevery)
 {
-    int32_t i, j, l, cnt, tics = 0, r;
+    int32_t i, j, l, cnt, tics = 0;
     short k;
 
     if( !opendemoread(n) )
@@ -9523,9 +9618,9 @@ int demoverify(int n, char *dumpname, int draw, int switchevery)
             nextpage();
             if(switchevery > 0 && tics%switchevery == 0)
             {
-                r = gamerenderer;
-                printf("DEMOSWITCH tic %d: renderer %d -> %d\n",tics,(int)r,
-                       video_setrenderer((r == 2 && video_glunavailable) ? 0 : (r+1)&3));
+                char tag[32];
+                sprintf(tag,"DEMOSWITCH tic %d:",(int)tics);
+                video_teststep(tag);
             }
         }
     }

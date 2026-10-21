@@ -117,6 +117,7 @@ int glgamepalette_check(void);  /* render_gl_game.c */
 void videoswitch_setup(void);  /* render_gl_game.c */
 int videoswitch_palette_check(void);  /* render_gl_game.c */
 int video_setrenderer(int r);  /* game.c */
+int video_setmode(int displaymode, int w, int h);  /* game.c */
 extern int32_t video_glunavailable;  /* game.c */
 extern SDL_Surface *surface;  /* sdl_driver.c: the 8-bit frame */
 
@@ -1793,7 +1794,7 @@ static int video_switch_check(void)
     double d;
 
     videoswitch_setup();
-    if (_setgamemode(1, 320, 200) != 0) { fprintf(stderr, "FAIL: _setgamemode(320x200)\n"); return 0; }
+    if (video_setmode(DISPLAY_WINDOWED, 320, 200) != 0) { fprintf(stderr, "FAIL: video_setmode(320x200)\n"); return 0; }
     if (video_setrenderer(2) != 2) { fprintf(stderr, "FAIL: renderer 2\n"); return 0; }
     for (id = 1; (id < 1000) && (win == NULL); id++)
         win = SDL_GetWindowFromID(id);
@@ -1844,6 +1845,93 @@ static int video_switch_check(void)
     printf("renderer 3 -> 0 -> 3 -> 0 -> 3: window %u, context %p kept: %s\n", (unsigned) winid, ctx,
            ok ? "yes" : "no");
     if (!videoswitch_palette_check()) ok = 0;
+    return ok;
+}
+
+/*
+ * The VIDEO page's resolution and display mode (game.c video_setmode) in
+ *  renderer 3: each keeps the window and the context, xdim/ydim follow the
+ *  drawable, and a frame fills it (no black left after clearing to white).
+ *  In renderer 0 the 8-bit frame is drawn at the size asked for (borderless:
+ *  the desktop's), shown through the same context, filling it too. A mode
+ *  set at the same size leaves the window where it is. 1: pass, 0: fail.
+ */
+static int video_mode_check(void)
+{
+    static const struct { int mode, w, h, r; } seq[] = {
+        { DISPLAY_WINDOWED, 800, 600, 3 }, { DISPLAY_WINDOWED, 1024, 576, 3 },
+        { DISPLAY_BORDERLESS, 640, 480, 3 }, { DISPLAY_WINDOWED, 640, 400, 3 },
+        { DISPLAY_WINDOWED, 800, 600, 0 }, { DISPLAY_BORDERLESS, 640, 480, 0 },
+        { DISPLAY_WINDOWED, 1024, 576, 3 }, { DISPLAY_WINDOWED, 1024, 576, 0 },
+        { DISPLAY_WINDOWED, 1024, 576, 3 }
+    };
+    SDL_GLContext ctx = SDL_GL_GetCurrentContext();
+    SDL_Window *win = SDL_GL_GetCurrentWindow();
+    Uint32 id, winid = SDL_GetWindowID(win);
+    unsigned char *shown;
+    int i, k, ok = 1, dw, dh, ww, wh, x, y, x2, y2, same, white = 31;
+    long dark;
+
+    unsetenv(BUILD_WINDOWED);  /* so borderless is */
+    for (i = 0; i < (int) (sizeof (seq) / sizeof (seq[0])); i++)
+    {
+        same = ((i > 0) && (seq[i].mode == DISPLAY_WINDOWED) && (seq[i - 1].mode == DISPLAY_WINDOWED) &&
+                (seq[i].w == seq[i - 1].w) && (seq[i].h == seq[i - 1].h));
+        if (same)  /* moved by the player */
+        {
+            SDL_SetWindowPosition(win, 60, 80);
+            for (id = SDL_GetTicks(); SDL_GetTicks() - id < 300; SDL_Delay(10))
+                _handle_events();
+        }
+        SDL_GetWindowPosition(win, &x, &y);
+        if (video_setrenderer(seq[i].r) != seq[i].r)
+            { fprintf(stderr, "FAIL: renderer %d\n", seq[i].r); ok = 0; }
+        if (video_setmode(seq[i].mode, seq[i].w, seq[i].h) != 0)
+            { fprintf(stderr, "FAIL: video_setmode(%d, %dx%d)\n", seq[i].mode, seq[i].w, seq[i].h); return 0; }
+        for (id = SDL_GetTicks(); SDL_GetTicks() - id < 1500; SDL_Delay(10))  /* the new size shown */
+            _handle_events();
+        if ((getrendermode() != seq[i].r) || (SDL_GL_GetCurrentContext() != ctx) ||
+            (SDL_GetWindowFromID(winid) != win) || (SDL_GL_GetCurrentWindow() != win))
+            { fprintf(stderr, "FAIL: %s %dx%d made a new window or context\n",
+                      display_modename(seq[i].mode), seq[i].w, seq[i].h); ok = 0; }
+        if (getvideodisplaymode() != seq[i].mode)
+            { fprintf(stderr, "FAIL: display %d, not %d\n", getvideodisplaymode(), seq[i].mode); ok = 0; }
+        SDL_GetWindowSize(win, &ww, &wh);
+        SDL_GL_GetDrawableSize(win, &dw, &dh);
+        if ((seq[i].mode == DISPLAY_WINDOWED) && ((ww != seq[i].w) || (wh != seq[i].h)))
+            { fprintf(stderr, "FAIL: window %dx%d, not %dx%d\n", ww, wh, seq[i].w, seq[i].h); ok = 0; }
+        if ((seq[i].r == 3) && ((xdim != min(dw, MAXXDIM)) || (ydim != min(dh, MAXYDIM))))
+            { fprintf(stderr, "FAIL: drawn at %dx%d in a %dx%d drawable\n", (int) xdim, (int) ydim, dw, dh); ok = 0; }
+        if ((seq[i].r == 0) && (seq[i].mode == DISPLAY_WINDOWED) && ((xdim != seq[i].w) || (ydim != seq[i].h)))
+            { fprintf(stderr, "FAIL: renderer 0 drawn at %dx%d, not %dx%d\n", (int) xdim, (int) ydim, seq[i].w, seq[i].h); ok = 0; }
+        if (same)
+        {
+            SDL_GetWindowPosition(win, &x2, &y2);
+            printf("window at %d,%d before the renderer switch and mode set, %d,%d after\n", x, y, x2, y2);
+            if ((x2 != x) || (y2 != y))
+                { fprintf(stderr, "FAIL: the window moved from %d,%d to %d,%d\n", x, y, x2, y2); ok = 0; }
+        }
+
+        for (k = 0; k < 2; k++)  /* the front buffer: the frame drawn */
+        {
+            if (getrendermode() == 3)
+                clearallviews(white);
+            else  /* classic's clears to colour 0 */
+                memset((void *) frameplace, white, (size_t) bytesperline * ydim);
+            nextpage();
+        }
+        shown = read_shown(&dw, &dh);
+        for (dark = 0, k = 0; k < dw * dh; k++)
+            if ((shown[k * 3] | shown[k * 3 + 1] | shown[k * 3 + 2]) == 0)
+                dark++;
+        free(shown);
+        printf("renderer %d, %s %dx%d: window %dx%d, drawable %dx%d, drawn at %dx%d, %ld black pixels\n",
+               seq[i].r, display_modename(getvideodisplaymode()), seq[i].w, seq[i].h, ww, wh, dw, dh,
+               (int) xdim, (int) ydim, dark);
+        if (dark != 0)
+            { fprintf(stderr, "FAIL: the frame doesn't fill the window\n"); ok = 0; }
+    }
+    setenv(BUILD_WINDOWED, "1", 1);
     return ok;
 }
 
@@ -1923,6 +2011,7 @@ int main(int argc, char **argv)
     if ((argc > 3) && (strcmp(argv[3], "video") == 0))
     {
         i = video_switch_check();
+        if (i == 1) i = video_mode_check();
         return (i == 1) ? 0 : (i == 77) ? 77 : 1;
     }
     i = present8_check();

@@ -65,12 +65,10 @@ int glgamepalette_check(void)
     return ok;
 }
 
-/* What video_setrenderer's mode sets use: a 320x200 window, as render_gl's. */
+/* What video_setrenderer's mode sets use (the size: video_setmode's). */
 void videoswitch_setup(void)
 {
     ScreenMode = 1;
-    ScreenWidth = 320;
-    ScreenHeight = 200;
     genspriteremaps();  /* the game's water palette */
     myconnectindex = screenpeek = 0;
     ps[0].palette = (char *) palette;  /* as the game has it from the start */

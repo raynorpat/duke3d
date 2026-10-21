@@ -167,6 +167,9 @@ int setgamemode_gl(char davidoption);
  *  set. BUILD_WINDOWED forces windowed. Alt+Enter toggles windowed and the
  *  full-screen style set here (borderless when windowed is set). */
 void setvideodisplaymode(int mode);
+/* The same, set by the next mode set together with its size: one change on
+ *  screen (the VIDEO page's DISPLAY and RESOLUTION). */
+void setvideodisplaymodenext(int mode);
 int getvideodisplaymode(void);  /* the window's */
 void setvideovsync(int on);  /* 1: present on vsync (the default) */
 int getvideovsync(void);

@@ -10,9 +10,11 @@ set_tests_properties(sdl_driver_smoke PROPERTIES
 
 add_test(NAME sdl_driver_smoke_gl_fallback COMMAND sdl_driver_smoke gl_fallback)
 add_test(NAME sdl_driver_smoke_displaymode_setter COMMAND sdl_driver_smoke displaymode_setter)
+add_test(NAME sdl_driver_smoke_mode_sizes COMMAND sdl_driver_smoke mode_sizes)
 add_test(NAME sdl_driver_smoke_palette_fade COMMAND sdl_driver_smoke palette_fade)
 add_test(NAME sdl_driver_smoke_screencapture COMMAND sdl_driver_smoke screencapture_formats)
 set_tests_properties(sdl_driver_smoke_gl_fallback sdl_driver_smoke_displaymode_setter
+                     sdl_driver_smoke_mode_sizes
                      sdl_driver_smoke_palette_fade
                      sdl_driver_smoke_screencapture PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
@@ -537,6 +539,18 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
               "-DWORK=${CMAKE_BINARY_DIR}/nc13"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
     set_tests_properties(net_connect_v13d_${_v13d_edition} PROPERTIES TIMEOUT 90)
+    # One peer changes renderer, display mode and resolution as the VIDEO
+    # page does, every 20 frames (OpenGL fails headless): still in sync.
+    math(EXPR _net_cycle_port "${_net_port} + 50")
+    add_test(NAME net_videocycle_v13d_${_v13d_edition}
+      COMMAND "${CMAKE_COMMAND}"
+              "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_v13d_data}"
+              "-DB=$<TARGET_FILE:duke3d>" "-DB_DATA=${_v13d_data}"
+              -DPORT=${_net_cycle_port} -DMODE=connect "-DARGS=/v1 /l1"
+              "-DA_ARGS=-videocycle 20" "-DA_EXPECT=VIDEOCYCLE renderer [0-9] -> [12].*drawn at 1600x900"
+              "-DWORK=${CMAKE_BINARY_DIR}/nv13"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
+    set_tests_properties(net_videocycle_v13d_${_v13d_edition} PROPERTIES TIMEOUT 90)
     set(_net_n 0)
     foreach(_peer IN LISTS DUKE3D_NET_PEERS)
       string(REGEX REPLACE "=.*" "" _peer_exe "${_peer}")

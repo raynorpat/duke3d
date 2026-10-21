@@ -8,7 +8,8 @@ add_library(buildengine STATIC
   glsubmit.c
   mmulti.c
   pragmas.c
-  sdl_driver.c)
+  sdl_driver.c
+  ../videoopts.c)
 
 if(WIN32)
   target_sources(buildengine PRIVATE win32_compat.c)

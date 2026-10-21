@@ -70,11 +70,11 @@ int main(int argc, char **argv)
     }
 #endif
 
-    /* 8-bit modes keep the engine's 1600x1200 limit. */
+    /* 8-bit modes keep the engine's 1600x1200 limit, and the aspect. */
     m.renderer = 0;
     m.xdim3d = 1920;
     m.ydim3d = 1080;
-    if ((editorsetgamemode(&m) != 0) || (xdim != 1600) || (ydim != 1200))
+    if ((editorsetgamemode(&m) != 0) || (xdim != 1600) || (ydim != 900))
     {
         fprintf(stderr, "FAIL: 1920x1080 in renderer 0 gave %dx%d\n", (int) xdim, (int) ydim);
         return 1;

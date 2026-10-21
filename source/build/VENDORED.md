@@ -405,9 +405,16 @@ Ported from later JFBuild commits, retyped as above:
   high-DPI display, bigger) drawable's pixels. `getmousearea` (ours, for
   the editor's cursor) is the window's size, or at an internal size the
   frame's part of it.
-- `_setgamemode` (8-bit) still clamps modes over 1600x1200 to 1600x1200,
-  now with literals, so the larger `MAXXDIM`/`MAXYDIM` only reach GL. The
-  size asked for is kept for renderer 3's window.
+- `_setgamemode` sizes the window (or exclusive's display mode) as asked;
+  8-bit modes draw at that size, or in borderless at the window's (the
+  desktop), capped to 1600x1200 keeping the aspect (`videoopts_drawsize`,
+  so `videoopts.c` is in this library) and the width a multiple of 4,
+  shown scaled; the larger `MAXXDIM`/`MAXYDIM` only reach GL.
+  `setvideodisplaymodenext` gives the next mode set a display mode, so a
+  new mode and size change the screen once. A mode set leaves the window's
+  size, position and display mode alone when they haven't changed (a moved
+  window stays put, also when the first GL window replaces it); a new size
+  is centred on the display's bounds.
 - `glext.c`/`glext.h` (ours, not JFBuild's): renderer 3's draw paths
   (`GLPATH_AUTO`, `IMMEDIATE`, `VBO`, `SHADER`) and their setting names,
   the pure `gl_choosepath`, and the GL entry points past 1.1 as `bgl…`

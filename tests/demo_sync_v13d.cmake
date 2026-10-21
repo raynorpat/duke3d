@@ -12,7 +12,10 @@
 #         -P demo_sync_v13d.cmake
 #
 # FLAGS adds options to the run: -demodraw draws each tic, -demoswitch <n>
-# also switches renderer every n tics (and the run must report switches).
+# also switches renderer, display mode and resolution every n tics (and the
+# run must report switches that took effect). -demoswitch runs without
+# BUILD_WINDOWED, so its display modes are set (the dummy driver's display
+# is no real one).
 include("${CMAKE_CURRENT_LIST_DIR}/v13d_data.cmake")
 v13d_check_edition("${DATA}" "${EDITION}")
 
@@ -41,7 +44,11 @@ separate_arguments(_flags UNIX_COMMAND "${FLAGS}")
 set(ENV{SDL_VIDEODRIVER} dummy)
 # No sound: killing the game at the timeout would pop the speakers.
 set(ENV{SDL_AUDIODRIVER} dummy)
-set(ENV{BUILD_WINDOWED} 1)
+if(FLAGS MATCHES "-demoswitch")
+  unset(ENV{BUILD_WINDOWED})
+else()
+  set(ENV{BUILD_WINDOWED} 1)
+endif()
 set(ENV{HOME} "${_home}")
 set(ENV{USERPROFILE} "${_home}")
 set(ENV{DUKE3D_SAVE_DIR} "${_home}")
@@ -87,8 +94,14 @@ endif()
 if(NOT _result EQUAL 0)
   message(FATAL_ERROR "duke3d -demoverify ${DEMO} failed: ${_result}\n${_out}${_err}")
 endif()
-if(FLAGS MATCHES "-demoswitch" AND NOT _out MATCHES "DEMOSWITCH")
-  message(FATAL_ERROR "-demoswitch made no switch:\n${_out}")
+if(FLAGS MATCHES "-demoswitch")
+  # a switch to renderer 1 or 2, and each display mode at its size
+  foreach(_want "renderer [0-9] -> [12]" "display borderless, drawn at 1024x768"
+                "display exclusive, drawn at 1024x768" "display windowed, drawn at 1600x900")
+    if(NOT _out MATCHES "DEMOSWITCH[^\n]*${_want}")
+      message(FATAL_ERROR "-demoswitch made no switch with \"${_want}\":\n${_out}")
+    endif()
+  endforeach()
 endif()
 string(REGEX MATCH "DEMOSTATE [-0-9 ]+" _line "${_out}")
 if(NOT _line)
