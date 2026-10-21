@@ -154,7 +154,8 @@ unchanged.
 - OpenGL comes from `"SDL_opengl.h"` (`GL_SILENCE_DEPRECATION` on macOS).
 - `rendmode` is defined in `engine.c`, not here.
 - `glinfo` (`struct glinfo_t { float maxanisotropy; char bgra, clamptoedge,
-  texcompr, texnpot, vbo, glsl, fbo; }`; `vbo`/`glsl`/`fbo` are set by `glext.c`), which upstream got from `baselayer.h`) is declared in
+  texcompr, texnpot, vbo, glsl, fbo; }`, which upstream got from
+  `baselayer.h`; `vbo`/`glsl`/`fbo` are set by `glext.c`) is declared in
   `build.h` under `USE_OPENGL`, not here. `sdl_driver.c` defines it, filled in
   by `setgamemode_gl`, and `nofog` (which upstream declares but no JFBuild
   file of that commit defines), set to 0.
@@ -442,8 +443,8 @@ Ported from later JFBuild commits, retyped as above:
   floor sprites blend as classic's do, through `transluc` (a 256x256
   texture) at its two levels, with the index under them read from a copy
   of the framebuffer (`glshdst`): `polymost_transread` copies the
-  polygon's box before it's drawn unless the copy holds it with nothing
-  drawn there since (`polymost_drawn` keeps the boxes drawn after a copy;
+  whole frame before the polygon is drawn unless the copy holds the
+  polygon's box with nothing drawn there since (`polymost_drawn` keeps the boxes drawn after a copy;
   lines, text and clears drop it). That's the 3D view, rotatesprite, the map view's floors and the
   tile picker; lines, text, pixels and clears are the index itself
   (`polymost_2dcolor`). `polymost_shaderdraw` binds the framebuffer and

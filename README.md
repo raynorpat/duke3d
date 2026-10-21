@@ -127,7 +127,8 @@ JFBuild:
 
 Set `Renderer` under `[Screen Setup]` in `duke3d.cfg`, or use `-renderer N`
 for one run (the config keeps its own value). A number outside 0-3 is taken
-as the nearest one. Renderer 3 draws at the window's real pixel size and
+as the nearest one. Renderer 3 draws at the window's real pixel size
+(unless `GLInternalWidth`/`GLInternalHeight` is set on the 2.1 path) and
 uses a legacy (non-core) OpenGL context. Windowed, it opens at the size
 asked for, even over the 1600x1200 the 8-bit modes stop at. If OpenGL isn't
 available, the game prints a message and uses renderer 0. The map editor has
@@ -162,8 +163,9 @@ Renderer 3 draws with one of three paths, each needing more of the driver:
 | 2.1 | `shader` | OpenGL 2.1 with GLSL and framebuffer objects | Draws the whole frame as palette indices, then looks them up through the game's own shade tables and palette, so shading, palette swaps and fades follow classic. Translucent sprites, walls and tiles blend through the translucency table, as classic does |
 
 - `GLDrawPath` under `[Screen Setup]` in `duke3d.cfg` is `auto` (the default),
-  `immediate`, `vbo` or `shader`, in any case. `auto` takes the best path the
-  driver has. A named path the driver can't do falls back to the best it can,
+  `immediate`, `vbo` or `shader`, in any case, written in quotes, such as
+  `GLDrawPath = "shader"` (unquoted, it reads as `auto`). `auto` takes the
+  best path the driver has. A named path the driver can't do falls back to the best it can,
   with a message such as `OpenGL path shader unavailable; using vbo.`, and
   every start prints the path in use (`OpenGL path: shader (2.1)`). A path
   better than the one named is never used: `vbo` on a driver that has the
@@ -188,7 +190,8 @@ Renderer 3 draws with one of three paths, each needing more of the driver:
 #### Display mode and vsync
 
 - `DisplayMode` under `[Screen Setup]` is `windowed`, `borderless` (the
-  default) or `exclusive`. Borderless is a desktop-sized window without a mode
+  default) or `exclusive`, written in quotes, such as `DisplayMode =
+  "windowed"` (unquoted, it reads as borderless). Borderless is a desktop-sized window without a mode
   change. Exclusive is true fullscreen: it switches the display to the
   smallest mode at least as big as the game's size (so 640x400 may pick
   1920x1200 and scale up). If the display has no such mode, it uses borderless
@@ -210,8 +213,9 @@ Known gaps:
 - The 1.1 and 1.5 paths don't match classic's shading exactly.
 - On the 1.1 and 1.5 paths, palette switches (underwater, slime, night
   vision, the title and ending screens, cutscenes) and brightness changes
-  rebuild the textures, so they can stutter. The 2.1 path doesn't. Fades and
-  flashes are drawn over the frame on every path.
+  rebuild the textures, so they can stutter. The 2.1 path doesn't. On the 1.1
+  and 1.5 paths fades and flashes are drawn over the frame; the 2.1 path
+  fades the palette.
 - No `.md2` models or hi-res texture replacement.
 - Polymost's own todo list applies (sprite sorting, the hall of mirrors near
   the zenith, ...).
