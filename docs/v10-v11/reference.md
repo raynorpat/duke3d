@@ -403,3 +403,160 @@ as far as `getpackets` shows them. Both releases' packets differ from 1.3D:
   of packet 5 (`0x10c7e`–`0x10c94`).
 - Packet 6 (name) has `BYTEVERSION` at byte 1 in 1.1 (`0x10dc6`), names from byte 2. In
   1.0 the name starts at byte 1, with no version.
+
+### player_struct (1.1)
+
+`ps[]` is 8 × `0x34e` bytes at `0x1162e0`, byte-packed like 1.3D's `0x552`-byte struct
+(`savegame.c` `sg_player`, `DUKE3D_GAMEVER < GAMEVER_14`). The map was derived by aligning
+every fmatch-paired function of `sw11.bin` with `sw13.bin` and voting on the `ps` offset
+pairs in matching instructions (processinput, shoot, doincrements, displayweapon,
+resetplayerstats, resetweapons, resetinventory, cheatkeys and the rest). The fields that
+have no 1.3D partner were then read at every use. 1.0 has the same `0x34e` stride; its map
+was not checked. Field names are this tree's. "1.3D" is the 1.3D offset. Ledger rows quote
+these names.
+
+Compared with 1.3D, 1.1:
+- has no `bobposx`/`bobposy`, `weaprecs[256]`, `weapreccnt` or `subweapon`
+- has 10-entry `ammo_amount[]` and `gotweapon[]` (weapon 7 is the flamethrower; no freezer)
+- moves `frag`/`fraggedself` after `fist_incs`
+- shrinks `frag_ps` and `interface_toggle_flag` to bytes
+- adds seven fields
+
+| Offset | Size | Field | 1.3D | Evidence (1.1) |
+|---|---|---|---|---|
+| `0x000`–`0x22f` | | `zoom` … `invdisptime` | same | same offsets as 1.3D; `posx/posy/posz` `0x214/0x218/0x21c` in every function |
+| `0x230` | 4 | `oposx` | `0x238` | processinput `0x45b3b`; xvel bob uses it in place of `bobposx` (`0x45ad5`) |
+| `0x234` | 4 | `oposy` | `0x23c` | `0x45b47` |
+| `0x238` | 4 | `oposz` | `0x240` | `0x45b53` |
+| `0x23c` | 4 | `pyoff` | `0x244` | `0x45b59` |
+| `0x240` | 4 | `opyoff` | `0x248` | `0x45b5f` |
+| `0x244` | 4 | `posxv` | `0x24c` | |
+| `0x248` | 4 | `posyv` | `0x250` | |
+| `0x24c` | 4 | `poszv` | `0x254` | |
+| `0x250` | 4 | `last_pissed_time` | `0x258` | doincrements `0x447af` |
+| `0x254` | 4 | `truefz` | `0x25c` | processinput `0x44e0c` |
+| `0x258` | 4 | `truecz` | `0x260` | `0x44e1b` |
+| `0x25c` | 4 | `player_par` | `0x264` | doincrements |
+| `0x260` | 4 | `visibility` | `0x268` | |
+| `0x264` | 4 | `bobcounter` | `0x26c` | |
+| `0x268` | 4 | `weapon_sway` | `0x270` | |
+| `0x26c` | 4 | `pals_time` | `0x274` | quickkill `0x3f310` |
+| `0x270` | 4 | `burn_time` (1.1 only) | — | set to 120 when THROWFLAME hits a player (moveweapons `0x28702`); counted down in processinput (`0x4517a`, +48 `extra_extra8` per tic); zeroed under water (`0x45bdc`) and by resetplayerstats (`0x48368`) |
+| `0x274` | 4 | `randomflamex` | `0x278` | only write: `krand()%120+100` when a burn starts (`0x286e7`); never read, like 1.3D's |
+| `0x278` | 4 | `crack_time` | `0x27c` | doincrements (`= 777`) |
+| `0x27c` | 2 | `ang` | `0x280` | |
+| `0x27e` | 2 | `oang` | `0x282` | |
+| `0x280` | 2 | `angvel` | `0x284` | `0x46778` |
+| `0x282` | 2 | `cursectnum` | `0x286` | |
+| `0x284` | 2 | `look_ang` | `0x288` | |
+| `0x286` | 2 | `last_extra` | `0x28a` | |
+| `0x288` | 20 | `ammo_amount[10]` | `0x28c` (11) | weapon `k` at `0x288+2k` |
+| `0x29c` | 2 | `wackedbyactor` | `0x2a2` | |
+| `0x29e` | 2 | `curr_weapon` | `0x2a8` | |
+| `0x2a0` | 2 | `last_weapon` | `0x2aa` | |
+| `0x2a2` | 2 | `tipincs` | `0x2ac` | doincrements; FEM tipping (G11-S15) |
+| `0x2a4` | 2 | `horizoff` | `0x2ae` | |
+| `0x2a6` | 2 | `holoduke_amount` | `0x2b0` | checkavailinven icon 3 |
+| `0x2a8` | 2 | `newowner` | `0x2b2` | |
+| `0x2aa` | 2 | `hurt_delay` | `0x2b4` | |
+| `0x2ac` | 2 | `hbomb_hold_delay` | `0x2b6` | |
+| `0x2ae` | 2 | `jumping_counter` | `0x2b8` | |
+| `0x2b0` | 2 | `airleft` | `0x2ba` | |
+| `0x2b2` | 2 | `knee_incs` | `0x2bc` | |
+| `0x2b4` | 2 | `access_incs` | `0x2be` | |
+| `0x2b6` | 2 | `fta` | `0x2c0` | |
+| `0x2b8` | 2 | `ftq` | `0x2c2` | |
+| `0x2ba` | 2 | `access_wallnum` | `0x2c4` | |
+| `0x2bc` | 2 | `access_spritenum` | `0x2c6` | |
+| `0x2be` | 2 | `kickback_pic` | `0x2c8` | |
+| `0x2c0` | 2 | `got_access` | `0x2ca` | |
+| `0x2c2` | 2 | `weapon_ang` | `0x2cc` | |
+| `0x2c4` | 2 | `firstaid_amount` | `0x2ce` | checkavailinven icon 1 |
+| `0x2c6` | 2 | `somethingonplayer` | `0x2d0` | |
+| `0x2c8` | 2 | `on_crane` | `0x2d2` | |
+| `0x2ca` | 2 | `i` | `0x2d4` | |
+| `0x2cc` | 2 | `one_parallax_sectnum` | `0x2d6` | |
+| `0x2ce` | 2 | `over_shoulder_on` | `0x2d8` | |
+| `0x2d0` | 2 | `random_club_frame` | `0x2da` | |
+| `0x2d2` | 2 | `fist_incs` | `0x2dc` | |
+| `0x2d4` | 2 | `frag` | `0x2a4` | `ps[frag_ps].frag++` at death (`0x455b9`) |
+| `0x2d6` | 2 | `fraggedself` | `0x2a6` | `0x456eb` |
+| `0x2d8` | 2 | `one_eighty_count` | `0x2de` | |
+| `0x2da` | 2 | `cheat_phase` | `0x2e0` | |
+| `0x2dc` | 2 | `dummyplayersprite` | `0x2e2` | |
+| `0x2de` | 2 | `extra_extra8` | `0x2e4` | |
+| `0x2e0` | 2 | `quick_kick` | `0x2e6` | doincrements `0x449f5`; cheatkeys sets 24 |
+| `0x2e2` | 2 | `heat_amount` | `0x2e8` | checkavailinven icon 5 |
+| `0x2e4` | 2 | `actorsqu` | `0x2ea` | |
+| `0x2e6` | 2 | `timebeforeexit` | `0x2ec` | |
+| `0x2e8` | 2 | `customexitsound` | `0x2ee` | (no `weaprecs`, `weapreccnt` or `interface_toggle_flag` follow) |
+| `0x2ea` | 2 | `rotscrnang` | `0x4f4` | |
+| `0x2ec` | 2 | `dead_flag` | `0x4f6` | |
+| `0x2ee` | 2 | `show_empty_weapon` | `0x4f8` | |
+| `0x2f0` | 2 | `scuba_amount` | `0x4fa` | checkavailinven icon 6 |
+| `0x2f2` | 2 | `jetpack_amount` | `0x4fc` | icon 4 |
+| `0x2f4` | 2 | `steroids_amount` | `0x4fe` | icon 2 |
+| `0x2f6` | 2 | `shield_amount` | `0x500` | |
+| `0x2f8` | 2 | `spacesuit_amount` (1.1 only) | — | inventory item 5: CON `addinventory 5` (`0x36c80`), `items` cheat 1600 (`0x1d14a`), checkavailinven icon 7 (`0x237ac`), doincrements countdown (`0x449a5`) |
+| `0x2fa` | 2 | `holoduke_on` | `0x502` | |
+| `0x2fc` | 2 | `pycount` | `0x504` | |
+| `0x2fe` | 2 | `weapon_pos` | `0x506` | |
+| `0x300` | 2 | `transporter_hold` | `0x50a` | (`frag_ps` moved to `0x32e`) |
+| `0x302` | 2 | `last_full_weapon` | `0x50c` | |
+| `0x304` | 2 | `footprintshade` | `0x50e` | |
+| `0x306` | 2 | `boot_amount` | `0x510` | checkavailinven icon 8 |
+| `0x308` | 4 | `scream_voice` | `0x512` | |
+| `0x30c` | 1 | `gm` | `0x516` | |
+| `0x30d` | 1 | `on_warping_sector` | `0x517` | |
+| `0x30e` | 1 | `footprintcount` | `0x518` | |
+| `0x30f` | 1 | `hbomb_on` | `0x519` | |
+| `0x310` | 1 | `jumping_toggle` | `0x51a` | |
+| `0x311` | 1 | `on_sector_effector` (1.1 only) | — | set to 1 when SE0, SE6/14 or SE30 carries the player (moveeffectors `0x2a13e`, `0x2afaa`, `0x2d303`); cleared each processinput tic (`0x4513f`) and by resetplayerstats; read only by displayrooms (`0x165f6`), where it turns off view interpolation |
+| `0x312` | 1 | `rapid_fire_hold` | `0x51b` | |
+| `0x313` | 1 | `on_ground` | `0x51c` | |
+| `0x314` | 13 | `name[13]` | `0x51d` | no reads, as in 1.3D |
+| `0x321` | 1 | `inven_icon` | `0x52a` | checkavailinven (`0x23740`) |
+| `0x322` | 1 | `buttonpalette` | `0x52b` | secret exit test (`0x45241`) |
+| `0x323` | 1 | `jetpack_on` | `0x52c` | |
+| `0x324` | 1 | `spritebridge` | `0x52d` | |
+| `0x325` | 1 | `lastrandomspot` | `0x52e` | |
+| `0x326` | 1 | `no_autoaim` (1.1 only) | — | aim returns -1 for a player shooter when set (`0x3f806`); also hides the crosshair (`0x154e1`). Only ever cleared (resetplayerstats in multiplayer, `0x48580`), so it is always 0 |
+| `0x327` | 1 | `spacesuit_on` (1.1 only) | — | set by moveplayers in space (`0x2567b`); cleared when the suit runs out (`0x449c9`) or the player leaves ceiling space (`0x45f9b`); drawn by displaymasks (`0x41f24`) |
+| `0x328` | 1 | `scuba_on` | `0x52f` | |
+| `0x329` | 1 | `spacesuit_used` (1.1 only) | — | set when the suit runs out (`0x449d5`); then space hurts (`extra_extra8 += 32`, `0x256a0`); cleared by `addinventory 5` (`0x36ca2`) and resetplayerstats |
+| `0x32a` | 1 | `footprintpal` | `0x530` | |
+| `0x32b` | 1 | `heat_on` | `0x531` | |
+| `0x32c` | 1 | `holster_weapon` | `0x532` | |
+| `0x32d` | 1 | `falling_counter` | `0x533` | |
+| `0x32e` | 1 | `frag_ps` (byte) | `0x508` (short) | death frag credit (`0x45594`); set by ifhitbyweapon, moveplayers, movetransports, CON `resetplayer` (`0x36803`) and resetpspritevars |
+| `0x32f` | 1 | `aim_mode` | `0x534` | getinput, cheatkeys bit 23 (`0x507ac`), processinput (`0x44ebe`, `0x4725f`) |
+| `0x330` | 10 | `gotweapon[10]` | `0x535` (11) | |
+| `0x33a` | 1 | `refresh_inventory` | `0x540` | |
+| `0x33b` | 4 | `palette` | `0x541` | setpal (`0x3f1e0`) |
+| `0x33f` | 1 | `toggle_key_flag` | `0x545` | |
+| `0x340` | 1 | `knuckle_incs` | `0x546` | |
+| `0x341` | 1 | `select_dir` (1.1 only) | — | the field commented out of this tree's struct. operatesectors case 15 sets it on a path that is never taken (`0x4c654`, `1.1-sector.md`); processinput's SE17 choice block reads it (`0x453d8`) |
+| `0x342` | 1 | `walking_snd_toggle` | `0x547` | |
+| `0x343` | 1 | `interface_toggle_flag` (byte) | `0x4f2` (short) | cheatkeys key debounce (`0x507cc`–`0x507ea`) |
+| `0x344` | 1 | `palookup` | `0x548` | |
+| `0x345` | 1 | `hard_landing` | `0x549` | |
+| `0x346` | 1 | `max_secret_rooms` | `0x54a` | |
+| `0x347` | 1 | `secret_rooms` | `0x54b` | |
+| `0x348` | 3 | `pals[3]` | `0x54c` | |
+| `0x34b` | 1 | `max_actors_killed` | `0x54f` | |
+| `0x34c` | 1 | `actors_killed` | `0x550` | |
+| `0x34d` | 1 | `return_to_center` | `0x551` | |
+
+Weapons (`ammo_amount`, `gotweapon`, `curr_weapon`) are numbered as in the 1.1 `DEFS.CON`:
+- 0 KNEE, 1 PISTOL, 2 SHOTGUN, 3 CHAINGUN, 4 RPG, 5 HANDBOMB, 6 SHRINKER
+- 7 FLAMETHROWER
+- 8 TRIPBOMB, 9 HANDREMOTE
+
+The weapon → projectile table at `0xc6f58` holds KNEE, SHOTSPARK1, SHOTGUN, CHAINGUN, RPG,
+HEAVYHBOMB, SHRINKER, FLAMETHROWER (2548), HANDHOLDINGLASER and HANDREMOTE.
+
+Inventory items (`inven_icon`, checkavailinven order):
+- 1 first aid, 2 steroids, 3 holoduke, 4 jetpack, 5 heat
+- 6 scuba
+- 7 space suit
+- 8 boots
