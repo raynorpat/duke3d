@@ -2217,7 +2217,15 @@ void gameexit(char *msg)
     if(qe || cp)
         goto GOTOHERE;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1 and 1.0 show the bonus screen on any exit from a non-coop game. 1.1 then
+    // skips the two order screens, and 1.0 shows them on every exit (G11-G37, G10-G09).
+    // Fix: as in 1.3D, the version refusal ("\nYou cannot ...") skips both screens, so
+    // a refused peer leaves at once instead of waiting for a key.
+    if(playerswhenstarted > 1 && ud.coop == 0 && *(t+1) != 'V' && *(t+1) != 'Y')
+#else
     if(playerswhenstarted > 1 && ud.coop != 1 && *t == ' ')
+#endif
     {
         dobonus(1);
 // CTW - MODIFICATION
@@ -2241,8 +2249,16 @@ void gameexit(char *msg)
 // CTW - MODIFICATION
 /*  if( *t != 0 && *(t+1) != 'V' && *(t+1) != 'Y' && playonten == 0 )
         showtwoscreens();*/
+#if DUKE3D_GAMEVER < GAMEVER_11
+    if( *(t+1) != 'V' && *(t+1) != 'Y' )
+        showtwoscreens();
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+    if( *t != 0 && *(t+1) != 'V' && *(t+1) != 'Y' && !(playerswhenstarted > 1 && ud.coop == 0) )
+        showtwoscreens();
+#else
     if( *t != 0 && *(t+1) != 'V' && *(t+1) != 'Y' && true)
         showtwoscreens();
+#endif
 // CTW END - MODIFICATION
 
     GOTOHERE:

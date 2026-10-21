@@ -1899,7 +1899,72 @@ static const struct { short page, y; const char *text; } credits10[] =
 };
 #endif
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER >= GAMEVER_11 && DUKE3D_GAMEVER < GAMEVER_13D
+// 1.1's credits: seven pages, with its own hardware page, as its menus() draws them
+// (page, y, line) (G11-G37).
+static const struct { short page, y; const char *text; } credits11[] =
+{
+    { 0, 50, "ORIGINAL CONCEPT" },
+    { 0, 59, "TODD REPLOGLE" },
+    { 0, 68, "ALLEN H. BLUM III" },
+    { 0, 90, "PRODUCED & DIRECTED BY" },
+    { 0, 99, "GREG MALONE" },
+    { 0, 121, "EXECUTIVE PRODUCER" },
+    { 0, 130, "GEORGE BROUSSARD" },
+    { 1, 50, "GAME PROGRAMMING" },
+    { 1, 59, "TODD REPLOGLE" },
+    { 1, 80, "BUILD ENGINE/TOOLS/NET/MODEM" },
+    { 1, 89, "KEN SILVERMAN" },
+    { 1, 111, "MAP DESIGN" },
+    { 1, 120, "ALLEN H BLUM III" },
+    { 1, 129, "RICHARD GRAY" },
+    { 2, 35, "3D MODELING" },
+    { 2, 44, "CHUCK JONES" },
+    { 2, 53, "SAPPHIRE CORPORATION" },
+    { 2, 73, "ARTWORK" },
+    { 2, 82, "DIRK JONES" },
+    { 2, 91, "STEPHEN HORNBACK" },
+    { 2, 100, "JAMES STOREY" },
+    { 2, 119, "NETWORK LAYER/SETUP PROGRAM" },
+    { 2, 128, "MARK DOCHTERMANN" },
+    { 2, 147, "SOUND ENGINE" },
+    { 2, 156, "JIM DOSE" },
+    { 3, 75, "SOUND & MUSIC DEVELOPMENT" },
+    { 3, 84, "ROBERT PRINCE" },
+    { 3, 93, "LEE JACKSON" },
+    { 3, 112, "VOICE TALENT" },
+    { 3, 121, "LANI MINELLA - VOICE PRODUCER" },
+    { 3, 130, "JON ST. JOHN AS \"DUKE NUKEM\"" },
+    { 4, 48, "SPECIAL THANKS TO" },
+    { 4, 57, "STEVE BLACKBURN, SCOTT MILLER" },
+    { 4, 66, "TOM HALL, TERRY NAGY, JOE SIEGLER" },
+    { 4, 75, "COLLEEN COMPTON, FORMGEN, INC." },
+    { 4, 93, "THE 3D REALMS BETA TESTERS" },
+    { 4, 102, "MIKE BARTELT, WAYNE BENNER" },
+    { 4, 111, "GLENN BRENSINGER, ROB BROWN" },
+    { 4, 120, "ERIK HARRIS, KEN HECKBERT" },
+    { 4, 129, "TERRY HERRIN, GREG HIVELY" },
+    { 4, 138, "HANK LEUKART, KEN MAYER" },
+    { 4, 147, "JEFF RAUSCH, KELLY ROGERS" },
+    { 4, 156, "MIKE DUNCAN, DOUG HOWELL" },
+    { 5, 50, "COMPANY PRODUCT SUPPORT" },
+    { 5, 68, "THE FOLLOWING COMPANIES WERE COOL" },
+    { 5, 77, "ENOUGH TO GIVE US LOTS OF STUFF" },
+    { 5, 86, "DURING THE MAKING OF DUKE NUKEM 3D." },
+    { 5, 104, "ALTEC LANSING MULTIMEDIA" },
+    { 5, 113, "CREATIVE LABS, INC." },
+    { 5, 131, "THANKS FOR THE HARDWARE, GUYS." },
+    { 6, 50, "DUKE NUKEM IS A TRADEMARK OF" },
+    { 6, 59, "3D REALMS ENTERTAINMENT" },
+    { 6, 78, "DUKE NUKEM 3D" },
+    { 6, 87, "(C) 1996 3D REALMS ENTERTAINMENT" },
+    { 6, 106, "PLEASE READ LICENSE.DOC FOR SHAREWARE" },
+    { 6, 115, "DISTRIBUTION GRANTS AND RESTRICTIONS" },
+    { 6, 134, "MADE IN DALLAS, TEXAS USA" },
+};
+#endif
+
+#if DUKE3D_GAMEVER >= GAMEVER_13D && DUKE3D_GAMEVER < GAMEVER_14
 // 1.3D's credits: eight pages of text, as its menus() draws them (page, y, line).
 static const struct { short page, y; const char *text; } credits13[] =
 {
@@ -2049,7 +2114,9 @@ void menus(void)
             gametext(160,122+8,"ON THE MAIN MENU IF YOU WISH TO",0,2+8+16);
             gametext(160,131+8,"UPGRADE TO THE FULL REGISTERED",0,2+8+16);
             gametext(160,140+8,"VERSION OF DUKE NUKEM 3D.",0,2+8+16);
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 and 1.0 have no "press any key" line (G11-G37)
             gametext(160,149+16,"PRESS ANY KEY...",0,2+8+16);
+#endif
 
             if( x >= -1 ) cmenu(100);
             break;
@@ -2438,6 +2505,8 @@ void menus(void)
                 current_menu--;
 #if DUKE3D_GAMEVER < GAMEVER_11
                 if(current_menu < 990) current_menu = 995;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+                if(current_menu < 990) current_menu = 996;
 #elif DUKE3D_GAMEVER < GAMEVER_14
                 if(current_menu < 990) current_menu = 997;
 #else
@@ -2468,6 +2537,8 @@ void menus(void)
                 current_menu++;
 #if DUKE3D_GAMEVER < GAMEVER_11
                 if(current_menu > 995) current_menu = 990;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+                if(current_menu > 996) current_menu = 990;
 #elif DUKE3D_GAMEVER < GAMEVER_14
                 if(current_menu > 997) current_menu = 990;
 #else
@@ -2479,6 +2550,10 @@ void menus(void)
             for(l=0;l<(int)(sizeof(credits10)/sizeof(credits10[0]));l++)
                 if(credits10[l].page == current_menu-990)
                     gametext(160,credits10[l].y,(char *)credits10[l].text,0,2+8+16);
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+            for(l=0;l<(int)(sizeof(credits11)/sizeof(credits11[0]));l++)
+                if(credits11[l].page == current_menu-990)
+                    gametext(160,credits11[l].y,(char *)credits11[l].text,0,2+8+16);
 #elif DUKE3D_GAMEVER < GAMEVER_14
             for(l=0;l<(int)(sizeof(credits13)/sizeof(credits13[0]));l++)
                 if(credits13[l].page == current_menu-990)
