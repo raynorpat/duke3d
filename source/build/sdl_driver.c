@@ -978,7 +978,8 @@ int setgamemode_gl(char davidoption)
 
     /* destroying an SDL_Renderer can leave no context current. */
     SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
-    SDL_GL_SetSwapInterval(sdl_vsync);
+    if (SDL_GL_SetSwapInterval(sdl_vsync) != 0)
+        sdldebug("SDL_GL_SetSwapInterval() failed: [%s].", SDL_GetError());
 
     /* the state JFBuild sets after every GL mode change. */
     glEnable(GL_TEXTURE_2D);
@@ -1017,7 +1018,7 @@ int setgamemode_gl(char davidoption)
     {
         polymost_prepare_shader();
         if (gldrawpath != GLPATH_SHADER)
-            init_gl_res_vars(0);
+            init_gl_res_vars(1);
     } /* if */
     last_render_ticks = SDL_GetTicks();
     return(0);
@@ -1213,7 +1214,8 @@ void setvideovsync(int on)
     sdl_vsync = (on != 0);
 #ifdef USE_OPENGL
     if (sdl_glcontext != NULL)
-        SDL_GL_SetSwapInterval(sdl_vsync);
+        if (SDL_GL_SetSwapInterval(sdl_vsync) != 0)
+            sdldebug("SDL_GL_SetSwapInterval() failed: [%s].", SDL_GetError());
 #endif
 #if SDL_VERSION_ATLEAST(2, 0, 18)
     if (sdl_renderer != NULL)
