@@ -8,6 +8,7 @@
 int32_t gldrawpathrequest = GLPATH_AUTO;
 int32_t gldrawpath = GLPATH_IMMEDIATE;
 int32_t glinternalwidth = 0, glinternalheight = 0;
+double glcontrast = 1.0, glsaturation = 1.0;
 int32_t gl_forcefail = 0;
 
 int gl_choosepath(int requested, int glmajor, int glminor, int hasvbo, int hasglsl, int hasfbo)
@@ -55,6 +56,23 @@ void gl_fitrect(int32_t w, int32_t h, int32_t dw, int32_t dh, int32_t *r)
     r[0] = (dw - r[2]) / 2;
     r[1] = (dh - r[3]) / 2;
 } /* gl_fitrect */
+
+
+void gl_colorcorrect(unsigned char *c, double contrast, double saturation)
+{
+    double l, v;
+    int i;
+
+    if ((contrast == 1.0) && (saturation == 1.0))
+        return;
+    l = (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255.0;
+    for (i = 0; i < 3; i++)
+    {
+        v = (l + saturation * (c[i] / 255.0 - l) - 0.5) * contrast + 0.5;
+        v = (v < 0.0) ? 0.0 : (v > 1.0) ? 1.0 : v;
+        c[i] = (unsigned char) (v * 255.0 + 0.5);
+    } /* for */
+} /* gl_colorcorrect */
 
 
 #ifdef USE_OPENGL

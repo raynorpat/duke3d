@@ -38,6 +38,19 @@ static void checkrect(int32_t w, int32_t h, int32_t dw, int32_t dh, int32_t x, i
     }
 }
 
+static void checkcolor(const char *what, int r, int g, int b, double contrast, double saturation,
+                       int wr, int wg, int wb)
+{
+    unsigned char c[3];
+
+    c[0] = (unsigned char) r; c[1] = (unsigned char) g; c[2] = (unsigned char) b;
+    gl_colorcorrect(c, contrast, saturation);
+    if ((c[0] != wr) || (c[1] != wg) || (c[2] != wb)) {
+        printf("FAIL %s: %d,%d,%d (expected %d,%d,%d)\n", what, c[0], c[1], c[2], wr, wg, wb);
+        fails++;
+    }
+}
+
 int main(void)
 {
     int r;
@@ -97,6 +110,28 @@ int main(void)
     checkrect(320, 240, 1280, 800, 106, 0, 1067, 800);
     checkrect(1280, 800, 1280, 800, 0, 0, 1280, 800);
     checkrect(1920, 1200, 1280, 800, 0, 0, 1280, 800);
+
+    /* contrast and saturation: EDuke32's, after the palette */
+    {
+        int i, n = 0;
+        unsigned char c[3];
+        for (i = 0; i < 4096; i++) {  /* 1, 1: untouched */
+            c[0] = (unsigned char) (i * 37); c[1] = (unsigned char) (i * 101); c[2] = (unsigned char) (i * 7);
+            gl_colorcorrect(c, 1.0, 1.0);
+            n += (c[0] != (unsigned char) (i * 37)) || (c[1] != (unsigned char) (i * 101)) || (c[2] != (unsigned char) (i * 7));
+        }
+        check("identity", n, 0);
+    }
+    checkcolor("grey red", 255, 0, 0, 1.0, 0.0, 54, 54, 54);        /* Rec.709 luma 0.2126 */
+    checkcolor("grey green", 0, 255, 0, 1.0, 0.0, 182, 182, 182);   /* 0.7152 */
+    checkcolor("grey blue", 0, 0, 255, 1.0, 0.0, 18, 18, 18);       /* 0.0722 */
+    checkcolor("grey white", 255, 255, 255, 1.0, 0.0, 255, 255, 255);
+    checkcolor("saturate 2", 200, 100, 50, 1.0, 2.0, 255, 82, 0);   /* luma 117.65: 2x-L, clamped */
+    checkcolor("saturate 0.5", 200, 100, 50, 1.0, 0.5, 159, 109, 84);
+    checkcolor("contrast 1.5", 0, 128, 255, 1.5, 1.0, 0, 128, 255);  /* about 127.5: 0 and 255 clamp */
+    checkcolor("contrast 1.5 mid", 64, 100, 200, 1.5, 1.0, 32, 86, 236);
+    checkcolor("contrast 0.5", 0, 128, 255, 0.5, 1.0, 64, 128, 191);
+    checkcolor("both", 200, 100, 50, 1.5, 0.0, 113, 113, 113);      /* grey 117.65, then contrast */
 
     if (fails)
         return 1;

@@ -46,6 +46,16 @@ extern int32_t glinternalwidth, glinternalheight;
 	 * either is 0, otherwise at least 320x200. 0: as set, 1: one of them was
 	 * 0, 2: made bigger. */
 int gl_internalsize(int32_t w, int32_t h, int32_t *ow, int32_t *oh);
+	/* The shader path's contrast and saturation, applied to the palette it
+	 * shows after the fade (EDuke32's: 1.0 each leaves it as it is). */
+#define GL_CONTRAST_MIN 0.5
+#define GL_CONTRAST_MAX 1.5
+#define GL_SATURATION_MIN 0.0
+#define GL_SATURATION_MAX 2.0
+extern double glcontrast, glsaturation;
+	/* Applies them to the colour c (r, g, b): saturation around its Rec.709
+	 * luma, then contrast around half, clamped. 1, 1: c untouched. */
+void gl_colorcorrect(unsigned char *c, double contrast, double saturation);
 	/* Where a w by h frame shows in a dw by dh drawable: scaled by the
 	 * largest factor that fits, pixels square, centred. r: x, y (the bars'
 	 * width and height), width, height, in whole pixels. */

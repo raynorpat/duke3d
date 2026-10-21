@@ -837,8 +837,18 @@ static void polymost_shaderquad ()
 	glsub_flush();
 }
 
+	//The palette the GL 2.1 tier shows its indices through: the one on screen
+	//   (getfadedpalette), with the contrast and saturation set
+static void polymost_shownpalette (palette_t *pal)
+{
+	int32_t i;
+
+	getfadedpalette(pal);
+	for(i=0;i<256;i++) gl_colorcorrect(&pal[i].r,glcontrast,glsaturation);
+}
+
 	//Shows the frame on the GL 2.1 tier: draws the framebuffer's indices into the
-	//   window (dw by dh) through the palette on screen (getfadedpalette), for the
+	//   window (dw by dh) through polymost_shownpalette, for the
 	//   swap, at r (x, y, width, height: gl_fitrect's), black around it. The
 	//   framebuffer keeps them. 0: not on that tier (or nothing drawn yet).
 int32_t polymost_present_shader (const int32_t *r, int32_t dw, int32_t dh)
@@ -853,7 +863,7 @@ int32_t polymost_present_shader (const int32_t *r, int32_t dw, int32_t dh)
 	glsub_flush();
 	bglBindFramebuffer(GL_FRAMEBUFFER,0);
 	glshbound = 0;
-	getfadedpalette(pal);
+	polymost_shownpalette(pal);
 	bglActiveTexture(GL_TEXTURE1);
 	if ((!glshpal) || (memcmp(glshpalnow,pal,sizeof(glshpalnow))))
 	{
@@ -904,7 +914,7 @@ unsigned char *polymost_capture_shader ()
 	glReadPixels(0,0,xres,yres,GL_RED,GL_UNSIGNED_BYTE,idx);
 	glPixelStorei(GL_PACK_ALIGNMENT,4);
 	if (!glshbound) bglBindFramebuffer(GL_FRAMEBUFFER,0);
-	getfadedpalette(pal);
+	polymost_shownpalette(pal);
 	for(y=0,p=rgb;y<yres;y++) //the framebuffer's rows are bottom-up
 		for(x=0;x<xres;x++,p+=3)
 		{

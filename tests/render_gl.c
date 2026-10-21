@@ -87,7 +87,9 @@
  *  being drawn, a window resize loses; or that at an internal size (320x200)
  *  doesn't draw at it, is further than 8 from renderer 0's at 320x200,
  *  isn't shown scaled to fit with black bars (after a resize too), or
- *  doesn't validate the size or ignore it off the shader path.
+ *  doesn't validate the size or ignore it off the shader path; or whose
+ *  contrast and saturation aren't gl_colorcorrect's on the frame shown and
+ *  its screenshots, or change the frame at 1.
  *
  *  usage: render_gl <DUKE3D.GRP> <dir>
  *
@@ -1078,6 +1080,69 @@ static void await_resize(int32_t oldw)
     Uint32 t0;
     for (t0 = SDL_GetTicks(); (xdim == oldw) && (SDL_GetTicks() - t0 < 3000); SDL_Delay(10))
         _handle_events();
+}
+
+/* The shader path's contrast and saturation (glcontrast, glsaturation):
+ *  at other values than 1 the frame shown, unfaded and faded, is the one
+ *  at 1 with gl_colorcorrect applied to each pixel, and a screenshot is it;
+ *  back at 1 the frame is the same as before. 0 fails, 77 no shader path. */
+static int color_frames(const char *dir, int32_t x, int32_t y, int32_t z, short a, short sect)
+{
+    static const int frames[2] = { 0, 2 };  /* hud, and it faded */
+    unsigned char *ref[2], *buf;
+    char path[1024];
+    int f, ok = 1, capsame;
+    long i, n, wrong, changed;
+
+    gldrawpathrequest = GLPATH_SHADER;
+    if (setgamemode_gl(1) != 0) { fprintf(stderr, "FAIL: OpenGL with draw path shader\n"); return 0; }
+    gldrawpathrequest = GLPATH_AUTO;
+    if (gldrawpath != GLPATH_SHADER) { printf("color frames: no shader path, skipped\n"); return 77; }
+    n = (long) xdim * ydim;
+    buf = malloc((size_t) n * 3);
+    for (f = 0; f < 2; f++)
+    {
+        ref[f] = malloc((size_t) n * 3);
+        glcontrast = glsaturation = 1.0;
+        shader_frame(frames[f], x, y, z, a, sect);
+        read_front(ref[f]);
+        setpalettefade(0, 0, 0, 0);
+        glcontrast = 1.3;
+        glsaturation = 0.4;
+        shader_frame(frames[f], x, y, z, a, sect);
+        read_front(buf);
+        for (wrong = changed = 0, i = 0; i < n; i++)
+        {
+            unsigned char c[3];
+            memcpy(c, &ref[f][i * 3], 3);
+            gl_colorcorrect(c, glcontrast, glsaturation);
+            if (memcmp(c, &buf[i * 3], 3)) wrong++;
+            if (memcmp(&ref[f][i * 3], &buf[i * 3], 3)) changed++;
+        }
+        snprintf(path, sizeof (path), "%s/cccap%d0000.bmp", dir, f);
+        remove(path);
+        snprintf(path, sizeof (path), "%s/cccap%dxxxx.bmp", dir, f);
+        capsame = screencapture(path, 0) == 0;
+        snprintf(path, sizeof (path), "%s/cccap%d0000.bmp", dir, f);
+        capsame = capsame && bmp_is(path, buf);
+        setpalettefade(0, 0, 0, 0);
+        printf("color frames: %s at contrast 1.3, saturation 0.4: %ld pixels changed, %ld not as the formula says; "
+               "screenshot %s\n", f ? "fade" : "hud", changed, wrong, capsame ? "the screen" : "NOT the screen");
+        if ((wrong != 0) || (changed < n / 10))  /* black stays black */
+            { fprintf(stderr, "FAIL: the shader path's contrast and saturation aren't the formula's\n"); ok = 0; }
+        if (!capsame)
+            { fprintf(stderr, "FAIL: a shader path screenshot lacks the contrast and saturation\n"); ok = 0; }
+    }
+    glcontrast = glsaturation = 1.0;
+    shader_frame(0, x, y, z, a, sect);
+    read_front(buf);
+    printf("color frames: back at 1, 1: mean |frame - frame before| %.2f\n", front_diff(buf, ref[0]));
+    if (memcmp(buf, ref[0], (size_t) n * 3))
+        { fprintf(stderr, "FAIL: the shader path's frame changes at contrast and saturation 1\n"); ok = 0; }
+    free(ref[0]);
+    free(ref[1]);
+    free(buf);
+    return ok;
 }
 
 /*
@@ -2264,6 +2329,8 @@ int main(int argc, char **argv)
     }
 
     i = shader_frames(argv[2], posx, posy, posz, ang, sectnum, zerotile);
+    if (i == 0) return 1;
+    i = color_frames(argv[2], posx, posy, posz, ang, sectnum);
     if (i == 0) return 1;
     i = internal_frames(argv[2]);
     if (i == 0) return 1;
