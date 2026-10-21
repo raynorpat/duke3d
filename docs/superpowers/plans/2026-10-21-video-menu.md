@@ -63,6 +63,16 @@
 - [ ] Steps 2–4: implement; manual check of every combination in renderers 0 and 3.
 - [ ] Step 5: commit, e.g. `engine: change resolution and display mode live`.
 
+### Task 3b: fade around switches (addendum)
+
+**Files:** Modify `source/game.c` (the video request queue), `source/build/sdl_driver.c` (a present-level fade independent of the game's palette fade). Tests: `tests/render_gl.c`, demo switch test, `tests/sdl_driver_smoke.c`.
+
+**Interfaces:** `video_request*` calls start a transition: fade out over ~0.25 s of real time (present-level multiplier on the final colours, composed with the game's own fade), apply the queued change(s) at black, fade in over ~0.25 s. Several changes queued during one fade apply together. The game's palette/fade state (`palto`, `setpalettefade` values, `curpalette`) and game ticks are untouched.
+
+- [ ] Step 1: failing tests: render_gl — during a transition the presented frame darkens toward black and recovers, in renderers 0 and 3, and the game's fade values are unchanged before/after; smoke — the transition timeline (pure function of elapsed ms); demo switch test still in sync with transitions on.
+- [ ] Steps 2–4: implement; check by eye (grabs) a renderer switch, a resolution change and a display change.
+- [ ] Step 5: commit, e.g. `game: fade out and in around video switches`.
+
 ### Task 4: supersampling
 
 **Files:** Modify `source/build/polymost.c`, `source/build/sdl_driver.c` (scene FBO size, present downscale), `source/editormode.c`/`source/astub.c` (build.cfg). Tests: `tests/render_gl.c`.

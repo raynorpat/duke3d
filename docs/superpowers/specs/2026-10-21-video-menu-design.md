@@ -39,6 +39,10 @@ Other behaviour *(my calls, user agreed with the playback)*:
 - **Supersampling sizes** *(my call)*: 2k/4k/8k are fixed heights (1440/2160/4320) with the window's aspect. A choice whose size is not larger than the window greys out (so supersampling only ever scales down). Clamped to the GPU's maximum framebuffer size with a message.
 - **Run-only overrides** *(my call)*: the page shows the values in effect (including `-renderer`, Alt+Enter, `BUILD_WINDOWED`, a fullscreen→borderless fallback). Leaving the page saves only rows the user changed; a changed row becomes the saved setting. Untouched rows keep the saved value, so a one-run override isn't written.
 
+## Addendum (user request during execution)
+
+- **Fade around switches** *(user)*: renderer, resolution and display-mode changes fade the screen to black (~0.25 s), apply the change while black, then fade back in (~0.25 s) *(durations my call)*. The fade is applied at the final present (8-bit palette for renderers 0–2, the GL fade/present for renderer 3); the game's own palette, flashes (`palto`), timing and game state are untouched, so demo and multiplayer sync are unaffected and play continues underneath. Triggered when a change is confirmed, not while scrolling choices.
+
 ## Non-goals
 
 - Changing the classic renderer's look.
