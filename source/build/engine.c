@@ -1789,8 +1789,8 @@ static void parascan(int32_t dax1, int32_t dax2, int32_t sectnum,
 				}
 				x++;
 			}
-			if (j <= x)
-				wallscan(j,x,topptr,botptr,swplc,lplc);
+			if (j < x)
+				wallscan(j,x-1,topptr,botptr,swplc,lplc);
 		}
 		globalpicnum = l;
 	}

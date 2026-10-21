@@ -172,6 +172,15 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
     TIMEOUT 30)
 
+  # Views narrower than a Polymost one before them (which leaves every
+  # column's bounds open) draw nothing right of their edge.
+  add_test(NAME render_e1l1_narrow
+    COMMAND render_e1l1 "${DUKE3D_GRP}"
+            "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_narrow.bmp" "" 0 narrow)
+  set_tests_properties(render_e1l1_narrow PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+    TIMEOUT 30)
+
   # Classic renderer HUD rotatesprites and textured map view at several
   # 8-bit modes.
   foreach(_size 320x200 640x400 640x480 1280x1024 480x640 1280x720 1600x900)
