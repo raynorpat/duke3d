@@ -2384,8 +2384,9 @@ void movestandables(void)
             if( j == -1 ) goto BOLT;
 
 #if DUKE3D_GAMEVER < GAMEVER_13D
-            // 1.1's debris: 15 pieces stacked up from the floor.
-            for(k=0;k<15;k++)
+            // 1.1's debris: up to 15 pieces stacked up from the floor. The loop
+            // counter is also the new sprite, so it usually stops after one (G11-A13).
+            for(j=0;j<15;j++)
             {
                 {
                     // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
@@ -2393,7 +2394,7 @@ void movestandables(void)
                     int32_t r_vel = (TRAND&127)+64;
                     int32_t r_ang = TRAND&2047;
                     int32_t r_pn = SCRAP1+(TRAND&15);
-                    j = EGS(SECT,SX,SY,sector[SECT].floorz-(12<<8)-(k<<9),r_pn,-8,64,64,r_ang,r_vel,r_zv,i,5);
+                    j = EGS(SECT,SX,SY,sector[SECT].floorz-(12<<8)-(j<<9),r_pn,-8,64,64,r_ang,r_vel,r_zv,i,5);
                 }
                 sprite[j].pal = 2;
             }
