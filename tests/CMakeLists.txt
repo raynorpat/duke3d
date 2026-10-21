@@ -539,8 +539,9 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
               "-DWORK=${CMAKE_BINARY_DIR}/nc13"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
     set_tests_properties(net_connect_v13d_${_v13d_edition} PROPERTIES TIMEOUT 90)
-    # One peer changes renderer, display mode and resolution as the VIDEO
-    # page does, every 20 frames (OpenGL fails headless): still in sync.
+    # One peer changes renderer and resolution as the VIDEO page does, every
+    # 20 frames (OpenGL fails headless; BUILD_WINDOWED keeps both windowed):
+    # still in sync.
     math(EXPR _net_cycle_port "${_net_port} + 50")
     add_test(NAME net_videocycle_v13d_${_v13d_edition}
       COMMAND "${CMAKE_COMMAND}"
