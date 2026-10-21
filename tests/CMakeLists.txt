@@ -582,6 +582,46 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
               -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
     set_tests_properties(demo_refuse_${_vold_name} PROPERTIES TIMEOUT 120)
   endif()
+  # Each DOS 1.1 reference save must load with the state its status bar
+  # showed, and survive our own save and reload (1.1 only; 1.0 is Task 16).
+  if(_vold_data AND _vold_edition STREQUAL "sw11")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_save_refs.cmake")
+    get_cmake_property(_vars VARIABLES)
+    foreach(_var IN LISTS _vars)
+      if(_var MATCHES "^V13D_SAVE_(.+)_EDITION$" AND "${${_var}}" STREQUAL _vold_edition)
+        set(_ref "${CMAKE_MATCH_1}")
+        string(REGEX REPLACE "^sw11_" "" _name "${_ref}")
+        add_test(NAME dos_save_${_vold_name}_${_name}
+          COMMAND "${CMAKE_COMMAND}" -DMODE=load "-DNAME=${_ref}"
+                  "-DDUKE3D=$<TARGET_FILE:duke3d>"
+                  "-DDATA=${_vold_data}" "-DEDITION=${_vold_edition}"
+                  "-DREFS=${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_save_refs.cmake"
+                  "-DPYTHON=${Python3_EXECUTABLE}"
+                  "-DDECODER=${CMAKE_CURRENT_SOURCE_DIR}/v13d_save_decode.py"
+                  "-DWORK=${CMAKE_BINARY_DIR}/sv_${_name}"
+                  -P "${CMAKE_CURRENT_SOURCE_DIR}/dos_save_v13d.cmake")
+        set_tests_properties(dos_save_${_vold_name}_${_name} PROPERTIES TIMEOUT 120)
+      endif()
+    endforeach()
+    # The 1.0 and 1.3D shareware saves, when their folders are set, and a 1.5
+    # one must be refused (rulings.md: BYTEVERSION 12 collides with neither).
+    set(_vold_others "")
+    foreach(_other "${DUKE3D_V10_SW_DATA_DIR}" "${DUKE3D_V13D_SW_DATA_DIR}")
+      if(_other AND EXISTS "${_other}/refsaves/e1l1start.SAV")
+        if(_vold_others)
+          string(APPEND _vold_others "$<SEMICOLON>")
+        endif()
+        string(APPEND _vold_others "${_other}/refsaves/e1l1start.SAV")
+      endif()
+    endforeach()
+    add_test(NAME save_refuse_${_vold_name}
+      COMMAND "${CMAKE_COMMAND}" -DMODE=refuse
+              "-DDUKE3D=$<TARGET_FILE:duke3d>"
+              "-DDATA=${_vold_data}" "-DEDITION=${_vold_edition}"
+              "-DOTHER=${_vold_others}" "-DWORK=${CMAKE_BINARY_DIR}/sr_${_vold_name}"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/dos_save_v13d.cmake")
+    set_tests_properties(save_refuse_${_vold_name} PROPERTIES TIMEOUT 120)
+  endif()
   # The edition check must refuse the 1.0 and 1.3D shareware as 1.1.
   if(_vold_edition STREQUAL "sw11" AND DUKE3D_V10_SW_DATA_DIR AND DUKE3D_V13D_SW_DATA_DIR)
     add_test(NAME v11_edition_mismatch

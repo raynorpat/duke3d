@@ -154,12 +154,22 @@ def blocks(path):
     return out
 
 
-# Blocks our saves change, by index in a single-player save: the script and
-# hittype pointer bitmaps (we keep script values as offsets, so ours are all
-# zero), and lockclock (loadplayer resets the clock, as DOS does).
-ALLOWED = {60: 'script bitmap', 61: 'script bitmap', 68: 'hittype bitmap', 78: 'lockclock'}
-PALETTE = 0x541     # each player's DOS palette pointer; we write zeros
-GM = 0x516          # loading clears MODE_MENU (1) from gm, as DOS's loadplayer does
+# Per layout, by index in a single-player save: the blocks our saves change
+# (the script and hittype pointer bitmaps, which we keep zeroed because our
+# script values are offsets already, and lockclock, which loadplayer resets
+# as DOS does), the animatecnt and animateptr blocks, the ps[] blocks, the
+# player_struct size, and each player's DOS palette pointer (we write zeros)
+# and gm, with the bits our saves may change: loading clears MODE_MENU (1), as
+# 1.3D's loadplayer does; 1.1's loadplayer overwrites gm, and its saves hold 0.
+LAYOUTS = {
+    '1.3D': dict(allowed={60: 'script bitmap', 61: 'script bitmap',
+                          68: 'hittype bitmap', 78: 'lockclock'},
+                 animatecnt=81, animateptr=83, ps=(47, 48),
+                 psize=PLAYER_SIZE, palette=0x541, gm=0x516, gmmask=0xfe),
+    '1.1': dict(allowed={59: 'script bitmap', 64: 'hittype bitmap', 74: 'lockclock'},
+                animatecnt=77, animateptr=79, ps=(47,),
+                psize=PLAYER_SIZE_11, palette=0x33b, gm=0x30c, gmmask=0),
+}
 
 
 def compare(dos, ours):
@@ -168,26 +178,32 @@ def compare(dos, ours):
         print('block layouts differ: %d blocks %s vs %d blocks %s'
               % (len(a), [len(x) for x in a], len(b), [len(x) for x in b]))
         return 1
+    version, = struct.unpack('<i', a[0])
+    L = LAYOUTS['1.1' if version == BYTEVERSION_11 else '1.3D']
     # animateptr: entries past animatecnt are stale in DOS saves and never
     # read, and we write zeros there.
-    n = 4 * struct.unpack('<i', a[81])[0]
-    a[83], b[83] = a[83][:n], b[83][:n]
-    # ps[0..11] and ps[12..15]: kdfread stores each player as a difference
-    # from the one before, so undo that before masking.
+    n = 4 * struct.unpack('<i', a[L['animatecnt']])[0]
+    i = L['animateptr']
+    a[i], b[i] = a[i][:n], b[i][:n]
+    # ps[]: kdfread stores each player as a difference from the one before,
+    # so undo that before masking.
+    size = L['psize']
     for x in (a, b):
-        ps = bytearray(x[47] + x[48])
-        for p in range(PLAYER_SIZE, len(ps), PLAYER_SIZE):
-            for j in range(PLAYER_SIZE):
-                ps[p + j] = (ps[p + j] + ps[p - PLAYER_SIZE + j]) & 255
-        for p in range(0, len(ps), PLAYER_SIZE):
-            ps[p + PALETTE:p + PALETTE + 4] = bytes(4)
-            ps[p + GM] &= 0xfe
-        x[47], x[48] = bytes(ps[:len(x[47])]), bytes(ps[len(x[47]):])
+        ps = bytearray(b''.join(x[k] for k in L['ps']))
+        for p in range(size, len(ps), size):
+            for j in range(size):
+                ps[p + j] = (ps[p + j] + ps[p - size + j]) & 255
+        for p in range(0, len(ps), size):
+            ps[p + L['palette']:p + L['palette'] + 4] = bytes(4)
+            ps[p + L['gm']] &= L['gmmask']
+        o = 0
+        for k in L['ps']:
+            x[k], o = bytes(ps[o:o + len(x[k])]), o + len(x[k])
     bad = 0
     for i, (x, y) in enumerate(zip(a, b)):
         if x != y:
-            print('block %d differs (%s)' % (i, ALLOWED.get(i, 'not allowed')))
-            bad += i not in ALLOWED
+            print('block %d differs (%s)' % (i, L['allowed'].get(i, 'not allowed')))
+            bad += i not in L['allowed']
     return 1 if bad else 0
 
 

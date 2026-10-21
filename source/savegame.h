@@ -1,8 +1,8 @@
 /*
- * Save files use the DOS layout of the build's version (1.5, or 1.3D in
- * 1.3D builds): every record packed to 1 byte, every value little-endian,
- * written with the same dfwrite calls (element size and count) the DOS game
- * made, so the LZW blocks come out the same.
+ * Save files use the DOS layout of the build's version (1.5, 1.3D in 1.3D
+ * builds, or 1.1 in 1.1 builds): every record packed to 1 byte, every value
+ * little-endian, written with the same dfwrite calls (element size and count)
+ * the DOS game made, so the LZW blocks come out the same.
  */
 #ifndef _INCL_SAVEGAME_H_
 #define _INCL_SAVEGAME_H_
@@ -12,7 +12,16 @@
 #define SG_WALL_SIZE        32
 #define SG_SECTOR_SIZE      40
 #define SG_SPRITE_SIZE      44
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+#define SG_PLAYER_SIZE      0x34e   /* the 1.1 player_struct */
+#define SG_DOS_MAXHITTYPES  2048    /* as in 1.3D */
+#define SG_DOS_MAXPLAYERS   8       /* 1.1 saves ps[] and po[] for 8 players */
+/* 1.1 writes ps[] and po[] as 8 elements each, both in one block. */
+#define SG_PLAYER_DFSIZE    SG_PLAYER_SIZE
+#define SG_PLAYER_DFCOUNT   SG_DOS_MAXPLAYERS
+#define SG_PLAYER_BLOCK0    (SG_DOS_MAXPLAYERS*SG_PLAYER_SIZE)
+#define SG_DOS_MAXSCRIPT    10240   /* script[] entries in a 1.1 save */
+#elif DUKE3D_GAMEVER < GAMEVER_14
 #define SG_PLAYER_SIZE      0x552   /* the 1.3D player_struct */
 #define SG_DOS_MAXHITTYPES  2048    /* 1.3D saves hittype[] for the first 2048 sprites only */
 /* 1.3D writes ps[] as MAXPLAYERS elements, which dfwrite splits after 12. */
@@ -27,6 +36,15 @@
 #define SG_PLAYER_BLOCK0    (SG_PLAYER_SIZE*MAXPLAYERS)
 #endif
 #define SG_PLAYERORIG_SIZE  16
+#if DUKE3D_GAMEVER < GAMEVER_13D
+#define SG_PLAYERORIG_DFSIZE  SG_PLAYERORIG_SIZE
+#define SG_PLAYERORIG_DFCOUNT SG_DOS_MAXPLAYERS
+#else
+#define SG_DOS_MAXPLAYERS     MAXPLAYERS
+#define SG_DOS_MAXSCRIPT      MAXSCRIPTSIZE
+#define SG_PLAYERORIG_DFSIZE  (SG_PLAYERORIG_SIZE*MAXPLAYERS)
+#define SG_PLAYERORIG_DFCOUNT 1
+#endif
 #define SG_WEAPONHIT_SIZE   71
 #define SG_ANIMWALL_SIZE    6
 #if DUKE3D_GAMEVER < GAMEVER_14

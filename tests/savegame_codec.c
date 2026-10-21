@@ -75,7 +75,86 @@ static void test_sprite(void)
     CHECK(memcmp(&s, &back, sizeof(s)) == 0);
 }
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+/* The DOS 1.1 player_struct (docs/v10-v11/reference.md, "player_struct (1.1)"). */
+static void test_player(void)
+{
+    static struct player_struct p, back;
+    static unsigned char b[2048];
+
+    memset(&p, 0, sizeof(p)); memset(&back, 0, sizeof(back)); memset(b, 0xee, sizeof(b));
+    p.zoom = 0x01020304; p.loogiey[63] = 0x44; p.posx = -5; p.oposx = 0x0708;
+    p.pals_time = 0x0909; p.burn_time = 120; p.crack_time = 777; p.ang = 0x0605;
+    p.ammo_amount[9] = 0x0a; p.wackedbyactor = 0x0b; p.curr_weapon = 7; p.i = 0x0a0b;
+    p.fist_incs = 0x0c; p.frag = 0x0d; p.fraggedself = 0x0e; p.customexitsound = 0x0f;
+    p.rotscrnang = 0x10; p.shield_amount = 100; p.spacesuit_amount = 1600;
+    p.holoduke_on = 0x12; p.transporter_hold = 0x13; p.boot_amount = 0x14;
+    p.scream_voice = 0x0c0d0e0f; p.gm = 0x11; p.jumping_toggle = 0x15; p.rapid_fire_hold = 0x16;
+    p.name[0] = 'D'; p.inven_icon = 0x17; p.lastrandomspot = 0x18; p.spacesuit_on = 1;
+    p.scuba_on = 0x19; p.spacesuit_used = 1; p.footprintpal = 0x1a; p.falling_counter = 0x1b;
+    p.frag_ps = 3; p.aim_mode = 1; p.gotweapon[0] = 1; p.gotweapon[9] = 1;
+    p.refresh_inventory = 0x1c; p.palette = (char *)b; p.toggle_key_flag = 0x22;
+    p.knuckle_incs = 0x23; p.walking_snd_toggle = 0x24; p.interface_toggle_flag = 0x25;
+    p.palookup = 0x26; p.pals[2] = 0x27; p.actors_killed = 0x28; p.return_to_center = 0x33;
+    CHECK(sg_player(b, &p, 1) == 0x34e);
+    CHECK(b[0] == 0x04 && b[1] == 0x03 && b[2] == 0x02 && b[3] == 0x01);
+    CHECK(le32(b + 520) == 0x44);
+    CHECK(le32(b + 0x214) == -5);
+    CHECK(le32(b + 0x230) == 0x0708);
+    CHECK(le32(b + 0x26c) == 0x0909);
+    CHECK(le32(b + 0x270) == 120);
+    CHECK(le32(b + 0x278) == 777);
+    CHECK(le16(b + 0x27c) == 0x0605);
+    CHECK(le16(b + 0x29a) == 0x0a);
+    CHECK(le16(b + 0x29c) == 0x0b);
+    CHECK(le16(b + 0x29e) == 7);
+    CHECK(le16(b + 0x2ca) == 0x0a0b);
+    CHECK(le16(b + 0x2d2) == 0x0c);
+    CHECK(le16(b + 0x2d4) == 0x0d);
+    CHECK(le16(b + 0x2d6) == 0x0e);
+    CHECK(le16(b + 0x2e8) == 0x0f);
+    CHECK(le16(b + 0x2ea) == 0x10);
+    CHECK(le16(b + 0x2f6) == 100);
+    CHECK(le16(b + 0x2f8) == 1600);
+    CHECK(le16(b + 0x2fa) == 0x12);
+    CHECK(le16(b + 0x300) == 0x13);
+    CHECK(le16(b + 0x306) == 0x14);
+    CHECK(le32(b + 0x308) == 0x0c0d0e0f);
+    CHECK(b[0x30c] == 0x11);
+    CHECK(b[0x310] == 0x15);
+    CHECK(b[0x311] == 0);       /* on_sector_effector: not carried */
+    CHECK(b[0x312] == 0x16);
+    CHECK(b[0x314] == 'D');
+    CHECK(b[0x321] == 0x17);
+    CHECK(b[0x325] == 0x18);
+    CHECK(b[0x326] == 0);       /* no_autoaim: never set */
+    CHECK(b[0x327] == 1);
+    CHECK(b[0x328] == 0x19);
+    CHECK(b[0x329] == 1);
+    CHECK(b[0x32a] == 0x1a);
+    CHECK(b[0x32d] == 0x1b);
+    CHECK(b[0x32e] == 3);
+    CHECK(b[0x32f] == 1);
+    CHECK(b[0x330] == 1 && b[0x339] == 1);
+    CHECK(b[0x33a] == 0x1c);
+    CHECK(b[0x33b] == 0 && b[0x33c] == 0 && b[0x33d] == 0 && b[0x33e] == 0);
+    CHECK(b[0x33f] == 0x22);
+    CHECK(b[0x340] == 0x23);
+    CHECK(b[0x341] == 0);       /* select_dir: not carried */
+    CHECK(b[0x342] == 0x24);
+    CHECK(b[0x343] == 0x25);
+    CHECK(b[0x344] == 0x26);
+    CHECK(b[0x34a] == 0x27);
+    CHECK(b[0x34c] == 0x28);
+    CHECK(b[0x34d] == 0x33);
+    CHECK(b[0x34e] == 0xee);
+    b[0x33b] = 0x99;   /* a DOS pointer: must not be restored */
+    CHECK(sg_player(b, &back, 0) == 0x34e);
+    CHECK(back.palette == NULL);
+    back.palette = p.palette;
+    CHECK(memcmp(&p, &back, sizeof(p)) == 0);
+}
+#elif DUKE3D_GAMEVER < GAMEVER_14
 /* The DOS 1.3D player_struct (docs/v13d/reference.md, ledger F-007). */
 static void test_player(void)
 {

@@ -269,7 +269,9 @@ int loadplayerfile(char *fnptr, signed char spot)
      i = sg_playerblocksize(fil);
      if(i != SG_PLAYER_BLOCK0)
      {
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        printf("%s is not a DOS 1.1 save (player block is %d bytes).\n",fnptr,i);
+#elif DUKE3D_GAMEVER < GAMEVER_14
         printf("%s is not a DOS 1.3D save (player block is %d bytes).\n",fnptr,i);
 #elif DUKE3D_GAMEVER < GAMEVER_15
         printf("%s is not a DOS 1.4 save (player block is %d bytes).\n",fnptr,i);
@@ -347,9 +349,9 @@ int loadplayerfile(char *fnptr, signed char spot)
      sg_read16s(fil,nextspritestat,2,MAXSPRITES);
      numcyclers = clampcount(sg_read16(fil),MAXCYCLERS);
      sg_read16s(fil,&cyclers[0][0],12,MAXCYCLERS);
-     sg_readrecs(fil,ps,sizeof(struct player_struct),sg_player,MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
+     sg_readrecs(fil,ps,sizeof(struct player_struct),sg_player,SG_DOS_MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
      for(i=0;i<MAXPLAYERS;i++) ps[i].palette = (char *) &palette[0];
-     sg_readrecs(fil,po,sizeof(struct player_orig),sg_playerorig,MAXPLAYERS,SG_PLAYERORIG_SIZE*MAXPLAYERS,1);
+     sg_readrecs(fil,po,sizeof(struct player_orig),sg_playerorig,SG_DOS_MAXPLAYERS,SG_PLAYERORIG_DFSIZE,SG_PLAYERORIG_DFCOUNT);
      numanimwalls = clampcount(sg_read16(fil),MAXANIMWALLS);
      sg_readrecs(fil,animwall,sizeof(struct animwalltype),sg_animwall,MAXANIMWALLS,SG_ANIMWALL_SIZE*MAXANIMWALLS,1);
      sg_read32s(fil,msx,4,sizeof(msx)/sizeof(msx[0]));
@@ -379,8 +381,8 @@ int loadplayerfile(char *fnptr, signed char spot)
      sg_read16s(fil,cloudy,sizeof(short)<<7,1);
 #endif
 
-     kdfread(&scriptptrs[0],1,MAXSCRIPTSIZE,fil);
-     sg_read32s(fil,script,4,MAXSCRIPTSIZE);
+     kdfread(&scriptptrs[0],1,SG_DOS_MAXSCRIPT,fil);
+     sg_read32s(fil,script,4,SG_DOS_MAXSCRIPT);
 
      clearbuf(actorscrptr,MAXTILES,0L);
      sg_read32s(fil,actorscrptr,4,SG_DOS_MAXTILES);
@@ -407,6 +409,16 @@ int loadplayerfile(char *fnptr, signed char spot)
 
      earthquaketime = sg_read8(fil);
      ud.from_bonus = sg_read16(fil);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     // 1.1 ends with 7 scalars; auto_run and crosshair are bytes.
+     ud.respawn_monsters = sg_read32(fil);
+     ud.m_respawn_monsters = ud.respawn_monsters;
+     ud.respawn_items = sg_read32(fil);
+     ud.m_respawn_items = ud.respawn_items;
+     ud.god = sg_read8(fil);
+     ud.auto_run = sg_read8(fil);
+     ud.crosshair = sg_read8(fil);
+#else
      ud.secretlevel = sg_read16(fil);
      ud.respawn_monsters = sg_read32(fil);
      ud.m_respawn_monsters = ud.respawn_monsters;
@@ -422,6 +434,7 @@ int loadplayerfile(char *fnptr, signed char spot)
      ud.m_monsters_off = ud.monsters_off;
      ud.last_level = sg_read16(fil);
      ud.eog = sg_read8(fil);
+#endif
 
 #if DUKE3D_GAMEVER >= GAMEVER_14 // a 1.3D save ends here
      ud.coop = sg_read32(fil);
@@ -635,8 +648,8 @@ int saveplayerfile(char *fnptr, signed char spot)
      sg_write16s(fil,nextspritestat,2,MAXSPRITES);
      sg_write16(fil,numcyclers);
      sg_write16s(fil,&cyclers[0][0],12,MAXCYCLERS);
-     sg_writerecs(fil,ps,sizeof(struct player_struct),sg_player,MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
-     sg_writerecs(fil,po,sizeof(struct player_orig),sg_playerorig,MAXPLAYERS,SG_PLAYERORIG_SIZE*MAXPLAYERS,1);
+     sg_writerecs(fil,ps,sizeof(struct player_struct),sg_player,SG_DOS_MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
+     sg_writerecs(fil,po,sizeof(struct player_orig),sg_playerorig,SG_DOS_MAXPLAYERS,SG_PLAYERORIG_DFSIZE,SG_PLAYERORIG_DFCOUNT);
      sg_write16(fil,numanimwalls);
      sg_writerecs(fil,animwall,sizeof(struct animwalltype),sg_animwall,MAXANIMWALLS,SG_ANIMWALL_SIZE*MAXANIMWALLS,1);
      sg_write32s(fil,msx,4,sizeof(msx)/sizeof(msx[0]));
@@ -663,10 +676,10 @@ int saveplayerfile(char *fnptr, signed char spot)
 #endif
 
      // Script values are already offsets; the pointer flag blocks are kept zeroed.
-     clearbufbyte(scriptptrs,MAXSCRIPTSIZE,0L);
+     clearbufbyte(scriptptrs,SG_DOS_MAXSCRIPT,0L);
 
-     dfwrite(&scriptptrs[0],1,MAXSCRIPTSIZE,fil);
-     sg_write32s(fil,script,4,MAXSCRIPTSIZE);
+     dfwrite(&scriptptrs[0],1,SG_DOS_MAXSCRIPT,fil);
+     sg_write32s(fil,script,4,SG_DOS_MAXSCRIPT);
 
      sg_write32s(fil,actorscrptr,4,SG_DOS_MAXTILES);
 
@@ -691,6 +704,13 @@ int saveplayerfile(char *fnptr, signed char spot)
 
      sg_write8(fil,earthquaketime);
      sg_write16(fil,ud.from_bonus);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     sg_write32(fil,ud.respawn_monsters);
+     sg_write32(fil,ud.respawn_items);
+     sg_write8(fil,ud.god);
+     sg_write8(fil,ud.auto_run);
+     sg_write8(fil,ud.crosshair);
+#else
      sg_write16(fil,ud.secretlevel);
      sg_write32(fil,ud.respawn_monsters);
      sg_write32(fil,ud.respawn_items);
@@ -701,6 +721,7 @@ int saveplayerfile(char *fnptr, signed char spot)
      sg_write32(fil,ud.monsters_off);
      sg_write16(fil,ud.last_level);
      sg_write8(fil,ud.eog);
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // a 1.3D save ends here
      sg_write32(fil,ud.coop);
      sg_write32(fil,ud.marker);

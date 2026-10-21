@@ -1,15 +1,16 @@
-# Runs a 1.3D build headless on a DOS 1.3D save. MODE is one of:
+# Runs a 1.3D or 1.1 build headless on a DOS save of its own release. MODE is
+# one of:
 #   load    -loadverify must print the reference state (tests/data/v13d_save_refs.cmake);
 #           then -saveverify writes the game back out. That copy must hold the same
 #           blocks as the DOS save (v13d_save_decode.py compare), and loading it must
 #           print the same state
-#   refuse  a save from the other 1.3D edition and one with the 1.5 BYTEVERSION must
-#           both exit 2 with the version message
+#   refuse  each OTHER save (another release or edition) and one with the 1.5
+#           BYTEVERSION must exit 2 with the version message
 #
-#   cmake -DMODE=<mode> -DDUKE3D=<exe> -DDATA=<1.3D data dir> -DEDITION=<full|sw>
+#   cmake -DMODE=<mode> -DDUKE3D=<exe> -DDATA=<1.3D data dir> -DEDITION=<full|sw|sw11>
 #         -DREFS=<v13d_save_refs.cmake> -DPYTHON=<python3> -DDECODER=<v13d_save_decode.py>
 #         -DWORK=<scratch dir>
-#         [-DNAME=<ref name>] [-DOTHER=<other edition's save>] -P dos_save_v13d.cmake
+#         [-DNAME=<ref name>] [-DOTHER=<other releases' saves, ;-separated>] -P dos_save_v13d.cmake
 include("${CMAKE_CURRENT_LIST_DIR}/v13d_data.cmake")
 v13d_check_edition("${DATA}" "${EDITION}")
 
@@ -82,15 +83,23 @@ if(MODE STREQUAL "load")
     message(FATAL_ERROR "our save of it\n game: '${_got}'\n want: '${_want}'")
   endif()
 elseif(MODE STREQUAL "refuse")
-  file(COPY_FILE "${OTHER}" "${_run}/other.sav")
+  set(_files "")
+  set(_n 0)
+  foreach(_other IN LISTS OTHER)
+    math(EXPR _n "${_n} + 1")
+    file(COPY_FILE "${_other}" "${_run}/other${_n}.sav")
+    list(APPEND _files other${_n}.sav)
+  endforeach()
   # A 1.5 save's first block: BYTEVERSION 117, uncompressed.
   file(COPY_FILE "${CMAKE_CURRENT_LIST_DIR}/data/v15_save_header.sav" "${_run}/v15.sav")
-  foreach(_file other.sav v15.sav)
+  list(APPEND _files v15.sav)
+  foreach(_file IN LISTS _files)
     run_duke3d(_result _out -loadverify ${_file})
     if(NOT _result EQUAL 2)
       message(FATAL_ERROR "${_file}: -loadverify exited ${_result}, not 2")
     endif()
-    if(NOT _out MATCHES "is a version [0-9]+ save, not")
+    # A 1.0 save has no version: its first four name bytes are read as one.
+    if(NOT _out MATCHES "is a version -?[0-9]+ save, not")
       message(FATAL_ERROR "${_file}: no version message")
     endif()
   endforeach()
