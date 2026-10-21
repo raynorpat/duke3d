@@ -838,9 +838,10 @@ static void polymost_shaderquad ()
 }
 
 	//Shows the frame on the GL 2.1 tier: draws the framebuffer's indices into the
-	//   window through the palette on screen (getfadedpalette), for the swap. The
+	//   window (dw by dh) through the palette on screen (getfadedpalette), for the
+	//   swap, at r (x, y, width, height: gl_fitrect's), black around it. The
 	//   framebuffer keeps them. 0: not on that tier (or nothing drawn yet).
-int32_t polymost_present_shader ()
+int32_t polymost_present_shader (const int32_t *r, int32_t dw, int32_t dh)
 {
 	palette_t pal[256];
 	unsigned char rgb[768];
@@ -868,12 +869,20 @@ int32_t polymost_present_shader ()
 	}
 	else (glBindTexture)(GL_TEXTURE_2D,glshpal);
 	bglActiveTexture(GL_TEXTURE0);
+	if ((r[0]) || (r[1]) || (r[2] != dw) || (r[3] != dh)) //a smaller frame, scaled up: the bars
+	{
+		glViewport(0,0,dw,dh);
+		glClearColor(0,0,0,0);
+		glClear(GL_COLOR_BUFFER_BIT);
+	}
+	glViewport(r[0],r[1],r[2],r[3]);
 	bglUseProgram(glshresolve);
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D,glshfbotex);
 	polymost_shaderquad();
 	bglUseProgram(0);
 	glDisable(GL_TEXTURE_2D);
+	glViewport(0,0,xres,yres); //setpolymost2dview's, which it keeps
 	return(1);
 }
 
@@ -904,6 +913,13 @@ unsigned char *polymost_capture_shader ()
 		}
 	free(idx);
 	return(rgb);
+}
+
+	//After a mode set: makes what the GL 2.1 tier draws with now, so a failure
+	//   falls back to the vbo path before anything is drawn
+void polymost_prepare_shader ()
+{
+	polymost_shaderready();
 }
 
 	//A window resize, before polymost_glreset: takes the frame's texture from the

@@ -39,8 +39,17 @@ int gl_choosepath(int requested, int glmajor, int glminor, int hasvbo, int hasgl
 
 	/* The path asked for (set before setgamemode_gl) and the one in use. */
 extern int32_t gldrawpathrequest, gldrawpath;
-	/* The size renderer 3 draws at (0: the window's). Not used yet. */
+	/* The size the shader path draws at (0: the window's), scaled up to the
+	 * window; the other paths draw at the window's. */
 extern int32_t glinternalwidth, glinternalheight;
+	/* The size drawn at for the settings w by h: 0x0 (the window's) when
+	 * either is 0, otherwise at least 320x200. 0: as set, 1: one of them was
+	 * 0, 2: made bigger. */
+int gl_internalsize(int32_t w, int32_t h, int32_t *ow, int32_t *oh);
+	/* Where a w by h frame shows in a dw by dh drawable: scaled by the
+	 * largest factor that fits, pixels square, centred. r: x, y (the bars'
+	 * width and height), width, height, in whole pixels. */
+void gl_fitrect(int32_t w, int32_t h, int32_t dw, int32_t dh, int32_t *r);
 	/* Test hook: 1 makes GLSL and FBOs unavailable, as if they failed; 2 makes
 	 * the shader path's shader not compile, 3 its framebuffer incomplete. */
 extern int32_t gl_forcefail;

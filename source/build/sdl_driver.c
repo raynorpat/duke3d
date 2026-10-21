@@ -145,7 +145,8 @@ int32_t bpp = 8;
 struct glinfo_t glinfo;
 char nofog = 0;
 extern void polymost_glreset(void);
-extern int32_t polymost_present_shader(void);
+extern int32_t polymost_present_shader(const int32_t *r, int32_t dw, int32_t dh);
+extern void polymost_prepare_shader(void);
 extern unsigned char *polymost_capture_shader(void);
 extern GLuint polymost_takeframe_shader(void);
 extern void polymost_putframe_shader(GLuint tex);
@@ -162,6 +163,9 @@ static GLuint lastframe = 0;  /* the last swapped frame, before its fade */
 static int lastframe_set = 0;  /* lastframe holds a frame yet */
 static int swapped = 0;  /* a swap has shown something in this mode */
 static int lastframe_w, lastframe_h;  /* its texture size */
+static int gl_draw_w, gl_draw_h;  /* the drawable */
+static int gl_scaled = 0;  /* the shader path draws at its internal size (xres, yres)... */
+static int32_t gl_showrect[4];  /* ...shown here in the drawable (gl_fitrect) */
 #endif
 
 SDL_Surface *surface = NULL; /* This isn't static so that we can use it elsewhere AH */
@@ -668,7 +672,7 @@ static void gl_draw_lastframe(void)
  */
 static void gl_swap(void)
 {
-    if (polymost_present_shader())
+    if (polymost_present_shader(gl_showrect, gl_draw_w, gl_draw_h))
     {
         SDL_GL_SwapWindow(sdl_window);
         swapped = 1;
@@ -720,7 +724,7 @@ void _glpalettefade(void)
 {
     if ((sdl_glcontext == NULL) || (framedrawn))
         return;
-    if (polymost_present_shader())  /* the GL 2.1 tier keeps the frame */
+    if (polymost_present_shader(gl_showrect, gl_draw_w, gl_draw_h))  /* the GL 2.1 tier keeps the frame */
     {
         SDL_GL_SwapWindow(sdl_window);
         swapped = 1;
@@ -739,21 +743,48 @@ void _glpalettefade(void)
 } /* _glpalettefade */
 
 
-/* xdim/ydim are the drawable size, clamped to what the engine's arrays hold. */
-static void init_gl_res_vars(void)
+/*
+ * xdim/ydim are the drawable size, clamped to what the engine's arrays hold,
+ *  or on the shader path its internal size (glinternalwidth/height), which
+ *  the present scales up to the drawable. say: tell why a setting isn't used.
+ */
+static void init_gl_res_vars(int say)
 {
-    int w, h;
+    int w, h, why;
+    int32_t iw, ih;
 
-    SDL_GL_GetDrawableSize(sdl_window, &w, &h);
-    if (w > MAXXDIM) w = MAXXDIM;
-    if (h > MAXYDIM) h = MAXYDIM;
+    SDL_GL_GetDrawableSize(sdl_window, &gl_draw_w, &gl_draw_h);
+    w = (gl_draw_w > MAXXDIM) ? MAXXDIM : gl_draw_w;
+    h = (gl_draw_h > MAXYDIM) ? MAXYDIM : gl_draw_h;
+
+    why = gl_internalsize(glinternalwidth, glinternalheight, &iw, &ih);
+    if ((say) && (why == 1))
+        printf("GL internal size %dx%d needs a width and a height; drawing at the window's size.\n",
+               (int) glinternalwidth, (int) glinternalheight);
+    else if ((say) && (why == 2))
+        printf("GL internal size %dx%d is under 320x200; drawing at %dx%d.\n",
+               (int) glinternalwidth, (int) glinternalheight, (int) iw, (int) ih);
+    if ((iw != 0) && (gldrawpath != GLPATH_SHADER))
+    {
+        if (say)
+            printf("GL internal size %dx%d needs draw path shader; drawing at the window's size.\n",
+                   (int) iw, (int) ih);
+        iw = 0;
+    } /* if */
+    gl_scaled = (iw != 0);
+    if (gl_scaled)
+    {
+        w = iw;
+        h = ih;
+    } /* if */
+    gl_fitrect(w, h, gl_draw_w, gl_draw_h, gl_showrect);
 
     xdim = xres = w;
     ydim = yres = h;
     bytesperline = w;
     qsetmode = 200;
     frameplace = 0;
-    sdldebug("OpenGL drawable is %dx%d.", w, h);
+    sdldebug("OpenGL drawable is %dx%d, drawn at %dx%d.", gl_draw_w, gl_draw_h, w, h);
 
     SDL_SetWindowTitle(sdl_window, titlelong);
     setupmouse();
@@ -778,10 +809,21 @@ static void gl_resize(void)
     int drawn;
 
     SDL_GL_GetDrawableSize(sdl_window, &w, &h);
-    if (w > MAXXDIM) w = MAXXDIM;
-    if (h > MAXYDIM) h = MAXYDIM;
-    if ((w == xres) && (h == yres))
+    if ((w == gl_draw_w) && (h == gl_draw_h))
         return;
+    if (gl_scaled)  /* the internal size stays; only where it shows changes. */
+    {
+        gl_draw_w = w;
+        gl_draw_h = h;
+        gl_fitrect(xres, yres, w, h, gl_showrect);
+        if ((!framedrawn) && (polymost_present_shader(gl_showrect, w, h)))
+        {
+            SDL_GL_SwapWindow(sdl_window);  /* a still screen: shown again. */
+            swapped = 1;
+            framedrawn = 0;
+        } /* if */
+        return;
+    } /* if */
 
     /* init_res_lookups sets the base palette and drops the fade: keep both. */
     memcpy(pal, curpalette, sizeof (pal));
@@ -798,7 +840,7 @@ static void gl_resize(void)
     } /* if */
     shframe = polymost_takeframe_shader();  /* the GL 2.1 tier's, drawn or being drawn */
     polymost_glreset();
-    init_gl_res_vars();
+    init_gl_res_vars(0);
     memcpy(curpalette, pal, sizeof (pal));
     memcpy(getbasepalette(), base, sizeof (base));
     palfadergb = fadergb;
@@ -907,9 +949,15 @@ int setgamemode_gl(char davidoption)
     bpp = 32;
     numpages = 2;  /* as JFBuild: permanent rotatesprites go on both pages. */
     gl_davidoption = davidoption;
-    init_gl_res_vars();
+    init_gl_res_vars(1);
     setrendermode(3);
     polymost_glreset();
+    if (gl_scaled)  /* the shader path failing now draws at the window's size. */
+    {
+        polymost_prepare_shader();
+        if (gldrawpath != GLPATH_SHADER)
+            init_gl_res_vars(0);
+    } /* if */
     last_render_ticks = SDL_GetTicks();
     return(0);
 #else
@@ -1010,6 +1058,14 @@ static void mouse_area(int *w, int *h)
 void getmousearea(int *w, int *h)
 {
     mouse_area(w, h);
+#ifdef USE_OPENGL
+    /* drawn at an internal size: the frame's part of the window, in points. */
+    if ((sdl_glcontext != NULL) && (gl_scaled) && (gl_draw_w > 0) && (gl_draw_h > 0))
+    {
+        *w = (int) (((int64_t) gl_showrect[2] * *w + gl_draw_w / 2) / gl_draw_w);
+        *h = (int) (((int64_t) gl_showrect[3] * *h + gl_draw_h / 2) / gl_draw_h);
+    } /* if */
+#endif
 } /* getmousearea */
 
 

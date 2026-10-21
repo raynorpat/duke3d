@@ -142,7 +142,8 @@ void _updateScreenRect(int32_t x, int32_t y, int32_t w, int32_t h);
 /* mouse/keystuff stuff. Also implemented in sdl_driver.c ... */
 int setupmouse(void);
 /* The size readmousexy's motion is in: the 8-bit mode's, or in OpenGL the
- *  window's points, which a high-DPI drawable (xdim, ydim) outnumbers. */
+ *  window's points, which a high-DPI drawable (xdim, ydim) outnumbers; the
+ *  frame's part of them when the shader path draws at an internal size. */
 void getmousearea(int *w, int *h);
 void readmousexy(short *x, short *y);
 void readmousebstatus(short *bstatus);

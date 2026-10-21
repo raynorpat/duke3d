@@ -27,6 +27,36 @@ int gl_choosepath(int requested, int glmajor, int glminor, int hasvbo, int hasgl
 } /* gl_choosepath */
 
 
+int gl_internalsize(int32_t w, int32_t h, int32_t *ow, int32_t *oh)
+{
+    *ow = *oh = 0;
+    if ((w == 0) && (h == 0))
+        return(0);
+    if ((w == 0) || (h == 0))
+        return(1);
+    *ow = (w < 320) ? 320 : w;
+    *oh = (h < 200) ? 200 : h;
+    return(((*ow != w) || (*oh != h)) ? 2 : 0);
+} /* gl_internalsize */
+
+
+void gl_fitrect(int32_t w, int32_t h, int32_t dw, int32_t dh, int32_t *r)
+{
+    if ((int64_t) w * dh <= (int64_t) dw * h)  /* as tall as the drawable */
+    {
+        r[3] = dh;
+        r[2] = (int32_t) (((int64_t) w * dh + h / 2) / h);
+    } /* if */
+    else  /* as wide */
+    {
+        r[2] = dw;
+        r[3] = (int32_t) (((int64_t) h * dw + w / 2) / w);
+    } /* else */
+    r[0] = (dw - r[2]) / 2;
+    r[1] = (dh - r[3]) / 2;
+} /* gl_fitrect */
+
+
 #ifdef USE_OPENGL
 #include "SDL.h"
 #include "build.h"

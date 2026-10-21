@@ -360,7 +360,8 @@ Ported from later JFBuild commits, retyped as above:
   returns -1 with the mode untouched (from GL, its context is made current
   again). It sets JFBuild's GL state, fills `glinfo` from whole
   `GL_EXTENSIONS` tokens, sets `bpp = 32`, `xdim`/`ydim` to the drawable
-  size clamped to `MAXXDIM`x`MAXYDIM`, `qsetmode = 200` and `frameplace = 0`,
+  size clamped to `MAXXDIM`x`MAXYDIM` (on the shader path with an internal
+  size, that size: see `glext.c`), `qsetmode = 200` and `frameplace = 0`,
   then calls `setrendermode(3)` and `polymost_glreset()`. Without
   `USE_OPENGL` it returns -1 with an SDL error set.
 - `init_new_res_vars` is split: `init_res_lookups` (`ylookup`,
@@ -375,11 +376,14 @@ Ported from later JFBuild commits, retyped as above:
   changed, call `polymost_glreset()` and redo the mode variables. With no
   frame being drawn, the last frame is drawn again, stretched to the new
   size, and swapped, so a still screen (which isn't redrawn) and its fades
-  survive.
+  survive. At an internal size only where the frame shows changes (and a
+  still screen is shown again).
   `setupmouse`, the mouse motion clamp and `_idle` check `sdl_window`
   instead of `surface`, and the clamp and `setupmouse`'s centre use the
   window's size, as SDL's mouse events are in points, not the (on a
-  high-DPI display, bigger) drawable's pixels.
+  high-DPI display, bigger) drawable's pixels. `getmousearea` (ours, for
+  the editor's cursor) is the window's size, or at an internal size the
+  frame's part of it.
 - `_setgamemode` (8-bit) still clamps modes over 1600x1200 to 1600x1200,
   now with literals, so the larger `MAXXDIM`/`MAXYDIM` only reach GL. The
   size asked for is kept for renderer 3's window.
@@ -396,8 +400,18 @@ Ported from later JFBuild commits, retyped as above:
   from `gldrawpathrequest` (the game's `GLDrawPath`, the editor's
   `gldrawpath`) and prints it. `gl_forcefail` (a test hook): 1 makes GLSL
   and FBOs unavailable, 2 breaks the shader path's shader, 3 leaves its
-  framebuffer incomplete. `glinternalwidth`/`glinternalheight` are set from the
-  settings but not used yet.
+  framebuffer incomplete. `glinternalwidth`/`glinternalheight` (the game's
+  `GLInternalWidth`/`Height`, the editor's `glinternalwidth`/`height`) set
+  the shader path's internal size: `gl_internalsize` takes both or neither
+  (one alone is the window's size) and at least 320x200, and
+  `setgamemode_gl` prints why when it changes them, or ignores them (with
+  a message) off the shader path; if the shader path then fails (built at
+  once by `polymost_prepare_shader`) it draws at the window's size.
+  `xdim`/`ydim` (and `xres`/`yres`, the framebuffer) are that size, so the
+  game lays out as classic does at it; `polymost_present_shader` draws the
+  frame into `gl_fitrect`'s rectangle of the drawable (the largest scale
+  that fits, square pixels, centred, nearest texel) with black bars around
+  it; screenshots are the internal-size frame.
 - `glsubmit.c`/`glsubmit.h` (ours): renderer 3's vertex submission.
   `polymost.c`'s and `engine.c`'s `glBegin`/`glTexCoord`/`glColor`/
   `glVertex`/`glEnd` (drawpoly, `drawtrap`/`tessectrap`, the tile picker,
