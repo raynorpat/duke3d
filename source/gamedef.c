@@ -2249,7 +2249,7 @@ char parse(void)
 
             if(g_x > 1024)
             {
-                short temphit, sclip, angdif;
+                short temphit = -1, sclip, angdif; // -1: 1.0's hitscan leaves this unwritten on a miss (DOS read stack garbage)
 
 #if DUKE3D_GAMEVER < GAMEVER_11
                 if( g_sp->picnum == BOSS1 || g_sp->picnum == BOSS2 ) // any size (C10-003)

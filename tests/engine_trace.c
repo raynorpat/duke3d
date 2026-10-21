@@ -92,10 +92,10 @@ int main(void)
 #endif
 
     /* E10-004: a sprite of sector 0 whose clip line lies on sector 1's east
-     *  wall's clip line (x = 1920), right on the path. clipmove returns the
- *  short clipobjectval. 1.0 adds every wall
+     *  wall's clip line (x = 1920), right on the path. 1.0 adds every wall
      *  before any sprite, so raytrace meets the sprite first and keeps it on
-     *  the tie; later engines add sector 1's walls last and keep the wall. */
+     *  the tie; later engines add sector 1's walls last and keep the wall.
+     *  clipmove returns the short clipobjectval. */
     i = insertsprite(0, 0);
     sprite[i].x = 1920+256; sprite[i].y = 512; sprite[i].z = 0;
     sprite[i].cstat = 1; sprite[i].picnum = 0; sprite[i].clipdist = 32;

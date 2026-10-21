@@ -4188,6 +4188,7 @@ void checksectors(short snum)
 
                 case NUKEBUTTON:
 
+                    j = -1; // -1: 1.0's hitscan leaves this unwritten on a miss (DOS read stack garbage)
                     hitawall(p,&j);
                     if(j >= 0 && wall[j].overpicnum == 0)
                         if(hittype[neartagsprite].temp_data[0] == 0)

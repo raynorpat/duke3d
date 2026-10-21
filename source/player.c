@@ -173,7 +173,7 @@ int32_t hits(short i)
 int32_t hitasprite(short i,short *hitsp)
 {
     int32_t sx,sy,sz,zoff;
-    short sect,hw;
+    short sect,hw = -1; // -1: 1.0's hitscan leaves this unwritten on a miss (DOS read stack garbage)
 
     if(badguy(&sprite[i]) )
         zoff = (42<<8);
@@ -409,7 +409,7 @@ short aim(spritetype *s,short aang)
 // so it is a separate copy.
 void shoot(short i,short atwith)
 {
-    short sect, hitsect, hitspr, hitwall, l, sa, p, j, k, scount;
+    short sect, hitsect, hitspr = -1, hitwall = -1, l, sa, p, j, k, scount; // -1: 1.0's hitscan leaves this unwritten on a miss (DOS read stack garbage)
     int32_t sx, sy, sz, vel, zvel, hitx, hity, hitz, x, oldzvel, dal;
     unsigned char sizx,sizy;
     spritetype *s;
@@ -1013,7 +1013,7 @@ void shoot(short i,short atwith)
 #else
 void shoot(short i,short atwith)
 {
-    short sect, hitsect, hitspr, hitwall, l, sa, p, j, k, scount;
+    short sect, hitsect, hitspr = -1, hitwall = -1, l, sa, p, j, k, scount; // -1: 1.0's hitscan leaves this unwritten on a miss (DOS read stack garbage)
     int32_t sx, sy, sz, vel, zvel, hitx, hity, hitz, x, oldzvel, dal;
     unsigned char sizx,sizy;
     spritetype *s;
