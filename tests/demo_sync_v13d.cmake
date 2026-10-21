@@ -1,13 +1,14 @@
-# Plays one original 1.3D demo headless with -demoverify and compares the
+# Plays one original 1.3D or 1.1 demo headless with -demoverify and compares the
 # final state with the values measured from the DOS executable
 # (tests/data/v13d_demo_refs.cmake). MODE refuse instead hands the build a
-# demo with a 1.5 header and expects it to be refused (exit 2); MODE fullonly
+# demo with a 1.5 header, and then each demo file in OTHERS, and expects every
+# one to be refused (exit 2); MODE fullonly
 # hands a shareware build an episode 2 demo header and expects the refusal to
 # say it needs the full version.
 #
-#   cmake -DDUKE3D=<exe> -DDATA=<1.3D data dir> -DEDITION=<full|sw>
+#   cmake -DDUKE3D=<exe> -DDATA=<data dir> -DEDITION=<full|sw|sw11>
 #         -DDEMO=<n> -DREFS=<v13d_demo_refs.cmake> -DWORK=<scratch dir>
-#         [-DMODE=refuse] -P demo_sync_v13d.cmake
+#         [-DMODE=refuse [-DOTHERS=<demo files>]] -P demo_sync_v13d.cmake
 include("${CMAKE_CURRENT_LIST_DIR}/v13d_data.cmake")
 v13d_check_edition("${DATA}" "${EDITION}")
 
@@ -39,12 +40,15 @@ set(ENV{HOME} "${_home}")
 set(ENV{USERPROFILE} "${_home}")
 set(ENV{DUKE3D_SAVE_DIR} "${_home}")
 
-execute_process(COMMAND "${DUKE3D}" -demoverify ${DEMO}
-  WORKING_DIRECTORY "${_run}"
-  TIMEOUT 300
-  RESULT_VARIABLE _result
-  OUTPUT_VARIABLE _out
-  ERROR_VARIABLE _err)
+macro(_demo_run)
+  execute_process(COMMAND "${DUKE3D}" -demoverify ${DEMO}
+    WORKING_DIRECTORY "${_run}"
+    TIMEOUT 300
+    RESULT_VARIABLE _result
+    OUTPUT_VARIABLE _out
+    ERROR_VARIABLE _err)
+endmacro()
+_demo_run()
 
 if(MODE STREQUAL "fullonly")
   if(NOT _result EQUAL 2 OR NOT _out MATCHES "needs the full version")
@@ -54,13 +58,23 @@ if(MODE STREQUAL "fullonly")
   return()
 endif()
 if(MODE STREQUAL "refuse")
-  if(NOT _result EQUAL 2)
-    message(FATAL_ERROR "a 1.5 demo wasn't refused: exit ${_result}\n${_out}${_err}")
-  endif()
-  if(NOT _out MATCHES "refused")
-    message(FATAL_ERROR "the refusal printed no message:\n${_out}")
-  endif()
-  message(STATUS "refused as expected")
+  set(_what "a 1.5 demo")
+  set(_others ${OTHERS})
+  while(TRUE)
+    if(NOT _result EQUAL 2)
+      message(FATAL_ERROR "${_what} wasn't refused: exit ${_result}\n${_out}${_err}")
+    endif()
+    if(NOT _out MATCHES "refused")
+      message(FATAL_ERROR "the refusal of ${_what} printed no message:\n${_out}")
+    endif()
+    message(STATUS "${_what} refused as expected")
+    if(NOT _others)
+      break()
+    endif()
+    list(POP_FRONT _others _what)
+    file(COPY_FILE "${_what}" "${_run}/demo${DEMO}.dmo")
+    _demo_run()
+  endwhile()
   return()
 endif()
 

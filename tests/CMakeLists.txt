@@ -555,6 +555,33 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
               -P "${CMAKE_CURRENT_SOURCE_DIR}/game_boot_v13d.cmake")
     set_tests_properties(game_boot_${_vold_name} PROPERTIES TIMEOUT 240)
   endif()
+  # The original demos, played to the end and compared with the DOS state
+  # (1.1 only so far; 1.0 is Task 16).
+  if(_vold_data AND _vold_edition STREQUAL "sw11")
+    foreach(_demo 1 2 3)
+      add_test(NAME demo_sync_${_vold_name}_${_demo}
+        COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
+                "-DDATA=${_vold_data}" "-DEDITION=${_vold_edition}"
+                "-DDEMO=${_demo}"
+                "-DREFS=${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_demo_refs.cmake"
+                "-DWORK=${CMAKE_BINARY_DIR}/ds_${_vold_name}_${_demo}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
+      set_tests_properties(demo_sync_${_vold_name}_${_demo} PROPERTIES TIMEOUT 400)
+    endforeach()
+    # A 1.5 demo, and the 1.3D shareware one when that folder is set, must be
+    # refused. A 1.0 demo can't be told from a 1.1 one (F11-001).
+    set(_vold_others "")
+    if(DUKE3D_V13D_SW_DATA_DIR)
+      set(_vold_others "${DUKE3D_V13D_SW_DATA_DIR}/DEMO1.DMO")
+    endif()
+    add_test(NAME demo_refuse_${_vold_name}
+      COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
+              "-DDATA=${_vold_data}" "-DEDITION=${_vold_edition}"
+              -DDEMO=1 -DMODE=refuse "-DOTHERS=${_vold_others}"
+              "-DWORK=${CMAKE_BINARY_DIR}/dr_${_vold_name}"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
+    set_tests_properties(demo_refuse_${_vold_name} PROPERTIES TIMEOUT 120)
+  endif()
   # The edition check must refuse the 1.0 and 1.3D shareware as 1.1.
   if(_vold_edition STREQUAL "sw11" AND DUKE3D_V10_SW_DATA_DIR AND DUKE3D_V13D_SW_DATA_DIR)
     add_test(NAME v11_edition_mismatch

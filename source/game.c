@@ -8920,6 +8920,40 @@ char opendemoread(char which_demo) // 0 = mine
 
      kread32(recfilep,&ud.reccnt);
 #if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     // 1.1 demos have a 9-byte header: volume, level and skill bytes, then
+     // ud.multimode as a short (F11-001). It has no version, so a 1.0 demo
+     // can't be told apart; a 1.3D or later header fails the range checks.
+     {
+         char vol, lev, skill;
+         short mm;
+
+         kread8(recfilep,&vol);
+         kread8(recfilep,&lev);
+         kread8(recfilep,&skill);
+         kread16(recfilep,&mm);
+#ifdef VOLUMEONE
+         if( (vol == 1 || vol == 2) && lev <= 10 && skill <= 4 && mm >= 1 && mm <= MAXPLAYERS )
+         {
+            printf("%s is an episode %d demo, which needs the full version; refused.\n",fname,vol+1);
+            kclose(recfilep);
+            return 0;
+         }
+         if( vol != 0 || lev > 10 || skill > 4 || mm < 1 || mm > MAXPLAYERS )
+#else
+         if( vol > 2 || lev > 10 || skill > 4 || mm < 1 || mm > MAXPLAYERS )
+#endif
+         {
+            printf("%s isn't a Duke Nukem 3D 1.1 demo; refused.\n",fname);
+            kclose(recfilep);
+            return 0;
+         }
+         ud.volume_number = vol;
+         ud.level_number = lev;
+         ud.player_skill = skill;
+         ud.multimode = mm;
+     }
+#else
      // 1.3D demos have a 24-byte header and no version byte (reference.md
      // "Demo file"). A later demo has its version where the volume goes, so
      // a value no 1.3D game can have refuses it.
@@ -8959,6 +8993,7 @@ char opendemoread(char which_demo) // 0 = mine
          kread32(recfilep,(int32 *)&ud.m_respawn_items);
          kread32(recfilep,(int32 *)&ud.m_respawn_inventory);
      }
+#endif
 
      // Fix: 1.3D kept the player's cheats (god mode, noclip) into the demo, which then desynced; clear them as 1.4 does.
      ud.god = ud.cashman = ud.eog = ud.showallmap = 0;
@@ -9055,7 +9090,15 @@ void opendemowrite(void)
 // CTW END - MODIFICATION
     val32 = BUILDSWAP_INTEL32(dummylong);
     fwrite(&val32,4,1,frecfilep);
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1 builds record in 1.1's demo format (F11-001).
+    fwrite((char *)&ud.volume_number,sizeof(char),1,frecfilep);
+    fwrite((char *)&ud.level_number,sizeof(char),1,frecfilep);
+    fwrite((char *)&ud.player_skill,sizeof(char),1,frecfilep);
+    val16 = BUILDSWAP_INTEL16(ud.multimode);
+    fwrite((short *)&val16,sizeof(short),1,frecfilep);
+    (void)ver; (void)i;
+#elif DUKE3D_GAMEVER < GAMEVER_14
     // 1.3D builds record in 1.3D's own demo format.
     fwrite((char *)&ud.volume_number,sizeof(char),1,frecfilep);
     fwrite((char *)&ud.level_number,sizeof(char),1,frecfilep);
