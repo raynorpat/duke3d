@@ -4503,8 +4503,8 @@ void processinput(short snum)
             {
                 if ( !(sector[s->sectnum].lotag&0x8000) && ( isanunderoperator(sector[s->sectnum].lotag) ||
                     isanearoperator(sector[s->sectnum].lotag) ) )
-#if DUKE3D_GAMEVER < GAMEVER_13D
-                        activatebysector(s->sectnum,snum); // 1.1 passes the player number
+#if DUKE3D_GAMEVER < GAMEVER_14
+                        activatebysector(s->sectnum,snum); // 1.3D and older pass the player number
 #else
                         activatebysector(s->sectnum,pi);
 #endif
@@ -4515,7 +4515,7 @@ void processinput(short snum)
                 }
             }
             else if( klabs(fz-cz) < (32<<8) && isanunderoperator(sector[psect].lotag) )
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_14
                 activatebysector(psect,snum);
 #else
                 activatebysector(psect,pi);
