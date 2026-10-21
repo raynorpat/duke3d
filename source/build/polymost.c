@@ -101,6 +101,7 @@ double gdo, gdx, gdy;
 #if (USEZBUFFER != 0)
 int32_t *zbufmem = 0, zbufysiz = 0, zbufbpl = 0;
 #endif
+static int32_t zbufwrite = 1; //0: renderer 2's spans don't write the z-buffer
 
 #ifdef USE_OPENGL
 int32_t glredbluemode = 0;
@@ -1803,7 +1804,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 										{
 #if (DEPTHDEBUG == 0)
 #if (USEZBUFFER != 0)
-											zbufmem[vidp-(char *)frameplace] = d0;
+											if (zbufwrite) zbufmem[vidp-(char *)frameplace] = d0;
 #endif
 											vidp[0] = palptr[(unsigned char)walptr[imod(u0>>16,tsizx)*tsizy + ((v0>>16)&tsizym1)]]; //+((d0>>13)&0x3f00)];
 #else
@@ -1830,7 +1831,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 #if (USEZBUFFER != 0)
 											if ((dacol != 255) && (d0 <= zbufmem[vidp-(char *)frameplace]))
 											{
-												zbufmem[vidp-(char *)frameplace] = d0;
+												if (zbufwrite) zbufmem[vidp-(char *)frameplace] = d0;
 												vidp[0] = palptr[((int32_t)dacol)]; //+((d0>>13)&0x3f00)];
 											}
 #else
@@ -1858,7 +1859,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 #if (USEZBUFFER != 0)
 											if ((dacol != 255) && (d0 <= zbufmem[vidp-(char *)frameplace]))
 											{
-												zbufmem[vidp-(char *)frameplace] = d0;
+												if (zbufwrite) zbufmem[vidp-(char *)frameplace] = d0;
 												vidp[0] = palptr[((int32_t)dacol)]; //+((d0>>13)&0x3f00)];
 											}
 #else
@@ -1887,7 +1888,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 #if (USEZBUFFER != 0)
 										if ((dacol != 255) && (d0 <= zbufmem[vidp-(char *)frameplace]))
 										{
-											zbufmem[vidp-(char *)frameplace] = d0;
+											if (zbufwrite) zbufmem[vidp-(char *)frameplace] = d0;
 											vidp[0] = transluc[(((int32_t)vidp[0])<<8)+((int32_t)palptr[((int32_t)dacol)])]; //+((d0>>13)&0x3f00)])];
 										}
 #else
@@ -1916,7 +1917,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 #if (USEZBUFFER != 0)
 										if ((dacol != 255) && (d0 <= zbufmem[vidp-(char *)frameplace]))
 										{
-											zbufmem[vidp-(char *)frameplace] = d0;
+											if (zbufwrite) zbufmem[vidp-(char *)frameplace] = d0;
 											vidp[0] = transluc[((int32_t)vidp[0])+(((int32_t)palptr[((int32_t)dacol)/*+((d0>>13)&0x3f00)*/])<<8)];
 										}
 #else
@@ -3374,12 +3375,102 @@ void polymost_drawmaskwall (int32_t damaskwallcnt)
 	drawpoly(dpx,dpy,n,method|METH_LAYERS);
 }
 
+	//Of the depths at which the rays through the columns xl..xr (xp at depth yp)
+	//   of a face sprite's picture cross the wall a..b (projected), the least
+	//   (most 0) or the greatest (most 1); -1 if none crosses it in front of the
+	//   eye. Both are at the picture's ends or at the wall's ends.
+static float polymost_wallcross (float ax, float ay, float bx, float by, float yp, float xl, float xr, int32_t most)
+{
+	float dx = bx-ax, dy = by-ay, s[4], den, lam, u, d = -1.f;
+	int32_t k;
+
+	s[0] = xl; s[1] = xr; s[2] = s[3] = xl;
+	if (ay > SCISDIST) s[2] = ax*yp/ay;
+	if (by > SCISDIST) s[3] = bx*yp/by;
+	for(k=0;k<4;k++)
+	{
+		if ((s[k] < xl) || (s[k] > xr)) continue;
+		den = s[k]*dy - yp*dx; if (fabs(den) < 1e-6) continue;
+		lam = (ax*dy - ay*dx)/den;
+		u = (ax*yp - ay*s[k])/den;
+		if ((u < -1e-4) || (u > 1.0001) || (lam <= 0.f)) continue;
+		if ((d < 0.f) || ((lam*yp > d) == (most != 0))) d = lam*yp;
+	}
+	return(d);
+}
+
+	//Classic clips a face sprite only by the walls in front of it (drawsprite's
+	//   spritewallfront test), so one lying against a wall it's in front of draws
+	//   whole, its flat picture reaching through the wall. Polymost draws it all at
+	//   its middle's depth, where the z-buffer cuts it on that wall. This is the
+	//   depth (polymost's, as yp) it has to come to over its columns xl..xr (xp at
+	//   yp) to stay in front of each such wall of its sector or the ones next to it
+	//   (facing the eye, it in front, an end beyond it: classic doesn't clip by it),
+	//   but no nearer than any wall drawn this frame that classic does clip it by
+	//   (facing the eye, it behind, an end nearer; a red wall only with a step,
+	//   up or down, as its sector's floor or ceiling edge hides what's past it) so
+	//   that those still hide it; yp if it needn't or can't come nearer.
+static int spritewallfront (spritetype *s, int32_t w);
+static float polymost_spritenear (spritetype *tspr, float yp, float xl, float xr)
+{
+	float a[4], d, nearest = yp;
+	int32_t i, w, endw, sect, pass;
+
+	for(pass=0;pass<2;pass++)
+		for(i=(pass?0:-1);i<(pass?numsectors:sector[tspr->sectnum].wallnum);i++)
+		{
+			if (pass)
+			{
+				if (nearest >= yp) return(yp); //nothing to come in front of
+				sect = i;
+				if (!(gotsector[sect>>3]&pow2char[sect&7])) continue;
+			}
+			else
+			{
+				sect = tspr->sectnum;
+				if (i >= 0) { sect = wall[sector[sect].wallptr+i].nextsector; if (sect < 0) continue; }
+			}
+			for(w=sector[sect].wallptr,endw=w+sector[sect].wallnum;w<endw;w++)
+			{
+				if (spritewallfront(tspr,w) == pass) continue;
+				if ((pass) && (wall[w].nextsector >= 0) &&
+					 (sector[wall[w].nextsector].floorz == sector[sect].floorz) &&
+					 (sector[wall[w].nextsector].ceilingz == sector[sect].ceilingz) &&
+					 (!((sector[wall[w].nextsector].floorstat|sector[sect].floorstat|
+						 sector[wall[w].nextsector].ceilingstat|sector[sect].ceilingstat)&2)))
+					continue; //no step either way, flat: hides nothing
+				a[0] = (float)(wall[w].x-globalposx); a[1] = (float)(wall[w].y-globalposy);
+				if ((float)(wall[wall[w].point2].x-wall[w].x)*-a[1] < (float)(wall[wall[w].point2].y-wall[w].y)*-a[0])
+					continue; //its back to the eye: not drawn
+				a[2] = (float)(wall[wall[w].point2].x-globalposx); a[3] = (float)(wall[wall[w].point2].y-globalposy);
+				d = a[1]*gcosang - a[0]*gsinang; a[1] = a[0]*gcosang2 + a[1]*gsinang2; a[0] = d;
+				d = a[3]*gcosang - a[2]*gsinang; a[3] = a[2]*gcosang2 + a[3]*gsinang2; a[2] = d;
+				if (!pass)
+				{
+					if ((a[1] >= yp) == (a[3] >= yp)) continue; //all nearer (classic clips) or all beyond
+					d = polymost_wallcross(a[0],a[1],a[2],a[3],yp,xl,xr,0);
+					if ((d > 0.f) && (d < nearest)) nearest = d;
+				}
+				else
+				{
+					if ((a[1] >= yp) && (a[3] >= yp)) continue; //all beyond: classic doesn't clip by it
+					d = polymost_wallcross(a[0],a[1],a[2],a[3],yp,xl,xr,1)*1.02f; //behind it, past the masks' depth range
+					if (d > nearest) nearest = d;
+					if (nearest >= yp) return(yp);
+				}
+			}
+		}
+		//No nearer than a quarter of its depth, nor than 8 (128 map units): the
+		//   GL near plane is at about 2*xdimen/ydimen
+	return(max(nearest,max(yp*.25f,8.f)));
+}
+
 void polymost_drawsprite (int32_t snum)
 {
 	double px[6], py[6];
 	float f, r, c, s, fx, fy, sx0, sy0, sx1, sy1, xp0, yp0, xp1, yp1, oxp0, oyp0, ryp0, ryp1, ft[4];
-	float x0, y0, x1, y1, sc0, sf0, sc1, sf1, px2[6], py2[6], xv, yv, t0, t1;
-	int32_t i, j, spritenum, xoff, yoff, method, npoints;
+	float x0, y0, x1, y1, sc0, sf0, sc1, sf1, px2[6], py2[6], xv, yv, t0, t1, fogshades = 0.f;
+	int32_t i, j, spritenum, xoff, yoff, method, npoints, nearer;
 	spritetype *tspr;
 
 	tspr = tspriteptr[snum];
@@ -3453,7 +3544,31 @@ void polymost_drawsprite (int32_t snum)
 				if (py[2] > sy0) py[2] = py[3] = sy0;
 			}
 
+				//In front of the walls behind it, as classic: nearer, the same picture
+				//   (u, v and the depth scale together) and shade (its fog's shades per
+				//   unit of depth scale back), not writing the depth it's moved to
+			f = polymost_spritenear(tspr,yp0,(px[0]-ghalfx)*yp0/ghalfx,(px[1]-ghalfx)*yp0/ghalfx);
+			nearer = (f < yp0);
+			if (nearer)
+			{
+				f = yp0/f;
+				gdo *= f; gux *= f; guo *= f; gvy *= f; gvo *= f;
+				zbufwrite = 0;
+#ifdef USE_OPENGL
+				fogshades = glfogshades; glfogshades *= f;
+				if (rendmode == 3) glDepthMask(GL_FALSE);
+#endif
+			}
+
 			pow2xsplit = 0; drawpoly(px,py,4,method|METH_LAYERS);
+			zbufwrite = 1;
+#ifdef USE_OPENGL
+			if (nearer)
+			{
+				glfogshades = fogshades;
+				if (rendmode == 3) glDepthMask(GL_TRUE);
+			}
+#endif
 			break;
 		case 1: //Wall sprite
 				//Project 3D to 2D
