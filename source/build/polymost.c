@@ -3017,6 +3017,7 @@ void polymost_drawrooms ()
 		resizeglcheck();
 		_glframedrawn();
 		polymost_beginframe_shader(1); //GL 2.1: into the index framebuffer
+		if (!glshbound) glClear(GL_DEPTH_BUFFER_BIT); //1.1/1.5: as the shader path clears it
 
 		//glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 		//glEnable(GL_TEXTURE_2D);
