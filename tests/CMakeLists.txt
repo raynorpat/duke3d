@@ -636,11 +636,15 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
   endif()
   # Two copies of the 1.1 build must meet over UDP on localhost, and both
   # peers must refuse each DUKE3D_NET_PEERS build (1.0, 1.3D sw, ...) by
-  # BYTEVERSION alone (rulings.md). 1.0 is Task 16.
-  if(_vold_data AND _vold_edition STREQUAL "sw11")
+  # BYTEVERSION alone (rulings.md). The same for the 1.0 build, on its own ports.
+  if(_vold_data)
     set(DUKE3D_NET_PEERS "" CACHE STRING "Other duke3d builds to test multiplayer refusal against")
     # DukeMatch (the default) and co-op (/c), both put straight into E1L1.
-    set(_net_port 23800)
+    if(_vold_edition STREQUAL "sw11")
+      set(_net_port 23800)
+    else()
+      set(_net_port 23900)
+    endif()
     foreach(_mode dm coop)
       if(_mode STREQUAL "dm")
         set(_net_args "/v1 /l1")
