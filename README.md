@@ -130,7 +130,10 @@ for one run (the config keeps its own value). A number outside 0-3 is taken
 as the nearest one. Renderer 3 draws at the window's real pixel size
 (unless `GLInternalWidth`/`GLInternalHeight` is set on the 2.1 path) and
 uses a legacy (non-core) OpenGL context. Windowed, it opens at the size
-asked for, even over the 1600x1200 the 8-bit modes stop at. If OpenGL isn't
+asked for, even over the 1600x1200 the 8-bit modes stop at. Once renderer 3
+has been used, its window and context stay until the program exits, and
+renderers 0-2 and the editor's 2D mode are shown through them, looking as
+before (switching renderer doesn't make a new window). If OpenGL isn't
 available, the game prints a message and uses renderer 0. The map editor has
 its own settings (see [Map editor](#map-editor)).
 

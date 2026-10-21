@@ -70,7 +70,9 @@ BUILDLIC.TXT LICENSE.md
   `tspritevline` adds its step as signed
 - `engine.c`: `drawmasks` swaps sprite pointers directly (it swapped half of
   each); `initengine` clears all of `waloff[]`; `loadpics` aligns `pic` with
-  `~(intptr_t)15`
+  `~(intptr_t)15`; `parascan`'s last run of sky tiles stops at its wall's
+  right edge (it drew one column more, with that column's bounds left over
+  from an earlier, wider view: past the end of the frame after renderer 3)
 - `build.h`: `BUILD_STATIC_ASSERT` checks `sectortype`/`walltype`/`spritetype`
   are 40/32/44 bytes
 - printf formats match their now-32-bit arguments; C-library narrowings
@@ -352,14 +354,14 @@ Ported from later JFBuild commits, retyped as above:
   still are without `POLYMOST`), room for 8K drawables. No array sized by
   them is saved, recorded in demos or sent over the network.
 - `sdl_driver.c`: `setgamemode_gl(davidoption)`, prototyped in `display.h`
-  and `engine_protos.h`. It makes a new `SDL_WINDOW_OPENGL |
+  and `engine_protos.h`. The first time, it makes a new `SDL_WINDOW_OPENGL |
   SDL_WINDOW_ALLOW_HIGHDPI` window (the last 8-bit window's windowed size,
   kept by `go_to_new_vid_mode`, or the size `_setgamemode` was asked for
   when it clamped it, and the current fullscreen state) with a legacy context (double buffered, 24-bit depth, swap
   interval 1 or else 0), and only then drops the 8-bit window, renderer,
-  texture and surfaces (or, from GL, the old GL window), so any failure
-  returns -1 with the mode untouched (from GL, its context is made current
-  again). It sets JFBuild's GL state, fills `glinfo` from whole
+  texture and surfaces, so any failure returns -1 with the mode untouched.
+  The window and context then stay until shutdown: later calls set the
+  window's size again and reuse them. It sets JFBuild's GL state, fills `glinfo` from whole
   `GL_EXTENSIONS` tokens, sets `bpp = 32`, `xdim`/`ydim` to the drawable
   size clamped to `MAXXDIM`x`MAXYDIM` (on the shader path with an internal
   size, that size: see `glext.c`), `qsetmode = 200` and `frameplace = 0`,
@@ -369,9 +371,16 @@ Ported from later JFBuild commits, retyped as above:
   `horizlookup` through `screen`, `setview`, brightness) is shared with GL,
   where `screen` holds only the lookups and nothing is cleared.
 - Leaving GL (any 8-bit mode set, or shutdown) calls `polymost_glreset()`
-  while the context is current, deletes the context and window, and sets
-  `bpp = 8` and `setrendermode(0)`. JFBuild resets the texture cache the
-  same way before and after each GL mode change.
+  and sets `bpp = 8` and `setrendermode(0)`; only shutdown deletes the
+  context and window. JFBuild resets the texture cache the same way before
+  and after each GL mode change. Once there is a context, the 8-bit modes
+  (renderers 0-2, the editor's 2D mode) are shown through it instead of an
+  SDL_Renderer: the surface is blitted through its palette to RGBA,
+  uploaded to a texture (power-of-two sized without
+  `GL_ARB_texture_non_power_of_two`) and drawn with `gl_fitrect`'s
+  letterboxing, nearest pixel, into the drawable; mouse motion is scaled
+  from window points to the frame's pixels, as the SDL_Renderer's logical
+  size did.
 - In GL: `_nextpage` swaps; the fullscreen toggle and
   `SDL_WINDOWEVENT_SIZE_CHANGED` re-read the drawable size and, if it
   changed, call `polymost_glreset()` and redo the mode variables. With no
@@ -426,7 +435,7 @@ Ported from later JFBuild commits, retyped as above:
   and `sdl_driver.c` define `GLSUB_WRAP`, which wraps their GL state calls
   to draw the batch first (binding the bound texture or enabling an enabled
   cap is skipped while batching), and `gl_swap` draws it before the swap.
-  `setgamemode_gl` calls `glsub_init`, `destroy_gl_window` `glsub_uninit`.
+  `setgamemode_gl` calls `glsub_init`, `gl_leave` `glsub_uninit`.
   The immediate and vbo paths draw the same pixels as JFBuild's immediate
   mode on the drivers tested (macOS's 2.1).
 - `polymost.c` (ours): on the shader path (GL 2.1) everything draws
