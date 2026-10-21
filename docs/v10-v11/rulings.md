@@ -14,3 +14,17 @@ Each names what was decided, why, and what it costs if it turns out wrong.
   "BYTEVERSION". Cost if wrong: Tasks 13–14 add a release byte or tag to the
   handshake and save header. Note for those tasks: a 1.0 build cannot reject a
   mismatched peer or save by version, because the 1.0 formats have no version field.
+
+- **Task 6 (reference saves): patched playback, not key injection.** `saveplayer` in
+  both releases is plain file output, so `tools/v13d/mksave.py` calls it from a hook on
+  playback's `domovethings` call at a set tic of a `gendemo.py` demo, and the same hook
+  writes `STATE.BIN`. The DOSBox-X `AUTOTYPE` fallback was not needed. The expected
+  values come from that memory dump. Cost if wrong: the saves come from a patched EXE,
+  but the patch only adds a call after a finished tic. Run at the last tic of 1.1
+  demo 1, the hook's dump matched the plain demo-end capture except for
+  `ps[0].visibility`. `displayrooms` changes that field each frame, and the hook runs
+  before that frame is drawn.
+- **Task 6: a fifth save, `e1l2inv`.** No E1L1 spot the random walk could reach held
+  both several weapons and inventory items. So `e1inv` has the weapons (E1L1 weapons
+  room) and `e1l2inv` has the inventory (E1L2 inventory room). Cost if wrong: drop the
+  `e1l2inv` rows and files.

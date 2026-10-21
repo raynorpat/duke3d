@@ -612,3 +612,88 @@ never touch an aim field.
 `0x322` is unnamed because nothing in 1.0 sets it. `auto_run` is named from its toggle
 quote and its use; it is game state in 1.0, because cheatkeys runs it from the synced
 input bits.
+
+## Demo reference capture
+
+`tests/data/v13d_demo_refs.cmake` holds the final state of the six original 1.0 and 1.1
+demos (`V13D_DEMO_SW10_<n>_*`, `V13D_DEMO_SW11_<n>_*`). They are captured with the 1.3D
+method (`docs/v13d/reference.md`, "Demo reference capture") and the same tools, which take
+`sw10` and `sw11` as editions:
+
+1. `tools/v13d/mkcapture.py sw10|sw11 <original DUKE3D.EXE> <scratch dir>/DUKE3D.EXE <n>`
+   reads the flattened image `~/Projects/ref/ghidra/sw10.bin` or `sw11.bin` (or
+   `V13D_FLAT`). Its per-edition entries hold the addresses from "Address map", the LE
+   header and stub offsets (`0x290fc`, `0x26654`), `ps[]`'s `0x34e` stride, and the cave
+   sizes (1.0 `0x560`, 1.1 `0x900`). The patch is 213 bytes (319 with `krandlog`).
+   `krandlog` keeps 256 return addresses in 1.0 but only 41 in 1.1, because 1.1 has
+   only `0xb0` bytes of slack after object 3.
+2. The scratch directory holds the release's `DUKE3D.GRP`, CONs, `DUKE.RTS`, the three
+   demos and a `DUKE3D.CFG`. Neither release ships a `DUKE3D.CFG`. The 1.3D shareware one
+   (`~/Downloads/DUKE3D13SW/DUKE3D.CFG`, `FXDevice = 0`, `BlasterType = 6`, address
+   `0x220`, IRQ 7, DMA 1/5) is copied unchanged. Both EXEs read the same `[Sound Setup]`
+   and `[Screen Setup]` keys from `DUKE3D.CFG` (the key names are in each EXE's strings),
+   and both start up and play demos with it. The DOSBox-X config is the 1.3D one:
+   `cycles=max`, `core=dynamic`, `[mixer] nosound=true`, `sbtype=sb16` at
+   `220`/IRQ 7/DMA 1/HDMA 5, `memsize=32`.
+3. Wait for `STATE.BIN` (181078 bytes: 8 + 4096 × 44 + `0x34e`), kill DOSBox-X, then run
+   `tools/v13d/statebin.py STATE.BIN sw11_<n>`. `_TICS` is the demo header's `reccnt`.
+
+Every capture ended with `reccnt` 0. The captures are deterministic: 1.0 demo 3 and 1.1
+demo 1, captured a second time, gave byte-identical `STATE.BIN` files.
+
+## DOS reference saves
+
+`tests/data/v13d_save_refs.cmake` rows with `_EDITION` `sw10` or `sw11` describe saves
+made by the original EXEs without anyone at the keyboard. Each is in that release's
+`<data dir>/refsaves/<name>.SAV`. `tools/v13d/mksave.py <sw10|sw11> <in.exe> <out.exe>
+<demo n> <tic> <slot>` first runs `mkcapture.py`. It then diverts playback's call to
+`domovethings` (1.1 `0x1fb8a`, 1.0 `0x1f7ba`) to a 59-byte hook placed `0x100`
+bytes into the cave. The hook counts tics in the log slack. Right after tic `<tic>` it
+calls `saveplayer(<slot>)`, which writes `GAME<slot>.SAV`, and then jumps to the
+`STATE.BIN` dump, so the dump and the save hold the same moment. `saveplayer` in both
+releases is plain file output (no network wait, no screen work), so it can run from
+playback. The demo is `gendemo.py sw10|sw11 DEMO1.DMO <vol> <lev> 2 3000 <seed>`, played
+as demo 1. For some saves the GRP's map start was first moved with `startnear.py`.
+`mksave.py values <edition> STATE.BIN <name> <level>` prints the rows. Health is the
+player sprite's `extra`, armor is `shield_amount`, ammo is
+`ammo_amount[curr_weapon]`, and X/Y are the player sprite's.
+
+As a check, the hook was run at the last tic of 1.1 demo 1 (tic 2933). It wrote
+`GAME0.SAV`, and its `STATE.BIN` matched the demo-end capture except for
+`ps[0].visibility` (505 against 512). `displayrooms` moves that field toward
+`ud.const_visibility` on each drawn frame, and the hook runs before the frame. So the
+saves hold the state between a tic and its frame.
+
+| Name | Slot | Map, start | Seed | Tic | What it holds (both releases unless noted) |
+|---|---|---|---|---|---|
+| `e1l1start` | 0 | E1L1, map start | 1 | 1 | the level just started (one tic of input) |
+| `e1l1fight` | 1 | E1L1, `startnear` on the first LIZTROOP (1680) by sprite index (a different trooper in each release) | 3 | 400 | awake enemies, health 46 (1.0) / 9 (1.1) |
+| `e1l2door` | 2 | E1L2, map start | 1 | 40 | the start elevator (lotag 18) moving: `animatecnt` 2 |
+| `e1inv` | 3 | E1L1, `startnear` on the CHAINGUNSPRITE at (16000, 48256) (`which` 0 in 1.0, 2 in 1.1) | 13 (1.0), 3 (1.1) | 1200 (1.0), 700 (1.1) | pistol, shotgun, chaingun, RPG and pipebombs; the current weapon is the pistol (1.0) or the pipebombs (1.1) |
+| `e1l2inv` | 4 | E1L2, `startnear` on the STEROIDS at (3136, 40576) | 6 | 40 | inventory: steroids, holoduke, jetpack, and heat (1.0 only) |
+
+No E1L1 spot the random walk could reach gave both several weapons and inventory items.
+The weapons room around (16000, 48256) has no reachable inventory item, so `e1l2inv` is
+an extra save that covers the inventory fields. No save has armor.
+
+MD5s of the `refsaves/` copies:
+
+| Name | 1.0 | 1.1 |
+|---|---|---|
+| `e1l1start` | `d19a8402cd7440d623c3827ca28442db` | `9ebcd31d0bf6208e2be2f5a0fd0f19d7` |
+| `e1l1fight` | `b2765172170e659b7a5f225682a7d2db` | `15303b071b5a9b28ba2da384bf6b8cfd` |
+| `e1l2door` | `7f990ae1590ef8ce717aa4a78eacfe01` | `8fa72ba62440a628930e729093c1ff59` |
+| `e1inv` | `0ef80ba63a0ff3f375ee7a5d3aa943e9` | `028fdb3c94a2a5b920fef045c4c47d0b` |
+| `e1l2inv` | `6a204428db925ae4cda90422b4bc68d9` | `ec2dcb62d9e1c073e09d7d5a914ab049` |
+
+Every save was made twice. Both runs gave byte-identical `STATE.BIN` files, and the
+saves decode to the same blocks except for two that are not game state:
+
+- **The thumbnail.** Nothing renders the save-screen tile during playback, so
+  `saveplayer` writes 16000 bytes from whatever its tile pointer (1.1 `0x197f24`, 1.0
+  `0x197c10`) points at. That looks like DOS low memory, which changes with the run's
+  timing.
+- **`hittype[].dispicnum`** (offset 15 in each 71-byte entry). The renderer sets it, so
+  it depends on which frames were drawn.
+
+A loader has to carry both through unchanged, but neither has an expected value.
