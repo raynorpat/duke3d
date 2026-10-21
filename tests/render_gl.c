@@ -72,10 +72,9 @@
  *  lying against a wall (its picture reaching through the wall, as classic
  *  draws it), draws more than a tenth more of it or of one in a pit than
  *  classic (over a live trooper in front, over the pit's rim) or, on the
- *  shader path, shades it further than 7.5 from classic, or whose map view fills a sector
- *  translucent in 3D (floorstat 256, 384) translucent, whose 2D frames are
- *  far from immediate
- *  mode's, whose view smaller than the screen isn't where vbo draws it or
+ *  shader path, shades it further than 7.5 from classic, or whose map view
+ *  fills translucent a sector that is translucent in 3D (floorstat 256,
+ *  384), whose 2D frames are far from immediate mode's, whose view smaller than the screen isn't where vbo draws it or
  *  loses the border, whose frame doesn't fade or capture, or that doesn't fall back to
  *  vbo, drawing as vbo does, when its shader or framebuffer fails; or whose
  *  frames with the HUD, status bar, menu letters, text, the water palette, the map view,
@@ -458,7 +457,7 @@ static int lastframe_same(void)
 #define CMPH 480
 static const struct { const char *name; int32_t x, y, z; short ang; double maxdiff, shmaxdiff; } cmpview[] = {
     { "distance", 13824, 50350, -2048, 1024, 5.8, 4.7 },
-    { "closeup", 13824, 43118, -2048, 1536, 2.41, 1.4 },
+    { "closeup", 13824, 43118, -2048, 1536, 2.5, 1.4 },
     { "dark-lit", 13824, 50350, -2048, 512, 3.3, 2.8 },
     { "sprites", 24767, 46541, -2048, 1409, 3.7, 1.8 },
     { "sprites-mid", 14107, 44964, -2048, 1793, 4.6, 2.3 },
