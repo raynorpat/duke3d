@@ -59,6 +59,12 @@ target_include_directories(pragmas_semantics PRIVATE "${PROJECT_SOURCE_DIR}/sour
 target_link_libraries(pragmas_semantics PRIVATE buildengine)
 add_test(NAME pragmas_semantics COMMAND pragmas_semantics)
 
+# inside() per engine revision.
+add_executable(engine_inside engine_inside.c)
+target_include_directories(engine_inside PRIVATE "${PROJECT_SOURCE_DIR}/source")
+target_link_libraries(engine_inside PRIVATE buildengine)
+add_test(NAME engine_inside COMMAND engine_inside)
+
 add_executable(vline_counts vline_counts.c)
 target_link_libraries(vline_counts PRIVATE buildengine)
 add_test(NAME vline_counts COMMAND vline_counts)

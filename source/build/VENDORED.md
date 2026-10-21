@@ -85,6 +85,9 @@ BUILDLIC.TXT LICENSE.md
 - `engine.c`, `cache1d.c`: version-guarded 1.3D engine logic, on
   `BUILD_ENGINEREV`: the 1996 logic square root, slope maths, `inside` and the
   1996 LZW format (see ledger E-001 to E-004, E-012)
+- `engine.c`: version-guarded 1.1 and 1.0 engine logic, on `BUILD_ENGINEREV`:
+  the early `inside`, which compares the two products and keeps a one-byte
+  count (see ledger E11-001)
 - `a.c`, `a.h`: the C line drawers are JFBuild's `src/a-c.c` (Ken Silverman's
   own C port of `A.ASM` from `BUILDC.ZIP`, made 64-bit clean), from
   <https://github.com/jonof/jfbuild> commit

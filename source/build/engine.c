@@ -4398,7 +4398,9 @@ int inside(int32_t x, int32_t y, short sectnum)
 {
 	walltype *wal;
 	int32_t i, x1, y1, x2, y2;
-#if (BUILD_ENGINEREV < 19960427L)
+#if (BUILD_ENGINEREV < 19960320L)
+	char cnt;
+#elif (BUILD_ENGINEREV < 19960427L)
 	int32_t cnt;
 #else
 	uint32_t cnt;
@@ -4415,7 +4417,12 @@ int inside(int32_t x, int32_t y, short sectnum)
 		if ((y1^y2) < 0)
 		{
 			x1 = wal->x-x; x2 = wall[wal->point2].x-x;
-#if (BUILD_ENGINEREV < 19960427L)
+#if (BUILD_ENGINEREV < 19960320L)
+			if ((x1^x2) < 0)
+				cnt ^= (x1*y2<x2*y1)^(y1<y2);
+			else if (x1 >= 0)
+				cnt ^= 1;
+#elif (BUILD_ENGINEREV < 19960427L)
 			if ((x1^x2) < 0) cnt ^= (x1*y2-x2*y1)^(y1-y2); else cnt ^= ~x1;
 #else
 			if ((x1^x2) >= 0) cnt ^= x1; else cnt ^= (x1*y2-x2*y1)^y2;
@@ -4423,7 +4430,9 @@ int inside(int32_t x, int32_t y, short sectnum)
 		}
 		wal++; i--;
 	} while (i);
-#if (BUILD_ENGINEREV < 19960427L)
+#if (BUILD_ENGINEREV < 19960320L)
+	return(cnt);
+#elif (BUILD_ENGINEREV < 19960427L)
 	return(cnt<0);
 #else
 	return(cnt>>31);
