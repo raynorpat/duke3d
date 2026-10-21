@@ -2877,6 +2877,9 @@ char doincrements(struct player_struct *p)
     int32_t /*j,*/i,snum;
 
     snum = sprite[p->i].yvel;
+#if DUKE3D_GAMEVER < GAMEVER_11
+    p->weapon_ang = -(sync[snum].avel/5); // 1.0 sets it each tic (G10-L14)
+#endif
 //    j = sync[snum].avel;
 //    p->weapon_ang = -(j/5);
 
