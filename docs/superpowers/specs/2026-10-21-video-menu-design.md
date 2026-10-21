@@ -1,7 +1,7 @@
 # VIDEO Menu: Live Video Settings — Design
 
 Date: 2026-10-21
-Status: Draft
+Status: Approved
 
 ## Intent
 
