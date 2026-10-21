@@ -174,20 +174,10 @@ static SDL_Renderer *sdl_renderer = NULL;
 static SDL_Texture *sdl_texture = NULL;
 static SDL_Surface *sdl_rgbsurface = NULL;  /* 32-bit staging copy of surface */
 static int debug_hall_of_mirrors = 0;
-static int sdl_fullscreen = 0;
-static int sdl_fullscreen_wanted = 1;  /* default: fullscreen unless BUILD_WINDOWED */
-
-void setvideofullscreen(int on)
-{
-    sdl_fullscreen_wanted = (on != 0);
-    sdl_fullscreen = sdl_fullscreen_wanted && (getenv(BUILD_WINDOWED) == NULL);
-} /* setvideofullscreen */
-
-
-int getvideofullscreen(void)
-{
-    return sdl_fullscreen;
-} /* getvideofullscreen */
+static int sdl_displaymode = DISPLAY_BORDERLESS;  /* the window's */
+static int sdl_displaymode_wanted = DISPLAY_BORDERLESS;  /* unless BUILD_WINDOWED */
+static int sdl_vsync = 1;
+static int exclusive_w = 0, exclusive_h = 0;  /* exclusive's size: the game mode's */
 static int32_t mouse_x = 0;
 static int32_t mouse_y = 0;
 static int32_t mouse_relative_x = 0;
@@ -277,7 +267,7 @@ static void output_surface_info(SDL_Surface *_surface)
 
     sdldebug("screen surface is (%dx%dx%dbpp), %s.",
             _surface->w, _surface->h, _surface->format->BitsPerPixel,
-            sdl_fullscreen ? "fullscreen" : "windowed");
+            display_modename(sdl_displaymode));
 
     if ((sdl_renderer != NULL) && (SDL_GetRendererInfo(sdl_renderer, &info) == 0))
         sdldebug("SDL renderer is \"%s\".", info.name);
@@ -514,6 +504,71 @@ static void init_res_lookups(int davidoption, int framebuffer)
 } /* init_res_lookups */
 
 
+/*
+ * Moves a window from display mode now to mode, exclusive at the display
+ *  mode nearest exclusive_w by exclusive_h (borderless when there's none).
+ *  Between the full-screen styles it goes through windowed. Returns the mode
+ *  it's in. (Its flags can't always tell: under sdl2-compat the dummy
+ *  driver reports exclusive as desktop full screen.)
+ */
+static int set_window_display(SDL_Window *window, int now, int mode)
+{
+    SDL_DisplayMode want, got;
+    Uint32 flags = (mode == DISPLAY_EXCLUSIVE) ? SDL_WINDOW_FULLSCREEN :
+                   (mode == DISPLAY_BORDERLESS) ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
+
+    if (mode == DISPLAY_EXCLUSIVE)
+    {
+        memset(&want, '\0', sizeof (want));
+        want.w = exclusive_w;
+        want.h = exclusive_h;
+        if ((SDL_GetClosestDisplayMode(SDL_GetWindowDisplayIndex(window), &want, &got) == NULL) ||
+            (SDL_SetWindowDisplayMode(window, &got) != 0))
+        {
+            fprintf(stderr, "BUILDSDL: no exclusive fullscreen mode for %dx%d [%s]; borderless instead.\n",
+                    exclusive_w, exclusive_h, SDL_GetError());
+            return(set_window_display(window, now, DISPLAY_BORDERLESS));
+        } /* if */
+        sdldebug("exclusive fullscreen at %dx%d, %d Hz.", got.w, got.h, got.refresh_rate);
+    } /* if */
+
+    if (now == mode)
+        return(mode);
+    if ((now != DISPLAY_WINDOWED) && (mode != DISPLAY_WINDOWED) &&
+        (SDL_SetWindowFullscreen(window, 0) == 0))
+        now = DISPLAY_WINDOWED;
+    if (SDL_SetWindowFullscreen(window, flags) != 0)
+    {
+        sdldebug("SDL_SetWindowFullscreen() failed: [%s].", SDL_GetError());
+        return(now);
+    } /* if */
+    return(mode);
+} /* set_window_display */
+
+
+/*
+ * A window in sdl_displaymode. An exclusive one is made hidden and shown
+ *  once its display mode is set, so the display changes mode only once.
+ */
+static SDL_Window *create_window(int w, int h, Uint32 flags)
+{
+    SDL_Window *window;
+
+    if (sdl_displaymode == DISPLAY_BORDERLESS)
+        flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    else if (sdl_displaymode == DISPLAY_EXCLUSIVE)
+        flags |= SDL_WINDOW_HIDDEN;
+    window = SDL_CreateWindow(titlelong,
+                    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
+    if ((window != NULL) && (sdl_displaymode == DISPLAY_EXCLUSIVE))
+    {
+        sdl_displaymode = set_window_display(window, DISPLAY_WINDOWED, DISPLAY_EXCLUSIVE);
+        SDL_ShowWindow(window);
+    } /* if */
+    return(window);
+} /* create_window */
+
+
 static void go_to_new_vid_mode(int vidoption, int w, int h)
 {
     int scale;
@@ -538,16 +593,20 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
     gl_window_h = h * scale;
 #endif
 
+    if (exclusive_w == 0)  /* no game mode yet (the editor's 2D) */
+    {
+        exclusive_w = w * scale;
+        exclusive_h = h * scale;
+    } /* if */
+
     if (sdl_window == NULL)
     {
-        sdl_window = SDL_CreateWindow(titlelong,
-                        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                        w * scale, h * scale,
-                        sdl_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+        sdl_window = create_window(w * scale, h * scale, 0);
         if (sdl_window == NULL)
             goto vidmode_failed;
 
-        sdl_renderer = SDL_CreateRenderer(sdl_window, -1, SDL_RENDERER_PRESENTVSYNC);
+        sdl_renderer = SDL_CreateRenderer(sdl_window, -1,
+                                          sdl_vsync ? SDL_RENDERER_PRESENTVSYNC : 0);
         if (sdl_renderer == NULL)
             sdl_renderer = SDL_CreateRenderer(sdl_window, -1, 0);
         if (sdl_renderer == NULL)
@@ -557,9 +616,11 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
     {
         /* set the size even when fullscreen, so going windowed restores it. */
         SDL_SetWindowSize(sdl_window, w * scale, h * scale);
-        if (!sdl_fullscreen)
+        if (sdl_displaymode == DISPLAY_WINDOWED)
             SDL_SetWindowPosition(sdl_window, SDL_WINDOWPOS_CENTERED,
                                   SDL_WINDOWPOS_CENTERED);
+        else  /* exclusive keeps the game mode's display mode. */
+            sdl_displaymode = set_window_display(sdl_window, sdl_displaymode, sdl_displaymode);
     } /* else */
 
     SDL_RenderSetLogicalSize(sdl_renderer, w, h);
@@ -886,11 +947,8 @@ int setgamemode_gl(char davidoption)
      */
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    window = SDL_CreateWindow(titlelong,
-                    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                    gl_window_w, gl_window_h,
-                    SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI |
-                    (sdl_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
+    window = create_window(gl_window_w, gl_window_h,
+                           SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI);
     context = (window != NULL) ? SDL_GL_CreateContext(window) : NULL;
     if (context == NULL)
     {
@@ -920,8 +978,7 @@ int setgamemode_gl(char davidoption)
 
     /* destroying an SDL_Renderer can leave no context current. */
     SDL_GL_MakeCurrent(sdl_window, sdl_glcontext);
-    if (SDL_GL_SetSwapInterval(1) != 0)
-        SDL_GL_SetSwapInterval(0);
+    SDL_GL_SetSwapInterval(sdl_vsync);
 
     /* the state JFBuild sets after every GL mode change. */
     glEnable(GL_TEXTURE_2D);
@@ -1115,32 +1172,78 @@ static int sdl_mouse_motion_filter(SDL_Event const *event)
 } /* sdl_mouse_motion_filter */
 
 
-/* With SDL2 the surface survives the toggle, so no pointer fixups needed. */
+/* With SDL2 the surface survives the change, so no pointer fixups needed. */
+static void show_display_mode(int mode)
+{
+    if (sdl_window == NULL)
+    {
+        sdl_displaymode = mode;  /* the next mode set makes the window. */
+        return;
+    } /* if */
+
+    sdl_displaymode = set_window_display(sdl_window, sdl_displaymode, mode);
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+    {
+        gl_resize();  /* macOS may report the new size later, as an event. */
+        return;
+    } /* if */
+#endif
+    output_surface_info(surface);
+} /* show_display_mode */
+
+
+void setvideodisplaymode(int mode)
+{
+    if ((mode < 0) || (mode >= DISPLAY_COUNT))
+        mode = DISPLAY_BORDERLESS;
+    sdl_displaymode_wanted = mode;
+    show_display_mode((getenv(BUILD_WINDOWED) != NULL) ? DISPLAY_WINDOWED : mode);
+} /* setvideodisplaymode */
+
+
+int getvideodisplaymode(void)
+{
+    return(sdl_displaymode);
+} /* getvideodisplaymode */
+
+
+void setvideovsync(int on)
+{
+    sdl_vsync = (on != 0);
+#ifdef USE_OPENGL
+    if (sdl_glcontext != NULL)
+        SDL_GL_SetSwapInterval(sdl_vsync);
+#endif
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+    if (sdl_renderer != NULL)
+        SDL_RenderSetVSync(sdl_renderer, sdl_vsync);
+#endif  /* older SDL: at the next window's renderer. */
+} /* setvideovsync */
+
+
+int getvideovsync(void)
+{
+    return(sdl_vsync);
+} /* getvideovsync */
+
+
+/* Alt+Enter: windowed, or the full-screen style set (borderless if none). */
 static int attempt_fullscreen_toggle(void)
 {
-    Uint32 flags = sdl_fullscreen ? 0 : SDL_WINDOW_FULLSCREEN_DESKTOP;
+    int mode = sdl_displaymode_wanted;
 
     sdldebug("attempting to toggle fullscreen flag...");
 
     if (sdl_window == NULL)
         return(0);
 
-    if (SDL_SetWindowFullscreen(sdl_window, flags) != 0)
-    {
-        sdldebug("SDL_SetWindowFullscreen() failed: [%s].", SDL_GetError());
-        return(0);
-    } /* if */
-
-    sdl_fullscreen = !sdl_fullscreen;
-#ifdef USE_OPENGL
-    if (sdl_glcontext != NULL)
-    {
-        gl_resize();  /* macOS may report the new size later, as an event. */
-        return(1);
-    } /* if */
-#endif
-    output_surface_info(surface);
-    return(1);
+    if (sdl_displaymode != DISPLAY_WINDOWED)
+        mode = DISPLAY_WINDOWED;
+    else if (mode == DISPLAY_WINDOWED)
+        mode = DISPLAY_BORDERLESS;
+    show_display_mode(mode);
+    return(sdl_displaymode == mode);
 } /* attempt_fullscreen_toggle */
 
 
@@ -1696,7 +1799,7 @@ void _platform_init(int argc, char **argv, const char *title, const char *icon)
     else
         mouse_grabbed = 0;
 
-    sdl_fullscreen = sdl_fullscreen_wanted && (getenv(BUILD_WINDOWED) == NULL);
+    sdl_displaymode = (getenv(BUILD_WINDOWED) != NULL) ? DISPLAY_WINDOWED : sdl_displaymode_wanted;
 
     set_sdl_renderer();
 
@@ -2068,6 +2171,9 @@ int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim)
 #ifdef USE_OPENGL
     int32_t glw = daxdim, glh = daydim;
 #endif
+
+    exclusive_w = daxdim;  /* the size asked for, before the clamp */
+    exclusive_h = daydim;
 
     /* 8-bit modes keep the original limit; MAXXDIM/MAXYDIM grew for OpenGL. */
     if (daxdim > 1600 || daydim > 1200)

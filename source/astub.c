@@ -1855,7 +1855,7 @@ static void savebuildcfg(void)
    saved = 1;
    // BUILD_WINDOWED forces a window for this run only; keep build.cfg's choice.
    if (getenv(BUILD_WINDOWED) == NULL)
-       buildcfg.fullscreen = getvideofullscreen();
+       buildcfg.displaymode = getvideodisplaymode();  // Alt+Enter's is kept
    // Alt+K's renderer is kept; -renderer's alone isn't.
    if (editorrendererpicked)
        buildcfg.renderer = editormode.renderer;
@@ -1909,7 +1909,8 @@ void ExtInit(void)
     glcontrast = buildcfg.glcontrast;  // the shader path's, applied as it shows each frame
     glsaturation = buildcfg.glsaturation;
 #endif
-    setvideofullscreen(buildcfg.fullscreen);
+    setvideodisplaymode(buildcfg.displaymode);
+    setvideovsync(buildcfg.vsync);
 
                 initmouse();
 

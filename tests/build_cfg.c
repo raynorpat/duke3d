@@ -16,6 +16,7 @@
 
 #include "buildcfg.h"
 #include "build/glext.h"
+#include "build/displaymode.h"
 
 static int fails;
 
@@ -35,7 +36,8 @@ static void putstr(const char *path, const char *s) { put(path, s, strlen(s)); }
 static int same(const buildcfg_t *a, const buildcfg_t *b)
 {
     return a->renderer == b->renderer && a->xdim3d == b->xdim3d &&
-           a->ydim3d == b->ydim3d && a->fullscreen == b->fullscreen &&
+           a->ydim3d == b->ydim3d && a->displaymode == b->displaymode &&
+           a->vsync == b->vsync &&
            a->gltexmiplevel == b->gltexmiplevel &&
            a->gldrawpath == b->gldrawpath && a->glinternalwidth == b->glinternalwidth &&
            a->glinternalheight == b->glinternalheight &&
@@ -75,7 +77,9 @@ int main(void)
     text[n] = '\0';
     CHECK(strstr(text, "renderer = 0"));
     CHECK(strstr(text, "xdim3d = 640"));
-    CHECK(strstr(text, "fullscreen = 1"));
+    CHECK(strstr(text, "displaymode = borderless\n") && strstr(text, "vsync = 1\n"));
+    CHECK(!strstr(text, "fullscreen"));
+    CHECK(d.displaymode == DISPLAY_BORDERLESS && d.vsync == 1);
     CHECK(strstr(text, "keyforward = c8"));
     CHECK(strstr(text, "gldrawpath = auto"));
     CHECK(strstr(text, "glinternalwidth = 0"));
@@ -105,6 +109,34 @@ int main(void)
     CHECK(strstr(text, "gldrawpath = shader"));
     CHECK(strstr(text, "glinternalheight = 200"));
 
+    /* display mode in any case, written back lowercase; vsync off */
+    putstr(cfg, "displaymode = Exclusive\nvsync = 0\n");
+    CHECK(buildcfg_read(&c, cfg) == 0);
+    CHECK(c.displaymode == DISPLAY_EXCLUSIVE && c.vsync == 0);
+    CHECK(buildcfg_write(&c, cfg) == 0);
+    f = fopen(cfg, "r");
+    n = f ? fread(text, 1, sizeof(text) - 1, f) : 0;
+    if (f) fclose(f);
+    text[n] = '\0';
+    CHECK(strstr(text, "displaymode = exclusive\n") && strstr(text, "vsync = 0\n"));
+    putstr(cfg, "displaymode = bogus\nvsync = 5\n");
+    CHECK(buildcfg_read(&c, cfg) == 0);
+    CHECK(c.displaymode == DISPLAY_BORDERLESS && c.vsync == 1);
+
+    /* phase 2's fullscreen key, read when there's no displaymode */
+    putstr(cfg, "fullscreen = 0\n");
+    CHECK(buildcfg_read(&c, cfg) == 0);
+    CHECK(c.displaymode == DISPLAY_WINDOWED);
+    putstr(cfg, "fullscreen = 1\n");
+    CHECK(buildcfg_read(&c, cfg) == 0);
+    CHECK(c.displaymode == DISPLAY_BORDERLESS);
+    putstr(cfg, "displaymode = exclusive\nfullscreen = 0\n");
+    CHECK(buildcfg_read(&c, cfg) == 0);
+    CHECK(c.displaymode == DISPLAY_EXCLUSIVE);
+    putstr(cfg, "fullscreen = 1\ndisplaymode = windowed\n");
+    CHECK(buildcfg_read(&c, cfg) == 0);
+    CHECK(c.displaymode == DISPLAY_WINDOWED);
+
     /* clamping */
     putstr(cfg, "renderer = 9\nxdim3d = 99999\ngltexmiplevel = -3\n"
                 "mousesensitivity = 50\nkeyfire = 0\ngldrawpath = bogus\n"
@@ -127,7 +159,7 @@ int main(void)
                 "ydim3d = 600\r\nfullscreen = 0\r\n");
     CHECK(buildcfg_read(&c, cfg) == 0);
     CHECK(c.renderer == d.renderer && c.xdim3d == 640);
-    CHECK(c.ydim3d == 600 && c.fullscreen == 0);
+    CHECK(c.ydim3d == 600 && c.displaymode == DISPLAY_WINDOWED);
 
     /* missing file leaves the struct alone */
     c = d;

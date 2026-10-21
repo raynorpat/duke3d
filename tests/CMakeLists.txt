@@ -9,10 +9,10 @@ set_tests_properties(sdl_driver_smoke PROPERTIES
   TIMEOUT 30)
 
 add_test(NAME sdl_driver_smoke_gl_fallback COMMAND sdl_driver_smoke gl_fallback)
-add_test(NAME sdl_driver_smoke_fullscreen_setter COMMAND sdl_driver_smoke fullscreen_setter)
+add_test(NAME sdl_driver_smoke_displaymode_setter COMMAND sdl_driver_smoke displaymode_setter)
 add_test(NAME sdl_driver_smoke_palette_fade COMMAND sdl_driver_smoke palette_fade)
 add_test(NAME sdl_driver_smoke_screencapture COMMAND sdl_driver_smoke screencapture_formats)
-set_tests_properties(sdl_driver_smoke_gl_fallback sdl_driver_smoke_fullscreen_setter
+set_tests_properties(sdl_driver_smoke_gl_fallback sdl_driver_smoke_displaymode_setter
                      sdl_driver_smoke_palette_fade
                      sdl_driver_smoke_screencapture PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"

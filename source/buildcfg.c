@@ -2,6 +2,7 @@
 
 #include "buildcfg.h"
 #include "build/glext.h"
+#include "build/displaymode.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -34,7 +35,8 @@ void buildcfg_defaults(buildcfg_t *c)
     c->renderer = 0;
     c->xdim3d = 640;
     c->ydim3d = 480;
-    c->fullscreen = 1;
+    c->displaymode = DISPLAY_BORDERLESS;
+    c->vsync = 1;
     c->gltexmiplevel = 0;
     c->mousesensitivity = 1.0;
     memcpy(c->keys, default_keys, sizeof(c->keys));
@@ -87,6 +89,11 @@ static void apply(buildcfg_t *c, const char *name, const char *val)
         parse_decimal(val, GL_SATURATION_MIN, GL_SATURATION_MAX, &c->glsaturation);
         return;
     }
+    if (!strcmp(name, "displaymode")) {
+        i = display_modefromname(val);
+        c->displaymode = (i >= 0) ? i : DISPLAY_BORDERLESS;
+        return;
+    }
     if (!strcmp(name, "gldrawpath")) {
         c->gldrawpath = gl_pathfromname(val);
         return;
@@ -104,7 +111,7 @@ static void apply(buildcfg_t *c, const char *name, const char *val)
     if (!strcmp(name, "renderer")) c->renderer = clamp_int(v, 0, 3);
     else if (!strcmp(name, "xdim3d")) c->xdim3d = clamp_int(v, 320, 7680);
     else if (!strcmp(name, "ydim3d")) c->ydim3d = clamp_int(v, 200, 4320);
-    else if (!strcmp(name, "fullscreen")) c->fullscreen = v != 0;
+    else if (!strcmp(name, "vsync")) c->vsync = v != 0;
     else if (!strcmp(name, "gltexmiplevel")) c->gltexmiplevel = clamp_int(v, 0, 15);
     else if (!strcmp(name, "glinternalwidth")) c->glinternalwidth = clamp_int(v, 0, 7680);
     else if (!strcmp(name, "glinternalheight")) c->glinternalheight = clamp_int(v, 0, 4320);
@@ -122,6 +129,8 @@ static char *trim(char *s)
 int buildcfg_read(buildcfg_t *c, const char *path)
 {
     char line[256];
+    long v;
+    int displaymode = 0, fullscreen = -1;  /* the old fullscreen key: without a displaymode */
     FILE *f = fopen(path, "r");
     if (!f)
         return -1;
@@ -137,10 +146,18 @@ int buildcfg_read(buildcfg_t *c, const char *path)
         *eq = '\0';
         name = trim(name);
         val = trim(eq + 1);
-        if (*name && *val)
+        if (!*name || !*val)
+            continue;
+        displaymode |= !strcmp(name, "displaymode");
+        if (!strcmp(name, "fullscreen")) {
+            if (parse_long(val, 10, &v))
+                fullscreen = v != 0;
+        } else
             apply(c, name, val);
     }
     fclose(f);
+    if (!displaymode && fullscreen >= 0)
+        c->displaymode = fullscreen ? DISPLAY_BORDERLESS : DISPLAY_WINDOWED;
     return 0;
 }
 
@@ -159,7 +176,8 @@ int buildcfg_write(const buildcfg_t *c, const char *path)
     fprintf(f, "renderer = %d\n", (int)c->renderer);
     fprintf(f, "xdim3d = %d\n", (int)c->xdim3d);
     fprintf(f, "ydim3d = %d\n", (int)c->ydim3d);
-    fprintf(f, "fullscreen = %d\n", (int)c->fullscreen);
+    fprintf(f, "displaymode = %s\n", display_modename(c->displaymode));
+    fprintf(f, "vsync = %d\n", (int)c->vsync);
     fprintf(f, "gltexmiplevel = %d\n", (int)c->gltexmiplevel);
     fprintf(f, "gldrawpath = %s\n", gl_pathname(c->gldrawpath));
     fprintf(f, "glinternalwidth = %d\n", (int)c->glinternalwidth);
