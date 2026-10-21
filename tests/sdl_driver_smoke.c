@@ -563,6 +563,98 @@ static int screencapture_formats(int argc, char **argv)
     return 0;
 }
 
+/* A frame shown with the fade timeline ms_a to ms_b (from t0) ago: its
+ *  darkness is between videofade_at at either end (out: a, b capped at the
+ *  hold), 1 if so. */
+static int fade_shown_between(Uint32 t0, int held, const char *what)
+{
+    Uint32 a = SDL_GetTicks() - t0, b;
+    int d, lo, hi;
+
+    _nextpage();
+    b = SDL_GetTicks() - t0;
+    d = getvideofade();
+    if (held) { a = (a > VIDEOFADE_MS) ? VIDEOFADE_MS : a; b = (b > VIDEOFADE_MS) ? VIDEOFADE_MS : b; }
+    lo = videofade_at(a); hi = videofade_at(b);
+    if (lo > hi) { int t = lo; lo = hi; hi = t; }
+    if ((d < lo) || (d > hi))
+    {
+        fprintf(stderr, "FAIL: %s: darkness %d %u-%u ms in, not %d-%d\n", what, d, (unsigned) a, (unsigned) b, lo, hi);
+        return 0;
+    }
+    return 1;
+}
+
+/*
+ * The VIDEO page's fade around a change: videofade_at (the darkness by ms
+ *  into it, 0 none to 256 black: out over VIDEOFADE_MS, then in), and the
+ *  driver's run of it in real time over the frames shown: held black until
+ *  setvideofadein, back from where it got to when asked out again mid-way,
+ *  and done after.
+ */
+static int video_fade(int argc, char **argv)
+{
+    static const struct { uint32_t ms; int want; } at[] = {
+        { 0, 0 }, { 125, 128 }, { 250, 256 }, { 375, 128 }, { 500, 0 }, { 5000, 0 }
+    };
+    Uint32 t0;
+    int i, d;
+
+    for (i = 0; i < (int) (sizeof (at) / sizeof (at[0])); i++)
+        if (videofade_at(at[i].ms) != at[i].want)
+            { fprintf(stderr, "FAIL: videofade_at(%u) %d, not %d\n", (unsigned) at[i].ms, videofade_at(at[i].ms), at[i].want); return 1; }
+    for (i = 1; i <= 2 * VIDEOFADE_MS; i++)
+        if ((i <= VIDEOFADE_MS) ? (videofade_at(i) < videofade_at(i - 1)) : (videofade_at(i) > videofade_at(i - 1)))
+            { fprintf(stderr, "FAIL: videofade_at isn't out then in at %d ms\n", i); return 1; }
+
+    _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
+    if (_setgamemode(1, 320, 200) != 0) { fprintf(stderr, "FAIL: _setgamemode(320x200)\n"); return 1; }
+    memset((void *) frameplace, 31, xdim * ydim);
+    _nextpage();
+    if ((getvideofade() != 0) || (videofading())) { fprintf(stderr, "FAIL: a fade before one was asked for\n"); return 1; }
+
+    setvideofadeout();
+    t0 = SDL_GetTicks();
+    while (SDL_GetTicks() - t0 < 2 * VIDEOFADE_MS)  /* out, then held */
+    {
+        if (!fade_shown_between(t0, 1, "out")) return 1;
+        SDL_Delay(5);
+    }
+    if ((getvideofade() != 256) || (!videofading())) { fprintf(stderr, "FAIL: not held black\n"); return 1; }
+    setvideofadeout();  /* asked again while black: stays */
+    _nextpage();
+    if (getvideofade() != 256) { fprintf(stderr, "FAIL: a second change undid the black\n"); return 1; }
+
+    t0 = SDL_GetTicks() - VIDEOFADE_MS;
+    setvideofadein();
+    while (SDL_GetTicks() - t0 < VIDEOFADE_MS + VIDEOFADE_MS / 2)  /* half way in */
+    {
+        if (!fade_shown_between(t0, 0, "in")) return 1;
+        SDL_Delay(5);
+    }
+    d = getvideofade();
+    setvideofadeout();  /* turned back from about half way */
+    _nextpage();
+    if (abs(getvideofade() - d) > 64)  /* some ms on, not from 0 or 256 */
+        { fprintf(stderr, "FAIL: turned back from %d to %d, not from where it was\n", d, getvideofade()); return 1; }
+    printf("turned back at darkness %d: %d\n", d, getvideofade());
+    for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < VIDEOFADE_MS; SDL_Delay(5))
+        _nextpage();
+    if (getvideofade() != 256) { fprintf(stderr, "FAIL: not black again: %d\n", getvideofade()); return 1; }
+
+    setvideofadein();
+    for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < VIDEOFADE_MS + 20; SDL_Delay(5))
+        _nextpage();
+    if ((getvideofade() != 0) || (videofading())) { fprintf(stderr, "FAIL: not done: %d\n", getvideofade()); return 1; }
+    setvideofadein();  /* with none under way: nothing */
+    _nextpage();
+    if ((getvideofade() != 0) || (videofading())) { fprintf(stderr, "FAIL: a fade-in with none under way\n"); return 1; }
+
+    _uninitengine();
+    printf("PASS: video_fade\n");
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     char pal[256 * 4];
@@ -580,6 +672,8 @@ int main(int argc, char **argv)
         return palette_fade(argc, argv);
     if ((argc > 1) && (strcmp(argv[1], "screencapture_formats") == 0))
         return screencapture_formats(argc, argv);
+    if ((argc > 1) && (strcmp(argv[1], "video_fade") == 0))
+        return video_fade(argc, argv);
 
     _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
     if (_setgamemode(1, 320, 200) != 0)

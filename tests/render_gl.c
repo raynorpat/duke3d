@@ -118,6 +118,11 @@ void videoswitch_setup(void);  /* render_gl_game.c */
 int videoswitch_palette_check(void);  /* render_gl_game.c */
 int video_setrenderer(int r);  /* game.c */
 int video_setmode(int displaymode, int w, int h);  /* game.c */
+void video_requestrenderer(int r);  /* game.c */
+void video_requestmode(int displaymode, int w, int h);  /* game.c */
+void video_getmode(int32_t *w, int32_t *h);  /* game.c */
+void video_applypending(void);  /* game.c */
+extern int32_t GLDrawPath;  /* config.c */
 extern int32_t video_glunavailable;  /* game.c */
 extern SDL_Surface *surface;  /* sdl_driver.c: the 8-bit frame */
 
@@ -1774,6 +1779,103 @@ static int present8_check(void)
     return ok;
 }
 
+/* A white frame in the renderer in effect, shown. */
+static void fade_frame(void)
+{
+    if (getrendermode() == 3)
+        clearallviews(31);
+    else
+        memset((void *) frameplace, 31, (size_t) bytesperline * ydim);
+    nextpage();
+}
+
+static double shown_mean(const unsigned char *shown, int w, int h)
+{
+    double sum = 0;
+    long i;
+
+    for (i = 0; i < (long) w * h * 3; i++)
+        sum += shown[i];
+    return sum / ((double) w * h * 3);
+}
+
+/*
+ * The VIDEO page's fade around a change (game.c video_request*): a request
+ *  for the renderer in effect (the fade alone), drawn and read for 1.5 s of
+ *  real time, over a game fade (63, 0, 0, 16). Each frame read is the
+ *  white frame darkened by the driver's getvideofade()/256; it goes to
+ *  black and back through the levels between, and ends the picture it was.
+ *  The game's fade, curpalette and the 8-bit palette are the same at black
+ *  and after. midw: a mode (windowed midw by midh) asked for 100 ms in,
+ *  made at black with the first. sdl: read through the SDL renderer (whose
+ *  read can lag a frame, so a looser match). 1: pass.
+ */
+static int video_fade_run(SDL_Window *win, int sdl, int midw, int midh, const char *what)
+{
+    unsigned char *before, *shown, fadedelta = 0;
+    palette_t pal[256], fadergb;
+    SDL_Color spal[256];
+    int ow, oh, bw, bh, ok = 1, r = getrendermode(), asked = 0, black = 0, out = 0, in = 0, n = 0;
+    int32_t w0, h0, w1, h1, madeat = -1;
+    double base, ratio, err, worst = 0, least = 1;
+    Uint32 t0;
+
+    setpalettefade(63, 0, 0, 16);
+    fade_frame();
+    before = present8_read(win, sdl, &bw, &bh);
+    base = shown_mean(before, bw, bh);
+    fadergb = palfadergb;
+    fadedelta = palfadedelta;
+    memcpy(pal, curpalette, sizeof (pal));
+    if (r != 3) memcpy(spal, surface->format->palette->colors, sizeof (spal));
+
+    video_requestrenderer(r);
+    for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < 1500; n++)
+    {
+        if ((midw) && (!asked) && (SDL_GetTicks() - t0 >= 100))
+            { video_requestmode(DISPLAY_WINDOWED, midw, midh); asked = 1; }
+        fade_frame();
+        video_getmode(&w0, &h0);
+        if (getvideofade() == 256)  /* the game's state as it was, under the black */
+        {
+            black++;
+            if ((palfadedelta != fadedelta) || (memcmp(&palfadergb, &fadergb, sizeof (fadergb)) != 0) ||
+                (memcmp(curpalette, pal, sizeof (pal)) != 0))
+                { fprintf(stderr, "FAIL: %s: the game's palette or fade changed during the fade\n", what); ok = 0; }
+        }
+        video_applypending();
+        video_getmode(&w1, &h1);
+        if ((w1 != w0) || (h1 != h0)) madeat = getvideofade();
+        shown = present8_read(win, sdl, &ow, &oh);
+        ratio = shown_mean(shown, ow, oh) / base;
+        free(shown);
+        err = fabs(ratio - (double) (256 - getvideofade()) / 256.0);
+        if (err > worst) worst = err;
+        if (ratio < least) least = ratio;
+        if ((ratio > 0.2) && (ratio < 0.8)) { if (black) in++; else out++; }
+    }
+    if ((midw) && ((w1 != midw) || (h1 != midh) || (madeat != 256)))
+        { fprintf(stderr, "FAIL: %s: the mode asked for during the fade: %dx%d, made at darkness %d\n",
+                  what, (int) w1, (int) h1, (int) madeat); ok = 0; }
+
+    fade_frame();
+    shown = present8_read(win, sdl, &ow, &oh);
+    printf("%s: %d frames, %d black, %d fading out and %d in between 0.2 and 0.8, darkest %.3f, "
+           "worst |shown - darkness| %.3f, fading %d after\n", what, n, black, out, in, least, worst, videofading());
+    if ((!black) || (!out) || (!in) || (least > 0.02) || (worst > (sdl ? 0.07 : 0.02)) || (videofading()))
+        { fprintf(stderr, "FAIL: %s: the frame didn't fade to black and back with the darkness\n", what); ok = 0; }
+    if ((!midw) && ((ow != bw) || (oh != bh) || (memcmp(shown, before, (size_t) bw * bh * 3) != 0)))
+        { fprintf(stderr, "FAIL: %s: the picture after the fade isn't the one before\n", what); ok = 0; }
+    if ((palfadedelta != fadedelta) || (memcmp(&palfadergb, &fadergb, sizeof (fadergb)) != 0) ||
+        ((!midw) && (memcmp(curpalette, pal, sizeof (pal)) != 0)) ||
+        ((r != 3) && (!midw) && (memcmp(spal, surface->format->palette->colors, sizeof (spal)) != 0)))
+        { fprintf(stderr, "FAIL: %s: the game's palette or fade changed\n", what); ok = 0; }
+    free(shown);
+    free(before);
+    setpalettefade(0, 0, 0, 0);
+    return ok;
+}
+
 /*
  * The VIDEO page's renderer switch (game.c video_setrenderer) in a run that
  *  starts in renderers 0-2, so in its own process (render_gl_video). OpenGL
@@ -1819,6 +1921,9 @@ static int video_switch_check(void)
         { fprintf(stderr, "FAIL: after OpenGL failed the 8-bit picture isn't shown\n"); ok = 0; }
     free(shown);
     free(want);
+    if (video_setrenderer(0) != 0) { fprintf(stderr, "FAIL: renderer 0\n"); return 0; }
+    if (!video_fade_run(win, 1, 0, 0, "fade, renderer 0 through the SDL renderer")) ok = 0;
+    video_setrenderer(2);
     if (video_setrenderer(3) != 2)
         { fprintf(stderr, "FAIL: OpenGL tried again after it failed\n"); ok = 0; }
 
@@ -1944,6 +2049,16 @@ static int video_mode_check(void)
         if (dark != 0)
             { fprintf(stderr, "FAIL: the frame doesn't fill the window\n"); ok = 0; }
     }
+
+    printf("renderer 3 draws on the %s path\n", gl_pathname(gldrawpath));
+    if (!video_fade_run(win, 0, 800, 600, "fade, renderer 3, 800x600 asked for during it")) ok = 0;
+    GLDrawPath = GLPATH_VBO;  /* the fixed function tiers' fade quad */
+    video_setmode(DISPLAY_WINDOWED, 800, 600);
+    printf("renderer 3 draws on the %s path\n", gl_pathname(gldrawpath));
+    if (!video_fade_run(win, 0, 0, 0, "fade, renderer 3 (vbo)")) ok = 0;
+    GLDrawPath = GLPATH_AUTO;
+    video_setrenderer(0);
+    if (!video_fade_run(win, 0, 0, 0, "fade, renderer 0 through OpenGL")) ok = 0;
     set_build_windowed(1);
     return ok;
 }

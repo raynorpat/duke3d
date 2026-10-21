@@ -146,7 +146,7 @@ int32_t bpp = 8;
 struct glinfo_t glinfo;
 char nofog = 0;
 extern void polymost_glreset(void);
-extern int32_t polymost_present_shader(const int32_t *r, int32_t dw, int32_t dh);
+extern int32_t polymost_present_shader(const int32_t *r, int32_t dw, int32_t dh, int32_t dark);
 extern void polymost_prepare_shader(void);
 extern unsigned char *polymost_capture_shader(void);
 extern GLuint polymost_takeframe_shader(void);
@@ -305,6 +305,75 @@ static void output_driver_info(void)
 } /* output_driver_info */
 
 
+/*
+ * The VIDEO page's fade around a change: a darkness (0 none, 256 black)
+ *  over every frame shown, on top of the game's own palette and fade,
+ *  which it leaves alone. It runs in real time: videofade_at.
+ */
+static int vfade_state = 0;  /* 0 none, 1 out (then held black), 2 in */
+static Uint32 vfade_start;  /* SDL_GetTicks of the timeline's 0 */
+static int vfade_shown = 0;  /* the darkness of the last frame shown */
+
+int videofade_at(uint32_t ms)
+{
+    if (ms <= VIDEOFADE_MS)
+        return((int) (ms * 256 / VIDEOFADE_MS));
+    if (ms < 2 * VIDEOFADE_MS)
+        return((int) ((2 * VIDEOFADE_MS - ms) * 256 / VIDEOFADE_MS));
+    return(0);
+} /* videofade_at */
+
+
+/* The darkness for a frame being shown now, kept as vfade_shown. */
+static int vfade_now(void)
+{
+    Uint32 ms = SDL_GetTicks() - vfade_start;
+
+    if (vfade_state == 0)
+        vfade_shown = 0;
+    else if (vfade_state == 1)  /* black until setvideofadein */
+        vfade_shown = videofade_at((ms < VIDEOFADE_MS) ? ms : VIDEOFADE_MS);
+    else if (ms >= 2 * VIDEOFADE_MS)
+        vfade_state = vfade_shown = 0;
+    else
+        vfade_shown = videofade_at(ms);
+    return(vfade_shown);
+} /* vfade_now */
+
+
+void setvideofadeout(void)
+{
+    Uint32 now = SDL_GetTicks(), ms = now - vfade_start;
+
+    if (vfade_state == 0)
+        vfade_start = now;
+    else if (vfade_state == 2)  /* turned back from where it is */
+        vfade_start = now - ((ms < 2 * VIDEOFADE_MS) ? 2 * VIDEOFADE_MS - ms : 0);
+    vfade_state = 1;
+} /* setvideofadeout */
+
+
+void setvideofadein(void)
+{
+    if (vfade_state != 1)
+        return;
+    vfade_state = 2;
+    vfade_start = SDL_GetTicks() - VIDEOFADE_MS;
+} /* setvideofadein */
+
+
+int getvideofade(void)
+{
+    return(vfade_shown);
+} /* getvideofade */
+
+
+int videofading(void)
+{
+    return(vfade_state != 0);
+} /* videofading */
+
+
 #ifdef USE_OPENGL
 static void gl_present8(void);
 #endif
@@ -312,6 +381,8 @@ static void gl_present8(void);
 /* Push the 8-bit surface through the palette to the window. */
 static void present_surface(void)
 {
+    Uint8 k;
+
 #ifdef USE_OPENGL
     if (sdl_glcontext != NULL)
     {
@@ -322,6 +393,8 @@ static void present_surface(void)
     if ((surface == NULL) || (sdl_texture == NULL))
         return;
 
+    k = (Uint8) ((255 * (256 - vfade_now())) >> 8);
+    SDL_SetTextureColorMod(sdl_texture, k, k, k);  /* 255: as it was */
     SDL_BlitSurface(surface, NULL, sdl_rgbsurface, NULL);
     SDL_UpdateTexture(sdl_texture, NULL, sdl_rgbsurface->pixels,
                       sdl_rgbsurface->pitch);
@@ -412,7 +485,7 @@ static void gl_present8(void)
 {
     int32_t r[4];
     int dw, dh;
-    float u, v;
+    float u, v, k;
 
     if ((surface == NULL) || (gl8tex == 0) || (gl_drawing))
         return;
@@ -449,7 +522,8 @@ static void gl_present8(void)
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, surface->w, surface->h,
                     GL_RGBA, GL_UNSIGNED_BYTE, sdl_rgbsurface->pixels);
-    glColor4f(1, 1, 1, 1);
+    k = (float) (256 - vfade_now()) / 256.0f;  /* the VIDEO page's fade; 1: none */
+    glColor4f(k, k, k, 1);
     glBegin(GL_QUADS);  /* the surface's top row at the top */
     glTexCoord2f(0, v); glVertex2f(-1, -1);
     glTexCoord2f(u, v); glVertex2f(1, -1);
@@ -959,6 +1033,25 @@ static void gl_draw_fade(void)
 } /* gl_draw_fade */
 
 
+/* The VIDEO page's fade (vfade_now): black over the frame at dark/256. */
+static void gl_draw_dark(int dark)
+{
+    if (!dark)
+        return;
+    setpolymost2dview();
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4ub(0, 0, 0, (dark > 255) ? 255 : dark);
+    glBegin(GL_QUADS);
+    glVertex2i(0, 0);
+    glVertex2i(xres, 0);
+    glVertex2i(xres, yres);
+    glVertex2i(0, yres);
+    glEnd();
+    glDisable(GL_BLEND);
+} /* gl_draw_dark */
+
+
 /* Fills the back buffer with (0,0)-(u,v) of a frame texture: bottom-up rows. */
 static void gl_draw_frame(GLuint tex, float u, float v)
 {
@@ -990,7 +1083,7 @@ static void gl_draw_lastframe(void)
  */
 static void gl_swap(void)
 {
-    if (polymost_present_shader(gl_showrect, gl_draw_w, gl_draw_h))
+    if (polymost_present_shader(gl_showrect, gl_draw_w, gl_draw_h, vfade_now()))
     {
         SDL_GL_SwapWindow(sdl_window);
         swapped = 1;
@@ -1008,6 +1101,7 @@ static void gl_swap(void)
 
     if (palfadedelta)
         gl_draw_fade();
+    gl_draw_dark(vfade_now());
 
     SDL_GL_SwapWindow(sdl_window);
     swapped = 1;
@@ -1042,7 +1136,7 @@ void _glpalettefade(void)
 {
     if ((!gl_drawing) || (framedrawn))
         return;
-    if (polymost_present_shader(gl_showrect, gl_draw_w, gl_draw_h))  /* the GL 2.1 tier keeps the frame */
+    if (polymost_present_shader(gl_showrect, gl_draw_w, gl_draw_h, vfade_now()))  /* the GL 2.1 tier keeps the frame */
     {
         SDL_GL_SwapWindow(sdl_window);
         swapped = 1;
@@ -1055,6 +1149,7 @@ void _glpalettefade(void)
     gl_draw_lastframe();
     if (palfadedelta)
         gl_draw_fade();
+    gl_draw_dark(vfade_now());
     SDL_GL_SwapWindow(sdl_window);
     swapped = 1;
     framedrawn = 0;
@@ -1134,7 +1229,7 @@ static void gl_resize(void)
         gl_draw_w = w;
         gl_draw_h = h;
         gl_fitrect(xres, yres, w, h, gl_showrect);
-        if ((!framedrawn) && (polymost_present_shader(gl_showrect, w, h)))
+        if ((!framedrawn) && (polymost_present_shader(gl_showrect, w, h, vfade_now())))
         {
             SDL_GL_SwapWindow(sdl_window);  /* a still screen: shown again. */
             swapped = 1;

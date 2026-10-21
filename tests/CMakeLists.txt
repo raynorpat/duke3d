@@ -13,10 +13,12 @@ add_test(NAME sdl_driver_smoke_displaymode_setter COMMAND sdl_driver_smoke displ
 add_test(NAME sdl_driver_smoke_mode_sizes COMMAND sdl_driver_smoke mode_sizes)
 add_test(NAME sdl_driver_smoke_palette_fade COMMAND sdl_driver_smoke palette_fade)
 add_test(NAME sdl_driver_smoke_screencapture COMMAND sdl_driver_smoke screencapture_formats)
+add_test(NAME sdl_driver_smoke_video_fade COMMAND sdl_driver_smoke video_fade)
 set_tests_properties(sdl_driver_smoke_gl_fallback sdl_driver_smoke_displaymode_setter
                      sdl_driver_smoke_mode_sizes
                      sdl_driver_smoke_palette_fade
-                     sdl_driver_smoke_screencapture PROPERTIES
+                     sdl_driver_smoke_screencapture
+                     sdl_driver_smoke_video_fade PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
   TIMEOUT 30)
 
@@ -260,13 +262,14 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
       ENVIRONMENT "BUILD_WINDOWED=1"
       SKIP_RETURN_CODE 77
       TIMEOUT 30)
-    # The VIDEO page's live renderer switch, from a run with no GL context yet.
+    # The VIDEO page's live renderer switch, from a run with no GL context
+    # yet, its modes, and the fade around them.
     add_test(NAME render_gl_video
       COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" video)
     set_tests_properties(render_gl_video PROPERTIES
       ENVIRONMENT "BUILD_WINDOWED=1"
       SKIP_RETURN_CODE 77
-      TIMEOUT 30)
+      TIMEOUT 60)
   endif()
 
   # Boots the real game to its title loop and into E1L1, headless. It uses

@@ -419,6 +419,13 @@ Ported from later JFBuild commits, retyped as above:
   first GL window replaces it); a new windowed size is given only while
   windowed (in full screen it waits for the return) and centred on the
   bounds of the display the window was on.
+- `setvideofadeout`/`setvideofadein` (the VIDEO page's fade around a
+  change): a darkness applied at every present, in real time, over the
+  game's palette and fade without touching them. The SDL renderer's texture
+  colour mod, `gl_present8`'s colour, a black quad after the fixed function
+  tiers' fade quad, and on the shader tier the palette
+  `polymost_present_shader` shows through (its new `dark` argument).
+  Captures leave it out, except a front-buffer read.
 - `glext.c`/`glext.h` (ours, not JFBuild's): renderer 3's draw paths
   (`GLPATH_AUTO`, `IMMEDIATE`, `VBO`, `SHADER`) and their setting names,
   the pure `gl_choosepath`, and the GL entry points past 1.1 as `bgl…`

@@ -2311,13 +2311,20 @@ void video_getmode(int32_t *w, int32_t *h)
     *h = gameheight;
 }
 
-// Changes asked for mid-frame (the VIDEO page), made after the frame is shown.
+// Changes asked for mid-frame (the VIDEO page): the screen fades to black
+// (the driver's setvideofadeout, in real time, over the game's own palette
+// and fade, which stay as they are), they are made together after a black
+// frame is shown, and it fades back in, also when a change failed. Play
+// goes on underneath.
 static int32_t video_pendingrenderer = -1;
 static int32_t video_pendingmode = -1, video_pendingw, video_pendingh;
+static char video_testtag[32];  // video_teststep's, printed when made
+static int32_t video_testfrom, video_testmode;
 
 void video_requestrenderer(int r)
 {
     video_pendingrenderer = r;
+    setvideofadeout();
 }
 
 void video_requestmode(int displaymode, int w, int h)
@@ -2325,15 +2332,24 @@ void video_requestmode(int displaymode, int w, int h)
     video_pendingmode = displaymode;
     video_pendingw = w;
     video_pendingh = h;
+    setvideofadeout();
 }
 
-static void video_applypending(void)
+static void video_testprint(void);
+
+// After nextpage: the changes asked for, once the frame shown was black.
+void video_applypending(void)
 {
+    if (((video_pendingmode < 0) && (video_pendingrenderer < 0)) || (getvideofade() < 256))
+        return;
     if (video_pendingmode >= 0)
         video_setmode(video_pendingmode,video_pendingw,video_pendingh);
     if (video_pendingrenderer >= 0)
         video_setrenderer(video_pendingrenderer);
     video_pendingmode = video_pendingrenderer = -1;
+    setvideofadein();
+    if (video_testtag[0])
+        video_testprint();
 }
 
 // -videocycle n: video_teststep every n frames in the game loop (the net
@@ -2341,24 +2357,39 @@ static void video_applypending(void)
 static int32_t videocycle, videocycleframe;
 
 // The sync tests' stand-in for the VIDEO page (-demoswitch, -videocycle):
-// the next renderer (skipping OpenGL once it has failed), then the next of
-// a few display modes and resolutions, printed after tag.
+// asks for the next renderer (skipping OpenGL once it has failed) and the
+// next of a few display modes and resolutions, faded as the page's are, and
+// prints them after tag when made. Skipped while a fade is under way.
+static const int32_t video_testmodes[][3] = {
+    { DISPLAY_WINDOWED, 640, 480 }, { DISPLAY_BORDERLESS, 800, 600 },
+    { DISPLAY_EXCLUSIVE, 1024, 768 }, { DISPLAY_WINDOWED, 2560, 1440 },
+    { DISPLAY_WINDOWED, 320, 200 }, { DISPLAY_WINDOWED, 1366, 768 }
+};
+
 static void video_teststep(const char *tag)
 {
-    static const int32_t modes[][3] = {
-        { DISPLAY_WINDOWED, 640, 480 }, { DISPLAY_BORDERLESS, 800, 600 },
-        { DISPLAY_EXCLUSIVE, 1024, 768 }, { DISPLAY_WINDOWED, 2560, 1440 },
-        { DISPLAY_WINDOWED, 320, 200 }, { DISPLAY_WINDOWED, 1366, 768 }
-    };
     static int32_t step;
-    int32_t r = gamerenderer, m = step++ % (int32_t)(sizeof(modes)/sizeof(modes[0]));
-    int32_t got = video_setrenderer((r == 2 && video_glunavailable) ? 0 : (r+1)&3);
+    int32_t r = gamerenderer;
 
-    video_setmode(modes[m][0],modes[m][1],modes[m][2]);
-    printf("%s renderer %d -> %d, %s %dx%d: display %s, drawn at %dx%d\n",tag,(int)r,(int)got,
-           display_modename(modes[m][0]),(int)modes[m][1],(int)modes[m][2],
+    if (videofading())
+        return;
+    video_testmode = step++ % (int32_t)(sizeof(video_testmodes)/sizeof(video_testmodes[0]));
+    video_testfrom = r;
+    strncpy(video_testtag,tag,sizeof(video_testtag)-1);
+    video_requestrenderer((r == 2 && video_glunavailable) ? 0 : (r+1)&3);
+    video_requestmode(video_testmodes[video_testmode][0],video_testmodes[video_testmode][1],
+                      video_testmodes[video_testmode][2]);
+}
+
+static void video_testprint(void)
+{
+    const int32_t *m = video_testmodes[video_testmode];
+
+    printf("%s renderer %d -> %d, %s %dx%d: display %s, drawn at %dx%d\n",video_testtag,
+           (int)video_testfrom,(int)gamerenderer,display_modename(m[0]),(int)m[1],(int)m[2],
            display_modename(getvideodisplaymode()),(int)xdim,(int)ydim);
     fflush(stdout);  // a killed run (the net test) still shows it
+    video_testtag[0] = 0;
 }
 
 // Renderer 3 redraws the whole screen each frame: the border and status bar
@@ -9617,6 +9648,7 @@ int demoverify(int n, char *dumpname, int draw, int switchevery)
             displayrooms(screenpeek,65536);
             displayrest(65536);
             nextpage();
+            video_applypending();
             if(switchevery > 0 && tics%switchevery == 0)
             {
                 char tag[32];

@@ -850,10 +850,11 @@ static void polymost_shownpalette (palette_t *pal)
 }
 
 	//Shows the frame on the GL 2.1 tier: draws the framebuffer's indices into the
-	//   window (dw by dh) through polymost_shownpalette, for the
+	//   window (dw by dh) through polymost_shownpalette, darkened by dark/256
+	//   (the VIDEO page's fade), for the
 	//   swap, at r (x, y, width, height: gl_fitrect's), black around it. The
 	//   framebuffer keeps them. 0: not on that tier (or nothing drawn yet).
-int32_t polymost_present_shader (const int32_t *r, int32_t dw, int32_t dh)
+int32_t polymost_present_shader (const int32_t *r, int32_t dw, int32_t dh, int32_t dark)
 {
 	palette_t pal[256];
 	unsigned char rgb[768];
@@ -866,6 +867,13 @@ int32_t polymost_present_shader (const int32_t *r, int32_t dw, int32_t dh)
 	bglBindFramebuffer(GL_FRAMEBUFFER,0);
 	glshbound = 0;
 	polymost_shownpalette(pal);
+	if (dark)
+		for(i=0;i<256;i++)
+		{
+			pal[i].r = (unsigned char)((pal[i].r*(256-dark))>>8);
+			pal[i].g = (unsigned char)((pal[i].g*(256-dark))>>8);
+			pal[i].b = (unsigned char)((pal[i].b*(256-dark))>>8);
+		}
 	bglActiveTexture(GL_TEXTURE1);
 	if ((!glshpal) || (memcmp(glshpalnow,pal,sizeof(glshpalnow))))
 	{
