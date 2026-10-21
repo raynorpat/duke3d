@@ -41,6 +41,8 @@ void buildcfg_defaults(buildcfg_t *c)
     c->gldrawpath = GLPATH_AUTO;
     c->glinternalwidth = 0;
     c->glinternalheight = 0;
+    c->glcontrast = 1.0;
+    c->glsaturation = 1.0;
 }
 
 static int32_t clamp_int(long v, long lo, long hi)
@@ -57,17 +59,32 @@ static int parse_long(const char *s, int base, long *out)
     return end != s && *end == '\0' && errno == 0;
 }
 
+/* Parses all of s as a decimal into *out, clamped to lo..hi; 0 on failure. */
+static int parse_decimal(const char *s, double lo, double hi, double *out)
+{
+    char *end;
+    double d = strtod(s, &end);
+    if (end == s || *end != '\0' || d != d)
+        return 0;
+    *out = d < lo ? lo : d > hi ? hi : d;
+    return 1;
+}
+
 static void apply(buildcfg_t *c, const char *name, const char *val)
 {
     long v;
     int i;
 
     if (!strcmp(name, "mousesensitivity")) {
-        char *end;
-        double d = strtod(val, &end);
-        if (end == val || *end != '\0' || d != d)
-            return;
-        c->mousesensitivity = d < 0.1 ? 0.1 : d > 10.0 ? 10.0 : d;
+        parse_decimal(val, 0.1, 10.0, &c->mousesensitivity);
+        return;
+    }
+    if (!strcmp(name, "glcontrast")) {
+        parse_decimal(val, GL_CONTRAST_MIN, GL_CONTRAST_MAX, &c->glcontrast);
+        return;
+    }
+    if (!strcmp(name, "glsaturation")) {
+        parse_decimal(val, GL_SATURATION_MIN, GL_SATURATION_MAX, &c->glsaturation);
         return;
     }
     if (!strcmp(name, "gldrawpath")) {
@@ -147,6 +164,8 @@ int buildcfg_write(const buildcfg_t *c, const char *path)
     fprintf(f, "gldrawpath = %s\n", gl_pathname(c->gldrawpath));
     fprintf(f, "glinternalwidth = %d\n", (int)c->glinternalwidth);
     fprintf(f, "glinternalheight = %d\n", (int)c->glinternalheight);
+    fprintf(f, "glcontrast = %g\n", c->glcontrast);
+    fprintf(f, "glsaturation = %g\n", c->glsaturation);
     fprintf(f, "mousesensitivity = %g\n", c->mousesensitivity);
     for (i = 0; i < BUILDCFG_NUMKEYS; i++)
         fprintf(f, "%s = %02x\n", key_names[i], c->keys[i]);

@@ -83,6 +83,7 @@ Duke Lookup Table
 #include "build/display.h"  /* rcg05232001 need some "vesa" routines. */
 #include "names.h"
 #include "buildcfg.h"
+#include "build/glext.h"
 #include "editormode.h"
 
 
@@ -1904,6 +1905,10 @@ void ExtInit(void)
     editormode.glinternalwidth = buildcfg.glinternalwidth;
     editormode.glinternalheight = buildcfg.glinternalheight;
     editormousesensitivity = (int32_t)(buildcfg.mousesensitivity*65536.0+0.5);
+#ifdef USE_OPENGL
+    glcontrast = buildcfg.glcontrast;  // the shader path's, applied as it shows each frame
+    glsaturation = buildcfg.glsaturation;
+#endif
     setvideofullscreen(buildcfg.fullscreen);
 
                 initmouse();

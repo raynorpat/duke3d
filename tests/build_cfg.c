@@ -40,6 +40,7 @@ static int same(const buildcfg_t *a, const buildcfg_t *b)
            a->gldrawpath == b->gldrawpath && a->glinternalwidth == b->glinternalwidth &&
            a->glinternalheight == b->glinternalheight &&
            a->mousesensitivity == b->mousesensitivity &&
+           a->glcontrast == b->glcontrast && a->glsaturation == b->glsaturation &&
            !memcmp(a->keys, b->keys, sizeof(a->keys));
 }
 
@@ -79,6 +80,18 @@ int main(void)
     CHECK(strstr(text, "gldrawpath = auto"));
     CHECK(strstr(text, "glinternalwidth = 0"));
     CHECK(d.gldrawpath == GLPATH_AUTO && d.glinternalwidth == 0 && d.glinternalheight == 0);
+    CHECK(strstr(text, "glcontrast = 1\n") && strstr(text, "glsaturation = 1\n"));
+    CHECK(d.glcontrast == 1.0 && d.glsaturation == 1.0);
+
+    /* contrast and saturation: decimals */
+    putstr(cfg, "glcontrast = 0.75\nglsaturation = 1.25\n");
+    CHECK(buildcfg_read(&c, cfg) == 0);
+    CHECK(c.glcontrast == 0.75 && c.glsaturation == 1.25);
+    CHECK(buildcfg_write(&c, cfg) == 0);
+    memset(&d, 0, sizeof(d));
+    CHECK(buildcfg_read(&d, cfg) == 0);
+    CHECK(same(&c, &d));
+    buildcfg_defaults(&d);
 
     /* draw path in any case, written back lowercase */
     putstr(cfg, "gldrawpath = Shader\nglinternalwidth = 320\nglinternalheight = 200\n");
@@ -95,11 +108,19 @@ int main(void)
     /* clamping */
     putstr(cfg, "renderer = 9\nxdim3d = 99999\ngltexmiplevel = -3\n"
                 "mousesensitivity = 50\nkeyfire = 0\ngldrawpath = bogus\n"
-                "glinternalwidth = -5\nglinternalheight = 99999\n");
+                "glinternalwidth = -5\nglinternalheight = 99999\n"
+                "glcontrast = 3\nglsaturation = -1\n");
     CHECK(buildcfg_read(&c, cfg) == 0);
     CHECK(c.renderer == 3 && c.xdim3d == 7680 && c.gltexmiplevel == 0);
     CHECK(c.gldrawpath == GLPATH_AUTO && c.glinternalwidth == 0 && c.glinternalheight == 4320);
     CHECK(c.mousesensitivity == 10.0 && c.keys[6] == 0x1d);
+    CHECK(c.glcontrast == 1.5 && c.glsaturation == 0.0);
+    putstr(cfg, "glcontrast = 0.1\nglsaturation = 9\n");
+    CHECK(buildcfg_read(&c, cfg) == 0);
+    CHECK(c.glcontrast == 0.5 && c.glsaturation == 2.0);
+    putstr(cfg, "glcontrast = 1.2x\nglsaturation = nan\n");
+    CHECK(buildcfg_read(&c, cfg) == 0);
+    CHECK(c.glcontrast == 1.0 && c.glsaturation == 1.0);
 
     /* garbage */
     putstr(cfg, "renderer\n= 5\nxdim3d = abc\r\n; comment\r\nunknownkey = 1\r\n"

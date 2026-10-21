@@ -149,7 +149,8 @@ int main(void)
 
         fputs("[Screen Setup]\nRenderer = 7\nGLTextureMipLevel = 99\n"
               "ScreenshotFormat = \"JPG\"\nGLDrawPath = \"Shader\"\n"
-              "GLInternalWidth = -5\nGLInternalHeight = 99999\n", f);
+              "GLInternalWidth = -5\nGLInternalHeight = 99999\n"
+              "GLContrast = \"9.5\"\nGLSaturation = \"-1\"\n", f);
         fclose(f);
         CONFIG_GetSetupFilename();
         CONFIG_ReadSetup();
@@ -159,6 +160,8 @@ int main(void)
         check("cfg GLDrawPath Shader", GLDrawPath, GLPATH_SHADER);
         check("cfg GLInternalWidth -5", GLInternalWidth, 0);
         check("cfg GLInternalHeight 99999", GLInternalHeight, 4320);
+        check("cfg GLContrast 9.5", GLContrast == GL_CONTRAST_MAX, 1);
+        check("cfg GLSaturation -1", GLSaturation == GL_SATURATION_MIN, 1);
         CONFIG_WriteSetup();
         f = fopen(cfg, "r");
         n = fread(text, 1, sizeof(text) - 1, f);
@@ -170,16 +173,25 @@ int main(void)
         check("cfg writes GLDrawPath shader", strstr(text, "GLDrawPath = \"shader\"") != NULL, 1);
         check("cfg writes GLInternalWidth 0", strstr(text, "GLInternalWidth = 0") != NULL, 1);
         check("cfg writes GLInternalHeight 4320", strstr(text, "GLInternalHeight = 4320") != NULL, 1);
+        check("cfg writes GLContrast 1.5", strstr(text, "GLContrast = \"1.5\"") != NULL, 1);
+        check("cfg writes GLSaturation 0", strstr(text, "GLSaturation = \"0\"") != NULL, 1);
 
         f = fopen(cfg, "w");
         fputs("[Screen Setup]\nRenderer = -2\nGLTextureMipLevel = -3\n"
-              "GLDrawPath = \"bogus\"\nGLInternalWidth = 320\n", f);
+              "GLDrawPath = \"bogus\"\nGLInternalWidth = 320\n"
+              "GLContrast = \"0.75\"\nGLSaturation = \"1.25x\"\n", f);
         fclose(f);
         CONFIG_ReadSetup();
         check("cfg Renderer -2", RendererSetting, 0);
         check("cfg GLTextureMipLevel -3", GLTextureMipLevel, 0);
         check("cfg GLDrawPath bogus", GLDrawPath, GLPATH_AUTO);
         check("cfg GLInternalWidth 320", GLInternalWidth, 320);
+        check("cfg GLContrast 0.75", GLContrast == 0.75, 1);
+        check("cfg GLSaturation 1.25x (not a number)", GLSaturation == 1.0, 1);
+        CONFIG_WriteSetup();
+        CONFIG_ReadSetup();
+        check("cfg GLContrast 0.75 round trip", GLContrast == 0.75, 1);
+        check("cfg GLSaturation 1 round trip", GLSaturation == 1.0, 1);
         remove(cfg);
         while ((slash = strrchr(cfg, '/')) != NULL) {
             *slash = 0;

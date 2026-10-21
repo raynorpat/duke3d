@@ -2104,6 +2104,8 @@ static int setgamemoderenderer(void)
     gldrawpathrequest = GLDrawPath;  // the path asked for; setgamemode_gl picks what the driver has
     glinternalwidth = GLInternalWidth;
     glinternalheight = GLInternalHeight;
+    glcontrast = GLContrast;  // the shader path's, applied as it shows each frame
+    glsaturation = GLSaturation;
 #endif
     if (gamerenderer == 3 && setgamemode_gl(ScreenMode) != 0)
     {
