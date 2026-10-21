@@ -1832,6 +1832,9 @@ void displayweapon(short snum)
 #define MAXHORIZ     127
 
 int32_t myaimmode = 0, myaimstat = 0, omyaimstat = 0;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+static int32_t sentaimmode = 0;
+#endif
 
 void getinput(short snum)
 {
@@ -1936,7 +1939,13 @@ void getinput(short snum)
     loc.bits |=   BUTTON(gamefunc_Inventory_Left)<<20;
     loc.bits |=   KB_KeyPressed(sc_Pause)<<21;
     loc.bits |=   BUTTON(gamefunc_Quick_Kick)<<22;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1's cheatkeys toggles aim_mode on bit 23, so send only the changes.
+    loc.bits |=   (myaimmode != sentaimmode)<<23;
+    sentaimmode = myaimmode;
+#else
     loc.bits |=   myaimmode<<23;
+#endif
     loc.bits |=   BUTTON(gamefunc_Holo_Duke)<<24;
     loc.bits |=   BUTTON(gamefunc_Jetpack)<<25;
     loc.bits |=   (((int32_t)gamequit)<<26);
