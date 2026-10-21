@@ -89,6 +89,13 @@ Side-by-side captures of E1L1, classic vs renderer 3 at the same camera (session
      the configured value is kept (as with the renderer setting).
 6. **README** documents the tiers and settings.
 
+## Addendum (2026-10-21, user requests during execution)
+
+- **Widescreen status bar** *(user)*: in widescreen modes the status bar reaches both screen edges, its side strips filled with the bar's own artwork mirrored outward (no stretching). All renderers; 4:3 and tall modes unchanged.
+- **Corpse clipping fix** *(user-reported bug)*: face sprites overlapping a wall behind them draw whole, as classic does (upstream Polymost bug); applies to renderers 2 and 3.
+- **EDuke32 ports** *(user)*: 27d32c7c (classic voxel `drawslab` palette lookup hoisted, output identical) and an adaptation of 5924cd30: Duke's 8-level brightness stays; the shader path's present pass adds contrast and saturation (EDuke32's formula and ranges, default identity), with `GLContrast`/`GLSaturation` settings. *(User chose keeping britable.)*
+- **Display mode and vsync** *(user)*: windowed / borderless (today's desktop fullscreen, the default for fullscreen users) / exclusive fullscreen at the configured resolution, and vsync on/off (default on), in game and editor, all renderers, with config keys and game menu entries; Alt+Enter toggles windowed and the chosen full-screen style; `BUILD_WINDOWED` still forces a window.
+
 ## Non-goals
 
 - Classic's look-up/down shearing (true perspective stays).
