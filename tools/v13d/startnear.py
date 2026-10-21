@@ -2,13 +2,15 @@
 (gendemo.py) starts next to the enemy or pickup under test. The map keeps its
 length; only the header's start position, angle and sector change.
 
-usage: startnear.py <in.grp> <out.grp> <MAP name> <picnum> [which]
+usage: startnear.py <in.grp> <out.grp> <MAP name> <picnum> [which [new picnum]]
 
 The start goes onto the <which>-th sprite of <picnum> (default the first), at its
-sector's floor height."""
+sector's floor height. With a new picnum, that sprite also becomes it, for a pickup
+or enemy the release has code for but no map places."""
 import struct, sys
 src, dst, mapname, pic = sys.argv[1], sys.argv[2], sys.argv[3].upper(), int(sys.argv[4])
 which = int(sys.argv[5]) if len(sys.argv) > 5 else 0
+newpic = int(sys.argv[6]) if len(sys.argv) > 6 else None
 d = bytearray(open(src,"rb").read())
 n = struct.unpack_from("<i", d, 12)[0]; off = 16+16*n
 for k in range(n):
@@ -25,5 +27,7 @@ s = p+44*hits[which]
 x, y, z = struct.unpack_from("<iii", d, s); sect = struct.unpack_from("<h", d, s+24)[0]
 floorz = struct.unpack_from("<i", d, sec+40*sect+8)[0]   # sectortype.floorz
 struct.pack_into("<iiihh", d, m+4, x, y, floorz-(38<<8), 0, sect)
+if newpic is not None: struct.pack_into("<h", d, s+14, newpic)
 open(dst, "wb").write(d)
-print(f"{mapname}: start at sprite {hits[which]} ({x},{y}) sector {sect}, {len(hits)} of picnum {pic}")
+print(f"{mapname}: start at sprite {hits[which]} ({x},{y}) sector {sect}, {len(hits)} of picnum {pic}"
+      + (f", now picnum {newpic}" if newpic is not None else ""))

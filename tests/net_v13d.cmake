@@ -1,13 +1,17 @@
 # Starts two peers over UDP on localhost and checks how they meet.
 #
 #   cmake -DA=<exe> -DA_DATA=<dir> -DB=<exe> -DB_DATA=<dir> -DPORT=<n>
-#         -DMODE=<refuse|connect> -DWORK=<scratch dir> -P net_v13d.cmake
+#         -DMODE=<refuse|connect> -DWORK=<scratch dir> [-DARGS="<options>"]
+#         -P net_v13d.cmake
+#
+# ARGS, space-separated, go to both peers after "-net net.cfg"; "/v1 /l1"
+# puts them straight into a level, so the game runs and checks its sync.
 #
 # Each data dir holds DUKE3D.GRP and GAME.CON, DEFS.CON and USER.CON. The
 # peers use ports PORT and PORT+1. MODE refuse expects both peers to leave
 # with the version message; MODE connect expects both to get past the
-# network setup and still be running, with no version message, when the
-# time runs out.
+# network setup and still be running, with no version message and no
+# out-of-sync report, when the time runs out.
 #
 # The driver runs both peers at once as one execute_process pipeline of two
 # "-DROLE=peer" runs of this script, each of which runs one game and keeps
@@ -21,7 +25,8 @@ if(ROLE STREQUAL "peer")
   set(ENV{HOME} "${RUN}/home")
   set(ENV{USERPROFILE} "${RUN}/home")
   set(ENV{DUKE3D_SAVE_DIR} "${RUN}/home")
-  execute_process(COMMAND "${EXE}" -net net.cfg
+  separate_arguments(_args UNIX_COMMAND "${ARGS}")
+  execute_process(COMMAND "${EXE}" -net net.cfg ${_args}
     WORKING_DIRECTORY "${RUN}"
     TIMEOUT ${SECONDS}
     RESULT_VARIABLE _result
@@ -51,9 +56,9 @@ set(ENV{BUILD_WINDOWED} 1)
 set(_seconds 20)
 execute_process(
   COMMAND "${CMAKE_COMMAND}" -DROLE=peer "-DEXE=${A}" "-DRUN=${WORK}/A"
-          -DSECONDS=${_seconds} -P "${CMAKE_CURRENT_LIST_FILE}"
+          -DSECONDS=${_seconds} "-DARGS=${ARGS}" -P "${CMAKE_CURRENT_LIST_FILE}"
   COMMAND "${CMAKE_COMMAND}" -DROLE=peer "-DEXE=${B}" "-DRUN=${WORK}/B"
-          -DSECONDS=${_seconds} -DDELAY=2 -P "${CMAKE_CURRENT_LIST_FILE}"
+          -DSECONDS=${_seconds} -DDELAY=2 "-DARGS=${ARGS}" -P "${CMAKE_CURRENT_LIST_FILE}"
   RESULT_VARIABLE _ignored)
 
 set(_fail "")
@@ -62,6 +67,7 @@ foreach(_peer A B)
   file(READ "${WORK}/${_peer}/result.txt" _result)
   string(FIND "${_out}" "You cannot play Duke with different versions" _refused)
   string(FIND "${_out}" "Multiplayer initialized" _joined)
+  string(FIND "${_out}" "Out Of Sync" _oos)
   if(MODE STREQUAL "refuse")
     if(_refused EQUAL -1)
       string(APPEND _fail "peer ${_peer} (${${_peer}}) didn't refuse; it ended with \"${_result}\".\n")
@@ -71,6 +77,8 @@ foreach(_peer A B)
       string(APPEND _fail "peer ${_peer} (${${_peer}}) refused its own version.\n")
     elseif(_joined EQUAL -1)
       string(APPEND _fail "peer ${_peer} (${${_peer}}) never got past the network setup.\n")
+    elseif(NOT _oos EQUAL -1)
+      string(APPEND _fail "peer ${_peer} (${${_peer}}) went out of sync.\n")
     elseif(NOT _result MATCHES "timeout|terminated")
       string(APPEND _fail "peer ${_peer} (${${_peer}}) left the game early: \"${_result}\".\n")
     endif()

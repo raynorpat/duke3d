@@ -162,7 +162,9 @@ static int loadpheader(char spot,int32 *vn,int32 *ln,int32 *psk,int32 *nump)
      char filename[] = "game0.sav";
      char fullname[MAX_PATH];
      int32_t fil;
+#if DUKE3D_GAMEVER >= GAMEVER_11
      int32_t bv = 0;
+#endif
 
      filename[4] = spot+'0';
      GetPathFromEnvironment(fullname, sizeof(fullname), filename);
@@ -171,8 +173,13 @@ static int loadpheader(char spot,int32 *vn,int32 *ln,int32 *psk,int32 *nump)
 
      walock[MAXTILES-3] = 255;
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // 1.0 saves have no version: they are told by their layout.
+     if(sg_check10(fil) < 0)
+#else
      bv = sg_read32(fil);
      if(bv != BYTEVERSION)
+#endif
      {
         FTA(114,&ps[myconnectindex]);
         kclose(fil);
@@ -258,6 +265,20 @@ int loadplayerfile(char *fnptr, signed char spot)
 
      ready2send = 0;
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // 1.0 saves have no version: they are told by their layout (rulings.md).
+     // bv is where the save's script was, for its script addresses.
+     bv = sg_check10(fil);
+     if(bv < 0)
+     {
+        printf("%s is not a DOS 1.0 save.\n",fnptr);
+        FTA(114,&ps[myconnectindex]);
+        kclose(fil);
+        ototalclock = totalclock;
+        ready2send = 1;
+        return 1;
+     }
+#else
      bv = sg_read32(fil);
      if(bv != BYTEVERSION)
      {
@@ -271,7 +292,9 @@ int loadplayerfile(char *fnptr, signed char spot)
      i = sg_playerblocksize(fil);
      if(i != SG_PLAYER_BLOCK0)
      {
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        printf("%s is not a DOS 1.1 save (player block is %d bytes).\n",fnptr,i);
+#elif DUKE3D_GAMEVER < GAMEVER_14
         printf("%s is not a DOS 1.3D save (player block is %d bytes).\n",fnptr,i);
 #elif DUKE3D_GAMEVER < GAMEVER_15
         printf("%s is not a DOS 1.4 save (player block is %d bytes).\n",fnptr,i);
@@ -284,6 +307,7 @@ int loadplayerfile(char *fnptr, signed char spot)
         ready2send = 1;
         return 1;
      }
+#endif
 
 #if DUKE3D_GAMEVER < GAMEVER_14
      nump = 1;  // 1.3D saves have no player count
@@ -337,9 +361,17 @@ int loadplayerfile(char *fnptr, signed char spot)
      kdfread((char *)waloff[MAXTILES-3],160,100,fil);
 
      numwalls = clampcount(sg_read16(fil),MAXWALLS);
+#if DUKE3D_GAMEVER < GAMEVER_11 // 1.0 saves only the map's walls and sectors
+     sg_readrecs(fil,wall,sizeof(walltype),sg_wall,numwalls,SG_WALL_SIZE,numwalls);
+#else
      sg_readrecs(fil,wall,sizeof(walltype),sg_wall,MAXWALLS,SG_WALL_SIZE,MAXWALLS);
+#endif
      numsectors = clampcount(sg_read16(fil),MAXSECTORS);
+#if DUKE3D_GAMEVER < GAMEVER_11
+     sg_readrecs(fil,sector,sizeof(sectortype),sg_sector,numsectors,SG_SECTOR_SIZE,numsectors);
+#else
      sg_readrecs(fil,sector,sizeof(sectortype),sg_sector,MAXSECTORS,SG_SECTOR_SIZE,MAXSECTORS);
+#endif
      sg_readrecs(fil,sprite,sizeof(spritetype),sg_sprite,MAXSPRITES,SG_SPRITE_SIZE,MAXSPRITES);
      sg_read16s(fil,headspritesect,2,MAXSECTORS+1);
      sg_read16s(fil,prevspritesect,2,MAXSPRITES);
@@ -349,9 +381,15 @@ int loadplayerfile(char *fnptr, signed char spot)
      sg_read16s(fil,nextspritestat,2,MAXSPRITES);
      numcyclers = clampcount(sg_read16(fil),MAXCYCLERS);
      sg_read16s(fil,&cyclers[0][0],12,MAXCYCLERS);
-     sg_readrecs(fil,ps,sizeof(struct player_struct),sg_player,MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
+     sg_readrecs(fil,ps,sizeof(struct player_struct),sg_player,SG_DOS_MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
      for(i=0;i<MAXPLAYERS;i++) ps[i].palette = (char *) &palette[0];
-     sg_readrecs(fil,po,sizeof(struct player_orig),sg_playerorig,MAXPLAYERS,SG_PLAYERORIG_SIZE*MAXPLAYERS,1);
+     sg_readrecs(fil,po,sizeof(struct player_orig),sg_playerorig,SG_DOS_MAXPLAYERS,SG_PLAYERORIG_DFSIZE,SG_PLAYERORIG_DFCOUNT);
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // 1.0 saves hittype[] here, raw, with DOS script addresses (F10-003):
+     // they are made offsets once actorscrptr[] is in.
+     clearbufbyte(hittype,sizeof(hittype),0L);
+     sg_readrecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,SG_DOS_MAXHITTYPES,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES);
+#endif
      numanimwalls = clampcount(sg_read16(fil),MAXANIMWALLS);
      sg_readrecs(fil,animwall,sizeof(struct animwalltype),sg_animwall,MAXANIMWALLS,SG_ANIMWALL_SIZE*MAXANIMWALLS,1);
      sg_read32s(fil,msx,4,sizeof(msx)/sizeof(msx[0]));
@@ -381,13 +419,24 @@ int loadplayerfile(char *fnptr, signed char spot)
      sg_read16s(fil,cloudy,sizeof(short)<<7,1);
 #endif
 
-     kdfread(&scriptptrs[0],1,MAXSCRIPTSIZE,fil);
-     sg_read32s(fil,script,4,MAXSCRIPTSIZE);
+     kdfread(&scriptptrs[0],1,SG_DOS_MAXSCRIPT,fil);
+     sg_read32s(fil,script,4,SG_DOS_MAXSCRIPT);
 
      clearbuf(actorscrptr,MAXTILES,0L);
      sg_read32s(fil,actorscrptr,4,SG_DOS_MAXTILES);
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // Every entry is stored minus the script's address, so the empty ones
+     // hold minus that. An actor's temp_data[1], [4] and [5] at or above it
+     // are addresses; sg_check10 has made sure they're in the script.
+     for(i=0;i<SG_DOS_MAXTILES;i++)
+         if(actorscrptr[i] == -bv) actorscrptr[i] = 0;
+     for(i=0;i<SG_DOS_MAXHITTYPES;i++)
+         if(sprite[i].picnum >= 0 && sprite[i].picnum < MAXTILES && actorscrptr[sprite[i].picnum])
+             for(j=0;j<3;j++)
+                 if(hittype[i].temp_data[sg_scriptslots10[j]] >= bv)
+                     hittype[i].temp_data[sg_scriptslots10[j]] -= bv;
+#elif DUKE3D_GAMEVER < GAMEVER_14
      clearbufbyte(hittype,sizeof(hittype),0L);
      kdfread(&scriptptrs[0],1,SG_DOS_MAXHITTYPES,fil);
      sg_readrecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,SG_DOS_MAXHITTYPES,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES);
@@ -409,6 +458,19 @@ int loadplayerfile(char *fnptr, signed char spot)
 
      earthquaketime = sg_read8(fil);
      ud.from_bonus = sg_read16(fil);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     // 1.1 ends with 7 scalars; auto_run and crosshair are bytes. 1.0 ends
+     // with the first 4.
+     ud.respawn_monsters = sg_read32(fil);
+     ud.m_respawn_monsters = ud.respawn_monsters;
+     ud.respawn_items = sg_read32(fil);
+     ud.m_respawn_items = ud.respawn_items;
+#if DUKE3D_GAMEVER >= GAMEVER_11
+     ud.god = sg_read8(fil);
+     ud.auto_run = sg_read8(fil);
+     ud.crosshair = sg_read8(fil);
+#endif
+#else
      ud.secretlevel = sg_read16(fil);
      ud.respawn_monsters = sg_read32(fil);
      ud.m_respawn_monsters = ud.respawn_monsters;
@@ -424,6 +486,7 @@ int loadplayerfile(char *fnptr, signed char spot)
      ud.m_monsters_off = ud.monsters_off;
      ud.last_level = sg_read16(fil);
      ud.eog = sg_read8(fil);
+#endif
 
 #if DUKE3D_GAMEVER >= GAMEVER_14 // a 1.3D save ends here
      ud.coop = sg_read32(fil);
@@ -613,7 +676,9 @@ int saveplayerfile(char *fnptr, signed char spot)
 
      ready2send = 0;
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 saves have no version
      sg_write32(fil,BYTEVERSION);
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D saves have no player count
      sg_write32(fil,ud.multimode);
 #endif
@@ -625,9 +690,17 @@ int saveplayerfile(char *fnptr, signed char spot)
      dfwrite((char *)waloff[MAXTILES-1],160,100,fil);
 
      sg_write16(fil,numwalls);
+#if DUKE3D_GAMEVER < GAMEVER_11 // 1.0 saves only the map's walls and sectors
+     sg_writerecs(fil,wall,sizeof(walltype),sg_wall,numwalls,SG_WALL_SIZE,numwalls);
+#else
      sg_writerecs(fil,wall,sizeof(walltype),sg_wall,MAXWALLS,SG_WALL_SIZE,MAXWALLS);
+#endif
      sg_write16(fil,numsectors);
+#if DUKE3D_GAMEVER < GAMEVER_11
+     sg_writerecs(fil,sector,sizeof(sectortype),sg_sector,numsectors,SG_SECTOR_SIZE,numsectors);
+#else
      sg_writerecs(fil,sector,sizeof(sectortype),sg_sector,MAXSECTORS,SG_SECTOR_SIZE,MAXSECTORS);
+#endif
      sg_writerecs(fil,sprite,sizeof(spritetype),sg_sprite,MAXSPRITES,SG_SPRITE_SIZE,MAXSPRITES);
      sg_write16s(fil,headspritesect,2,MAXSECTORS+1);
      sg_write16s(fil,prevspritesect,2,MAXSPRITES);
@@ -637,8 +710,25 @@ int saveplayerfile(char *fnptr, signed char spot)
      sg_write16s(fil,nextspritestat,2,MAXSPRITES);
      sg_write16(fil,numcyclers);
      sg_write16s(fil,&cyclers[0][0],12,MAXCYCLERS);
-     sg_writerecs(fil,ps,sizeof(struct player_struct),sg_player,MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
-     sg_writerecs(fil,po,sizeof(struct player_orig),sg_playerorig,MAXPLAYERS,SG_PLAYERORIG_SIZE*MAXPLAYERS,1);
+     sg_writerecs(fil,ps,sizeof(struct player_struct),sg_player,SG_DOS_MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
+     sg_writerecs(fil,po,sizeof(struct player_orig),sg_playerorig,SG_DOS_MAXPLAYERS,SG_PLAYERORIG_DFSIZE,SG_PLAYERORIG_DFCOUNT);
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // 1.0 saves hittype[] here, raw: an actor's script offsets in
+     // temp_data[1], [4] and [5] go out as DOS addresses (F10-003), and
+     // scriptptrs marks them to undo after.
+     for(i=0;i<SG_DOS_MAXHITTYPES;i++)
+         for(j=0;j<3;j++)
+         {
+             int32_t *t = &hittype[i].temp_data[sg_scriptslots10[j]];
+             scriptptrs[i*3+j] = sprite[i].picnum >= 0 && sprite[i].picnum < MAXTILES &&
+                 actorscrptr[sprite[i].picnum] && *t > 0 && *t < SG_DOS_MAXSCRIPT*4 && (*t&3) == 0;
+             if(scriptptrs[i*3+j]) *t += SG_DOS10_SCRIPTBASE;
+         }
+     sg_writerecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,SG_DOS_MAXHITTYPES,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES);
+     for(i=0;i<SG_DOS_MAXHITTYPES;i++)
+         for(j=0;j<3;j++)
+             if(scriptptrs[i*3+j]) hittype[i].temp_data[sg_scriptslots10[j]] -= SG_DOS10_SCRIPTBASE;
+#endif
      sg_write16(fil,numanimwalls);
      sg_writerecs(fil,animwall,sizeof(struct animwalltype),sg_animwall,MAXANIMWALLS,SG_ANIMWALL_SIZE*MAXANIMWALLS,1);
      sg_write32s(fil,msx,4,sizeof(msx)/sizeof(msx[0]));
@@ -665,14 +755,25 @@ int saveplayerfile(char *fnptr, signed char spot)
 #endif
 
      // Script values are already offsets; the pointer flag blocks are kept zeroed.
-     clearbufbyte(scriptptrs,MAXSCRIPTSIZE,0L);
+     clearbufbyte(scriptptrs,SG_DOS_MAXSCRIPT,0L);
 
-     dfwrite(&scriptptrs[0],1,MAXSCRIPTSIZE,fil);
-     sg_write32s(fil,script,4,MAXSCRIPTSIZE);
+     dfwrite(&scriptptrs[0],1,SG_DOS_MAXSCRIPT,fil);
+     sg_write32s(fil,script,4,SG_DOS_MAXSCRIPT);
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // 1.0 stores every entry minus the script's address, the empty ones too.
+     for(i=0;i<SG_DOS_MAXTILES;i++)
+         if(actorscrptr[i] == 0) actorscrptr[i] = -SG_DOS10_SCRIPTBASE;
      sg_write32s(fil,actorscrptr,4,SG_DOS_MAXTILES);
+     for(i=0;i<SG_DOS_MAXTILES;i++)
+         if(actorscrptr[i] == -SG_DOS10_SCRIPTBASE) actorscrptr[i] = 0;
+#else
+     sg_write32s(fil,actorscrptr,4,SG_DOS_MAXTILES);
+#endif
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+     // 1.0 wrote hittype[] after po[].
+#elif DUKE3D_GAMEVER < GAMEVER_14
      dfwrite(&scriptptrs[0],1,SG_DOS_MAXHITTYPES,fil);
      sg_writerecs(fil,hittype,sizeof(struct weaponhit),sg_weaponhit,SG_DOS_MAXHITTYPES,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES);
 #else
@@ -693,6 +794,15 @@ int saveplayerfile(char *fnptr, signed char spot)
 
      sg_write8(fil,earthquaketime);
      sg_write16(fil,ud.from_bonus);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     sg_write32(fil,ud.respawn_monsters);
+     sg_write32(fil,ud.respawn_items);
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 ends here
+     sg_write8(fil,ud.god);
+     sg_write8(fil,ud.auto_run);
+     sg_write8(fil,ud.crosshair);
+#endif
+#else
      sg_write16(fil,ud.secretlevel);
      sg_write32(fil,ud.respawn_monsters);
      sg_write32(fil,ud.respawn_items);
@@ -703,6 +813,7 @@ int saveplayerfile(char *fnptr, signed char spot)
      sg_write32(fil,ud.monsters_off);
      sg_write16(fil,ud.last_level);
      sg_write8(fil,ud.eog);
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // a 1.3D save ends here
      sg_write32(fil,ud.coop);
      sg_write32(fil,ud.marker);
@@ -1639,7 +1750,9 @@ static void non3dr_menus(void)
                 { "AIM UP", gamefunc_Aim_Up },
                 { "AIM DOWN", gamefunc_Aim_Down },
                 { "CENTER VIEW", gamefunc_Center_View },
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no mouse aiming
                 { "MOUSE AIM", gamefunc_Mouse_Aiming }
+#endif
             };
 
             DoKeybindMenu("MORE MOVEMENT", keybinds, ALEN(keybinds), MENU_CONTROLS);
@@ -1695,7 +1808,9 @@ static void non3dr_menus(void)
                 { "USE JETPACK", gamefunc_Jetpack },
                 { "USE NIGHTVISION", gamefunc_NightVision },
                 { "USE MEDKIT", gamefunc_MedKit },
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 sends no steroids bit (G10-S06)
                 { "USE STEROIDS", gamefunc_Steroids }
+#endif
             };
 
             DoKeybindMenu("INVENTORY", keybinds, ALEN(keybinds), MENU_CONTROLS);
@@ -1712,7 +1827,9 @@ static void non3dr_menus(void)
                 { "MAP FOLLOW MODE", gamefunc_Map_Follow_Mode },
                 { "SEE COOP VIEW", gamefunc_See_Coop_View },
                 { "CHAT MESSAGE", gamefunc_SendMessage },
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no crosshair (G10-G07)
                 { "TOGGLE CROSSHAIR", gamefunc_Toggle_Crosshair },
+#endif
             };
 
             DoKeybindMenu("MISCELLANEOUS", keybinds, ALEN(keybinds), MENU_CONTROLS);
@@ -1727,7 +1844,129 @@ static void non3dr_menus(void)
 }
 
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+// 1.0's credits: six pages, with no hardware page, as its menus() draws them
+// (page, y, line) (G10-G08).
+static const struct { short page, y; const char *text; } credits10[] =
+{
+    { 0, 50, "ORIGINAL CONCEPT" },
+    { 0, 59, "TODD REPLOGLE" },
+    { 0, 68, "ALLEN H. BLUM III" },
+    { 0, 90, "PRODUCED & DIRECTED BY" },
+    { 0, 99, "GREG MALONE" },
+    { 0, 121, "EXECUTIVE PRODUCER" },
+    { 0, 130, "GEORGE BROUSSARD" },
+    { 1, 50, "GAME PROGRAMMING" },
+    { 1, 59, "TODD REPLOGLE" },
+    { 1, 80, "BUILD ENGINE/TOOLS/NET/MODEM" },
+    { 1, 89, "KEN SILVERMAN" },
+    { 1, 111, "MAP DESIGN" },
+    { 1, 120, "ALLEN H BLUM III" },
+    { 1, 129, "RICHARD GRAY" },
+    { 2, 35, "3D MODELING" },
+    { 2, 44, "CHUCK JONES" },
+    { 2, 53, "SAPPHIRE CORPORATION" },
+    { 2, 73, "ARTWORK" },
+    { 2, 82, "DIRK JONES" },
+    { 2, 91, "STEPHEN HORNBACK" },
+    { 2, 100, "JAMES STOREY" },
+    { 2, 119, "NETWORK LAYER/SETUP PROGRAM" },
+    { 2, 128, "MARK DOCHTERMANN" },
+    { 2, 147, "SOUND ENGINE" },
+    { 2, 156, "JIM DOSE" },
+    { 3, 75, "SOUND & MUSIC DEVELOPMENT" },
+    { 3, 84, "ROBERT PRINCE" },
+    { 3, 93, "LEE JACKSON" },
+    { 3, 112, "VOICE TALENT" },
+    { 3, 121, "LANI MINELLA - VOICE PRODUCER" },
+    { 3, 130, "JON ST. JOHN AS \"DUKE NUKEM\"" },
+    { 4, 50, "SPECIAL THANKS TO" },
+    { 4, 59, "STEVE BLACKBURN, SCOTT MILLER" },
+    { 4, 68, "TOM HALL, TERRY NAGY, JOE SIEGLER" },
+    { 4, 87, "THE 3D REALMS BETA TESTERS" },
+    { 4, 96, "MIKE BARTELT, WAYNE BENNER" },
+    { 4, 105, "GLENN BRENSINGER, ROB BROWN" },
+    { 4, 114, "ERIK HARRIS, KEN HECKBERT" },
+    { 4, 123, "TERRY HERRIN, GREG HIVELY" },
+    { 4, 132, "HANK LEUKART, KEN MAYER" },
+    { 4, 141, "JEFF RAUSCH, KELLY ROGERS" },
+    { 4, 150, "MIKE DUNCAN, DOUG HOWELL" },
+    { 5, 50, "DUKE NUKEM IS A TRADEMARK OF" },
+    { 5, 59, "3D REALMS ENTERTAINMENT" },
+    { 5, 78, "DUKE NUKEM 3D" },
+    { 5, 87, "(C) 1996 3D REALMS ENTERTAINMENT" },
+    { 5, 106, "PLEASE READ LICENSE.DOC FOR SHAREWARE" },
+    { 5, 115, "DISTRIBUTION GRANTS AND RESTRICTIONS" },
+    { 5, 134, "MADE IN DALLAS, TEXAS USA" },
+};
+#endif
+
+#if DUKE3D_GAMEVER >= GAMEVER_11 && DUKE3D_GAMEVER < GAMEVER_13D
+// 1.1's credits: seven pages, with its own hardware page, as its menus() draws them
+// (page, y, line) (G11-G37).
+static const struct { short page, y; const char *text; } credits11[] =
+{
+    { 0, 50, "ORIGINAL CONCEPT" },
+    { 0, 59, "TODD REPLOGLE" },
+    { 0, 68, "ALLEN H. BLUM III" },
+    { 0, 90, "PRODUCED & DIRECTED BY" },
+    { 0, 99, "GREG MALONE" },
+    { 0, 121, "EXECUTIVE PRODUCER" },
+    { 0, 130, "GEORGE BROUSSARD" },
+    { 1, 50, "GAME PROGRAMMING" },
+    { 1, 59, "TODD REPLOGLE" },
+    { 1, 80, "BUILD ENGINE/TOOLS/NET/MODEM" },
+    { 1, 89, "KEN SILVERMAN" },
+    { 1, 111, "MAP DESIGN" },
+    { 1, 120, "ALLEN H BLUM III" },
+    { 1, 129, "RICHARD GRAY" },
+    { 2, 35, "3D MODELING" },
+    { 2, 44, "CHUCK JONES" },
+    { 2, 53, "SAPPHIRE CORPORATION" },
+    { 2, 73, "ARTWORK" },
+    { 2, 82, "DIRK JONES" },
+    { 2, 91, "STEPHEN HORNBACK" },
+    { 2, 100, "JAMES STOREY" },
+    { 2, 119, "NETWORK LAYER/SETUP PROGRAM" },
+    { 2, 128, "MARK DOCHTERMANN" },
+    { 2, 147, "SOUND ENGINE" },
+    { 2, 156, "JIM DOSE" },
+    { 3, 75, "SOUND & MUSIC DEVELOPMENT" },
+    { 3, 84, "ROBERT PRINCE" },
+    { 3, 93, "LEE JACKSON" },
+    { 3, 112, "VOICE TALENT" },
+    { 3, 121, "LANI MINELLA - VOICE PRODUCER" },
+    { 3, 130, "JON ST. JOHN AS \"DUKE NUKEM\"" },
+    { 4, 48, "SPECIAL THANKS TO" },
+    { 4, 57, "STEVE BLACKBURN, SCOTT MILLER" },
+    { 4, 66, "TOM HALL, TERRY NAGY, JOE SIEGLER" },
+    { 4, 75, "COLLEEN COMPTON, FORMGEN, INC." },
+    { 4, 93, "THE 3D REALMS BETA TESTERS" },
+    { 4, 102, "MIKE BARTELT, WAYNE BENNER" },
+    { 4, 111, "GLENN BRENSINGER, ROB BROWN" },
+    { 4, 120, "ERIK HARRIS, KEN HECKBERT" },
+    { 4, 129, "TERRY HERRIN, GREG HIVELY" },
+    { 4, 138, "HANK LEUKART, KEN MAYER" },
+    { 4, 147, "JEFF RAUSCH, KELLY ROGERS" },
+    { 4, 156, "MIKE DUNCAN, DOUG HOWELL" },
+    { 5, 50, "COMPANY PRODUCT SUPPORT" },
+    { 5, 68, "THE FOLLOWING COMPANIES WERE COOL" },
+    { 5, 77, "ENOUGH TO GIVE US LOTS OF STUFF" },
+    { 5, 86, "DURING THE MAKING OF DUKE NUKEM 3D." },
+    { 5, 104, "ALTEC LANSING MULTIMEDIA" },
+    { 5, 113, "CREATIVE LABS, INC." },
+    { 5, 131, "THANKS FOR THE HARDWARE, GUYS." },
+    { 6, 50, "DUKE NUKEM IS A TRADEMARK OF" },
+    { 6, 59, "3D REALMS ENTERTAINMENT" },
+    { 6, 78, "DUKE NUKEM 3D" },
+    { 6, 87, "(C) 1996 3D REALMS ENTERTAINMENT" },
+    { 6, 106, "PLEASE READ LICENSE.DOC FOR SHAREWARE" },
+    { 6, 115, "DISTRIBUTION GRANTS AND RESTRICTIONS" },
+    { 6, 134, "MADE IN DALLAS, TEXAS USA" },
+};
+#endif
+
+#if DUKE3D_GAMEVER >= GAMEVER_13D && DUKE3D_GAMEVER < GAMEVER_14
 // 1.3D's credits: eight pages of text, as its menus() draws them (page, y, line).
 static const struct { short page, y; const char *text; } credits13[] =
 {
@@ -1877,7 +2116,9 @@ void menus(void)
             gametext(160,122+8,"ON THE MAIN MENU IF YOU WISH TO",0,2+8+16);
             gametext(160,131+8,"UPGRADE TO THE FULL REGISTERED",0,2+8+16);
             gametext(160,140+8,"VERSION OF DUKE NUKEM 3D.",0,2+8+16);
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 and 1.0 have no "press any key" line (G11-G37)
             gametext(160,149+16,"PRESS ANY KEY...",0,2+8+16);
+#endif
 
             if( x >= -1 ) cmenu(100);
             break;
@@ -2264,7 +2505,11 @@ void menus(void)
 
                 sound(KICK_HIT);
                 current_menu--;
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+                if(current_menu < 990) current_menu = 995;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+                if(current_menu < 990) current_menu = 996;
+#elif DUKE3D_GAMEVER < GAMEVER_14
                 if(current_menu < 990) current_menu = 997;
 #else
                 if(current_menu < 990) current_menu = 992;
@@ -2292,14 +2537,26 @@ void menus(void)
                 KB_ClearKeyDown(sc_Space);
                 sound(KICK_HIT);
                 current_menu++;
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+                if(current_menu > 995) current_menu = 990;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+                if(current_menu > 996) current_menu = 990;
+#elif DUKE3D_GAMEVER < GAMEVER_14
                 if(current_menu > 997) current_menu = 990;
 #else
                 if(current_menu > 992) current_menu = 990;
 #endif
             }
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+            for(l=0;l<(int)(sizeof(credits10)/sizeof(credits10[0]));l++)
+                if(credits10[l].page == current_menu-990)
+                    gametext(160,credits10[l].y,(char *)credits10[l].text,0,2+8+16);
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+            for(l=0;l<(int)(sizeof(credits11)/sizeof(credits11[0]));l++)
+                if(credits11[l].page == current_menu-990)
+                    gametext(160,credits11[l].y,(char *)credits11[l].text,0,2+8+16);
+#elif DUKE3D_GAMEVER < GAMEVER_14
             for(l=0;l<(int)(sizeof(credits13)/sizeof(credits13[0]));l++)
                 if(credits13[l].page == current_menu-990)
                     gametext(160,credits13[l].y,(char *)credits13[l].text,0,2+8+16);

@@ -240,7 +240,11 @@ char getsound(unsigned short num)
     short fp;
     int32_t   l;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    if(num >= GAME_NUM_SOUNDS || SoundToggle == 0) return 0;
+#else
     if(num >= NUM_SOUNDS || SoundToggle == 0) return 0;
+#endif
     if (FXDevice == NumSoundCards) return 0;
 
     fp = kopen4load(sounds[num],loadfromgrouponly);
@@ -249,6 +253,13 @@ char getsound(unsigned short num)
     l = kfilelength( fp );
     soundsiz[num] = l;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1 locks fewer sounds, and at lock level 1.
+    if( (ud.level_number == 0 && ud.volume_number == 0 && (num == 189 || num == 232 || num == 17 ) ) ||
+        ( l < 10240 ) )
+    {
+        Sound[num].lock = 1;
+#else
     if( (ud.level_number == 0 && ud.volume_number == 0 && (num == 189 || num == 232 || num == 99 || num == 233 || num == 17 ) ) ||
 #if DUKE3D_GAMEVER < GAMEVER_15
         ( l < 12800 ) )
@@ -257,6 +268,7 @@ char getsound(unsigned short num)
 #endif
     {
         Sound[num].lock = 2;
+#endif
         allocache((intptr_t *)&Sound[num].ptr,l,(unsigned char *)&Sound[num].lock);
         if(Sound[num].ptr != NULL)
             kread( fp, Sound[num].ptr , l);
@@ -269,7 +281,9 @@ void precachenecessarysounds(void)
 {
     short i, j;
 
+#if DUKE3D_GAMEVER >= GAMEVER_13D
     if (FXDevice == NumSoundCards) return;
+#endif
     j = 0;
 
     for(i=0;i<GAME_NUM_SOUNDS;i++)
@@ -477,6 +491,10 @@ void resetplayerstats(short snum)
     p->weapon_sway      = 0;
 //    p->select_dir       = 0;
     p->extra_extra8     = 0;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    p->spacesuit_used   = 0;
+    p->burn_time        = 0;
+#endif
     p->show_empty_weapon= 0;
     p->dummyplayersprite=-1;
     p->crack_time       = 0;
@@ -498,13 +516,26 @@ void resetplayerstats(short snum)
     p->rapid_fire_hold  = 0;
     p->toggle_key_flag  = 0;
     p->access_spritenum = -1;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    if(ud.multimode > 1 && ud.coop == 0 ) // 1.1: dukematch only
+#else
     if(ud.multimode > 1 && ud.coop != 1 )
+#endif
         p->got_access = 7;
     else p->got_access      = 0;
     p->random_club_frame= 0;
     pus = 1;
     p->on_warping_sector = 0;
     p->spritebridge      = 0;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1 keeps the third-person view across levels, with the camera reset.
+    if(p->over_shoulder_on)
+    {
+        cameradist = 0;
+        cameraclock = totalclock;
+        p->over_shoulder_on = 1;
+    }
+#endif
     p->palette = (char *) &palette[0];
 
     if(p->steroids_amount < 400 )
@@ -516,7 +547,12 @@ void resetplayerstats(short snum)
     p->jetpack_on =         0;
     p->holoduke_on =       -1;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1 starts a level looking 256 aside, not 512.
+    p->look_ang          = 256 - ((ud.level_number&1)<<9);
+#else
     p->look_ang          = 512 - ((ud.level_number&1)<<10);
+#endif
 
     p->rotscrnang        = 0;
     p->newowner          =-1;
@@ -569,7 +605,9 @@ void resetweapons(short snum)
     p->gotweapon[KNEE_WEAPON] = 1;
     p->ammo_amount[PISTOL_WEAPON] = 48;
     p->gotweapon[HANDREMOTE_WEAPON] = 1;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 does it in resetinventory (G10-P02)
     p->last_weapon = -1;
+#endif
 
     p->show_empty_weapon= 0;
     p->last_pissed_time = 0;
@@ -593,7 +631,14 @@ void resetinventory(short snum)
     p->holoduke_amount =    0;
     p->firstaid_amount = 0;
     p->steroids_amount = 0;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    p->spacesuit_amount = 0;
+    p->spacesuit_on = 0;
+#endif
     p->inven_icon = 0;
+#if DUKE3D_GAMEVER < GAMEVER_11
+    p->last_weapon = -1; // 1.0 (G10-P02)
+#endif
 }
 
 
@@ -618,7 +663,9 @@ void resetprestat(short snum,char g)
     p->lastrandomspot = 0;
     p->weapon_pos = 6;
     p->kickback_pic = 5;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 clears it only with the inventory or the remote (G10-P01)
     p->last_weapon = -1;
+#endif
     p->weapreccnt = 0;
     p->show_empty_weapon= 0;
     p->holster_weapon = 0;
@@ -643,7 +690,36 @@ void resetprestat(short snum,char g)
     numinterpolations = 0;
     startofdynamicinterpolations = 0;
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+    // 1.0: a level left with timebeforeexit at 1 loses the pistol and keeps
+    // the inventory (G10-P01).
+    if( (g&MODE_EOL) == MODE_EOL && p->timebeforeexit != 1 )
+    {
+        if(p->curr_weapon == HANDREMOTE_WEAPON)
+        {
+            p->ammo_amount[HANDBOMB_WEAPON]++;
+            p->curr_weapon = HANDBOMB_WEAPON;
+            p->last_weapon = -1;
+        }
+    }
+    else
+    {
+        resetweapons(snum);
+        if(p->timebeforeexit == 1)
+        {
+            p->gotweapon[PISTOL_WEAPON] = 0;
+            p->ammo_amount[PISTOL_WEAPON] = 0;
+            p->curr_weapon = KNEE_WEAPON;
+        }
+        else resetinventory(snum);
+    }
+#else
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1 tests only for the end of a level, so dukematch keeps the weapons.
+    if( (g&MODE_EOL) != MODE_EOL )
+#else
     if( ( (g&MODE_EOL) != MODE_EOL && numplayers < 2) || (ud.coop != 1 && numplayers > 1) )
+#endif
     {
         resetweapons(snum);
         resetinventory(snum);
@@ -653,6 +729,7 @@ void resetprestat(short snum,char g)
         p->ammo_amount[HANDBOMB_WEAPON]++;
         p->curr_weapon = HANDBOMB_WEAPON;
     }
+#endif
 
     p->timebeforeexit   = 0;
     p->customexitsound  = 0;
@@ -1040,8 +1117,10 @@ void newgame(char vn,char ln,char sk)
 #endif
     ready2send = 0;
 
+#if DUKE3D_GAMEVER >= GAMEVER_13D
     if( ud.m_recstat != 2 && ud.last_level >= 0 && ud.multimode > 1 && ud.coop != 1)
         dobonus(1);
+#endif
 
 #if DUKE3D_GAMEVER >= GAMEVER_14
     if( ln == 0 && vn == 3 && ud.multimode < 2 && ud.lockout == 0)
@@ -1072,19 +1151,27 @@ void newgame(char vn,char ln,char sk)
     ud.level_number =   ln;
     ud.volume_number =  vn;
     ud.player_skill =   sk;
+#if DUKE3D_GAMEVER >= GAMEVER_13D
+    // 1.1 resets neither, so from_bonus carries into a new game.
     ud.secretlevel =    0;
     ud.from_bonus = 0;
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14
     parallaxyscale = 0;
 #endif
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+    p->last_weapon = -1; // 1.0 keeps last_level (G10-P02)
+#else
     ud.last_level = -1;
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14
     lastsavedpos = -1;
 #endif
     p->zoom            = 768;
     p->gm              = 0;
 
+#if DUKE3D_GAMEVER >= GAMEVER_13D
     if(ud.m_coop != 1)
     {
         p->curr_weapon = PISTOL_WEAPON;
@@ -1094,6 +1181,7 @@ void newgame(char vn,char ln,char sk)
         p->gotweapon[HANDREMOTE_WEAPON] = 1;
         p->last_weapon = -1;
     }
+#endif
 
     display_mirror =        0;
 
@@ -1106,11 +1194,13 @@ void newgame(char vn,char ln,char sk)
             connectpoint2[ud.multimode-1] = -1;
         }
     }
+#if DUKE3D_GAMEVER >= GAMEVER_13D
     else
     {
         connecthead = 0;
         connectpoint2[0] = -1;
     }
+#endif
 }
 
 
@@ -1120,7 +1210,9 @@ void resetpspritevars(char g)
     int32_t firstx,firsty;
     spritetype *s;
     char aimmode[MAXPLAYERS];
+#if DUKE3D_GAMEVER >= GAMEVER_13D
     STATUSBARTYPE tsbar[MAXPLAYERS];
+#endif
 
     EGS(ps[0].cursectnum,ps[0].posx,ps[0].posy,ps[0].posz,
         APLAYER,0,0,0,ps[0].ang,0,0,0,10);
@@ -1128,6 +1220,8 @@ void resetpspritevars(char g)
     if(ud.recstat != 2) for(i=0;i<MAXPLAYERS;i++)
     {
         aimmode[i] = ps[i].aim_mode;
+#if DUKE3D_GAMEVER >= GAMEVER_13D
+        // 1.1 doesn't carry the co-op weapons and inventory to the next level.
         if(ud.multimode > 1 && ud.coop == 1 && ud.last_level >= 0)
         {
             for(j=0;j<MAX_WEAPONS;j++)
@@ -1148,6 +1242,7 @@ void resetpspritevars(char g)
             tsbar[i].scuba_amount = ps[i].scuba_amount;
             tsbar[i].boot_amount = ps[i].boot_amount;
         }
+#endif
     }
 
     resetplayerstats(0);
@@ -1158,6 +1253,7 @@ void resetpspritevars(char g)
     if(ud.recstat != 2) for(i=0;i<MAXPLAYERS;i++)
     {
         ps[i].aim_mode = aimmode[i];
+#if DUKE3D_GAMEVER >= GAMEVER_13D
         if(ud.multimode > 1 && ud.coop == 1 && ud.last_level >= 0)
         {
             for(j=0;j<MAX_WEAPONS;j++)
@@ -1177,6 +1273,7 @@ void resetpspritevars(char g)
             ps[i].scuba_amount= tsbar[i].scuba_amount;
             ps[i].boot_amount = tsbar[i].boot_amount;
         }
+#endif
     }
 
     numplayersprites = 0;
@@ -1317,11 +1414,18 @@ void genspriteremaps(void)
     kclose(fp);
 }
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+char waitabort; // 1.1: Escape ended the last wait for players
+#endif
+
 void waitforeverybody()
 {
     int32_t i;
 
     if (numplayers < 2) return;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    waitabort = 0;
+#endif
     packbuf[0] = 250;
     for(i=connecthead;i>=0;i=connectpoint2[i])
     {
@@ -1333,6 +1437,13 @@ void waitforeverybody()
     do
     {
         _idle();  /* let input queue run... */
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        if(KB_KeyPressed(sc_Escape))
+        {
+            waitabort = 1;
+            return;
+        }
+#endif
         getpackets();
         for(i=connecthead;i>=0;i=connectpoint2[i])
         {
@@ -1457,10 +1568,24 @@ void enterlevel(char g)
     i = ud.screen_size;
     ud.screen_size = 0;
     dofrontscreens();
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    if(ud.recstat != 2)
+    {
+        MUSIC_StopSong();
+        FX_StopAllSounds();
+    }
+#endif
     vscrn();
     ud.screen_size = i;
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1 picks the song even for a demo and frees no sound locks. Its index
+    // is volume*10+level into 10 songs per volume; ours keeps 11, same song.
+    music_select = (ud.volume_number*11) + ud.level_number;
+    if(ud.recstat != 2)
+        playmusic(&music_fn[0][(int)music_select][0]);
+    FX_SetReverb(0);
+#elif DUKE3D_GAMEVER < GAMEVER_14
     // 1.3D starts the level music before loading the map.
     if(ud.recstat != 2)
     {
@@ -1500,7 +1625,7 @@ void enterlevel(char g)
     }
 #endif
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER >= GAMEVER_13D && DUKE3D_GAMEVER < GAMEVER_14
     FX_StopAllSounds();
     clearsoundlocks();
     FX_SetReverb(0);
@@ -1599,11 +1724,32 @@ void enterlevel(char g)
      drawbackground();
 
      clearbufbyte(playerquitflag,MAXPLAYERS,0x01010101);
+#if DUKE3D_GAMEVER >= GAMEVER_13D
      ps[myconnectindex].over_shoulder_on = 0;
+#endif
 
      clearfrags();
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     // 1.1: after an Escape out of the wait, the level opens on the main menu.
+     if(waitabort == 1)
+     {
+         current_menu = 0;
+         ps[myconnectindex].gm |= MODE_MENU;
+     }
+#endif
+
      resettimevars();  // Here we go
+
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     // 1.1 keeps the third-person view and resets its camera.
+     if(ps[myconnectindex].over_shoulder_on)
+     {
+         cameradist = 0;
+         cameraclock = totalclock;
+         ps[myconnectindex].over_shoulder_on = 1;
+     }
+#endif
 
 
 }

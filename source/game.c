@@ -46,7 +46,11 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <sys/stat.h>
 
 // The release the build plays as (DUKE3D_VERSION), as its startup banner shows it.
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+    #define VERSION "1.0"
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+    #define VERSION "1.1"
+#elif DUKE3D_GAMEVER < GAMEVER_14
     #define VERSION "1.3D"
 #elif DUKE3D_GAMEVER < GAMEVER_15
     #define VERSION "1.4"
@@ -1025,6 +1029,15 @@ void checksync(void)
 
       if (syncstat)
       {
+          static char syncreported;
+
+          // Also report it once on stdout, so a log shows it.
+          if (!syncreported)
+          {
+              syncreported = 1;
+              printf("Out Of Sync - Please restart game\n");
+              fflush(stdout);
+          }
           printext256(4L,130L,31,0,"Out Of Sync - Please restart game",0);
           //printext256(4L,138L,31,0,"RUN DN3DHELP.EXE for information.",0);
       }
@@ -1068,7 +1081,9 @@ void check_fta_sounds(short i)
             spritesound(DRON_RECOG,i);
             break;
         case COMMANDER:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
         case COMMANDERSTAYPUT:
+#endif
             spritesound(COMM_RECOG,i);
             break;
         case ORGANTIC:
@@ -1081,6 +1096,16 @@ void check_fta_sounds(short i)
         case BOSS1:
             sound(BOS1_RECOG);
             break;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        // 1.1: BOSS2 plays BOS3_RECOG from the sprite; the dummy Dukes play BOS2_RECOG.
+        case BOSS2:
+            spritesound(BOS3_RECOG,i);
+            break;
+        case DUMMYDUKE:
+        case BIGDUMMYDUKE:
+            spritesound(BOS2_RECOG,i);
+            break;
+#else
         case BOSS2:
             if(sprite[i].pal == 1)
                 sound(BOS2_RECOG);
@@ -1091,6 +1116,7 @@ void check_fta_sounds(short i)
                 sound(BOS3_RECOG);
             else sound(RIPHEADNECK);
             break;
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14
         case BOSS4:
         case BOSS4STAYPUT:
@@ -1127,7 +1153,13 @@ short badguy(spritetype *s)
 
     switch(s->picnum)
     {
+#if DUKE3D_GAMEVER < GAMEVER_13D
+            // 1.1 has no SHARK, COMMANDERSTAYPUT or BOSS3, and has the dummy Dukes.
+            case DUMMYDUKE:
+            case BIGDUMMYDUKE:
+#else
             case SHARK:
+#endif
             case RECON:
             case DRONE:
             case LIZTROOPONTOILET:
@@ -1142,7 +1174,9 @@ short badguy(spritetype *s)
             case LIZTROOP:
             case OCTABRAIN:
             case COMMANDER:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case COMMANDERSTAYPUT:
+#endif
             case PIGCOP:
             case EGG:
             case PIGCOPSTAYPUT:
@@ -1154,7 +1188,9 @@ short badguy(spritetype *s)
             case ORGANTIC:
             case BOSS1:
             case BOSS2:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case BOSS3:
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14
             case BOSS4:
 #endif
@@ -1185,7 +1221,13 @@ short badguypic(short pn)
 
     switch(pn)
     {
+#if DUKE3D_GAMEVER < GAMEVER_13D
+            // 1.1: the same set as badguy.
+            case DUMMYDUKE:
+            case BIGDUMMYDUKE:
+#else
             case SHARK:
+#endif
             case RECON:
             case DRONE:
             case LIZTROOPONTOILET:
@@ -1200,7 +1242,9 @@ short badguypic(short pn)
             case LIZTROOP:
             case OCTABRAIN:
             case COMMANDER:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case COMMANDERSTAYPUT:
+#endif
             case PIGCOP:
             case EGG:
             case PIGCOPSTAYPUT:
@@ -1212,7 +1256,9 @@ short badguypic(short pn)
             case ORGANTIC:
             case BOSS1:
             case BOSS2:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case BOSS3:
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14
             case BOSS4:
 #endif
@@ -1535,7 +1581,12 @@ void displayinventory(struct player_struct *p)
     n |= ( p->holoduke_amount > 0)<<2; if(n&4) j++;
     n |= (p->firstaid_amount > 0); if(n&1) j++;
     n |= (p->heat_amount > 0)<<4; if(n&16) j++;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    n |= (p->spacesuit_amount > 0)<<6; if(n&64) j++;
+    n |= (p->boot_amount > 0)<<7; if(n&128) j++;
+#else
     n |= (p->boot_amount > 0)<<6; if(n&64) j++;
+#endif
 
     xoff = 160-(j*11);
 
@@ -1570,8 +1621,15 @@ void displayinventory(struct player_struct *p)
                 rotatesprite(xoff<<16,y<<16,65536L,0,HEAT_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
                 case  32:
                 rotatesprite(xoff<<16,y<<16,65536L,0,AIRTANK_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                case 64:
+                rotatesprite(xoff<<16,y<<16,65536L,0,SPACESUIT_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
+                case 128:
+                rotatesprite(xoff<<16,y<<16,65536L,0,BOOT_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
+#else
                 case 64:
                 rotatesprite(xoff<<16,(y-1)<<16,65536L,0,BOOT_ICON,0,0,2+16,windowx1,windowy1,windowx2,windowy2);break;
+#endif
             }
 
             xoff += 22;
@@ -1713,7 +1771,12 @@ void coolgaugetext(short snum)
                 case 4: i = JETPACK_ICON; break;
                 case 5: i = HEAT_ICON; break;
                 case 6: i = AIRTANK_ICON; break;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                case 7: i = SPACESUIT_ICON; break;
+                case 8: i = BOOT_ICON; break;
+#else
                 case 7: i = BOOT_ICON; break;
+#endif
                 default: i = -1;
             }
             if (i >= 0) rotatesprite((231-o)<<16,(200-21)<<16,65536L,0,i,0,0,10+16+permbit,0,0,xdim-1,ydim-1);
@@ -1729,7 +1792,12 @@ void coolgaugetext(short snum)
                 case 4: i = ((p->jetpack_amount+15)>>4); j = p->jetpack_on; break;
                 case 5: i = p->heat_amount/12; j = p->heat_on; break;
                 case 6: i = ((p->scuba_amount+63)>>6); break;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                case 7: i = ((p->spacesuit_amount+15)>>4); break;
+                case 8: i = (p->boot_amount>>1); break;
+#else
                 case 7: i = (p->boot_amount>>1); break;
+#endif
             }
             invennum(284-30-o,200-6,(char)i,0,10+permbit);
             if (j > 0) minitext(288-30-o,180,"ON",0,10+16+permbit);
@@ -1857,7 +1925,12 @@ void coolgaugetext(short snum)
                     case 4: i = JETPACK_ICON; break;
                     case 5: i = HEAT_ICON; break;
                     case 6: i = AIRTANK_ICON; break;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    case 7: i = SPACESUIT_ICON; break;
+                    case 8: i = BOOT_ICON; break;
+#else
                     case 7: i = BOOT_ICON; break;
+#endif
                 }
                 rotatesprite((231-o)<<16,(200-21)<<16,65536L,0,i,0,0,10+16+permbit,0,0,xdim-1,ydim-1);
                 minitext(292-30-o,190,"%",6,10+16+permbit);
@@ -1885,7 +1958,12 @@ void coolgaugetext(short snum)
                     case 4: i = ((p->jetpack_amount+15)>>4); break;
                     case 5: i = p->heat_amount/12; break;
                     case 6: i = ((p->scuba_amount+63)>>6); break;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    case 7: i = ((p->spacesuit_amount+15)>>4); break;
+                    case 8: i = (p->boot_amount>>1); break;
+#else
                     case 7: i = (p->boot_amount>>1); break;
+#endif
                 }
                 invennum(284-30-o,200-6,(char)i,0,10+permbit);
             }
@@ -2158,7 +2236,15 @@ void gameexit(char *msg)
     if(qe || cp)
         goto GOTOHERE;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1 and 1.0 show the bonus screen on any exit from a non-coop game. 1.1 then
+    // skips the two order screens, and 1.0 shows them on every exit (G11-G37, G10-G09).
+    // Fix: as in 1.3D, the version refusal ("\nYou cannot ...") skips both screens, so
+    // a refused peer leaves at once instead of waiting for a key.
+    if(playerswhenstarted > 1 && ud.coop == 0 && *(t+1) != 'V' && *(t+1) != 'Y')
+#else
     if(playerswhenstarted > 1 && ud.coop != 1 && *t == ' ')
+#endif
     {
         dobonus(1);
 // CTW - MODIFICATION
@@ -2182,8 +2268,16 @@ void gameexit(char *msg)
 // CTW - MODIFICATION
 /*  if( *t != 0 && *(t+1) != 'V' && *(t+1) != 'Y' && playonten == 0 )
         showtwoscreens();*/
+#if DUKE3D_GAMEVER < GAMEVER_11
+    if( *(t+1) != 'V' && *(t+1) != 'Y' )
+        showtwoscreens();
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+    if( *t != 0 && *(t+1) != 'V' && *(t+1) != 'Y' && !(playerswhenstarted > 1 && ud.coop == 0) )
+        showtwoscreens();
+#else
     if( *t != 0 && *(t+1) != 'V' && *(t+1) != 'Y' && true)
         showtwoscreens();
+#endif
 // CTW END - MODIFICATION
 
     GOTOHERE:
@@ -2626,8 +2720,10 @@ void displayrest(int32_t smoothratio)
         }
     }
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no crosshair (G10-G07)
     if(ps[myconnectindex].newowner == -1 && ud.overhead_on == 0 && ud.crosshair && ud.camerasprite == -1)
         rotatesprite((160-(ps[myconnectindex].look_ang>>1))<<16,100L<<16,65536L,0,CROSSHAIR,0,0,2+1,windowx1,windowy1,windowx2,windowy2);
+#endif
 
     if(ps[myconnectindex].gm&MODE_TYPE)
         typemode();
@@ -2686,7 +2782,7 @@ void view(struct player_struct *pp, int32_t *vx, int32_t *vy,int32_t *vz,short *
 {
      spritetype *sp;
      int32_t i, nx, ny, nz, hx, hy, hz, hitx, hity, hitz;
-     short bakcstat, hitsect, hitwall, hitsprite, daang;
+     short bakcstat, hitsect, hitwall = -1, hitsprite = -1, daang; // -1: 1.0's hitscan leaves this unwritten on a miss (DOS read stack garbage)
 
      nx = (sintable[(ang+1536)&2047]>>4);
      ny = (sintable[(ang+1024)&2047]>>4);
@@ -3284,8 +3380,17 @@ short EGS(short whatsect,int32_t s_x,int32_t s_y,int32_t s_z,short s_pn,signed c
 
     i = insertsprite(whatsect,s_ss);
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1 also stops at sprite 2048: its saves hold only 2048 hittypes.
+    if( i < 0 || i >= 2048 )
+    {
+        sprintf(tempbuf,"sectnum %d OWPN %d PN %d spawned a %d\n",whatsect,sprite[s_ow].picnum,s_pn,i);
+        gameexit(tempbuf);
+    }
+#else
     if( i < 0 )
         gameexit(" Too many sprites spawned.");
+#endif
 
     hittype[i].bposx = s_x;
     hittype[i].bposy = s_y;
@@ -3362,15 +3467,19 @@ char wallswitchcheck(short i)
     switch(PN)
     {
         case HANDPRINTSWITCH:
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 lacks these switches
         case HANDPRINTSWITCH+1:
         case ALIENSWITCH:
         case ALIENSWITCH+1:
+#endif
         case MULTISWITCH:
         case MULTISWITCH+1:
         case MULTISWITCH+2:
         case MULTISWITCH+3:
         case ACCESSSWITCH:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
         case ACCESSSWITCH2:
+#endif
         case PULLSWITCH:
         case PULLSWITCH+1:
         case HANDSWITCH:
@@ -3397,10 +3506,14 @@ char wallswitchcheck(short i)
         case DIPSWITCH+1:
         case DIPSWITCH2:
         case DIPSWITCH2+1:
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no TECHSWITCH (G10-G04)
         case TECHSWITCH:
         case TECHSWITCH+1:
+#endif
+#if DUKE3D_GAMEVER >= GAMEVER_13D
         case DIPSWITCH3:
         case DIPSWITCH3+1:
+#endif
             return 1;
     }
     return 0;
@@ -3446,7 +3559,9 @@ short spawn( short j, short pn )
 
         T1 = T2 = T3 = T4 = T5 = T6 = 0;
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        if( PN != TRIPBOMB && PN != VIEWSCREEN && (CS&48) )
+#elif DUKE3D_GAMEVER < GAMEVER_14
         if( PN != TRIPBOMB && PN != VIEWSCREEN && PN != VIEWSCREEN2 && (CS&48) )
 #else
         if( PN != SPEAKER && PN != LETTER && PN != DUCK && PN != TARGET && PN != TRIPBOMB && PN != VIEWSCREEN && PN != VIEWSCREEN2 && (CS&48) )
@@ -3460,9 +3575,16 @@ short spawn( short j, short pn )
             if( wallswitchcheck(i) == 1 && (CS&16) )
 #endif
             {
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1 hides them in coop (coop != 0) and has no ACCESSSWITCH2.
+                if( PN != ACCESSSWITCH && sprite[i].pal)
+                {
+                    if( (ud.multimode < 2) || (ud.multimode > 1 && ud.coop != 0) )
+#else
                 if( PN != ACCESSSWITCH && PN != ACCESSSWITCH2 && sprite[i].pal)
                 {
                     if( (ud.multimode < 2) || (ud.multimode > 1 && ud.coop==1) )
+#endif
                     {
                         sprite[i].xrepeat = sprite[i].yrepeat = 0;
                         sprite[i].cstat = SLT = SHT = 0;
@@ -3493,8 +3615,10 @@ short spawn( short j, short pn )
             SH = SCRIPT_PTR(actorscrptr[s])[0];
             T5 = SCRIPT_PTR(actorscrptr[s])[1];
             T2 = SCRIPT_PTR(actorscrptr[s])[2];
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 gives map sprites no hitag default
             if( SCRIPT_PTR(actorscrptr[s])[3] && SHT == 0 )
                 SHT = SCRIPT_PTR(actorscrptr[s])[3];
+#endif
         }
         else T2 = T5 = 0;
     }
@@ -3587,7 +3711,11 @@ short spawn( short j, short pn )
                         sp->z = getceilzofslope(SECT,SX,SY)+(16<<8);
                         sp->cstat |= 8;
                     }
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    else // 1.1 puts the splash on the floor for every other lotag
+#else
                     else if( sector[sprite[j].sectnum].lotag == 1)
+#endif
                         sp->z = getflorzofslope(SECT,SX,SY);
                 }
 
@@ -3670,7 +3798,11 @@ short spawn( short j, short pn )
                 sp->cstat = 128|2;
                 sp->ang = sprite[j].ang;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                sp->xvel = 96;
+#else
                 sp->xvel = 128;
+#endif
                 changespritestat(i,5);
                 ssp(i,CLIPMASK0);
                 setsprite(i,sp->x,sp->y,sp->z);
@@ -3790,10 +3922,15 @@ short spawn( short j, short pn )
 #if DUKE3D_GAMEVER < GAMEVER_14
                 if(j >= 0)
                 {
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    // 1.1 doesn't copy a pal-1 parent's pal.
+                    if( sprite[j].picnum != NUKEBARREL && sprite[j].picnum != TIRE )
+#else
                     // 1.3D bleeds red from pal-6 parents too.
                     if( sprite[j].pal == 1)
                         sp->pal = 1;
                     else if( sprite[j].picnum != NUKEBARREL && sprite[j].picnum != TIRE )
+#endif
 #else
                 if(j >= 0 && sp->picnum != PUKE)
                 {
@@ -3854,7 +3991,9 @@ short spawn( short j, short pn )
                 hittype[i].temp_data[2] = 0;
                 hittype[i].temp_data[5] = sp->ang;
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no case for it (G10-G01)
             case SPACEMARINE:
+#endif
                 if(sp->picnum == SPACEMARINE)
                 {
                     sp->extra = 20;
@@ -3876,7 +4015,9 @@ short spawn( short j, short pn )
             case GRATE1:
             case CHAIR1:
             case CHAIR2:
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no case for it (G10-G01)
             case CHAIR3:
+#endif
             case BOTTLE1:
             case BOTTLE2:
             case BOTTLE3:
@@ -3900,17 +4041,25 @@ short spawn( short j, short pn )
             case OCEANSPRITE3:
             case OCEANSPRITE5:
             case MONK:
+#if DUKE3D_GAMEVER < GAMEVER_13D
+            // 1.1 has NAKED1 here, and none of the tiles guarded below.
+            case NAKED1:
+#else
             case INDY:
             case LUKE:
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case JURYGUY:
 #endif
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case SCALE:
             case VACUUM:
+#endif
             case FANSPRITE:
             case CACTUS:
             case CACTUSBROKE:
             case HANGLIGHT:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case FETUS:
             case FETUSBROKE:
             case CAMERALIGHT:
@@ -3919,9 +4068,11 @@ short spawn( short j, short pn )
             case POT1:
             case POT2:
             case POT3:
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case TRIPODCAMERA:
 #endif
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case SUSHIPLATE1:
             case SUSHIPLATE2:
             case SUSHIPLATE3:
@@ -3935,6 +4086,7 @@ short spawn( short j, short pn )
             case PIPE4:
             case PIPE5:
             case PIPE6:
+#endif
                 sp->clipdist = 32;
                 sp->cstat |= 257;
             case OCEANSPRITE4:
@@ -3964,6 +4116,10 @@ short spawn( short j, short pn )
             case MASKWALL5:
             case MASKWALL6:
             case MASKWALL7:
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1 keeps only the flip bits and makes them blocking wall sprites.
+                sp->cstat = (sp->cstat&12)|17;
+#else
             case MASKWALL8:
             case MASKWALL9:
             case MASKWALL10:
@@ -3974,6 +4130,7 @@ short spawn( short j, short pn )
             case MASKWALL15:
                 j = sp->cstat&60;
                 sp->cstat = j|1;
+#endif
                 changespritestat(i,0);
                 break;
             case FOOTPRINTS:
@@ -4020,28 +4177,45 @@ short spawn( short j, short pn )
             case FEM2:
             case FEM3:
             case FEM4:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case FEM5:
             case FEM6:
             case FEM7:
             case FEM8:
             case FEM9:
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case FEM10:
 #endif
             case PODFEM1:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case NAKED1:
             case STATUE:
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case TOUGHGAL:
 #endif
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1: lotag 1, and an eighth of the player's health.
+                sp->lotag = 1;
+                sp->extra = max_player_health>>3;
+#else
                 sp->yvel = sp->hitag;
                 sp->hitag = -1;
+#endif
                 if(sp->picnum == PODFEM1) sp->extra <<= 1;
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case BLOODYPOLE:
+#endif
 
             case QUEBALL:
             case STRIPEBALL:
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1 gives the FEMs and the balls the same small, blocking shape.
+                sp->cstat = 257;
+                sp->clipdist = 8;
+#else
                 if(sp->picnum == QUEBALL || sp->picnum == STRIPEBALL)
                 {
                     sp->cstat = 256;
@@ -4052,6 +4226,7 @@ short spawn( short j, short pn )
                     sp->cstat |= 257;
                     sp->clipdist = 32;
                 }
+#endif
 
                 changespritestat(i,2);
                 break;
@@ -4065,12 +4240,19 @@ short spawn( short j, short pn )
                     sp->pal = ps[sprite[j].yvel].palookup;
                 }
             case DUKECAR:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case HELECOPT:
+#endif
 //                if(sp->picnum == HELECOPT || sp->picnum == DUKECAR) sp->xvel = 1024;
                 sp->cstat = 0;
                 sp->extra = 1;
                 sp->xvel = 292;
                 sp->zvel = 360;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1 has none of the cases below, so these stay unhittable.
+                changespritestat(i,1);
+                break;
+#else
             case RESPAWNMARKERRED:
 #if DUKE3D_GAMEVER < GAMEVER_14
             case SATELLITE:
@@ -4091,6 +4273,7 @@ short spawn( short j, short pn )
             case MIKE:
                 if(sp->picnum == MIKE)
                     sp->yvel = sp->hitag;
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case WEATHERWARN:
 #endif
@@ -4125,7 +4308,9 @@ short spawn( short j, short pn )
                 break;
 
             case VIEWSCREEN:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case VIEWSCREEN2:
+#endif
                 sp->owner = i;
                 sp->lotag = 1;
                 sp->extra = 1;
@@ -4172,13 +4357,20 @@ short spawn( short j, short pn )
             case RESPAWN:
                 sp->extra = 66-13;
             case MUSICANDSFX:
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 keeps pal-1 sounds in single player
                 if( ud.multimode < 2 && sp->pal == 1)
                 {
                     sp->xrepeat = sp->yrepeat = 0;
                     changespritestat(i,5);
                     break;
                 }
+#endif
+#if DUKE3D_GAMEVER < GAMEVER_11
+                sp->xrepeat = sp->yrepeat = 0; // 1.0 hides it by size, not cstat bit 15 (G10-G02)
+                sp->cstat = 0;
+#else
                 sp->cstat = (short)32768;
+#endif
                 changespritestat(i,11);
                 break;
 
@@ -4247,7 +4439,9 @@ short spawn( short j, short pn )
             case APLAYER:
                 sp->xrepeat = sp->yrepeat = 0;
                 j = ud.coop;
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 compares coop with the lotag as it is
                 if(j == 2) j = 0;
+#endif
 
                 if( ud.multimode < 2 || (ud.multimode > 1 && j != sp->lotag) )
                     changespritestat(i,5);
@@ -4320,6 +4514,13 @@ short spawn( short j, short pn )
                 if(j >= 0 && (sprite[j].statnum == 10 || sprite[j].statnum == 1))
                 {
                     sp->shade = 32;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    // 1.1 always makes the drip red, and has no first ssp move.
+                    sp->pal = 2;
+                    sp->z -= (13<<8);
+                    sp->ang = getangle(ps[connecthead].posx-sp->x,ps[connecthead].posy-sp->y);
+                    sp->xvel = 48-(TRAND&31);
+#else
                     if(sprite[j].pal != 1)
                     {
                         sp->pal = 2;
@@ -4329,6 +4530,7 @@ short spawn( short j, short pn )
                     sp->ang = getangle(ps[connecthead].posx-sp->x,ps[connecthead].posy-sp->y);
                     sp->xvel = 48-(TRAND&31);
                     ssp(i,CLIPMASK0);
+#endif
                 }
                 else if(j == -1)
                 {
@@ -4340,8 +4542,13 @@ short spawn( short j, short pn )
                 }
             case TRASH:
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1 gives WATERDRIP a random angle too: one more krand per drip.
+                sp->ang = TRAND&2047;
+#else
                 if(sp->picnum != WATERDRIP)
                     sp->ang = TRAND&2047;
+#endif
 
             case WATERDRIPSPLASH:
 
@@ -4358,7 +4565,9 @@ short spawn( short j, short pn )
                 break;
             case TOUCHPLATE:
                 T3 = sector[sect].floorz;
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 moves the floor in water sectors too
                 if(sector[sect].lotag != 1 && sector[sect].lotag != 2)
+#endif
                     sector[sect].floorz = sp->z;
                 if(sp->pal && ud.multimode > 1)
                 {
@@ -4367,7 +4576,11 @@ short spawn( short j, short pn )
                     break;
                 }
             case WATERBUBBLEMAKER:
+#if DUKE3D_GAMEVER < GAMEVER_11
+                sp->xrepeat = sp->yrepeat = 0; // 1.0 hides it by size, not cstat bit 15 (G10-G02)
+#else
                 sp->cstat |= 32768;
+#endif
                 changespritestat(i,6);
                 break;
             case BOLT1:
@@ -4383,8 +4596,12 @@ short spawn( short j, short pn )
                 T1 = sp->xrepeat;
                 T2 = sp->yrepeat;
             case MASTERSWITCH:
+#if DUKE3D_GAMEVER < GAMEVER_11
+                sp->xrepeat = sp->yrepeat = 0; // 1.0 hides it by size, the BOLT1s too (G10-G02)
+#else
                 if(sp->picnum == MASTERSWITCH)
                     sp->cstat |= 32768;
+#endif
                 sp->yvel = 0;
                 changespritestat(i,6);
                 break;
@@ -4403,21 +4620,33 @@ short spawn( short j, short pn )
             case LIZMANSTAYPUT:
             case BOSS1STAYPUT:
             case PIGCOPDIVE:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case COMMANDERSTAYPUT:
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case BOSS4STAYPUT:
 #endif
                 hittype[i].actorstayput = sp->sectnum;
             case BOSS1:
             case BOSS2:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case BOSS3:
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case BOSS4:
 #endif
             case ROTATEGUN:
             case GREENSLIME:
                 if(sp->picnum == GREENSLIME)
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                    sp->extra = 10;
+#else
                     sp->extra = 1;
+#endif
+#if DUKE3D_GAMEVER < GAMEVER_13D
+            case DUMMYDUKE:
+            case BIGDUMMYDUKE:
+#endif
             case DRONE:
             case LIZTROOPONTOILET:
 #if DUKE3D_GAMEVER >= GAMEVER_14
@@ -4437,7 +4666,9 @@ short spawn( short j, short pn )
             case LIZMANJUMP:
             case ORGANTIC:
             case RAT:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case SHARK:
+#endif
 
 #if DUKE3D_GAMEVER < GAMEVER_14
                 // 1.3D doubles the strength of recoloured enemies.
@@ -4465,6 +4696,35 @@ short spawn( short j, short pn )
                     }
                 }
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1: BOSS1 is the small one outside episode 1; no RESPAWN pal copy;
+                // every enemy is shaded -20.
+                if( sp->picnum == BOSS1 || sp->picnum == BOSS1STAYPUT || sp->picnum == BOSS2 )
+                {
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0's are always the big ones (G10-G03)
+                    if(sp->picnum == BOSS1 && ud.volume_number > 0)
+                    {
+                        sp->clipdist = 80;
+                        sp->xrepeat = 40;
+                        sp->yrepeat = 40;
+                        sp->extra >>= 2;
+                    }
+                    else
+#endif
+                    {
+                        sp->xrepeat = 80;
+                        sp->yrepeat = 80;
+                        sp->clipdist = 127;
+                    }
+                }
+                else
+                {
+                    sp->xrepeat = 40;
+                    sp->yrepeat = 40;
+                    sp->clipdist = 80;
+                }
+                sp->shade = -20;
+#else
                 if( sp->picnum == BOSS4STAYPUT || sp->picnum == BOSS1 || sp->picnum == BOSS2 || sp->picnum == BOSS1STAYPUT || sp->picnum == BOSS3 || sp->picnum == BOSS4 )
                 {
                     if(j >= 0 && sprite[j].picnum == RESPAWN)
@@ -4503,6 +4763,7 @@ short spawn( short j, short pn )
 #endif
                     }
                 }
+#endif
 
                 if(j >= 0) sp->lotag = 0;
 
@@ -4535,7 +4796,9 @@ short spawn( short j, short pn )
                     if(j >= 0)
                     {
                         hittype[i].timetosleep = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 spawns them silently
                         check_fta_sounds(i);
+#endif
                         changespritestat(i,1);
                     }
                     else changespritestat(i,2);
@@ -4549,13 +4812,21 @@ short spawn( short j, short pn )
                 break;
 
             case LOCATORS:
+#if DUKE3D_GAMEVER < GAMEVER_11
+                sp->xrepeat = sp->yrepeat = 0; // 1.0 hides it by size, not cstat bit 15 (G10-G02)
+#else
                 sp->cstat |= 32768;
+#endif
                 changespritestat(i,7);
                 break;
 
             case ACTIVATORLOCKED:
             case ACTIVATOR:
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+                sp->xrepeat = sp->yrepeat = 0; // 1.0 hides it by size, not cstat bit 15 (G10-G02)
+                if(sp->picnum == ACTIVATORLOCKED)
+                    sector[sp->sectnum].lotag ^= 16384;
+#elif DUKE3D_GAMEVER < GAMEVER_14
                 sp->cstat |= (short) 32768;
                 if(sp->picnum == ACTIVATORLOCKED)
                     sector[sp->sectnum].lotag ^= 16384;
@@ -4624,7 +4895,9 @@ short spawn( short j, short pn )
                         changespritestat(i,5);
                         return i;
                     }
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 doesn't count RECONs
                     ps[myconnectindex].max_actors_killed++;
+#endif
                     hittype[i].temp_data[5] = 0;
                     if(ud.monsters_off == 1)
                     {
@@ -4667,17 +4940,27 @@ short spawn( short j, short pn )
             case RPGSPRITE:
             case SHRINKERSPRITE:
             case FREEZESPRITE:
+#if DUKE3D_GAMEVER < GAMEVER_13D
+            // 1.1 has FUELCAN and BODYSUIT instead of the devastator and freezer ammo.
+            case FUELCAN:
+            case BODYSUIT:
+#else
             case DEVISTATORSPRITE:
+#endif
 
             case SHOTGUNAMMO:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case FREEZEAMMO:
+#endif
             case HBOMBAMMO:
             case CRYSTALAMMO:
 #if DUKE3D_GAMEVER >= GAMEVER_14 // Atomic-only tiles; 1.3D's spawn has no case for them
             case GROWAMMO:
 #endif
             case BATTERYAMMO:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case DEVISTATORAMMO:
+#endif
             case RPGAMMO:
             case BOOTS:
             case AMMO:
@@ -4725,7 +5008,11 @@ short spawn( short j, short pn )
                     sp->cstat |= 128;
 #endif
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                if(ud.multimode > 1 && ud.coop == 0 && sp->picnum == ACCESSCARD)
+#else
                 if(ud.multimode > 1 && ud.coop != 1 && sp->picnum == ACCESSCARD)
+#endif
                 {
                     sp->xrepeat = sp->yrepeat = 0;
                     changespritestat(i,5);
@@ -4757,7 +5044,9 @@ short spawn( short j, short pn )
             case CONE:
             case BOX:
                 CS = 257; // Make it hitable
+#if DUKE3D_GAMEVER >= GAMEVER_13D
                 sprite[i].extra = 1;
+#endif
                 changespritestat(i,6);
                 break;
 
@@ -4781,12 +5070,18 @@ short spawn( short j, short pn )
             case CAMERA1+3:
             case CAMERA1+4:
             case CAMERAPOLE:
+#if DUKE3D_GAMEVER < GAMEVER_13D
+            case GENERICPOLE:
+                // 1.1: extra 0, cstat as mapped.
+                sp->extra = 0;
+#else
                 sp->extra = 1;
 
                 if(camerashitable) sp->cstat = 257;
                 else sp->cstat = 0;
 
             case GENERICPOLE:
+#endif
 
                 if( ud.multimode < 2 && sp->pal != 0 )
                 {
@@ -4797,8 +5092,10 @@ short spawn( short j, short pn )
                 else sp->pal = 0;
                 if(sp->picnum == CAMERAPOLE || sp->picnum == GENERICPOLE) break;
                 sp->picnum = CAMERA1;
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1's CAMERA1 goes on into the STEAM code
                 changespritestat(i,1);
                 break;
+#endif
             case STEAM:
                 if(j >= 0)
                 {
@@ -4809,12 +5106,19 @@ short spawn( short j, short pn )
                     ssp(i,CLIPMASK0);
                 }
             case CEILINGSTEAM:
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1 runs the steam as stat 1, not with the standables.
+                changespritestat(i,1);
+#else
                 changespritestat(i,6);
+#endif
                 break;
 
             case SECTOREFFECTOR:
                 sp->yvel = sector[sect].extra;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 hides it by size alone (G10-G02)
                 sp->cstat |= 32768;
+#endif
                 sp->xrepeat = sp->yrepeat = 0;
 
                 switch(sp->lotag)
@@ -4891,7 +5195,9 @@ short spawn( short j, short pn )
                         if(ud.recstat == 1)
                         {
                             sp->xrepeat=sp->yrepeat=64;
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 sets the size only (G10-G02)
                             sp->cstat &= 32767;
+#endif
                         }
                         break;
                     case 12:
@@ -5281,12 +5587,18 @@ short spawn( short j, short pn )
 
 
             case SEENINE:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case OOZFILTER:
+#endif
 
                 sp->shade = -16;
                 if(sp->xrepeat <= 8)
                 {
+#if DUKE3D_GAMEVER < GAMEVER_11
+                    sp->cstat = 0; // 1.0 (G10-G02)
+#else
                     sp->cstat = (short)32768;
+#endif
                     sp->xrepeat=sp->yrepeat=0;
                 }
                 else sp->cstat = 1+256;
@@ -5347,7 +5659,9 @@ short spawn( short j, short pn )
             case HORSEONSIDE:
             case FIREBARREL:
             case NUKEBARREL:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             case FIREVASE:
+#endif
             case NUKEBARRELDENTED:
             case NUKEBARRELLEAKED:
             case WOODENHORSE:
@@ -5360,6 +5674,11 @@ short spawn( short j, short pn )
                     sp->owner = j;
                 else sp->owner = i;
             case EGG:
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1 keeps EGG with monsters off and leaves its clipdist.
+                sp->cstat = 257|(TRAND&4);
+                changespritestat(i,2);
+#else
                 if( ud.monsters_off == 1 && sp->picnum == EGG )
                 {
                     sp->xrepeat = sp->yrepeat = 0;
@@ -5372,6 +5691,7 @@ short spawn( short j, short pn )
                     sp->cstat = 257|(TRAND&4);
                     changespritestat(i,2);
                 }
+#endif
                 break;
             case TOILETWATER:
                 sp->shade = -16;
@@ -6105,6 +6425,40 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
 #define CHEAT_WEAPONS MAX_WEAPONS
 #endif
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+// 1.1's 21 codes. Only letters and digits can be typed, so the '_' ones are
+// unreachable, and "xxxxxx" has no case. 1.0 has 20: no "clip" (G10-G05).
+#if DUKE3D_GAMEVER < GAMEVER_11
+#define NUMCHEATCODES 20
+#else
+#define NUMCHEATCODES 21
+#endif
+char cheatquotes[NUMCHEATCODES][14] = {
+    {"cornholio"},
+    {"stuff"},
+    {"scotty##"},
+    {"_________"},
+    {"view"},
+    {"_______"},
+    {"xxxxxx"},
+    {"cashman"},
+    {"items"},
+    {"rate"},
+    {"skill#"},
+    {"beta"},
+    {"hyper"},
+    {"monsters"},
+    {"______"},
+    {"_____"},
+    {"cosmo"},
+    {"______"},
+    {"kroz"},
+    {"allen"},
+#if DUKE3D_GAMEVER >= GAMEVER_11
+    {"clip"}
+#endif
+};
+#else
 #define NUMCHEATCODES 26
 char cheatquotes[NUMCHEATCODES][14] = {
     {"cornholio"},
@@ -6151,6 +6505,7 @@ char cheatquotes[NUMCHEATCODES][14] = {
 //    {"ending"}
 
 };
+#endif
 
 
 char cheatbuf[10],cheatbuflen;
@@ -6288,17 +6643,21 @@ void cheats(void)
 
                             sprite[ps[myconnectindex].i].hitag = 0;
                             sprite[ps[myconnectindex].i].lotag = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 leaves the sprite's pal
                             sprite[ps[myconnectindex].i].pal =
                                 ps[myconnectindex].palookup;
+#endif
 
                             FTA(17,&ps[myconnectindex]);
                         }
                         else
                         {
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 leaves last_extra
                             ud.god = 0;
                             sprite[ps[myconnectindex].i].extra = max_player_health;
                             hittype[ps[myconnectindex].i].extra = -1;
                             ps[myconnectindex].last_extra = max_player_health;
+#endif
                             FTA(18,&ps[myconnectindex]);
                         }
 
@@ -6311,7 +6670,9 @@ void cheats(void)
 
                     case 1:
 
-#ifdef VOLUMEONE
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        j = CHEAT_WEAPONS-6; // 1.1 gives weapons 1-5
+#elif defined VOLUMEONE
                         j = 6;
 #else
                         j = 0;
@@ -6333,7 +6694,11 @@ void cheats(void)
                         ps[myconnectindex].boot_amount          =    200;
                         ps[myconnectindex].shield_amount =           100;
                         ps[myconnectindex].scuba_amount =            6400;
+#if DUKE3D_GAMEVER < GAMEVER_11
+                        ps[myconnectindex].holoduke_amount =         1600; // 1.0 (G10-G05)
+#else
                         ps[myconnectindex].holoduke_amount =         2400;
+#endif
                         ps[myconnectindex].jetpack_amount =          1600;
                         ps[myconnectindex].firstaid_amount =         max_player_health;
 
@@ -6345,7 +6710,9 @@ void cheats(void)
 //                        FTA(21,&ps[myconnectindex]);
                         ps[myconnectindex].cheat_phase = 0;
                         KB_FlushKeyboardQueue();
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 leaves inven_icon (G10-G05)
                         ps[myconnectindex].inven_icon = 1;
+#endif
                         return;
 
                     case 2:
@@ -6355,6 +6722,22 @@ void cheats(void)
     break;
 #endif
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        // 1.1: scotty1# (# 1-6) only. skill# shares the episode test,
+                        //  which its six letters can never pass.
+                        if(cheatbuf[6] != '1' || cheatbuf[7] >= '7')
+                        {
+                            ps[myconnectindex].cheat_phase = 0;
+                            return;
+                        }
+                        if(k == 2)
+                        {
+                            ud.m_volume_number = ud.volume_number = 0;
+                            ud.m_level_number = ud.level_number = cheatbuf[7] - '1';
+                        }
+                        else ud.m_player_skill = ud.player_skill =
+                            cheatbuf[7] - '1';
+#else
                         if(k == 2)
                         {
                             short volnume,levnume;
@@ -6427,6 +6810,7 @@ void cheats(void)
                         }
                         else ud.m_player_skill = ud.player_skill =
                             cheatbuf[5] - '1';
+#endif
 
                         if(numplayers > 1 && myconnectindex == connecthead)
                         {
@@ -6447,6 +6831,9 @@ void cheats(void)
                         }
                         else ps[myconnectindex].gm |= MODE_RESTART;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        boardfilename[0] = 0; // drops a command line user map
+#endif
                         ps[myconnectindex].cheat_phase = 0;
                         KB_FlushKeyboardQueue();
                         return;
@@ -6509,10 +6896,17 @@ void cheats(void)
                         ps[myconnectindex].boot_amount          =    200;
                         ps[myconnectindex].shield_amount =           100;
                         ps[myconnectindex].scuba_amount =            6400;
+#if DUKE3D_GAMEVER < GAMEVER_11
+                        ps[myconnectindex].holoduke_amount =         1600; // 1.0 (G10-G05)
+#else
                         ps[myconnectindex].holoduke_amount =         2400;
+#endif
                         ps[myconnectindex].jetpack_amount =          1600;
 
                         ps[myconnectindex].firstaid_amount =         max_player_health;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        ps[myconnectindex].spacesuit_amount =        1600;
+#endif
                         ps[myconnectindex].got_access =              7;
                         FTA(5,&ps[myconnectindex]);
                         ps[myconnectindex].cheat_phase = 0;
@@ -6571,7 +6965,11 @@ void cheats(void)
                         return;
                     case 14:
                     case 25:
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                        ud.level_number = 5; // 1.1's end-of-episode test (unreachable code)
+#else
                         ud.eog = 1;
+#endif
                         ps[myconnectindex].gm |= MODE_EOL;
                         KB_FlushKeyboardQueue();
                         return;
@@ -6671,12 +7069,14 @@ void nonsharedkeys(void)
         FTA(82-ud.showweapons,&ps[screenpeek]);
     }
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no crosshair (G10-G07)
     if( BUTTON(gamefunc_Toggle_Crosshair) )
     {
         CONTROL_ClearButton(gamefunc_Toggle_Crosshair);
         ud.crosshair = 1-ud.crosshair;
         FTA(21-ud.crosshair,&ps[screenpeek]);
     }
+#endif
 
     if(ud.overhead_on && BUTTON(gamefunc_Map_Follow_Mode) )
     {
@@ -6709,6 +7109,7 @@ void nonsharedkeys(void)
         {
             if(SHIFTS_IS_PRESSED)
             {
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 has no song change key
                 if(i == 5 && ps[myconnectindex].fta > 0 && ps[myconnectindex].ftq == 26)
                 {
                     music_select++;
@@ -6724,6 +7125,7 @@ void nonsharedkeys(void)
                     FTA(26,&ps[myconnectindex]);
                     return;
                 }
+#endif
 
                 adduserquote(ud.ridecule[i-1]);
 
@@ -6940,6 +7342,15 @@ void nonsharedkeys(void)
             FTA(109+ps[myconnectindex].over_shoulder_on,&ps[myconnectindex]);
         }
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        // 1.1: F5 toggles the detail, with quotes 26 and 27.
+        if( KB_KeyPressed( sc_F5 ) )
+        {
+            KB_ClearKeyDown( sc_F5 );
+            ud.detail = (ud.detail == 0);
+            FTA(26+ud.detail,&ps[myconnectindex]);
+        }
+#else
         if( KB_KeyPressed( sc_F5 ) && MusicDevice != NumSoundCards )
         {
             KB_ClearKeyDown( sc_F5 );
@@ -6949,6 +7360,7 @@ void nonsharedkeys(void)
             FTA(26,&ps[myconnectindex]);
 
         }
+#endif
 
         if(KB_KeyPressed( sc_F8 ))
         {
@@ -7023,12 +7435,14 @@ void nonsharedkeys(void)
         vscrn();
     }
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0's AutoRun is a synced input bit (G10-G07)
     if( BUTTON(gamefunc_AutoRun) )
     {
         CONTROL_ClearButton(gamefunc_AutoRun);
         ud.auto_run = 1-ud.auto_run;
         FTA(85+ud.auto_run,&ps[myconnectindex]);
     }
+#endif
 
     if( BUTTON(gamefunc_Map) )
     {
@@ -7067,6 +7481,174 @@ void nonsharedkeys(void)
 
 
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+// 1.1's command line: its own help and a smaller set of switches.
+void comlinehelp(char **argv)
+{
+    puts("\n *  Here's a little command line help...");
+    printf("      %s [/flags] [/flags...]\n",argv[0]);
+    puts("\t?, /? this help message");
+    puts("\t/l#   go to Level #");
+    puts("\t/v#   go to Volume #");
+    puts("\t/s#   Skill # (0-3)");
+    puts("\t/r    Record a demo");
+    puts("\t/m    no Monsters during game play");
+    puts("\t/t(#) respawning Things, where # is:");
+    puts("\t    /t1     ...Respawn Monsters");
+    puts("\t    /t2     ...Respawn Items");
+    puts("\t    /t         Respawn BOTH.");
+    puts("\t/c    Co-op on...(multiplayer)");
+    puts("\t/q#   Fake multi player mode(# = numplayers).");
+    puts("\t/f#   Send fewer packets. (# = 1, 2, or 4)");
+    puts("\t-8250   (Setup)");
+    puts("\t-net    (Setup)");
+}
+
+void checkcommandline(int argc,char **argv)
+{
+    short i;
+    char *c;
+
+    i = 1;
+
+    ud.fta_on = 1;
+    ud.god = 0;
+    ud.m_respawn_items = 0;
+    ud.m_respawn_monsters = 0;
+    ud.warp_on = 0;
+    ud.cashman = 0;
+
+    while(i < argc)
+    {
+        c = argv[i];
+
+        if(*c == '-')
+        {
+            if( *(c+1) == '8' ) eightytwofifty = 1;
+            i++;
+            continue;
+        }
+
+        if(*c != '/' && strstr(c,".map"))
+        {
+            // A user map warps to the "USER FILE" level, volume 4 level 9.
+            printf("Entering %s\n",c);
+            strcpy(boardfilename,c);
+            ud.warp_on = 1;
+            ud.m_volume_number = 3;
+            ud.m_level_number = 8;
+            i++;
+            continue;
+        }
+
+        if(*c == '?')
+        {
+            comlinehelp(argv);
+            exit(0);
+        }
+
+        if(*c == '/')
+        {
+            c++;
+            switch(*c)
+            {
+                default:
+                    printf("Unknown command line parameter '%s'\n",argv[i]);
+                case '?':
+                    comlinehelp(argv);
+                    exit(0);
+                case 'n':
+                case 'N':
+                    c++;
+                    if(*c == '0') networkmode = 0;
+                    if(*c == '1') networkmode = 1;
+                    break;
+                case 'c':
+                case 'C':
+                    puts("Coop on...");
+                    ud.m_coop = 1;
+                    break;
+                case 'd':
+                case 'D':
+                    break; // 1.1 sets a byte that nothing reads
+                case 'f':
+                case 'F':
+                    c++;
+                    if(*c == '1')
+                        movesperpacket = 1;
+                    if(*c == '2')
+                        movesperpacket = 2;
+                    if(*c == '4')
+                        movesperpacket = 4;
+                    break;
+                case 'l':
+                case 'L':
+                    ud.warp_on = 1;
+                    c++;
+                    ud.m_level_number = ud.level_number = atol(c)-1;
+                    // Fix: /l0 and /l50 gave a level the game indexes level_file_names with.
+                    if( ud.m_level_number < 0 ) ud.m_level_number = ud.level_number = 0;
+                    if( ud.m_level_number > 10 ) ud.m_level_number = ud.level_number = 10;
+                    ud.m_player_skill = ud.player_skill = 2;
+                    break;
+                case 'm':
+                case 'M':
+                    ud.m_monsters_off = 1;
+                    puts("Monsters off...");
+                    break;
+                case 'q':
+                case 'Q':
+                    puts("Fake multi Mode...");
+                    if( *(++c) == 0) ud.multimode = 1;
+                    else ud.multimode = *c - '0';
+                    if( ud.multimode > 8 ) ud.multimode = 8;
+                    // Fix: /q0 gave 0 players, which the game later divides by.
+                    if( ud.multimode < 1 ) ud.multimode = 1;
+                    break;
+                case 'r':
+                case 'R':
+                    ud.m_recstat = 1;
+                    puts("Demorec mode on...");
+                    break;
+                case 's':
+                case 'S':
+                    c++;
+                    ud.m_player_skill = ud.player_skill = atol(c)-1;
+                    // Fix: /s0 and /s9 gave a skill the game indexes skill_names with.
+                    if( ud.m_player_skill < 0 ) ud.m_player_skill = ud.player_skill = 0;
+                    if( ud.m_player_skill > 3 ) ud.m_player_skill = ud.player_skill = 3;
+                    break;
+                case 't':
+                case 'T':
+                    c++;
+                    if(*c == '1') ud.m_respawn_monsters = 1;
+                    else if(*c == '2') ud.m_respawn_items = 1;
+                    else
+                    {
+                        ud.m_respawn_monsters = 1;
+                        ud.m_respawn_items = 1;
+                    }
+                    puts("Respawn on...");
+                    break;
+                case 'v':
+                case 'V':
+                    c++;
+                    if(*c == 'e' || *c == 'E')
+                    {
+                        printf("Duke Nukem 3D v%s\n",VERSION);
+                        exit(0);
+                    }
+                    ud.warp_on = 1;
+                    ud.m_volume_number = ud.volume_number = (int32_t)atol(c)-1;
+                    // Fix: the shareware has only episode 1, which other volumes index past.
+                    ud.m_volume_number = ud.volume_number = 0;
+                    break;
+            }
+        }
+        i++;
+    }
+}
+#else
 void comlinehelp(char **argv)
 {
     printf("Command line help.  %s [/flags...]\n",argv[0]);
@@ -7434,6 +8016,7 @@ void checkcommandline(int argc,char **argv)
         }
     }
 }
+#endif
 
 
 
@@ -7508,7 +8091,11 @@ void Logo(void)
     rotatesprite(0,0,65536L,0,DREALMS,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
     totalclock = 0;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    while( totalclock < (120*8) && !KB_KeyWaiting() ) // 1.1 shows the 3D Realms screen longer
+#else
     while( totalclock < (120*7) && !KB_KeyWaiting() )
+#endif
         getpackets();
 
     for(i=0;i<64;i+=7) palto(0,0,0,i);
@@ -7932,16 +8519,16 @@ void copyprotect(void)
 }
 
 
-// Which build plays a GRP: none, 1.3D full, 1.3D shareware, 1.4 or 1.5.
-enum { GRP_NONE, GRP_13D, GRP_13DSW, GRP_14, GRP_15 };
+// Which build plays a GRP: none, 1.0 or 1.1 shareware, 1.3D full, 1.3D shareware, 1.4 or 1.5.
+enum { GRP_NONE, GRP_10SW, GRP_11SW, GRP_13D, GRP_13DSW, GRP_14, GRP_15 };
 
 // The release DUKE3D.GRPs, by size and CRC-32 (the EDuke32 wiki FAQ's table;
 // the 1.3D and Atomic values were also measured from the original files).
 static const struct { int32_t size; uint32_t crc; int build; const char *name; } knowngrps[] =
 {
     {  9690241, 0x02F18900, GRP_NONE,  "the 0.99 shareware release" },
-    { 10429258, 0xA28AA589, GRP_NONE,  "the 1.0 shareware release" },
-    { 10442980, 0x912E1E8D, GRP_NONE,  "the 1.1 shareware release" },
+    { 10429258, 0xA28AA589, GRP_10SW,  "the 1.0 shareware release" },
+    { 10442980, 0x912E1E8D, GRP_11SW,  "the 1.1 shareware release" },
     { 11035779, 0x983AD923, GRP_13DSW, "the 1.3D shareware release" },
     { 10444391, 0xC5F71561, GRP_NONE,  "the 1.5 Mac shareware release" },
     { 26524524, 0xBBC9CE44, GRP_13D,   "the 1.3D full release" },
@@ -7949,7 +8536,11 @@ static const struct { int32_t size; uint32_t crc; int build; const char *name; }
     { 44356548, 0xFD3DCFF1, GRP_15,    "the 1.5 Atomic Edition" },
 };
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+#define OWNGRP GRP_10SW
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+#define OWNGRP GRP_11SW
+#elif DUKE3D_GAMEVER < GAMEVER_14
 #ifdef VOLUMEONE
 #define OWNGRP GRP_13DSW
 #else
@@ -8170,6 +8761,26 @@ int main(int argc,char **argv)
         while( !KB_KeyWaiting() ) getpackets();
     }
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1 sends names only in a network game, and its user maps come from
+    //  checkcommandline.
+    if(numplayers > 1)
+    {
+        ud.multimode = numplayers;
+        sendlogon();
+        getnames();
+    }
+
+    if(ud.multimode > 1)
+    {
+        playerswhenstarted = ud.multimode;
+
+        if(ud.multimode > 4)
+            gameexit("\nThe registered version of Duke Nukem 3D supports 5 or more players.");
+        ud.m_monsters_off = 1;
+        ud.m_player_skill = 0;
+    }
+#else
     if(numplayers > 1)
     {
         ud.multimode = numplayers;
@@ -8194,6 +8805,7 @@ int main(int argc,char **argv)
             ud.m_player_skill = 0;
         }
     }
+#endif
 
     ud.last_level = -1;
 
@@ -8237,7 +8849,7 @@ int main(int argc,char **argv)
 
     genspriteremaps();
 
-#ifdef VOLUMEONE
+#if defined VOLUMEONE && DUKE3D_GAMEVER >= GAMEVER_13D
         if(numplayers > 4 || ud.multimode > 4)
             gameexit(" The full version of Duke Nukem 3D supports 5 or more players.");
 #endif
@@ -8305,6 +8917,11 @@ int main(int argc,char **argv)
 
     ud.warp_on = 0;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1: Escape out of the wait for players goes back to the title.
+    if(waitabort) goto MAIN_LOOP_RESTART;
+#endif
+
     while ( !(ps[myconnectindex].gm&MODE_END) ) //The whole loop!!!!!!!!!!!!!!!!!!
     {
         if( ud.recstat == 2 || ud.multimode > 1 || ( ud.show_help == 0 && (ps[myconnectindex].gm&MODE_MENU) != MODE_MENU ) )
@@ -8328,9 +8945,16 @@ int main(int argc,char **argv)
                 ud.screen_size = i;
                 dobonus(0);
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                // 1.1 ends the episode when an exit leaves level 6 (E1L6) next with no
+                //  secret level to return from: that is, after E1L5.
+                if(ud.level_number == 5 && ud.from_bonus == 0)
+                {
+#else
                 if(ud.eog)
                 {
                     ud.eog = 0;
+#endif
                     if(ud.multimode < 2)
                     {
 #ifndef VOLUMEALL
@@ -8415,6 +9039,41 @@ char opendemoread(char which_demo) // 0 = mine
 
      kread32(recfilep,&ud.reccnt);
 #if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     // 1.1 demos have a 9-byte header: volume, level and skill bytes, then
+     // ud.multimode as a short (F11-001). It has no version, so a 1.0 demo
+     // can't be told apart; a 1.3D or later header fails the range checks.
+     {
+         // Fix: a truncated header left these uninitialized; start them out of range so it is refused.
+         char vol = 127, lev = 127, skill = 127;
+         short mm = 0;
+
+         kread8(recfilep,&vol);
+         kread8(recfilep,&lev);
+         kread8(recfilep,&skill);
+         kread16(recfilep,&mm);
+#ifdef VOLUMEONE
+         if( (vol == 1 || vol == 2) && lev <= 10 && skill <= 4 && mm >= 1 && mm <= MAXPLAYERS )
+         {
+            printf("%s is an episode %d demo, which needs the full version; refused.\n",fname,vol+1);
+            kclose(recfilep);
+            return 0;
+         }
+         if( vol != 0 || lev > 10 || skill > 4 || mm < 1 || mm > MAXPLAYERS )
+#else
+         if( vol > 2 || lev > 10 || skill > 4 || mm < 1 || mm > MAXPLAYERS )
+#endif
+         {
+            printf("%s isn't a Duke Nukem 3D %s demo; refused.\n",fname,VERSION);
+            kclose(recfilep);
+            return 0;
+         }
+         ud.volume_number = vol;
+         ud.level_number = lev;
+         ud.player_skill = skill;
+         ud.multimode = mm;
+     }
+#else
      // 1.3D demos have a 24-byte header and no version byte (reference.md
      // "Demo file"). A later demo has its version where the volume goes, so
      // a value no 1.3D game can have refuses it.
@@ -8454,6 +9113,7 @@ char opendemoread(char which_demo) // 0 = mine
          kread32(recfilep,(int32 *)&ud.m_respawn_items);
          kread32(recfilep,(int32 *)&ud.m_respawn_inventory);
      }
+#endif
 
      // Fix: 1.3D kept the player's cheats (god mode, noclip) into the demo, which then desynced; clear them as 1.4 does.
      ud.god = ud.cashman = ud.eog = ud.showallmap = 0;
@@ -8550,7 +9210,15 @@ void opendemowrite(void)
 // CTW END - MODIFICATION
     val32 = BUILDSWAP_INTEL32(dummylong);
     fwrite(&val32,4,1,frecfilep);
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1 builds record in 1.1's demo format (F11-001).
+    fwrite((char *)&ud.volume_number,sizeof(char),1,frecfilep);
+    fwrite((char *)&ud.level_number,sizeof(char),1,frecfilep);
+    fwrite((char *)&ud.player_skill,sizeof(char),1,frecfilep);
+    val16 = BUILDSWAP_INTEL16(ud.multimode);
+    fwrite((short *)&val16,sizeof(short),1,frecfilep);
+    (void)ver; (void)i;
+#elif DUKE3D_GAMEVER < GAMEVER_14
     // 1.3D builds record in 1.3D's own demo format.
     fwrite((char *)&ud.volume_number,sizeof(char),1,frecfilep);
     fwrite((char *)&ud.level_number,sizeof(char),1,frecfilep);
@@ -8602,6 +9270,37 @@ void opendemowrite(void)
     ud.reccnt = 0;
 }
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+// 1.0's demo record is fvel, svel, avel (all s16) and bits, with no horz
+// (F10-001). Both are 10 bytes, so the buffer is converted in place. 1.0's
+// getinput keeps avel within +-108, so our s8 holds it.
+static void demo10_fromdos(input *in, int32_t n)
+{
+    for (; n > 0; n--, in++)
+    {
+        unsigned char *b = (unsigned char *)in;
+        short fvel = (short)(b[0]|(b[1]<<8)), svel = (short)(b[2]|(b[3]<<8));
+        short avel = (short)(b[4]|(b[5]<<8));
+        uint32_t bits = b[6]|(b[7]<<8)|(b[8]<<16)|((uint32_t)b[9]<<24);
+        in->fvel = fvel; in->svel = svel; in->avel = (signed char)avel;
+        in->horz = 0; in->bits = bits;
+    }
+}
+
+static void demo10_todos(input *in, int32_t n)
+{
+    for (; n > 0; n--, in++)
+    {
+        unsigned char *b = (unsigned char *)in;
+        short fvel = in->fvel, svel = in->svel, avel = in->avel;
+        uint32_t bits = in->bits;
+        b[0] = fvel; b[1] = fvel>>8; b[2] = svel; b[3] = svel>>8;
+        b[4] = avel; b[5] = avel>>8;
+        b[6] = bits; b[7] = bits>>8; b[8] = bits>>16; b[9] = bits>>24;
+    }
+}
+#endif
+
 void record(void)
 {
     short i;
@@ -8613,7 +9312,9 @@ void record(void)
         totalreccnt++;
         if (ud.reccnt >= RECSYNCBUFSIZ)
         {
-            #if PLATFORM_BIGENDIAN
+            #if DUKE3D_GAMEVER < GAMEVER_11
+            demo10_todos(recsync,ud.reccnt);
+            #elif PLATFORM_BIGENDIAN
             input *inptr = recsync;
             int i;
             for (i = 0; i < ud.reccnt; i++)
@@ -8638,7 +9339,9 @@ void closedemowrite(void)
     {
         if (ud.reccnt > 0)
         {
-            #if PLATFORM_BIGENDIAN
+            #if DUKE3D_GAMEVER < GAMEVER_11
+            demo10_todos(recsync,ud.reccnt);
+            #elif PLATFORM_BIGENDIAN
             input *inptr = recsync;
             int i;
             for (i = 0; i < ud.reccnt; i++)
@@ -8701,7 +9404,9 @@ int demoverify(int n, char *dumpname)
             l = min(ud.reccnt,RECSYNCBUFSIZ);
             cnt = l/ud.multimode;
             kdfread(recsync,sizeof(input)*ud.multimode,cnt,recfilep);
-            #if PLATFORM_BIGENDIAN
+            #if DUKE3D_GAMEVER < GAMEVER_11
+            demo10_fromdos(recsync,cnt*ud.multimode);
+            #elif PLATFORM_BIGENDIAN
             {
                 input *inptr = (input *) recsync;
                 for (j = 0; j < cnt*ud.multimode; j++)
@@ -8790,7 +9495,11 @@ int32_t playback(void)
     {
         ud.recstat = 2;
         which_demo++;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        if(which_demo == 4) which_demo = 1; // 1.1 cycles DEMO1-3
+#else
         if(which_demo == 10) which_demo = 1;
+#endif
         enterlevel(MODE_DEMO);
     }
 
@@ -8818,7 +9527,9 @@ int32_t playback(void)
                 l = min(ud.reccnt,RECSYNCBUFSIZ);
                 cnt = l/ud.multimode;
                 kdfread(recsync,sizeof(input)*ud.multimode,cnt,recfilep);
-                #if PLATFORM_BIGENDIAN
+                #if DUKE3D_GAMEVER < GAMEVER_11
+                demo10_fromdos(recsync,cnt*ud.multimode);
+                #elif PLATFORM_BIGENDIAN
                 {
                     input *inptr = (input *) recsync;
                     cnt *= ud.multimode;
@@ -9016,7 +9727,11 @@ void fakedomovethings(void)
         omyz = myz;
         omyang = myang;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        getzrange(myx,myy,myz,psect,&cz,&hz,&fz,&lz,163L,CLIPMASK1); // as 1.1's processinput
+#else
         getzrange(myx,myy,myz,psect,&cz,&hz,&fz,&lz,163L,CLIPMASK0);
+#endif
 
         j = getflorzofslope(psect,myx,myy);
 
@@ -9531,7 +10246,9 @@ char domovethings(void)
           closedemowrite();
 #endif
 
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 doesn't end the game for its own quitter here
           if (i == myconnectindex) gameexit(" ");
+#endif
           if (screenpeek == i)
           {
                 screenpeek = connectpoint2[i];
@@ -9544,8 +10261,14 @@ char domovethings(void)
           numplayers--;
           ud.multimode--;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+          // 1.1 ends the game when fewer than two players are left.
+          if (numplayers < 2)
+              gameexit(" ");
+#else
           if (numplayers < 2)
               sound(GENERIC_AMBIENCE17);
+#endif
 
           pub = NUMPAGES;
           pus = NUMPAGES;
@@ -9558,8 +10281,10 @@ char domovethings(void)
 
           adduserquote(buf);
 
+#if DUKE3D_GAMEVER >= GAMEVER_13D
           if(j < 0 && networkmode == 0 )
               gameexit( " \nThe 'MASTER/First player' just quit the game.  All\nplayers are returned from the game. This only happens in 5-8\nplayer mode as a different network scheme is used.");
+#endif
       }
 
       if ((numplayers >= 2) && ((movefifoplc&7) == 7))
@@ -9600,8 +10325,14 @@ char domovethings(void)
         movefallers();          //ST 12
         moveexplosions();       //ST 4
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        // 1.1 moves the effectors before the actors.
+        moveeffectors();        //ST 3
+        moveactors();           //ST 1
+#else
         moveactors();           //ST 1
         moveeffectors();        //ST 3
+#endif
 
         movestandables();       //ST 6
         doanimations();
@@ -9701,11 +10432,19 @@ void dobonus(char bonusonly)
 
     if(bonusonly) goto FRAGBONUS;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1 has only the episode 1 ending, on the same test as main's, and plays it
+    //  even with the adult lockout on.
+    if(numplayers < 2 && ud.volume_number == 0 && ud.level_number == 5 && ud.from_bonus == 0)
+#else
     if(numplayers < 2 && ud.eog && ud.from_bonus == 0)
+#endif
         switch(ud.volume_number)
     {
         case 0:
+#if DUKE3D_GAMEVER >= GAMEVER_13D
             if(ud.lockout == 0)
+#endif
             {
                 ps[myconnectindex].palette = endingpal;
                 glsetgamepalette();
@@ -10311,8 +11050,10 @@ void lotsofglass(short i,short wallnum,short n)
      xv = wall[wall[wallnum].point2].x-x1;
      yv = wall[wall[wallnum].point2].y-y1;
 
+#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 starts the pieces on the wall itself
      x1 -= ksgn(yv);
      y1 += ksgn(xv);
+#endif
 
      xv /= j;
      yv /= j;
@@ -10396,6 +11137,16 @@ void lotsofcolourglass(short i,short wallnum,short n)
      {
         for(j=n-1; j >= 0 ;j--)
         {
+#if DUKE3D_GAMEVER < GAMEVER_13D
+            // 1.1 throws them like lotsofglass does: 4 krands per piece, not 5.
+            a = SA-256+(TRAND&511)+1024;
+            {
+                // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
+                int32_t r_zv = 1024-(TRAND&1023);
+                int32_t r_vel = 32+(TRAND&63);
+                k = EGS(SECT,SX,SY,SZ,GLASSPIECES+(j%3),-32,36,36,a,r_vel,r_zv,i,5);
+            }
+#else
             a = TRAND&2047;
             {
                 // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
@@ -10404,6 +11155,7 @@ void lotsofcolourglass(short i,short wallnum,short n)
                 int32_t r_z = SZ-(TRAND&(63<<8));
                 k = EGS(SECT,SX,SY,r_z,GLASSPIECES+(j%3),-32,36,36,a,r_vel,r_zv,i,5);
             }
+#endif
             sprite[k].pal = TRAND&15;
         }
         return;

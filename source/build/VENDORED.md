@@ -80,6 +80,9 @@ BUILDLIC.TXT LICENSE.md
   explicit casts
 - `mmulti.c`: `socklen_t` is `int` on Windows (it was `size_t`, which is 8
   bytes on Win64 while Winsock's `recvfrom` takes an `int *`)
+- `mmulti.c`: `connect_to_everyone` finds the local player's slot by port as
+  well as host, so peers sharing an IP (e.g. two on localhost) get their own
+  slots instead of both taking the last one
 - `pragmas.h`: `klabs` negates as unsigned, so `klabs(INT32_MIN)` gives
   `INT32_MIN` as x86 `neg` does instead of undefined behaviour (ledger E-009)
 - `engine.c`: version-guarded 1.4 engine logic, on `BUILD_ENGINEREV` (see
@@ -87,6 +90,14 @@ BUILDLIC.TXT LICENSE.md
 - `engine.c`, `cache1d.c`: version-guarded 1.3D engine logic, on
   `BUILD_ENGINEREV`: the 1996 logic square root, slope maths, `inside` and the
   1996 LZW format (see ledger E-001 to E-004, E-012)
+- `engine.c`: version-guarded 1.1 and 1.0 engine logic, on `BUILD_ENGINEREV`:
+  the early `inside`, which compares the two products and keeps a one-byte
+  count (see ledger E11-001)
+- `engine.c`: version-guarded 1.0 engine logic, on `BUILD_ENGINEREV <
+  19960220L`: `cansee`'s side test and `lintersect`; `hitscan` without a
+  cliptype (always `CLIPMASK1`) that resets only `*hitsect`; `clipmove`
+  accepting a bad sector and gathering every listed sector's walls before
+  their sprites (see ledger E10-001 to E10-004)
 - `a.c`, `a.h`: the C line drawers are JFBuild's `src/a-c.c` (Ken Silverman's
   own C port of `A.ASM` from `BUILDC.ZIP`, made 64-bit clean), from
   <https://github.com/jonof/jfbuild> commit

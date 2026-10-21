@@ -82,7 +82,11 @@ char level_names[44][33],level_file_names[44][128];
 int32_t partime[44],designertime[44];
 #if DUKE3D_GAMEVER < GAMEVER_14
 // 1.3D CONs can't name episodes or skills; the 1.3D executable has these built in.
+#if DUKE3D_GAMEVER < GAMEVER_13D
+char volume_names[4][33] = { "L.A. MELTDOWN", "LUNAR APOCALYPSE", "SCHRAPNEL CITY" }; // 1.1's spelling
+#else
 char volume_names[4][33] = { "L.A. MELTDOWN", "LUNAR APOCALYPSE", "SHRAPNEL CITY" };
+#endif
 char skill_names[5][33] = { "PIECE OF CAKE", "LET'S ROCK", "COME GET SOME", "DAMN I'M GOOD" };
 #else
 char volume_names[4][33];
@@ -179,7 +183,12 @@ signed char multiwho, multipos, multiwhat, multiflag;
 
 int32_t fakemovefifoplc,movefifoplc;
 int32_t myxbak[MOVEFIFOSIZ], myybak[MOVEFIFOSIZ], myzbak[MOVEFIFOSIZ];
+#if DUKE3D_GAMEVER < GAMEVER_11
+// 1.0 has no CON friction: its movement uses 0xcb00 (G10-L03).
+int32_t myhorizbak[MOVEFIFOSIZ],dukefriction = 0xcb00, show_shareware;
+#else
 int32_t myhorizbak[MOVEFIFOSIZ],dukefriction = 0xcc00, show_shareware;
+#endif
 
 short myangbak[MOVEFIFOSIZ];
 char myname[32],camerashitable,freezerhurtowner=0,lasermode;

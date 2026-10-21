@@ -4398,7 +4398,9 @@ int inside(int32_t x, int32_t y, short sectnum)
 {
 	walltype *wal;
 	int32_t i, x1, y1, x2, y2;
-#if (BUILD_ENGINEREV < 19960427L)
+#if (BUILD_ENGINEREV < 19960320L)
+	char cnt;
+#elif (BUILD_ENGINEREV < 19960427L)
 	int32_t cnt;
 #else
 	uint32_t cnt;
@@ -4415,7 +4417,12 @@ int inside(int32_t x, int32_t y, short sectnum)
 		if ((y1^y2) < 0)
 		{
 			x1 = wal->x-x; x2 = wall[wal->point2].x-x;
-#if (BUILD_ENGINEREV < 19960427L)
+#if (BUILD_ENGINEREV < 19960320L)
+			if ((x1^x2) < 0)
+				cnt ^= (x1*y2<x2*y1)^(y1<y2);
+			else if (x1 >= 0)
+				cnt ^= 1;
+#elif (BUILD_ENGINEREV < 19960427L)
 			if ((x1^x2) < 0) cnt ^= (x1*y2-x2*y1)^(y1-y2); else cnt ^= ~x1;
 #else
 			if ((x1^x2) >= 0) cnt ^= x1; else cnt ^= (x1*y2-x2*y1)^y2;
@@ -4423,7 +4430,9 @@ int inside(int32_t x, int32_t y, short sectnum)
 		}
 		wal++; i--;
 	} while (i);
-#if (BUILD_ENGINEREV < 19960427L)
+#if (BUILD_ENGINEREV < 19960320L)
+	return(cnt);
+#elif (BUILD_ENGINEREV < 19960427L)
 	return(cnt<0);
 #else
 	return(cnt>>31);
@@ -6155,11 +6164,15 @@ int cansee(int32_t x1, int32_t y1, int32_t z1, short sect1,
 	sectortype *sec;
 	walltype *wal, *wal2;
 	int32_t i, cnt, nexts, x, y, z, cz, fz, dasectnum, dacnt, danum;
+#if (BUILD_ENGINEREV >= 19960220L)
 	int32_t x21, y21, z21, x31, y31, x34, y34, bot, t;
+#endif
 
 	if ((x1 == x2) && (y1 == y2)) return(sect1 == sect2);
 
+#if (BUILD_ENGINEREV >= 19960220L)
 	x21 = x2-x1; y21 = y2-y1; z21 = z2-z1;
+#endif
 
 	clipsectorlist[0] = sect1; danum = 1;
 	for(dacnt=0;dacnt<danum;dacnt++)
@@ -6168,6 +6181,14 @@ int cansee(int32_t x1, int32_t y1, int32_t z1, short sect1,
 		for(cnt=sec->wallnum,wal=&wall[sec->wallptr];cnt>0;cnt--,wal++)
 		{
 			wal2 = &wall[wal->point2];
+#if (BUILD_ENGINEREV < 19960220L)
+			/* 1.0: a side test, then lintersect, which takes either sign of bot */
+			if ((wal->y-y1)*(wal2->x-x1) > (wal->x-x1)*(wal2->y-y1)) continue;
+			if (lintersect(x1,y1,z1,x2,y2,z2,wal->x,wal->y,wal2->x,wal2->y,&x,&y,&z) == 0) continue;
+
+			nexts = wal->nextsector;
+			if ((nexts < 0) || (wal->cstat&32)) return(0);
+#else
 			x31 = wal->x-x1; x34 = wal->x-wal2->x;
 			y31 = wal->y-y1; y34 = wal->y-wal2->y;
 
@@ -6182,6 +6203,7 @@ int cansee(int32_t x1, int32_t y1, int32_t z1, short sect1,
 			x = x1 + mulscale24(x21,t);
 			y = y1 + mulscale24(y21,t);
 			z = z1 + mulscale24(z21,t);
+#endif
 
 			getzsofslope((short)dasectnum,x,y,&cz,&fz);
 			if ((z <= cz) || (z >= fz)) return(0);
@@ -6273,6 +6295,17 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 	short nextsector;
 	char clipyou;
 
+#if (BUILD_ENGINEREV < 19960220L)
+	/* 1.0 has no cliptype (always CLIPMASK1), and resets only *hitsect */
+	*hitsect = -1;
+	if (sectnum < 0) return(-1);
+
+	*hitx = hitscangoalx; *hity = hitscangoaly;
+
+	dawalclipmask = 64;
+	dasprclipmask = 256;
+	(void)cliptype;
+#else
 	*hitsect = -1; *hitwall = -1; *hitsprite = -1;
 	if (sectnum < 0) return(-1);
 
@@ -6280,6 +6313,7 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 
 	dawalclipmask = (cliptype&65535);
 	dasprclipmask = (cliptype>>16);
+#endif
 
 	clipsectorlist[0] = sectnum;
 	tempshortcnt = 0; tempshortnum = 1;
@@ -6791,7 +6825,13 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 	int32_t xrepeat, yrepeat, gx, gy, dx, dy, dasprclipmask, dawalclipmask;
 	int32_t hitwall, cnt, clipyou;
 
+#if (BUILD_ENGINEREV < 19960220L)
+	/* 1.0 doesn't refuse a bad sector: it gathers no clip lines, moves to the
+	 * goal, and searches the clipsectorlist the last call left (below) */
+	if ((xvect|yvect) == 0) return(0);
+#else
 	if (((xvect|yvect) == 0) || (*sectnum < 0)) return(0);
+#endif
 	retval = 0;
 
 	oxvect = xvect;
@@ -6814,6 +6854,10 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 	dawalclipmask = (cliptype&65535);        /* CLIPMASK0 = 0x00010001 */
 	dasprclipmask = (cliptype>>16);          /* CLIPMASK1 = 0x01000040 */
 
+#if (BUILD_ENGINEREV < 19960220L)
+	if (*sectnum >= 0)
+	{
+#endif
 	clipsectorlist[0] = (*sectnum);
 	clipsectcnt = 0; clipsectnum = 1;
 	do
@@ -6883,6 +6927,15 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 			}
 		}
 
+#if (BUILD_ENGINEREV < 19960220L)
+	} while (clipsectcnt < clipsectnum);
+
+		/* 1.0 adds the walls of every sector first, then their sprites */
+	clipsectcnt = 0;
+	do
+	{
+		dasect = clipsectorlist[clipsectcnt++];
+#endif
 		for(j=headspritesect[dasect];j>=0;j=nextspritesect[j])
 		{
 			spr = &sprite[j];
@@ -7007,6 +7060,9 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 			}
 		}
 	} while (clipsectcnt < clipsectnum);
+#if (BUILD_ENGINEREV < 19960220L)
+	}
+#endif
 
 
 	hitwall = 0;

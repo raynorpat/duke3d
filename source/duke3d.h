@@ -106,7 +106,14 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define MAXSLEEPDIST  16384
 #define SLEEPTIME 24*64
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+#if DUKE3D_GAMEVER < GAMEVER_11
+    // 1.0: the shareware release has no version field; 10 is unused by any
+    //  release and only guards this build's net handshake.
+    #define BYTEVERSION 10
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+    // 1.1: the shareware release's own value, from its EXE.
+    #define BYTEVERSION 12
+#elif DUKE3D_GAMEVER < GAMEVER_14
     // 1.3D: the shareware and full releases' own values.
     #ifdef VOLUMEONE
         #define BYTEVERSION 14
@@ -153,6 +160,18 @@ struct player_struct;
 
 #include "names.h"
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+// 1.1 tiles from its DEFS.CON that names.h doesn't name.
+#define FUELCAN 45
+#define BODYSUIT 58
+#define DUMMYDUKE 1425
+#define BIGDUMMYDUKE 1430
+#define SPACESUIT_ICON 2466
+#define THROWFLAME 2500
+#define FLAMETHROWERSPRITE 24 // 1.3D's FREEZESPRITE tile
+#define FLAMETHROWER 2548 // 1.3D's FREEZE tile
+#endif
+
 #include "build/engine.h"
 
 #define TICRATE (120)
@@ -162,8 +181,10 @@ struct player_struct;
 
 #define NUM_SOUNDS 450
 
-// Sounds the game logic may name: 1.3D's sound table held 348.
-#if DUKE3D_GAMEVER < GAMEVER_14
+// Sounds the game logic may name: 1.1's sound table held 255, 1.3D's 348.
+#if DUKE3D_GAMEVER < GAMEVER_13D
+#define GAME_NUM_SOUNDS 255
+#elif DUKE3D_GAMEVER < GAMEVER_14
 #define GAME_NUM_SOUNDS 348
 #else
 #define GAME_NUM_SOUNDS NUM_SOUNDS
@@ -269,8 +290,15 @@ struct player_struct;
 #define SHRINKER_WEAPON      6
 #define DEVISTATOR_WEAPON    7
 #define TRIPBOMB_WEAPON      8
+#if DUKE3D_GAMEVER < GAMEVER_13D
+// 1.1's DEFS.CON numbering: 7 is the flamethrower and 9 the remote. 1.1 has
+//  no freezer, so it gets slot 10, which nothing gives.
+#define HANDREMOTE_WEAPON    9
+#define FREEZE_WEAPON        10
+#else
 #define FREEZE_WEAPON        9
 #define HANDREMOTE_WEAPON    10
+#endif
 #define GROW_WEAPON          11
 
 #define T1  hittype[i].temp_data[0]
@@ -460,6 +488,15 @@ struct player_struct
     char walking_snd_toggle, palookup, hard_landing;
     char max_secret_rooms,secret_rooms,/*fire_flag,*/pals[3];
     char max_actors_killed,actors_killed,return_to_center;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+    short spacesuit_amount; // 1.1's inventory item 5, the space suit
+    char spacesuit_used, spacesuit_on;
+    int32_t burn_time; // set when a THROWFLAME hits the player
+#endif
+#if DUKE3D_GAMEVER < GAMEVER_11
+    char auto_run; // 1.0: per player, toggled by input bit 17 (G10-S06)
+    char unnamed_322; // 1.0: the save's byte 0x322, which nothing sets (reference.md)
+#endif
 };
 
 extern unsigned char tempbuf[2048], packbuf[576];
@@ -494,6 +531,9 @@ extern int32 VoiceToggle,AmbienceToggle;
 extern SOUNDOWNER SoundOwner[NUM_SOUNDS][4];
 
 extern char playerreadyflag[MAXPLAYERS],playerquitflag[MAXPLAYERS];
+#if DUKE3D_GAMEVER < GAMEVER_13D
+extern char waitabort;
+#endif
 extern char sounds[NUM_SOUNDS][14];
 
 extern int32_t script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;
