@@ -8,7 +8,11 @@
 #
 #   cmake -DDUKE3D=<exe> -DDATA=<data dir> -DEDITION=<full|sw|sw11|sw10>
 #         -DDEMO=<n> -DREFS=<v13d_demo_refs.cmake> -DWORK=<scratch dir>
-#         [-DMODE=refuse [-DOTHERS=<demo files>]] -P demo_sync_v13d.cmake
+#         [-DMODE=refuse [-DOTHERS=<demo files>]] [-DFLAGS="<options>"]
+#         -P demo_sync_v13d.cmake
+#
+# FLAGS adds options to the run: -demodraw draws each tic, -demoswitch <n>
+# also switches renderer every n tics (and the run must report switches).
 include("${CMAKE_CURRENT_LIST_DIR}/v13d_data.cmake")
 v13d_check_edition("${DATA}" "${EDITION}")
 
@@ -32,6 +36,8 @@ else()
   file(COPY_FILE "${DATA}/DEMO${DEMO}.DMO" "${_run}/demo${DEMO}.dmo")
 endif()
 
+separate_arguments(_flags UNIX_COMMAND "${FLAGS}")
+
 set(ENV{SDL_VIDEODRIVER} dummy)
 # No sound: killing the game at the timeout would pop the speakers.
 set(ENV{SDL_AUDIODRIVER} dummy)
@@ -41,7 +47,7 @@ set(ENV{USERPROFILE} "${_home}")
 set(ENV{DUKE3D_SAVE_DIR} "${_home}")
 
 macro(_demo_run)
-  execute_process(COMMAND "${DUKE3D}" -demoverify ${DEMO}
+  execute_process(COMMAND "${DUKE3D}" -demoverify ${DEMO} ${_flags}
     WORKING_DIRECTORY "${_run}"
     TIMEOUT 300
     RESULT_VARIABLE _result
@@ -80,6 +86,9 @@ endif()
 
 if(NOT _result EQUAL 0)
   message(FATAL_ERROR "duke3d -demoverify ${DEMO} failed: ${_result}\n${_out}${_err}")
+endif()
+if(FLAGS MATCHES "-demoswitch" AND NOT _out MATCHES "DEMOSWITCH")
+  message(FATAL_ERROR "-demoswitch made no switch:\n${_out}")
 endif()
 string(REGEX MATCH "DEMOSTATE [-0-9 ]+" _line "${_out}")
 if(NOT _line)

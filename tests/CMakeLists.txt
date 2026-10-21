@@ -258,6 +258,13 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
       ENVIRONMENT "BUILD_WINDOWED=1"
       SKIP_RETURN_CODE 77
       TIMEOUT 30)
+    # The VIDEO page's live renderer switch, from a run with no GL context yet.
+    add_test(NAME render_gl_video
+      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" video)
+    set_tests_properties(render_gl_video PROPERTIES
+      ENVIRONMENT "BUILD_WINDOWED=1"
+      SKIP_RETURN_CODE 77
+      TIMEOUT 30)
   endif()
 
   # Boots the real game to its title loop and into E1L1, headless. It uses
@@ -440,6 +447,17 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
       set_tests_properties(demo_sync_v13d_${_v13d_edition}_${_demo} PROPERTIES TIMEOUT 400)
     endforeach()
+    # Demo 1 again, drawn, with the renderer switched every 50 tics as the
+    # VIDEO page does (OpenGL fails headless, and stays off): still in sync.
+    add_test(NAME demo_switch_v13d_${_v13d_edition}
+      COMMAND "${CMAKE_COMMAND}"
+              "-DDUKE3D=$<TARGET_FILE:duke3d>"
+              "-DDATA=${_v13d_data}" "-DEDITION=${_v13d_edition}"
+              -DDEMO=1 "-DFLAGS=-demoswitch 50"
+              "-DREFS=${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_demo_refs.cmake"
+              "-DWORK=${CMAKE_BINARY_DIR}/dsw13"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
+    set_tests_properties(demo_switch_v13d_${_v13d_edition} PROPERTIES TIMEOUT 400)
     add_test(NAME demo_refuse_v13d_${_v13d_edition}
       COMMAND "${CMAKE_COMMAND}"
               "-DDUKE3D=$<TARGET_FILE:duke3d>"

@@ -2168,8 +2168,12 @@ void binscreen(void)
 }
 
 
-// The renderer for this run: duke3d.cfg's, or -renderer's; 0 if OpenGL failed.
+// The renderer for this run: duke3d.cfg's, or -renderer's, or the VIDEO
+// page's; 0 if OpenGL failed.
 static int32_t gamerenderer;
+
+// OpenGL failed in this run (at the start or a switch): not tried again.
+int32_t video_glunavailable;
 
 // Sets the video mode from ScreenMode/Width/Height, then OpenGL when the
 // renderer is 3, so the renderer survives a mode change.
@@ -2185,14 +2189,87 @@ static int setgamemoderenderer(void)
     glcontrast = GLContrast;  // the shader path's, applied as it shows each frame
     glsaturation = GLSaturation;
 #endif
+    if (gamerenderer == 3 && video_glunavailable)
+        gamerenderer = 0;
     if (gamerenderer == 3 && setgamemode_gl(ScreenMode) != 0)
     {
         printf("OpenGL renderer unavailable (%s); using the classic renderer.\n", SDL_GetError());
         setgamemode(ScreenMode,ScreenWidth,ScreenHeight);
         gamerenderer = 0;
+        video_glunavailable = 1;
     }
     setrendermode(gamerenderer);
     return 0;
+}
+
+// Switches to renderer r now, keeping the window (the first switch to
+// OpenGL in a run that started in 0-2 makes it again, with GL); call it
+// between frames. If OpenGL fails, the renderer stays as it was. The mode
+// set drops the palette and the view: both are put back, with any fade.
+// RendererSetting, what duke3d.cfg keeps, is left alone. Returns the
+// renderer in effect.
+int video_setrenderer(int r)
+{
+    int32_t previous = gamerenderer;
+#ifdef POLYMOST
+    palette_t fadergb = palfadergb;
+    unsigned char fadedelta = palfadedelta;
+#else
+    r = 0;
+#endif
+
+    r = clamprenderer(r);
+    if (r == previous || (r == 3 && video_glunavailable))
+        return previous;
+
+    gamerenderer = r;
+    if (setgamemoderenderer() < 0)
+    {
+        gamerenderer = previous;
+        setgamemoderenderer();
+    }
+    else if (gamerenderer != r)
+    {
+        printf("Keeping renderer %d.\n", (int)previous);
+        gamerenderer = previous;
+        setrendermode(gamerenderer);  // the 8-bit mode is set: 0-2 differ only in drawing
+    }
+
+    glresetgamepalette();
+    if (getrendermode() == 3) glsetgamepalette();
+    else setbrightness(ud.brightness>>2,(unsigned char *)gameviewpalette());
+#ifdef POLYMOST
+    if (fadedelta)
+    {
+        if (getrendermode() == 3)
+        {
+            // shown with the next frame; setpalettefade would show one now
+            palfadergb = fadergb;
+            palfadedelta = fadedelta;
+        }
+        else setpalettefade(fadergb.r>>2,fadergb.g>>2,fadergb.b>>2,
+                            (fadedelta == 255) ? 64 : (fadedelta>>2));
+    }
+#endif
+
+    flushperms();
+    vscrn();  // the view, and the border and status bar drawn again
+    return gamerenderer;
+}
+
+// A switch asked for mid-frame (the VIDEO page), made after the frame is shown.
+static int32_t video_pendingrenderer = -1;
+
+void video_requestrenderer(int r)
+{
+    video_pendingrenderer = r;
+}
+
+static void video_applypending(void)
+{
+    if (video_pendingrenderer < 0) return;
+    video_setrenderer(video_pendingrenderer);
+    video_pendingrenderer = -1;
 }
 
 // Renderer 3 redraws the whole screen each frame: the border and status bar
@@ -8865,7 +8942,9 @@ int main(int argc,char **argv)
     if(i && i+1 < _argc)
     {
         j = CheckParm("DEMODUMP");
-        exit(demoverify(atoi(_argv[i+1]),(j && j+1 < _argc) ? _argv[j+1] : NULL));
+        l = CheckParm("DEMOSWITCH");
+        exit(demoverify(atoi(_argv[i+1]),(j && j+1 < _argc) ? _argv[j+1] : NULL,
+                        CheckParm("DEMODRAW") || l,(l && l+1 < _argc) ? atoi(_argv[l+1]) : 0));
     }
 
     i = CheckParm("LOADVERIFY");
@@ -9009,6 +9088,7 @@ int main(int argc,char **argv)
             rotatesprite((320-50)<<16,9<<16,65536L,0,BETAVERSION,0,0,2+8+16+128,0,0,xdim-1,ydim-1);
 #endif
         nextpage();
+        video_applypending();
     }
 
     gameexit(" ");
@@ -9381,11 +9461,13 @@ char in_menu = 0;
  *  code: 0 played, 2 refused. With -demodump <file> it also writes the state
  *  in tools/v13d/mkcapture.py's STATE.BIN layout (reccnt, randomseed,
  *  sprite[]) followed by ps[0] as this build lays it out, for finding where
- *  a desync starts.
+ *  a desync starts. draw: show a frame after each tic, as playback does;
+ *  switchevery (with draw): move to the next renderer every that many tics,
+ *  as the VIDEO page does, which mustn't change the state.
  */
-int demoverify(int n, char *dumpname)
+int demoverify(int n, char *dumpname, int draw, int switchevery)
 {
-    int32_t i, j, l, cnt, tics = 0;
+    int32_t i, j, l, cnt, tics = 0, r;
     short k;
 
     if( !opendemoread(n) )
@@ -9395,6 +9477,8 @@ int demoverify(int n, char *dumpname)
     }
     ud.recstat = 2;
     enterlevel(MODE_DEMO);
+    ready2send = 0;  // as playback: no live input into the fifo while drawing
+    if(draw) setvideovsync(0);  // as fast as it can draw
 
     i = 0;
     while (ud.reccnt > 0)
@@ -9430,6 +9514,20 @@ int demoverify(int n, char *dumpname)
         }
         domovethings();
         tics++;
+
+        if(draw)
+        {
+            gldrawframe();
+            displayrooms(screenpeek,65536);
+            displayrest(65536);
+            nextpage();
+            if(switchevery > 0 && tics%switchevery == 0)
+            {
+                r = gamerenderer;
+                printf("DEMOSWITCH tic %d: renderer %d -> %d\n",tics,(int)r,
+                       video_setrenderer((r == 2 && video_glunavailable) ? 0 : (r+1)&3));
+            }
+        }
     }
 
     // The player sprite (statnum 10), as the DOS reference capture reads it.
@@ -9622,6 +9720,7 @@ int32_t playback(void)
 #endif
         getpackets();
         nextpage();
+        video_applypending();
 
         if( ps[myconnectindex].gm==MODE_END || ps[myconnectindex].gm==MODE_GAME )
         {

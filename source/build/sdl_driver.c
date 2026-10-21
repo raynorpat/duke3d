@@ -1114,11 +1114,13 @@ int setgamemode_gl(char davidoption)
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         window = create_window(gl_window_w, gl_window_h,
                                SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI);
-        context = (window != NULL) ? SDL_GL_CreateContext(window) : NULL;
+        context = ((window != NULL) && (gl_forcefail != 4)) ? SDL_GL_CreateContext(window) : NULL;
         if (context == NULL)
         {
             if (window != NULL)
                 SDL_DestroyWindow(window);
+            if (gl_forcefail == 4)
+                SDL_SetError("no context (gl_forcefail 4)");
             return(-1);
         } /* if */
 

@@ -61,7 +61,8 @@ void gl_colorcorrect(unsigned char *c, double contrast, double saturation);
 	 * width and height), width, height, in whole pixels. */
 void gl_fitrect(int32_t w, int32_t h, int32_t dw, int32_t dh, int32_t *r);
 	/* Test hook: 1 makes GLSL and FBOs unavailable, as if they failed; 2 makes
-	 * the shader path's shader not compile, 3 its framebuffer incomplete. */
+	 * the shader path's shader not compile, 3 its framebuffer incomplete; 4
+	 * makes the run's first GL context fail, as on a machine without GL. */
 extern int32_t gl_forcefail;
 	/* Test hooks (polymost.c): RGB tile textures made, and times they were all
 	 * made dirty (gltexinvalidateall); the shader path makes none. */

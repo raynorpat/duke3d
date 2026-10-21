@@ -114,6 +114,10 @@
 /* The game is linked in (for render_gl_game.c), so it provides the
  * engine's callbacks. */
 int glgamepalette_check(void);  /* render_gl_game.c */
+void videoswitch_setup(void);  /* render_gl_game.c */
+int videoswitch_palette_check(void);  /* render_gl_game.c */
+int video_setrenderer(int r);  /* game.c */
+extern int32_t video_glunavailable;  /* game.c */
 extern SDL_Surface *surface;  /* sdl_driver.c: the 8-bit frame */
 
 #define APLAYER 1405  /* names.h: a player start */
@@ -1769,6 +1773,80 @@ static int present8_check(void)
     return ok;
 }
 
+/*
+ * The VIDEO page's renderer switch (game.c video_setrenderer) in a run that
+ *  starts in renderers 0-2, so in its own process (render_gl_video). OpenGL
+ *  failing (gl_forcefail 4) keeps the renderer, the SDL renderer's window
+ *  and its picture, and isn't tried again; then 3 -> 0 -> 3 -> 0 -> 3 makes
+ *  the GL window once, keeping it and the context; the player's palette and
+ *  fade survive each switch. 1: pass, 0: fail, 77: no OpenGL.
+ */
+static int video_switch_check(void)
+{
+    static const int seq[] = { 0, 3, 0, 3 };
+    SDL_Window *win = NULL;
+    SDL_GLContext ctx;
+    Uint32 id, winid;
+    unsigned char *shown, *want;
+    int ow, oh, i, r, ok = 1;
+    long bars;
+    double d;
+
+    videoswitch_setup();
+    if (_setgamemode(1, 320, 200) != 0) { fprintf(stderr, "FAIL: _setgamemode(320x200)\n"); return 0; }
+    if (video_setrenderer(2) != 2) { fprintf(stderr, "FAIL: renderer 2\n"); return 0; }
+    for (id = 1; (id < 1000) && (win == NULL); id++)
+        win = SDL_GetWindowFromID(id);
+    winid = SDL_GetWindowID(win);
+
+    gl_forcefail = 4;
+    r = video_setrenderer(3);
+    gl_forcefail = 0;
+    printf("renderer 2 -> 3, OpenGL failing: renderer %d, OpenGL greyed %d\n", r, (int) video_glunavailable);
+    if ((r != 2) || (getrendermode() != 2) || (!video_glunavailable))
+        { fprintf(stderr, "FAIL: OpenGL failing didn't keep renderer 2 and grey OpenGL\n"); ok = 0; }
+    if ((SDL_GetWindowFromID(winid) != win) || (SDL_GetRenderer(win) == NULL))
+        { fprintf(stderr, "FAIL: OpenGL failing lost the window or its SDL renderer\n"); return 0; }
+    for (id = SDL_GetTicks(); SDL_GetTicks() - id < 300; SDL_Delay(10))
+        _handle_events();
+    present8_frame(0);
+    want = present8_expected();
+    shown = present8_read(win, 1, &ow, &oh);
+    d = shown_diff(shown, ow, oh, want, xdim, ydim, &bars);
+    printf("after the failure, %dx%d window: mean |diff| %.3f, %ld bar pixels not black\n", ow, oh, d, bars);
+    if ((d > 0.5) || (bars != 0))
+        { fprintf(stderr, "FAIL: after OpenGL failed the 8-bit picture isn't shown\n"); ok = 0; }
+    free(shown);
+    free(want);
+    if (video_setrenderer(3) != 2)
+        { fprintf(stderr, "FAIL: OpenGL tried again after it failed\n"); ok = 0; }
+
+    video_glunavailable = 0;  /* as on a machine that has it */
+    if (video_setrenderer(3) != 3)
+    {
+        printf("SKIP: no OpenGL (%s)\n", SDL_GetError());
+        return 77;
+    }
+    ctx = SDL_GL_GetCurrentContext();
+    win = SDL_GL_GetCurrentWindow();
+    winid = SDL_GetWindowID(win);
+    if ((ctx == NULL) || (SDL_GetRenderer(win) != NULL))
+        { fprintf(stderr, "FAIL: renderer 3 isn't in a GL window\n"); return 0; }
+    for (i = 0; i < (int) (sizeof (seq) / sizeof (seq[0])); i++)
+    {
+        r = video_setrenderer(seq[i]);
+        if ((r != seq[i]) || (getrendermode() != seq[i]))
+            { fprintf(stderr, "FAIL: switch to renderer %d gave %d\n", seq[i], r); ok = 0; }
+        if ((SDL_GL_GetCurrentContext() != ctx) || (SDL_GetWindowFromID(winid) == NULL) ||
+            (SDL_GL_GetCurrentWindow() != SDL_GetWindowFromID(winid)))
+            { fprintf(stderr, "FAIL: switch to renderer %d made a new window or context\n", seq[i]); ok = 0; }
+    }
+    printf("renderer 3 -> 0 -> 3 -> 0 -> 3: window %u, context %p kept: %s\n", (unsigned) winid, ctx,
+           ok ? "yes" : "no");
+    if (!videoswitch_palette_check()) ok = 0;
+    return ok;
+}
+
 int main(int argc, char **argv)
 {
     int32_t posx, posy, posz;
@@ -1842,6 +1920,11 @@ int main(int argc, char **argv)
     setup_la_backdrop();
 
     _platform_init(argc, argv, "render_gl", "render");
+    if ((argc > 3) && (strcmp(argv[3], "video") == 0))
+    {
+        i = video_switch_check();
+        return (i == 1) ? 0 : (i == 77) ? 77 : 1;
+    }
     i = present8_check();
     if (i != 1) return (i == 77) ? 77 : 1;
     i = classic_compare(argv[2]);
