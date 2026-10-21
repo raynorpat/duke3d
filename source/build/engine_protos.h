@@ -128,6 +128,10 @@ extern int screencapture(char *filename, char inverseit);
 extern void setvmode(int mode);
 extern int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim);
 extern int setgamemode_gl(char davidoption);
+extern void setvideodisplaymode(int mode);
+extern int getvideodisplaymode(void);
+extern void setvideovsync(int on);
+extern int getvideovsync(void);
 extern void glredrawlastframe(void);
 extern void qsetmode640350(void);
 extern void qsetmode640480(void);
@@ -193,6 +197,7 @@ extern void gltexinvalidateall(void);
 #endif
 #if defined(POLYMOST) && defined(USE_OPENGL)
 extern void polymost_fillpolygon(int32_t npoints);
+extern void polymost_buildshaderamp(void);
 #endif
 extern void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz, short daang, int32_t dahoriz, short dacursectnum);
 extern int loadboard(char *filename, int32_t *daposx, int32_t *daposy, int32_t *daposz, short *daang, short *dacursectnum);

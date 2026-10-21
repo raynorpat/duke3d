@@ -83,6 +83,7 @@ Duke Lookup Table
 #include "build/display.h"  /* rcg05232001 need some "vesa" routines. */
 #include "names.h"
 #include "buildcfg.h"
+#include "build/glext.h"
 #include "editormode.h"
 
 
@@ -1852,9 +1853,8 @@ static void savebuildcfg(void)
 
    if (saved || (buildcfgpath[0] == 0)) return;
    saved = 1;
-   // BUILD_WINDOWED forces a window for this run only; keep build.cfg's choice.
-   if (getenv(BUILD_WINDOWED) == NULL)
-       buildcfg.fullscreen = getvideofullscreen();
+   // displaymode stays build.cfg's: Alt+Enter, BUILD_WINDOWED and an
+   // exclusive that fell back to borderless last for this run only.
    // Alt+K's renderer is kept; -renderer's alone isn't.
    if (editorrendererpicked)
        buildcfg.renderer = editormode.renderer;
@@ -1900,8 +1900,16 @@ void ExtInit(void)
     editormode.xdim3d = buildcfg.xdim3d;
     editormode.ydim3d = buildcfg.ydim3d;
     editormode.gltexmiplevel = buildcfg.gltexmiplevel;
+    editormode.gldrawpath = buildcfg.gldrawpath;
+    editormode.glinternalwidth = buildcfg.glinternalwidth;
+    editormode.glinternalheight = buildcfg.glinternalheight;
     editormousesensitivity = (int32_t)(buildcfg.mousesensitivity*65536.0+0.5);
-    setvideofullscreen(buildcfg.fullscreen);
+#ifdef USE_OPENGL
+    glcontrast = buildcfg.glcontrast;  // the shader path's, applied as it shows each frame
+    glsaturation = buildcfg.glsaturation;
+#endif
+    setvideodisplaymode(buildcfg.displaymode);
+    setvideovsync(buildcfg.vsync);
 
                 initmouse();
 

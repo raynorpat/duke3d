@@ -360,11 +360,12 @@ void setupdrawslab (int32_t dabpl, intptr_t pal)
 void drawslab (int32_t dx, int32_t v, int32_t dy, int32_t vi, intptr_t vptr, intptr_t p)
 {
 	int32_t x;
-	unsigned char *pp = (unsigned char *)p;
+	unsigned char c, *pp = (unsigned char *)p;
 
 	while (dy > 0)
 	{
-		for(x=0;x<dx;x++) *(pp+x) = slabpal[(int32_t)(*(unsigned char *)((v>>16)+vptr))];
+		c = slabpal[(int32_t)(*(unsigned char *)((v>>16)+vptr))]; /* one texel a row */
+		for(x=0;x<dx;x++) *(pp+x) = c;
 		pp += slabbpl; v += vi; dy--;
 	}
 }

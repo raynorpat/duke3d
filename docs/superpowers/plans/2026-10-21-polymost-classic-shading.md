@@ -110,11 +110,40 @@
 - [ ] Steps 2–4: implement; check the editor (3D mode, tile browser, cursor) at an internal size; suites pass.
 - [ ] Step 5: commits, e.g. `engine: render renderer 3 at a GL internal size and scale it up`.
 
-### Task 8: docs, matrix, speed and hand-over
+### Task 8: EDuke32 ports — voxel slab speedup, contrast and saturation (addendum)
+
+**Files:** Modify `source/build/a.c` (`drawslab`), the shader path's present shader (polymost.c / sdl_driver.c), `source/config.c`, `source/buildcfg.c`/`.h`, the game's video menu (`source/menues.c`). Tests: a classic voxel render check (pin unchanged), render_gl, `tests/game_helpers.c`, `tests/build_cfg.c`. Reference patches (untrusted, read only): session scratchpad `eduke32-patches/a.patch` (27d32c7c), `b.patch` (5924cd30), `notes.md`.
+
+- [ ] Step 1: `drawslab`: hoist the palette lookup out of the inner loop as 27d32c7c does (keep `while` unless the do/while is proven safe for every caller). Classic output byte-identical (a voxel render check pins it; add one if none exists).
+- [ ] Step 2: contrast and saturation on the shader path's present pass only, with 5924cd30's formula (contrast 0.5–1.5, saturation 0–2, Rec.709 luma), applied after the palette lookup and fade. Duke's 8-level brightness (`britable`, F11, `ScreenGamma`) is unchanged. Defaults 1.0 = identity (shader-vs-classic pins unchanged at defaults).
+- [ ] Step 3: settings `duke3d.cfg [Screen Setup] GLContrast`, `GLSaturation` (decimals, clamped), `build.cfg` `glcontrast`, `glsaturation`; game video menu sliders shown only when the shader path is active. Tests: cfg round trip/clamp; render_gl: non-default values change the presented frame as the formula says, defaults leave it identical; screenshots include them.
+- [ ] Step 4: suites pass; commits, e.g. `engine: hoist drawslab's palette lookup out of its loop`, `engine: add contrast and saturation to renderer 3's shader path`, `game: add GL contrast and saturation settings`.
+
+### Task 9: display mode and vsync (addendum)
+
+**Files:** Modify `source/build/sdl_driver.c` (window flags at the 8-bit and GL window creation, Alt+Enter toggle, swap interval / `SDL_RENDERER_PRESENTVSYNC`), `source/config.c`, `source/buildcfg.c`/`.h`, `source/astub.c`/`source/editormode.c`, the game's video menu. Tests: `tests/sdl_driver_smoke.c`, `tests/game_helpers.c`, `tests/build_cfg.c`.
+
+**Interfaces:** `enum { DISPLAY_WINDOWED, DISPLAY_BORDERLESS, DISPLAY_EXCLUSIVE };` with an engine setter/getter replacing or extending phase 2's `setvideofullscreen`; `void setvideovsync(int on)`. Borderless = today's `SDL_WINDOW_FULLSCREEN_DESKTOP`; exclusive = `SDL_WINDOW_FULLSCREEN` with `SDL_SetWindowDisplayMode` at the configured resolution (nearest supported mode). `BUILD_WINDOWED` still forces windowed. Alt+Enter toggles windowed ↔ the configured full-screen style.
+
+- [ ] Step 1: failing tests: cfg keys `duke3d.cfg [Screen Setup] DisplayMode` (`windowed`|`borderless`|`exclusive`; an existing `ScreenMode`/fullscreen value maps to borderless when unset) and `VSync` (0/1, default 1); `build.cfg` `displaymode`, `vsync` (phase 2's `fullscreen` key read for compatibility: 1 → borderless); smoke: the setters' flags/getters, BUILD_WINDOWED precedence.
+- [ ] Steps 2–4: implement for 8-bit and GL windows in game and editor; vsync via `SDL_GL_SetSwapInterval(0/1)` (GL) and recreating the SDL renderer with/without `SDL_RENDERER_PRESENTVSYNC` (8-bit); game video menu entries; suites pass; manual check on the Mac: each display mode in renderer 0 and 3, vsync on/off (fps capped vs uncapped), Alt+Enter.
+- [ ] Step 5: commits, e.g. `engine: add borderless and exclusive fullscreen and a vsync switch`, `game: add display mode and vsync settings`, `editor: add displaymode and vsync to build.cfg`.
+
+### Task 11: one GL context for the session (addendum)
+
+**Files:** Modify `source/build/sdl_driver.c` (window/context lifetime, 8-bit present, mode sets, Alt+Enter, resize, screenshots), `source/build/polymost.c`/`glext.c` only as needed; README. Tests: `tests/sdl_driver_smoke.c`, `tests/render_gl.c`.
+
+**Interfaces:** once created, the GL window and context live until shutdown. Renderers 0–2 and the editor's 2D mode upload the 8-bit frame (`frameplace`, xdim×ydim) as a texture and present it through the context with the current (faded, brightness-adjusted) palette — on 2.1 via the existing present shader path's palette lookup, on 1.1/1.5 by converting to RGB on upload — with today's letterboxing and nearest scaling. Renderer 3 entry/exit just switches drawing. Without any GL (POLYMOST off, or no GL driver), the SDL_Renderer present stays exactly as today. Remove the macOS SDL_HINT_RENDER_DRIVER workaround if it is no longer needed.
+
+- [ ] Step 1: failing tests: smoke — after 0→3→0→3 the GL context pointer is unchanged and never deleted; render_gl — an 8-bit frame presented through the context matches the SDL_Renderer present (read back the window) for a palette, a fade and a brightness level.
+- [ ] Steps 2–4: implement; editor Alt+K loop ≥ 30 runs × 12 switches with zero crashes, plus 2D↔3D, display modes, Alt+Enter, vsync, HiDPI, internal size, screenshots in every renderer; classic pins unchanged; fps for renderer 0 with vsync on/off not worse than now.
+- [ ] Step 5: commits, e.g. `engine: keep one GL context and present 8-bit modes through it`.
+
+### Task 10: docs, matrix, speed and hand-over
 
 **Files:** Modify `README.md`.
 
-- [ ] Step 1: README: renderer 3's three paths and how one is chosen, `GLDrawPath`, `GLInternalWidth/Height` and the `build.cfg` equivalents, what each tier looks like.
+- [ ] Step 1: README: renderer 3's three paths and how one is chosen, `GLDrawPath`, `GLInternalWidth/Height`, `GLContrast`/`GLSaturation`, `DisplayMode`, `VSync` and the `build.cfg` equivalents, what each tier looks like.
 - [ ] Step 2: matrix (1.3D, 1.3D shareware, 1.4, 1.5, 1.5 OFF) builds and passes; render_gl (opt-in) passes on the Mac with each forced path.
 - [ ] Step 3: speed table in the report: attract-demo fps per path, today vs now.
 - [ ] Step 4: commit `docs: document renderer 3's draw paths and internal size`.

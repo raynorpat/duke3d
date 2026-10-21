@@ -900,10 +900,14 @@ void SCRIPT_PutString
 		node->type = SCRIPTFLAG_ONESTRING;
 		node->key = SCRIPT_copystring (entryname);
 		SCRIPT_addchild (section, node);
-	} else {
+	} else if (node->type == SCRIPTFLAG_ONESTRING) {
 		free (node->data.string[0]);
+	} else if (node->type == SCRIPTFLAG_TWOSTRING) {
+		free (node->data.string[0]);
+		free (node->data.string[1]);
 	}
 
+	node->type = SCRIPTFLAG_ONESTRING;  /* over a number too */
 	node->data.string[0] = SCRIPT_copystring (string);
 }
 

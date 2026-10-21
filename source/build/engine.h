@@ -966,6 +966,9 @@ void setpolymost2dview(void);
 /* Renderer 3: draws a tile scaled into a dimen-pixel cell at tilex,tiley of
  * the tile screen. Returns -1 when it didn't draw (any other renderer). */
 int32_t polymost_drawtilescreen(int32_t tilex, int32_t tiley, int32_t wallnum, int32_t dimen);
+/* Renderer 3: makes a tile's texture now rather than when it's first drawn
+ * (datype 0: a wall's, repeating; 1: a sprite's, clamped). */
+void polymost_precache(int32_t dapicnum, int32_t dapalnum, int32_t datype);
 #endif
 
 /**@brief Check if a clipping box intersects a wall

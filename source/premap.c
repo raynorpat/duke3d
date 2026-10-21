@@ -26,6 +26,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #include <stdint.h>
 #include "duke3d.h"
+#include "glext.h"
 
 extern char everyothertime;
 short which_palookup = 9;
@@ -354,6 +355,19 @@ void docacheit(void)
         j++;
         if((j&7) == 0) getpackets();
     }
+
+#if defined(POLYMOST) && defined(USE_OPENGL)
+    /* Renderer 3's GL 2.1 tier: the level's index textures now, not as they're
+       first drawn; the same tile may be a wall's (repeating) or a sprite's. */
+    if (getrendermode() == 3 && gldrawpath == GLPATH_SHADER)
+        for(i=0;i<MAXTILES;i++)
+            if( (gotpic[i>>3]&(1<<(i&7))) && waloff[i] != 0)
+            {
+                polymost_precache((short)i,0,0);
+                polymost_precache((short)i,0,1);
+                if((++j&7) == 0) getpackets();
+            }
+#endif
 
     clearbufbyte(gotpic,sizeof(gotpic),0L);
 

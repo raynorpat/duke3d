@@ -70,7 +70,9 @@ BUILDLIC.TXT LICENSE.md
   `tspritevline` adds its step as signed
 - `engine.c`: `drawmasks` swaps sprite pointers directly (it swapped half of
   each); `initengine` clears all of `waloff[]`; `loadpics` aligns `pic` with
-  `~(intptr_t)15`
+  `~(intptr_t)15`; `parascan`'s last run of sky tiles stops at its wall's
+  right edge (it drew one column more, with that column's bounds left over
+  from an earlier, wider view: past the end of the frame after renderer 3)
 - `build.h`: `BUILD_STATIC_ASSERT` checks `sectortype`/`walltype`/`spritetype`
   are 40/32/44 bytes
 - printf formats match their now-32-bit arguments; C-library narrowings
@@ -165,7 +167,8 @@ unchanged.
 - OpenGL comes from `"SDL_opengl.h"` (`GL_SILENCE_DEPRECATION` on macOS).
 - `rendmode` is defined in `engine.c`, not here.
 - `glinfo` (`struct glinfo_t { float maxanisotropy; char bgra, clamptoedge,
-  texcompr, texnpot; }`, which upstream got from `baselayer.h`) is declared in
+  texcompr, texnpot, vbo, glsl, fbo; }`, which upstream got from
+  `baselayer.h`; `vbo`/`glsl`/`fbo` are set by `glext.c`) is declared in
   `build.h` under `USE_OPENGL`, not here. `sdl_driver.c` defines it, filled in
   by `setgamemode_gl`, and `nofog` (which upstream declares but no JFBuild
   file of that commit defines), set to 0.
@@ -362,38 +365,118 @@ Ported from later JFBuild commits, retyped as above:
   still are without `POLYMOST`), room for 8K drawables. No array sized by
   them is saved, recorded in demos or sent over the network.
 - `sdl_driver.c`: `setgamemode_gl(davidoption)`, prototyped in `display.h`
-  and `engine_protos.h`. It makes a new `SDL_WINDOW_OPENGL |
+  and `engine_protos.h`. The first time, it makes a new `SDL_WINDOW_OPENGL |
   SDL_WINDOW_ALLOW_HIGHDPI` window (the last 8-bit window's windowed size,
   kept by `go_to_new_vid_mode`, or the size `_setgamemode` was asked for
   when it clamped it, and the current fullscreen state) with a legacy context (double buffered, 24-bit depth, swap
   interval 1 or else 0), and only then drops the 8-bit window, renderer,
-  texture and surfaces (or, from GL, the old GL window), so any failure
-  returns -1 with the mode untouched (from GL, its context is made current
-  again). It sets JFBuild's GL state, fills `glinfo` from whole
+  texture and surfaces, so any failure returns -1 with the mode untouched.
+  The window and context then stay until shutdown: later calls set the
+  window's size again and reuse them. It sets JFBuild's GL state, fills `glinfo` from whole
   `GL_EXTENSIONS` tokens, sets `bpp = 32`, `xdim`/`ydim` to the drawable
-  size clamped to `MAXXDIM`x`MAXYDIM`, `qsetmode = 200` and `frameplace = 0`,
+  size clamped to `MAXXDIM`x`MAXYDIM` (on the shader path with an internal
+  size, that size: see `glext.c`), `qsetmode = 200` and `frameplace = 0`,
   then calls `setrendermode(3)` and `polymost_glreset()`. Without
   `USE_OPENGL` it returns -1 with an SDL error set.
 - `init_new_res_vars` is split: `init_res_lookups` (`ylookup`,
   `horizlookup` through `screen`, `setview`, brightness) is shared with GL,
   where `screen` holds only the lookups and nothing is cleared.
 - Leaving GL (any 8-bit mode set, or shutdown) calls `polymost_glreset()`
-  while the context is current, deletes the context and window, and sets
-  `bpp = 8` and `setrendermode(0)`. JFBuild resets the texture cache the
-  same way before and after each GL mode change.
+  and sets `bpp = 8` and `setrendermode(0)`; only shutdown deletes the
+  context and window. JFBuild resets the texture cache the same way before
+  and after each GL mode change. Once there is a context, the 8-bit modes
+  (renderers 0-2, the editor's 2D mode) are shown through it instead of an
+  SDL_Renderer: the surface is blitted through its palette to RGBA,
+  uploaded to a texture (power-of-two sized without
+  `GL_ARB_texture_non_power_of_two`) and drawn with `gl_fitrect`'s
+  letterboxing, nearest pixel, into the drawable; mouse motion is scaled
+  from window points to the frame's pixels, as the SDL_Renderer's logical
+  size did.
 - In GL: `_nextpage` swaps; the fullscreen toggle and
   `SDL_WINDOWEVENT_SIZE_CHANGED` re-read the drawable size and, if it
   changed, call `polymost_glreset()` and redo the mode variables. With no
   frame being drawn, the last frame is drawn again, stretched to the new
   size, and swapped, so a still screen (which isn't redrawn) and its fades
-  survive.
+  survive. At an internal size only where the frame shows changes (and a
+  still screen is shown again).
   `setupmouse`, the mouse motion clamp and `_idle` check `sdl_window`
   instead of `surface`, and the clamp and `setupmouse`'s centre use the
   window's size, as SDL's mouse events are in points, not the (on a
-  high-DPI display, bigger) drawable's pixels.
+  high-DPI display, bigger) drawable's pixels. `getmousearea` (ours, for
+  the editor's cursor) is the window's size, or at an internal size the
+  frame's part of it.
 - `_setgamemode` (8-bit) still clamps modes over 1600x1200 to 1600x1200,
   now with literals, so the larger `MAXXDIM`/`MAXYDIM` only reach GL. The
   size asked for is kept for renderer 3's window.
+- `glext.c`/`glext.h` (ours, not JFBuild's): renderer 3's draw paths
+  (`GLPATH_AUTO`, `IMMEDIATE`, `VBO`, `SHADER`) and their setting names,
+  the pure `gl_choosepath`, and the GL entry points past 1.1 as `bgl…`
+  pointers from `SDL_GL_GetProcAddress` (`glActiveTexture` at GL 1.3 or
+  `GL_ARB_multitexture`; vertex buffers at GL 1.5 or
+  `GL_ARB_vertex_buffer_object`; GLSL at GL 2.0; FBOs from
+  `GL_ARB_framebuffer_object` or `GL_EXT_framebuffer_object`), each group
+  all loaded or all NULL, so the binary runs on a 1.1 driver.
+  `gl_has_extension` moved there from `sdl_driver.c`. `setgamemode_gl` calls
+  `gl_initdrawpath`, which sets `glinfo.vbo`/`glsl`/`fbo`, picks `gldrawpath`
+  from `gldrawpathrequest` (the game's `GLDrawPath`, the editor's
+  `gldrawpath`) and prints it. `gl_forcefail` (a test hook): 1 makes GLSL
+  and FBOs unavailable, 2 breaks the shader path's shader, 3 leaves its
+  framebuffer incomplete. `glinternalwidth`/`glinternalheight` (the game's
+  `GLInternalWidth`/`Height`, the editor's `glinternalwidth`/`height`) set
+  the shader path's internal size: `gl_internalsize` takes both or neither
+  (one alone is the window's size) and at least 320x200, and
+  `setgamemode_gl` prints why when it changes them, or ignores them (with
+  a message) off the shader path; if the shader path then fails (built at
+  once by `polymost_prepare_shader`) it draws at the window's size.
+  `xdim`/`ydim` (and `xres`/`yres`, the framebuffer) are that size, so the
+  game lays out as classic does at it; `polymost_present_shader` draws the
+  frame into `gl_fitrect`'s rectangle of the drawable (the largest scale
+  that fits, square pixels, centred, nearest texel) with black bars around
+  it; screenshots are the internal-size frame.
+- `glsubmit.c`/`glsubmit.h` (ours): renderer 3's vertex submission.
+  `polymost.c`'s and `engine.c`'s `glBegin`/`glTexCoord`/`glColor`/
+  `glVertex`/`glEnd` (drawpoly, `drawtrap`/`tessectrap`, the tile picker,
+  `drawline256`, `printext256`, `plotpixel`) are `glsub_*` calls, as floats
+  (`glTexCoord2d`/`glVertex3d` and `glColor4ub` were). On the immediate path
+  they become vertex arrays (`glsub_force`, a test hook, can keep
+  `glBegin`/`glEnd`); on the vbo path a vertex buffer, given new storage
+  each draw; on the shader path vertex arrays again (faster than that
+  buffer on macOS's driver). `glsub_flusheach` (a test hook) draws each
+  polygon at its end. Fans become triangles so polygons batch; `polymost.c`
+  and `sdl_driver.c` define `GLSUB_WRAP`, which wraps their GL state calls
+  to draw the batch first (binding the bound texture or enabling an enabled
+  cap is skipped while batching), and `gl_swap` draws it before the swap.
+  `setgamemode_gl` calls `glsub_init`, `gl_leave` `glsub_uninit`.
+  The immediate and vbo paths draw the same pixels as JFBuild's immediate
+  mode on the drivers tested (macOS's 2.1).
+- `polymost.c` (ours): on the shader path (GL 2.1) everything draws
+  classic's palette indices into a framebuffer that keeps the frame, as
+  classic's does. Tiles are `GL_LUMINANCE8` index textures (their own
+  cache, `glidxtex`, kept by `gltexinvalidate`; `polymost_precache` makes
+  them, and `premap.c`'s `docacheit` precaches a level's), drawn by a
+  program that looks each texel up in `palookup` (a texture of every pal
+  and shade, reloaded when `makepalookup` sets `glshlookupdirty`) at the
+  polygon's shade plus, in the 3D view, classic's distance shade for the
+  pixel's eye z (`glfogshades`; the parallaxed sky's constant
+  `polymost_skyshade`), with index 255 see-through when masked and no glow
+  pass. Translucent masked walls, sprites, rotatesprites and map view
+  floor sprites blend as classic's do, through `transluc` (a 256x256
+  texture) at its two levels, with the index under them read from a copy
+  of the framebuffer (`glshdst`): `polymost_transread` copies the
+  whole frame before the polygon is drawn unless the copy holds the
+  polygon's box with nothing drawn there since (`polymost_drawn` keeps the boxes drawn after a copy;
+  lines, text and clears drop it). That's the 3D view, rotatesprite, the map view's floors and the
+  tile picker; lines, text, pixels and clears are the index itself
+  (`polymost_2dcolor`). `polymost_shaderdraw` binds the framebuffer and
+  the program for each; `polymost_drawrooms` clears only its depth, so a
+  hole shows what was there, as in classic. `polymost_present_shader`
+  draws the frame into the window through `getfadedpalette` (engine.c:
+  curpalette, or the base palette faded as `setpalettefade` fades the
+  8-bit one); `polymost_capture_shader` reads it the same way for
+  screenshots; `polymost_takeframe_shader`/`polymost_putframe_shader` keep
+  it, stretched, across a resize. A shader that doesn't compile or link,
+  or an incomplete framebuffer, prints why and falls back to the vbo path
+  (retexturing, as palette changes don't on the shader path).
 
 ## Renderer 3: 2D, clears, palette, fades, screenshots
 
@@ -448,6 +531,11 @@ Ported from later JFBuild commits, retyped as above:
     `engine_protos.h`) draws `lastframe`, without the fade, into the frame
     being drawn. Duke's 1.3D load/save menus draw over the previous frame,
     which renderer 3 doesn't keep after a swap.
+  - On the shader path none of the `lastframe` and fade quad steps happen:
+    `gl_swap` and `_glpalettefade` show the framebuffer through the faded
+    palette (`polymost_present_shader`), which keeps the frame for fades,
+    `glredrawlastframe` and screenshots; `VBE_setPalette` doesn't
+    retexture; `_glframereplayed` binds the window's framebuffer again.
 
 # Vendored: stb_image_write.h
 

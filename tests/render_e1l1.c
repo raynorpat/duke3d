@@ -2,7 +2,7 @@
  * Renders the start view of E1L1 from a real DUKE3D.GRP, headless, and
  *  checks the frame against a known checksum.
  *
- *  usage: render_e1l1 <DUKE3D.GRP> <out.bmp> [expected checksum, hex] [renderer] [tile|tilt]
+ *  usage: render_e1l1 <DUKE3D.GRP> <out.bmp> [expected checksum, hex] [renderer] [tile|tilt|narrow]
  *
  * Without an expected checksum (or with an empty one) it just prints the
  *  checksum and exits 0. The renderer is a setrendermode() number, 0 if
@@ -10,7 +10,9 @@
  *  game.c's low detail mode, and must look like renderer 0's. With "tilt",
  *  it draws game.c's screen tilt and low detail at 1600x900, where the tile
  *  is 512 or 256 wide; the checksum covers both frames, and renderers other
- *  than 0 must look like renderer 0's.
+ *  than 0 must look like renderer 0's. With "narrow", at 640x480, views
+ *  narrower than a renderer 2 one drawn before them, from 16 angles, must
+ *  draw nothing right of their edge (the sky drew a column past it).
  *  Run with SDL_VIDEODRIVER=dummy.
  */
 #include <stdio.h>
@@ -159,7 +161,7 @@ int main(int argc, char **argv)
     const unsigned char *pix;
     unsigned char *shot;
     int32_t i, same, npix;
-    int tilt;
+    int tilt, narrow;
 
     if (argc < 3)
     {
@@ -205,8 +207,9 @@ int main(int argc, char **argv)
     setup_la_backdrop();
 
     tilt = (argc > 5) && (strcmp(argv[5], "tilt") == 0);
+    narrow = (argc > 5) && (strcmp(argv[5], "narrow") == 0);
     _platform_init(argc, argv, "render_e1l1", "render");
-    if (_setgamemode(1, tilt ? 1600 : 320, tilt ? 900 : 200) != 0)
+    if (_setgamemode(1, tilt ? 1600 : (narrow ? 640 : 320), tilt ? 900 : (narrow ? 480 : 200)) != 0)
     {
         fprintf(stderr, "FAIL: _setgamemode\n");
         return 1;
@@ -255,6 +258,38 @@ int main(int argc, char **argv)
             }
             pix = pic;
         }
+    }
+    else if (narrow)
+    {
+        /* views narrower than one drawn before (so its column bounds past
+         *  the new view's edge are left over) draw nothing right of it. */
+        int32_t w, x, y, a, bad = 0;
+
+        for (a = 0; a < 2048; a += 128)
+            for (w = xdim - 20; w >= xdim / 2; w -= 16)
+            {
+                setview(0, 0, xdim - 1, ydim - 1);
+                setrendermode(2);  /* Polymost leaves every column's bounds open */
+                drawrooms(posx, posy, posz, (short) ((ang + a) & 2047), 100, sectnum);
+                setrendermode(0);
+                setview(0, 0, w - 1, ydim - 1);
+                memset((void *) frameplace, 255, xdim * ydim);
+                drawrooms(posx, posy, posz, (short) ((ang + a) & 2047), 100, sectnum);
+                for (y = 0; y < ydim; y++)
+                    for (x = w; x < xdim; x++)
+                        bad += (((unsigned char *) frameplace)[y * xdim + x] != 255);
+            }
+        printf("narrower views: %d pixels drawn right of the view\n", (int) bad);
+        if (bad != 0)
+        {
+            fprintf(stderr, "FAIL: a narrower view drew right of its edge\n");
+            return 1;
+        }
+        setview(0, 0, xdim - 1, ydim - 1);
+        drawrooms(posx, posy, posz, ang, 100, sectnum);
+        drawmasks();
+        nextpage();
+        pack_surface(shot);
     }
     else if ((argc > 5) && (strcmp(argv[5], "tile") == 0))
     {

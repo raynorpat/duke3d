@@ -9,10 +9,10 @@ set_tests_properties(sdl_driver_smoke PROPERTIES
   TIMEOUT 30)
 
 add_test(NAME sdl_driver_smoke_gl_fallback COMMAND sdl_driver_smoke gl_fallback)
-add_test(NAME sdl_driver_smoke_fullscreen_setter COMMAND sdl_driver_smoke fullscreen_setter)
+add_test(NAME sdl_driver_smoke_displaymode_setter COMMAND sdl_driver_smoke displaymode_setter)
 add_test(NAME sdl_driver_smoke_palette_fade COMMAND sdl_driver_smoke palette_fade)
 add_test(NAME sdl_driver_smoke_screencapture COMMAND sdl_driver_smoke screencapture_formats)
-set_tests_properties(sdl_driver_smoke_gl_fallback sdl_driver_smoke_fullscreen_setter
+set_tests_properties(sdl_driver_smoke_gl_fallback sdl_driver_smoke_displaymode_setter
                      sdl_driver_smoke_palette_fade
                      sdl_driver_smoke_screencapture PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
@@ -58,6 +58,13 @@ add_executable(pragmas_semantics pragmas_semantics.c)
 target_include_directories(pragmas_semantics PRIVATE "${PROJECT_SOURCE_DIR}/source")
 target_link_libraries(pragmas_semantics PRIVATE buildengine)
 add_test(NAME pragmas_semantics COMMAND pragmas_semantics)
+
+# Renderer 3's draw path from what the driver has, and the setting's names.
+# Built without the engine (and OpenGL), as the settings readers use it.
+add_executable(gl_path gl_path.c "${PROJECT_SOURCE_DIR}/source/build/glext.c")
+target_include_directories(gl_path PRIVATE "${PROJECT_SOURCE_DIR}/source/build")
+target_link_libraries(gl_path PRIVATE duke3d_compile_options)
+add_test(NAME gl_path COMMAND gl_path)
 
 # inside() per engine revision.
 add_executable(engine_inside engine_inside.c)
@@ -175,6 +182,15 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
             "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_tilt.bmp"
             "${DUKE3D_E1L1_TILT_CHECKSUM}" 0 tilt)
   set_tests_properties(render_e1l1_tilt PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+    TIMEOUT 30)
+
+  # Views narrower than a Polymost one before them (which leaves every
+  # column's bounds open) draw nothing right of their edge.
+  add_test(NAME render_e1l1_narrow
+    COMMAND render_e1l1 "${DUKE3D_GRP}"
+            "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_narrow.bmp" "" 0 narrow)
+  set_tests_properties(render_e1l1_narrow PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
     TIMEOUT 30)
 

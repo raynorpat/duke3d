@@ -7,9 +7,11 @@
 #define BUILDCFG_NUMKEYS 19
 
 typedef struct {
-    int32_t renderer, xdim3d, ydim3d, fullscreen, gltexmiplevel;
+    int32_t renderer, xdim3d, ydim3d, displaymode, vsync, gltexmiplevel;  /* DISPLAY_* */
     double mousesensitivity;
     unsigned char keys[BUILDCFG_NUMKEYS];
+    int32_t gldrawpath, glinternalwidth, glinternalheight;  /* GLPATH_*; 0: the window's */
+    double glcontrast, glsaturation;  /* the shader path's; 1: as it is */
 } buildcfg_t;
 
 /* Fills c with the defaults; keys are build.c's buildkeys[] initializer. */

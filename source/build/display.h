@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include "platform.h"
+#include "displaymode.h"
 
 #if (defined PLATFORM_SUPPORTS_SDL)
 #include "SDL.h"
@@ -142,7 +143,8 @@ void _updateScreenRect(int32_t x, int32_t y, int32_t w, int32_t h);
 /* mouse/keystuff stuff. Also implemented in sdl_driver.c ... */
 int setupmouse(void);
 /* The size readmousexy's motion is in: the 8-bit mode's, or in OpenGL the
- *  window's points, which a high-DPI drawable (xdim, ydim) outnumbers. */
+ *  window's points, which a high-DPI drawable (xdim, ydim) outnumbers; the
+ *  frame's part of them when the shader path draws at an internal size. */
 void getmousearea(int *w, int *h);
 void readmousexy(short *x, short *y);
 void readmousebstatus(short *bstatus);
@@ -161,8 +163,13 @@ int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim);
 /* Switches to an OpenGL window for renderer 3. Returns 0, or -1 (and leaves
  *  the 8-bit modes usable) when SDL or OpenGL can't provide one. */
 int setgamemode_gl(char davidoption);
-void setvideofullscreen(int on);  /* applies to the next mode set */
-int getvideofullscreen(void);
+/* DISPLAY_* (displaymode.h): now when there's a window, else at the next mode
+ *  set. BUILD_WINDOWED forces windowed. Alt+Enter toggles windowed and the
+ *  full-screen style set here (borderless when windowed is set). */
+void setvideodisplaymode(int mode);
+int getvideodisplaymode(void);  /* the window's */
+void setvideovsync(int on);  /* 1: present on vsync (the default) */
+int getvideovsync(void);
 /* Renderer 3: draws the last frame shown, unfaded, as the new frame's start. */
 void glredrawlastframe(void);
 #ifdef USE_OPENGL

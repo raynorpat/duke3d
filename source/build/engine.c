@@ -1789,8 +1789,8 @@ static void parascan(int32_t dax1, int32_t dax2, int32_t sectnum,
 				}
 				x++;
 			}
-			if (j <= x)
-				wallscan(j,x,topptr,botptr,swplc,lplc);
+			if (j < x)
+				wallscan(j,x-1,topptr,botptr,swplc,lplc);
 		}
 		globalpicnum = l;
 	}
@@ -4316,11 +4316,11 @@ void drawline256 (int32_t x1, int32_t y1, int32_t x2, int32_t y2, unsigned char 
 	if (rendmode == 3)
 	{
 		setpolymost2dview();
-		glBegin(GL_LINES);
-		glColor4ub(curpalette[col].r,curpalette[col].g,curpalette[col].b,255);
-		glVertex2f((float)x1/4096.0,(float)y1/4096.0);
-		glVertex2f((float)x2/4096.0,(float)y2/4096.0);
-		glEnd();
+		glsub_begin(GL_LINES);
+		polymost_2dcolor(col);
+		glsub_vertex((float)x1/4096.0,(float)y1/4096.0,0);
+		glsub_vertex((float)x2/4096.0,(float)y2/4096.0,0);
+		glsub_end();
 		return;
 	}
 #endif
@@ -7651,7 +7651,7 @@ static void __printext256(int32_t xpos, int32_t ypos, short col, short backcol, 
 		int32_t xx, yy, lc = -1;
 
 		setpolymost2dview();
-		glBegin(GL_POINTS);
+		glsub_begin(GL_POINTS);
 		for(i=0;name[i];i++)
 		{
 			letptr = &fontptr[name[i]<<3];
@@ -7664,23 +7664,23 @@ static void __printext256(int32_t xpos, int32_t ypos, short col, short backcol, 
 					if (letptr[y]&pow2char[7-fontsize-x])
 					{
 						if (lc != col)
-							glColor4ub(curpalette[col].r,curpalette[col].g,curpalette[col].b,255);
+							polymost_2dcolor(col);
 						lc = col;
-						glVertex2f((float)(xx+x)+0.5f,(float)yy+0.5f);
+						glsub_vertex((float)(xx+x)+0.5f,(float)yy+0.5f,0);
 					}
 					else if (backcol >= 0)
 					{
 						if (lc != backcol)
-							glColor4ub(curpalette[backcol].r,curpalette[backcol].g,curpalette[backcol].b,255);
+							polymost_2dcolor(backcol);
 						lc = backcol;
-						glVertex2f((float)(xx+x)+0.5f,(float)yy+0.5f);
+						glsub_vertex((float)(xx+x)+0.5f,(float)yy+0.5f,0);
 					}
 				}
 				yy--;
 			}
 			stx += charxsiz;
 		}
-		glEnd();
+		glsub_end();
 		return;
 	}
 #endif
@@ -8140,6 +8140,10 @@ void makepalookup(int32_t palnum, char *remapbuf, signed char r,
 			allocache((intptr_t *)&palookup[palnum],numpalookups<<8,&permanentlock);
 	}
 
+#if defined(POLYMOST) && defined(USE_OPENGL)
+	glshlookupdirty = 1;  /* renderer 3's GL 2.1 tier uploads them again */
+#endif
+
 	if (dastat == 0) return;
 	if ((r|g|b|63) != 63) return;
 
@@ -8254,6 +8258,47 @@ void setpalettefade(unsigned char r, unsigned char g, unsigned char b, unsigned 
 	}
 	applybrightness(fadepal);
 }
+
+
+#if defined(POLYMOST) && defined(USE_OPENGL)
+/* The palette setbrightness was last given (getfadedpalette fades it), for
+   renderer 3's resize to keep across the mode's setup, which resets it. */
+unsigned char *getbasepalette(void)
+{
+	return(basepal);
+}
+#endif
+
+
+#if defined(POLYMOST) && defined(USE_OPENGL)
+/*
+ * getfadedpalette
+ *  The palette renderer 3's GL 2.1 tier shows: curpalette, or with a fade,
+ *  the base palette faded as the 8-bit one is above, made 8-bit as
+ *  VBE_setPalette does. palfadedelta keeps offsets up to 64.
+ */
+void getfadedpalette(palette_t *pal)
+{
+	int32_t i, offset;
+	unsigned char c[3];
+
+	if (!palfadedelta) { memcpy(pal,curpalette,sizeof(palette_t)*256); return; }
+	offset = (palfadedelta == 255) ? 64 : (palfadedelta>>2);
+	for(i=0;i<256;i++)
+	{
+		c[0] = basepal[i*3+0]+((((int32_t)(palfadergb.r>>2)-(int32_t)basepal[i*3+0])*offset)>>6);
+		c[1] = basepal[i*3+1]+((((int32_t)(palfadergb.g>>2)-(int32_t)basepal[i*3+1])*offset)>>6);
+		c[2] = basepal[i*3+2]+((((int32_t)(palfadergb.b>>2)-(int32_t)basepal[i*3+2])*offset)>>6);
+		c[0] = britable[curbrightness][c[0]&63];
+		c[1] = britable[curbrightness][c[1]&63];
+		c[2] = britable[curbrightness][c[2]&63];
+		pal[i].r = (c[0]<<2)|(c[0]>>4);
+		pal[i].g = (c[1]<<2)|(c[1]>>4);
+		pal[i].b = (c[2]<<2)|(c[2]>>4);
+		pal[i].f = 0;
+	}
+}
+#endif
 
 
 static void fillpolygon(int32_t npoints)
@@ -8877,7 +8922,10 @@ void clearview(int32_t dacol)
 #if defined(POLYMOST) && defined(USE_OPENGL)
 	if (rendmode == 3)
 	{
-		glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
+		if (polymost_shaderdraw(0))  /* GL 2.1: the index */
+			glClearColor((float)dacol/255.f,0,0,0);
+		else
+			glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
 		/* only the view window, as below (JFBuild clears it all) */
 		glScissor(windowx1,yres-(windowy2+1),windowx2-windowx1+1,windowy2-windowy1+1);
 		glEnable(GL_SCISSOR_TEST);
@@ -8918,8 +8966,11 @@ void clearallviews(int32_t dacol)
 #if defined(POLYMOST) && defined(USE_OPENGL)
 	if (rendmode == 3)
 	{
+		if (polymost_shaderdraw(0))  /* GL 2.1: the index */
+			glClearColor((float)dacol/255.f,0,0,0);
+		else
+			glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
 		glViewport(0,0,xdim,ydim); glox1 = -1;
-		glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
 		glClear(GL_COLOR_BUFFER_BIT);
 		_glframedrawn();
 		return;
@@ -8954,10 +9005,10 @@ void plotpixel(int32_t x, int32_t y, char col)
 	if (rendmode == 3)
 	{
 		setpolymost2dview();
-		glBegin(GL_POINTS);
-		glColor4ub(curpalette[(unsigned char)col].r,curpalette[(unsigned char)col].g,curpalette[(unsigned char)col].b,255);
-		glVertex2f((float)x+0.5f,(float)y+0.5f);
-		glEnd();
+		glsub_begin(GL_POINTS);
+		polymost_2dcolor((unsigned char)col);
+		glsub_vertex((float)x+0.5f,(float)y+0.5f,0);
+		glsub_end();
 		return;
 	}
 #endif
@@ -9409,6 +9460,7 @@ void setpolymost2dview(void)
 {
 #if defined(POLYMOST) && defined(USE_OPENGL)
 	if (rendmode < 3) return;
+	polymost_shaderdraw(0);  /* GL 2.1: into the frame's indices, after the 3D view */
 
 	if (gloy1 != -1)
 	{

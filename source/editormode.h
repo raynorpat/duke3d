@@ -3,10 +3,12 @@
 
 #include <stdint.h>
 
-/* The editor's 3D mode: build.cfg's renderer (or -renderer's), 3D size and
- * mipmap levels dropped. */
+/* The editor's 3D mode: build.cfg's renderer (or -renderer's), 3D size,
+ * mipmap levels dropped, and renderer 3's draw path (GLPATH_*) and size (0:
+ * the window's). */
 typedef struct {
     int32_t renderer, xdim3d, ydim3d, gltexmiplevel;
+    int32_t gldrawpath, glinternalwidth, glinternalheight;
 } editormode_t;
 
 extern editormode_t editormode;  /* build.c: this run's */
