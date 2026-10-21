@@ -62,12 +62,16 @@
  *  vertices its own way, or renderer 3 further from renderer 0 than pinned
  *  (each viewpoint's mean difference, and the mean of two regions that
  *  renderer 0 darkens by distance), or a shader path (GL 2.1: palette
- *  indices) frame with a colour that isn't the palette's, whose frames
- *  change when every draw is flushed, whose 2D frames are far from immediate
+ *  indices) frame with a colour that isn't the palette's, whose translucent
+ *  surfaces (a web and glass, translucent sprites at both levels, the
+ *  crosshair and translucent HUD tiles, the map view's floor sprites) are
+ *  further than 8 from renderer 0's over their boxes, whose frames change
+ *  when every draw is flushed or when all the frame is copied for every
+ *  translucent draw, whose 2D frames are far from immediate
  *  mode's, whose view smaller than the screen isn't where vbo draws it or
  *  loses the border, whose frame doesn't fade or capture, or that doesn't fall back to
  *  vbo, drawing as vbo does, when its shader or framebuffer fails; or whose
- *  frames with the HUD, status bar, menu letters, text, the water palette,
+ *  frames with the HUD, status bar, menu letters, text, the water palette, the map view,
  *  a fade or a camera are further than 8 from renderer 0's or not all the
  *  palette's colours, whose screenshots aren't the screen, that makes RGB
  *  textures or retextures (palette changes, fades, glsetgamepalette,
@@ -108,6 +112,9 @@ extern SDL_Surface *surface;  /* sdl_driver.c: the 8-bit frame */
 #define FIRE 2271  /* names.h */
 #define FIRE2 2311  /* names.h */
 #define LITWALL 931  /* fire, from an E1L1 sprite: lit, and 112 wide */
+#define EXPLOSION2 1890  /* names.h */
+#define SMALLSMOKE 2329  /* names.h */
+#define CROSSHAIR 2523  /* names.h */
 
 /* polymost.c, which engine.c includes: the editor's tile picker, and the
  * texture cache reset. */
@@ -398,6 +405,9 @@ static void path_shots(unsigned char **shots, int32_t x, int32_t y, int32_t z, s
     rotatesprite(100<<16, 130<<16, 65536, 0, FIRSTGUN, 0, 0, 2, 0, 0, xdim-1, ydim-1);
     rotatesprite(160<<16, 130<<16, 65536, 0, FIRSTGUN, 0, 0, 2+1, 0, 0, xdim-1, ydim-1);
     rotatesprite(220<<16, 130<<16, 65536, 0, FIRSTGUN, 8, 0, 2+1+32, 0, 0, xdim-1, ydim-1);
+    for (i = 0; i < 3; i++)  /* each over the last, so a translucent one reads what's just drawn */
+        rotatesprite((150 + i * 10)<<16, (40 + i * 10)<<16, 65536, 0, THREEDEE, 0, 0,
+                     (i == 0) ? 2+8 : ((i == 1) ? 2+8+1 : 2+8+1+32), 0, 0, xdim-1, ydim-1);
     nextpage();
     read_front(shots[7]);
     polymosttexfullbright = 256;
@@ -427,8 +437,8 @@ static int lastframe_same(void)
  *  most its mean |renderer 3 - renderer 0| per channel may be, on the fixed
  *  function paths and on the shader path. The shader path's are pinned at
  *  what it measured (+0.3), under the target of 8 (and its regions within 3
- *  of renderer 0's); its translucent surfaces draw opaque for now, so
- *  "translucent" is pinned but isn't held to the target. */
+ *  of renderer 0's). "transprites" has translucent sprites put in it
+ *  (cmp_draw). */
 #define CMPW 640
 #define CMPH 480
 static const struct { const char *name; int32_t x, y, z; short ang; double maxdiff, shmaxdiff; } cmpview[] = {
@@ -438,8 +448,10 @@ static const struct { const char *name; int32_t x, y, z; short ang; double maxdi
     { "sprites", 24767, 46541, -2048, 1409, 3.7, 1.8 },
     { "sprites-mid", 14107, 44964, -2048, 1793, 4.6, 2.3 },
     { "sky", -31243, 7160, -181472, 1446, 5.7, 5.4 },
-    { "translucent", 14938, 44309, -2048, 300, 6.0, 6.2 },
+    { "translucent", 14938, 44309, -2048, 300, 6.0, 3.8 },
+    { "transprites", 13824, 50350, -2048, 1024, 6.0, 4.9 },
 };
+#define TRANSPRITEVIEW 7  /* cmp_draw puts translucent sprites in it */
 #define NCMPVIEWS ((int) (sizeof (cmpview) / sizeof (cmpview[0])))
 
 /* Regions measured in both (640x480 boxes, top-down): the shaded back room
@@ -452,14 +464,75 @@ static const struct { const char *name; int view, x0, y0, x1, y1; double maxdiff
 };
 #define NCMPREGIONS ((int) (sizeof (cmpregion) / sizeof (cmpregion[0])))
 
+/* The sprites cmp_draw puts ahead of TRANSPRITEVIEW, far to near (as
+ *  drawmasks draws them), overlapping: an opaque one behind, then smoke and
+ *  explosions translucent at both levels (cstat 2, 2|512), one in another
+ *  pal and some shaded. */
+static const struct { int32_t dist, side; short picnum, cstat, rep; signed char shade; unsigned char pal; } transprite[] = {
+    { 1600, 0, EXPLOSION2, 128, 40, 0, 0 },
+    { 1400, -200, SMALLSMOKE, 128|2, 110, 0, 0 },
+    { 1200, 160, EXPLOSION2, 128|2|512, 40, 8, 2 },
+    { 1000, -60, SMALLSMOKE, 128|2|512, 90, 0, 0 },
+    { 800, 100, SMALLSMOKE, 128|2, 64, 4, 0 },
+};
+#define NTRANSPRITES ((int) (sizeof (transprite) / sizeof (transprite[0])))
+
 static void cmp_draw(int v)
 {
-    short sect = 0;
+    short sect = 0, sn, s[NTRANSPRITES];
+    int32_t cx, cy, x, y;
+    int i;
 
     updatesector(cmpview[v].x, cmpview[v].y, &sect);
+    for (i = 0; (v == TRANSPRITEVIEW) && (i < NTRANSPRITES); i++)
+    {
+        cx = sintable[(cmpview[v].ang + 512) & 2047]; cy = sintable[cmpview[v].ang & 2047];
+        x = cmpview[v].x + ((cx * transprite[i].dist - cy * transprite[i].side) >> 14);
+        y = cmpview[v].y + ((cy * transprite[i].dist + cx * transprite[i].side) >> 14);
+        sn = sect;
+        updatesector(x, y, &sn);
+        if (sn < 0) sn = sect;  /* (not outside the map, which would corrupt the lists) */
+        s[i] = insertsprite(sn, 0);
+        sprite[s[i]].x = x;
+        sprite[s[i]].y = y;
+        sprite[s[i]].z = cmpview[v].z;
+        sprite[s[i]].picnum = transprite[i].picnum;
+        sprite[s[i]].cstat = transprite[i].cstat;
+        sprite[s[i]].xrepeat = sprite[s[i]].yrepeat = (unsigned char) transprite[i].rep;
+        sprite[s[i]].shade = transprite[i].shade;
+        sprite[s[i]].pal = transprite[i].pal;
+        sprite[s[i]].xoffset = sprite[s[i]].yoffset = 0;
+        sprite[s[i]].ang = (short) ((cmpview[v].ang + 1024) & 2047);
+    }
     clearallviews(0);
     drawrooms(cmpview[v].x, cmpview[v].y, cmpview[v].z, cmpview[v].ang, 100, sect);
     drawmasks();
+    for (i = 0; (v == TRANSPRITEVIEW) && (i < NTRANSPRITES); i++)
+        deletesprite(s[i]);
+}
+
+/* Boxes of the comparison views (640x480, top-down) where translucent
+ *  surfaces are: a web and glass, and the sprites cmp_draw puts in. Each
+ *  box's mean |shader - renderer 0| per channel may be at most 8. */
+static const struct { const char *name; int view, x0, y0, x1, y1; } cmpbox[] = {
+    { "web", 6, 470, 200, 640, 480 },
+    { "translucent sprites", TRANSPRITEVIEW, 230, 180, 420, 310 },
+};
+#define NCMPBOXES ((int) (sizeof (cmpbox) / sizeof (cmpbox[0])))
+
+/* Mean absolute difference per channel, over a box given in 640x480 terms
+ *  (top-down), of a GL frame (xdim by ydim, bottom-up) and a renderer 0 one
+ *  (640x480, top-down), nearest pixel. */
+static double cmp_boxdiff(const unsigned char *gl, const unsigned char *classic, int x0, int y0, int x1, int y1)
+{
+    long x, y, i, d = 0, n = 0;
+
+    for (y = y0 * ydim / CMPH; y < y1 * ydim / CMPH; y++)
+        for (x = x0 * xdim / CMPW; x < x1 * xdim / CMPW; x++, n++)
+            for (i = 0; i < 3; i++)
+                d += abs((int) gl[((ydim - 1 - y) * xdim + x) * 3 + i] -
+                         (int) classic[((y * CMPH / ydim) * CMPW + x * CMPW / xdim) * 3 + i]);
+    return (double) d / ((double) n * 3);
 }
 
 /* Mean of a box of a frame (w by h, RGB) given in 640x480 terms; up: rows
@@ -526,6 +599,7 @@ static int classic_compare(const char *dir)
     double d, m0, m3, rs, gs, most;
     int v, p, r, y, x, ok = 1, sh;
     long off;
+    uint32_t copies;
     SDL_Surface *s;
 
     for (v = 0; v < MAXSPRITES; v++)
@@ -581,7 +655,9 @@ static int classic_compare(const char *dir)
         sh = (cmppath[p].path == GLPATH_SHADER);
         for (v = 0; v < NCMPVIEWS; v++)
         {
+            copies = gl_transcopies;
             cmp_draw(v);
+            copies = gl_transcopies - copies;
             nextpage();
             snprintf(path, sizeof (path), "%s/cmp_%s_%s.bmp", dir, cmpview[v].name, cmppath[p].name);
             save_front(path, &rs, &gs);
@@ -594,9 +670,17 @@ static int classic_compare(const char *dir)
             if (sh)
             {
                 off = off_palette(gl);
-                printf("classic comparison, %s: %s has %ld pixels not of the palette\n",
-                       cmppath[p].name, cmpview[v].name, off);
+                printf("classic comparison, %s: %s has %ld pixels not of the palette; %u copies for translucent draws\n",
+                       cmppath[p].name, cmpview[v].name, off, (unsigned) copies);
                 if (off) ok = 0;
+                for (r = 0; r < NCMPBOXES; r++)
+                {
+                    if (cmpbox[r].view != v) continue;
+                    d = cmp_boxdiff(gl, classic[v], cmpbox[r].x0, cmpbox[r].y0, cmpbox[r].x1, cmpbox[r].y1);
+                    printf("classic comparison, %s: %s mean |r3 - r0| %.2f (most 8.00)\n",
+                           cmppath[p].name, cmpbox[r].name, d);
+                    if (d > 8) ok = 0;
+                }
             }
             for (r = 0; r < NCMPREGIONS; r++)
             {
@@ -623,20 +707,50 @@ static int classic_compare(const char *dir)
 }
 
 /* The frames shader_frames draws in both renderers. */
-#define SHFRAMES 4
-static const char *const shframename[SHFRAMES] = { "hud", "water", "fade", "camera" };
+#define SHFRAMES 5
+static const char *const shframename[SHFRAMES] = { "hud", "water", "fade", "camera", "map" };
 static unsigned char camerabuf[200 * 320];  /* the camera's tile, as game.c's tilt tile */
 
 /* Draws frame f of shader_frames and shows it: the start view (with a
  *  camera's picture over it, drawn to a tile in renderer 0 as game.c's
  *  cameras and tilt are, for "camera"), the HUD's gun, the status bar, menu
- *  letters shaded and in another pal, and text, a line and a pixel; in the
- *  water palette for "water", faded to red after it's shown for "fade". */
+ *  letters shaded and in another pal, the crosshair and two logos
+ *  translucent (dastat 1, 1|32), and text, a line and a pixel; in the
+ *  water palette for "water", faded to red after it's shown for "fade".
+ *  "map" is the map view instead, with two floor sprites ahead, translucent
+ *  at the two levels, one over the other, their sector lit. */
 static void shader_frame(int f, int32_t x, int32_t y, int32_t z, short a, short sect)
 {
     int i;
+    short s[2];
+    signed char floorshade;
 
     setbrightness(0, (f == 1) ? waterpal : palette);
+    if (f == 4)
+    {
+        floorshade = sector[sect].floorshade;
+        sector[sect].floorshade = 0;
+        for (i = 0; i < 2; i++)
+        {
+            s[i] = insertsprite(sect, 0);
+            sprite[s[i]].x = x + (sintable[(a+512)&2047]>>6) + i * (sintable[a&2047]>>7);
+            sprite[s[i]].y = y + (sintable[a&2047]>>6) - i * (sintable[(a+512)&2047]>>7);
+            sprite[s[i]].z = sector[sect].floorz;
+            sprite[s[i]].cstat = i ? 32|2|512 : 32|2;
+            sprite[s[i]].picnum = THREEDEE;
+            sprite[s[i]].shade = 0;
+            sprite[s[i]].pal = 0;
+            sprite[s[i]].xrepeat = sprite[s[i]].yrepeat = 64;
+            sprite[s[i]].xoffset = sprite[s[i]].yoffset = 0;
+            sprite[s[i]].ang = a;
+        }
+        clearview(0);
+        drawmapview(x, y, 2048, a);
+        nextpage();
+        for (i = 0; i < 2; i++) deletesprite(s[i]);
+        sector[sect].floorshade = floorshade;
+        return;
+    }
     clearallviews(0);
     if (f == 3)
     {
@@ -656,6 +770,9 @@ static void shader_frame(int f, int32_t x, int32_t y, int32_t z, short a, short 
     for (i = 0; i < 4; i++)
         rotatesprite((40 + i * 16)<<16, 30<<16, 65536, 0, STARTALPHANUM + ("DUKE"[i] - '!'),
                      (i & 1) ? 16 : 0, (i & 2) ? 2 : 0, 2+8+16, 0, 0, xdim-1, ydim-1);
+    rotatesprite(160<<16, 100<<16, 65536, 0, CROSSHAIR, 0, 0, 2+1, 0, 0, xdim-1, ydim-1);
+    rotatesprite(230<<16, 60<<16, 32768, 0, THREEDEE, 0, 0, 2+8+1, 0, 0, xdim-1, ydim-1);
+    rotatesprite(250<<16, 75<<16, 32768, 0, THREEDEE, 8, 2, 2+8+1+32, 0, 0, xdim-1, ydim-1);
     printext256(16, 16, 31, 0, "RENDERER 3 PRINTEXT256", 0);
     printext256(16, 32, 159, -1, "small font", 1);
     drawline256(16<<12, 48<<12, (xdim-16)<<12, (ydim-16)<<12, 31);
@@ -675,6 +792,29 @@ static double frame_diff(const unsigned char *gl, int gw, int gh, const unsigned
                 d += abs((int) gl[(y * gw + x) * 3 + i] -
                          (int) classic[(((gh - 1 - y) * ch / gh) * cw + x * cw / gw) * 3 + i]);
     return (double) d / ((double) gw * gh * 3);
+}
+
+/* Boxes of shader_frame's frames (a bit per frame), in thousandths of the
+ *  frame (top-down), around its translucent tiles: the crosshair, two logos
+ *  at the two levels, one over the other, and the map view's floor sprites. */
+static const struct { const char *name; int frames, x0, y0, x1, y1; } shbox[] = {
+    { "crosshair", 15, 480, 470, 520, 530 },
+    { "translucent logos", 15, 630, 260, 790, 420 },
+    { "floor sprites", 16, 435, 410, 555, 495 },
+};
+#define NSHBOXES ((int) (sizeof (shbox) / sizeof (shbox[0])))
+
+/* frame_diff over a box (x0, y0, x1, y1: thousandths of the frame, top-down). */
+static double frame_boxdiff(const unsigned char *gl, int gw, int gh, const unsigned char *classic, int cw, int ch,
+                            const int *box)
+{
+    long x, y, i, d = 0, n = 0;
+    for (y = box[1] * gh / 1000; y < box[3] * gh / 1000; y++)
+        for (x = box[0] * gw / 1000; x < box[2] * gw / 1000; x++, n++)
+            for (i = 0; i < 3; i++)
+                d += abs((int) gl[((gh - 1 - y) * gw + x) * 3 + i] -
+                         (int) classic[((y * ch / gh) * cw + x * cw / gw) * 3 + i]);
+    return (double) d / ((double) n * 3);
 }
 
 /* Pixels of a GL frame (n pixels) whose colour isn't one of pal's 256. */
@@ -748,10 +888,6 @@ static int shader_frames(const char *dir, int32_t x, int32_t y, int32_t z, short
     if (setgamemode_gl(1) != 0) { fprintf(stderr, "FAIL: OpenGL with draw path shader\n"); return 0; }
     gldrawpathrequest = GLPATH_AUTO;
     if (gldrawpath != GLPATH_SHADER) { printf("shader frames: no shader path, skipped\n"); return 77; }
-    /* The masked walls the draw paths' checks put in the start view come off
-     * (translucency, which the shader path doesn't do yet, isn't checked here). */
-    for (i = sector[sect].wallptr; i < sector[sect].wallptr + sector[sect].wallnum; i++)
-        { wallcstat[i - sector[sect].wallptr] = wall[i].cstat; wall[i].cstat &= ~(16|128); }
     polymosttexfullbright = 240;  /* as the game's palettes: the shader path ignores it */
     gw = xdim; gh = ydim;
     n = (long) gw * gh;
@@ -796,10 +932,13 @@ static int shader_frames(const char *dir, int32_t x, int32_t y, int32_t z, short
         { fprintf(stderr, "FAIL: a shader path screenshot isn't the screen\n"); ok = 0; }
 
     /* A hole (the start floor without art) shows what was cleared to: a
-     * good part of the frame. */
+     * good part of the frame (the masked walls the draw paths' checks put in
+     * the start view off, as they'd cover it). */
     setbrightness(0, palette);
     floorpic = sector[sect].floorpicnum;
     sector[sect].floorpicnum = zerotile;
+    for (i = sector[sect].wallptr; i < sector[sect].wallptr + sector[sect].wallnum; i++)
+        { wallcstat[i - sector[sect].wallptr] = wall[i].cstat; wall[i].cstat &= ~(16|128); }
     buf = malloc((size_t) n * 3);
     clearallviews(31);
     drawrooms(x, y, z, a, 100, sect);
@@ -807,6 +946,8 @@ static int shader_frames(const char *dir, int32_t x, int32_t y, int32_t z, short
     nextpage();
     read_front(buf);
     sector[sect].floorpicnum = floorpic;
+    for (i = sector[sect].wallptr; i < sector[sect].wallptr + sector[sect].wallnum; i++)
+        wall[i].cstat = wallcstat[i - sector[sect].wallptr];
     for (off = 0, i = 0; i < n; i++)  /* (white: nothing else in the view is) */
         if (memcmp(&buf[i * 3], &curpalette[31], 3) == 0) off++;
     printf("shader frames: %.1f%% of the frame is the hole's colour 31\n", 100.0 * off / n);
@@ -937,12 +1078,17 @@ static int shader_frames(const char *dir, int32_t x, int32_t y, int32_t z, short
         printf("shader frames: %s mean |shader - r0| %.2f (most 8.00), %ld pixels not of the %spalette\n",
                shframename[f], d, offpal[f], (f == 2) ? "faded " : "");
         if ((d > 8) || offpal[f]) ok = 0;
+        for (i = 0; i < NSHBOXES; i++)
+        {
+            if (!(shbox[i].frames & (1 << f))) continue;
+            d = frame_boxdiff(gl[f], gw, gh, classic[f], cw, ch, &shbox[i].x0);
+            printf("shader frames: %s, %s mean |shader - r0| %.2f (most 8.00)\n", shframename[f], shbox[i].name, d);
+            if (d > 8) ok = 0;
+        }
         free(gl[f]);
         free(classic[f]);
     }
     polymosttexfullbright = 256;
-    for (i = sector[sect].wallptr; i < sector[sect].wallptr + sector[sect].wallnum; i++)
-        wall[i].cstat = wallcstat[i - sector[sect].wallptr];
     if (!ok) fprintf(stderr, "FAIL: the shader path's frames\n");
     return ok;
 }
@@ -988,7 +1134,8 @@ int main(int argc, char **argv)
         { GLPATH_IMMEDIATE, GLSUB_ARRAYS, GLSUB_ARRAYS, "immediate, vertex arrays" },
         { GLPATH_VBO, -1, GLSUB_VBO, "vbo" },
     };
-    unsigned char *pathshot[2][PATHSHOTS], *shshot[2][PATHSHOTS], *ref, *mirror[2], *small[2];
+    unsigned char *pathshot[2][PATHSHOTS], *shshot[3][PATHSHOTS], *ref, *mirror[2], *small[2];
+    uint32_t copies;
     double smalld;
     double shfade[2][2];
     int p, s, pathdiffer;
@@ -1486,7 +1633,9 @@ int main(int argc, char **argv)
     /* The shader path (GL 2.1) draws 3D as palette indices, so its 3D frames
      * differ from the other paths' on purpose. Its frames must come out the
      * same with every draw flushed at once (no state change between polygons,
-     * framebuffer or program switch, missing a flush), with the start floor
+     * framebuffer or program switch, missing a flush) and with all the frame
+     * copied for every translucent draw (no copy it reads missing what was
+     * drawn under it since), with the start floor
      * and masked walls a tile without art too (its polygons write only
      * depth, the mirror hack, by a colour mask); its 2D frames (the map
      * view, a still screen) must be immediate mode's; a fade over its frame must redden the screen and a screenshot
@@ -1499,15 +1648,21 @@ int main(int argc, char **argv)
     else
     {
         setbrightness(0, palette);
-        for (i = 0; i < 2; i++)
+        for (i = 0; i < 3; i++)  /* batched, each draw flushed, all the frame copied for each translucent draw */
         {
             for (s = 0; s < PATHSHOTS; s++) shshot[i][s] = malloc((size_t) xdim * ydim * 3);
-            glsub_flusheach = i;
+            glsub_flusheach = (i == 1);
+            gl_transcopyall = (i == 2);
             draws = glsub_arraydraws;
+            copies = gl_transcopies;
             path_shots(shshot[i], posx, posy, posz, ang, sectnum, oddtile);
             draws = glsub_arraydraws - draws;
-            printf("draw path shader%s: %d array draws\n", i ? ", each draw flushed" : "", (int) draws);
+            copies = gl_transcopies - copies;
+            printf("draw path shader%s: %d array draws, %u copies for translucent draws in %d frames\n",
+                   (i == 1) ? ", each draw flushed" : ((i == 2) ? ", all the frame copied for each translucent draw" : ""),
+                   (int) draws, (unsigned) copies, PATHSHOTS);
         }
+        gl_transcopyall = 0;
         floorpic = sector[sectnum].floorpicnum;
         sector[sectnum].floorpicnum = zerotile;
         for (i = sector[sectnum].wallptr; i < sector[sectnum].wallptr + sector[sectnum].wallnum; i++)
@@ -1531,6 +1686,13 @@ int main(int argc, char **argv)
             {
                 fprintf(stderr, "FAIL: draw path shader: frame %d differs with each draw flushed, mean |difference| %.4f\n",
                         s, front_diff(shshot[0][s], shshot[1][s]));
+                return 1;
+            }
+        for (s = 0; s < PATHSHOTS; s++)  /* the copies for translucent draws cover what they read */
+            if (memcmp(shshot[0][s], shshot[2][s], (size_t) xdim * ydim * 3) != 0)
+            {
+                fprintf(stderr, "FAIL: draw path shader: frame %d differs with all the frame copied for each "
+                        "translucent draw, mean |difference| %.4f\n", s, front_diff(shshot[0][s], shshot[2][s]));
                 return 1;
             }
         if (memcmp(mirror[0], mirror[1], (size_t) xdim * ydim * 3) != 0)
