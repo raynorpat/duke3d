@@ -224,6 +224,7 @@ void getfadedpalette(palette_t *pal); //engine.c: the palette on screen
 static int32_t glshbound = 0; //drawing goes into the framebuffer (until it's shown)
 static int32_t glshprogon = 0; //with the index program (1) or the translucent one (2)
 static int32_t glscene = 0; //the 3D view is drawing (its depth cleared, its distance shade on)
+static int32_t glffcleared = 0; //1.1/1.5: this frame's depth is cleared
 static GLuint glshdst = 0, glshtrans = 0; //a copy of the framebuffer (unit 3) and transluc (unit 2)
 	//Translucent draws blend with the framebuffer's index under them, read from
 	//   glshdst: if glshcopied, it holds the framebuffer but for what was drawn
@@ -540,7 +541,7 @@ static void polymost_shaderfree ()
 {
 	glsub_flush();
 	if (glshbound) { bglBindFramebuffer(GL_FRAMEBUFFER,0); glshbound = 0; }
-	glscene = glshprogon = 0;
+	glscene = glshprogon = glffcleared = 0;
 	if ((glshprog) || (glshtprog) || (glshresolve)) bglUseProgram(0);
 	if (glshprog) { bglDeleteProgram(glshprog); glshprog = 0; }
 	if (glshtprog) { bglDeleteProgram(glshtprog); glshtprog = 0; }
@@ -744,6 +745,7 @@ static void polymost_2dcolor (int32_t col)
 	//   again, as for reading the screen. The next drawing binds the frame's.
 void polymost_unbind_shader ()
 {
+	glffcleared = 0;
 	if (!glshbound) return;
 	glsub_flush();
 	bglUseProgram(0);
@@ -3017,7 +3019,8 @@ void polymost_drawrooms ()
 		resizeglcheck();
 		_glframedrawn();
 		polymost_beginframe_shader(1); //GL 2.1: into the index framebuffer
-		if (!glshbound) glClear(GL_DEPTH_BUFFER_BIT); //1.1/1.5: as the shader path clears it
+		if ((!glshbound) && (!glffcleared)) //1.1/1.5: once a frame, as the shader path
+			{ glClear(GL_DEPTH_BUFFER_BIT); glffcleared = 1; }
 
 		//glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 		//glEnable(GL_TEXTURE_2D);
