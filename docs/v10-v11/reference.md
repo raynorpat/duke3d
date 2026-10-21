@@ -688,6 +688,27 @@ which weapons fire, so the walk reaches the target. Every scenario below uses sk
 | `fem4kill` | E1L5 | FEM4 (1325, 0) | 2 | — | FEM4 killed |
 | `podfem` | E1L1 | PODFEM1 (1294, 0) | 4 | — | PODFEM1 killed |
 
+For 1.0 (Task 16b), use `gendemo.py sw10`, the 1.0 data and CONs, `mkcapture.py sw10`,
+and the 1.0 `ps[0]` offsets from "player_struct (1.0)". The coverage log there also
+recorded `hitradius`, `checkhitsprite` (with the projectile), `ifhitbyweapon`, the player's
+fire switch, `checkweapons` and SE lotags. For a pickup or enemy no map places,
+`startnear.py <in> <out> <map> <picnum> <which> <new picnum>` also changes the sprite the
+player starts on to `<new picnum>`. Every 1.0 scenario uses skill 2 and 3000 tics. After
+G10-L14, each one ended with the same seed and `sprite[]`, and with only
+`ps[0].visibility` different:
+
+| Name | Map | Start on (picnum, which) | Made into | Seed | Weapon | Reaches |
+|---|---|---|---|---|---|---|
+| `tripplace` | E1L1 | RPGSPRITE (23, 0) | TRIPBOMBSPRITE (27) | 1 | 9 | the player places a tripbomb, which is set off |
+| `shrink` | E1L1 | LIZTROOP (1680, 0) | SHRINKERSPRITE (25) | 4 | 7 | SHRINKSPARK hits a trooper and the player |
+| `shrink2` | E1L1 | LIZTROOP (1680, 5) | SHRINKERSPRITE (25) | 1 | 7 | SHRINKSPARK hits a trooper and a FIREEXT |
+| `flame` | E1L1 | LIZTROOP (1680, 0) | FLAMETHROWERSPRITE (24) | 2 | 8 | THROWFLAME hits a trooper |
+| `flame2` | E1L1 | LIZTROOP (1680, 5) | FLAMETHROWERSPRITE (24) | 1 | 8 | THROWFLAME hits a trooper and a FIREEXT (found G10-L14) |
+| `boss` | E1L1 | LIZTROOP (1680, 0) | BOSS1 (2630) | 2 | — | BOSS1 shoots and is hit; awake past SLEEPTIME (found G10-L14) |
+| `boss2` | E1L1 | LIZTROOP (1680, 2) | BOSS1 (2630) | 1 | — | the same (found G10-L14) |
+| `monk` | E1L3 | MONK (1352, 0) | — | 16 | — | a trooper's FIRELASER hits the MONK |
+| `troopshoot` | E1L2 | LIZTROOPSHOOT (1715, 0) | — | 1 | — | LIZTROOPSHOOT (found G10-L14) |
+
 ## DOS reference saves
 
 `tests/data/v13d_save_refs.cmake` rows with `_EDITION` `sw10` or `sw11` describe saves
