@@ -607,6 +607,12 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
 
         sdl_renderer = SDL_CreateRenderer(sdl_window, -1,
                                           sdl_vsync ? SDL_RENDERER_PRESENTVSYNC : 0);
+        if (sdl_renderer == NULL)  /* the hinted driver may not be there. */
+        {
+            SDL_SetHint(SDL_HINT_RENDER_DRIVER, "");
+            sdl_renderer = SDL_CreateRenderer(sdl_window, -1,
+                                              sdl_vsync ? SDL_RENDERER_PRESENTVSYNC : 0);
+        } /* if */
         if (sdl_renderer == NULL)
             sdl_renderer = SDL_CreateRenderer(sdl_window, -1, 0);
         if (sdl_renderer == NULL)
@@ -1727,6 +1733,13 @@ static void set_sdl_renderer(void)
                 envr, BUILD_RENDERER);
         _exit(1);
     } /* else */
+
+#if defined(__APPLE__) && defined(USE_OPENGL)
+    /* present the 8-bit modes through GL, not Metal: Apple's GL on Metal can
+       crash the next Metal renderer after renderer 3's context goes. A
+       user's SDL_RENDER_DRIVER still wins. */
+    SDL_SetHintWithPriority(SDL_HINT_RENDER_DRIVER, "opengl", SDL_HINT_DEFAULT);
+#endif
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) == -1)
     {
