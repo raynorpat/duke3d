@@ -2741,7 +2741,7 @@ void view(struct player_struct *pp, int32_t *vx, int32_t *vy,int32_t *vz,short *
 {
      spritetype *sp;
      int32_t i, nx, ny, nz, hx, hy, hz, hitx, hity, hitz;
-     short bakcstat, hitsect, hitwall, hitsprite, daang;
+     short bakcstat, hitsect, hitwall = -1, hitsprite = -1, daang; // -1: 1.0's hitscan leaves this unwritten on a miss (DOS read stack garbage)
 
      nx = (sintable[(ang+1536)&2047]>>4);
      ny = (sintable[(ang+1024)&2047]>>4);

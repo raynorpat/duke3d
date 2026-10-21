@@ -4698,7 +4698,7 @@ void processinput(short snum)
                 if ( p->ammo_amount[TRIPBOMB_WEAPON] > 0 )
                 {
                     int32_t sx,sy,sz;
-                    short sect,hw,hitsp;
+                    short sect,hw = -1,hitsp = -1; // -1: 1.0's hitscan leaves this unwritten on a miss (DOS read stack garbage)
 
                     hitscan( p->posx, p->posy, p->posz,
                              p->cursectnum, sintable[(p->ang+512)&2047],
