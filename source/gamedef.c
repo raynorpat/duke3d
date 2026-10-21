@@ -42,8 +42,11 @@ static spritetype *g_sp;
 #define NUMKEYWORDS     112
 
 // 1.3D's compiler knows keywords 0-97 only (useractor and later came with 1.4),
-// and 1.1's 0-93, six of them with other words (C11-001).
-#if DUKE3D_GAMEVER < GAMEVER_13D
+// 1.1's 0-93, six of them with other words (C11-001), and 1.0's 0-92, with
+// debugprint at 90 (C10-002).
+#if DUKE3D_GAMEVER < GAMEVER_11
+#define NUMCONKEYWORDS  93
+#elif DUKE3D_GAMEVER < GAMEVER_13D
 #define NUMCONKEYWORDS  94
 #elif DUKE3D_GAMEVER < GAMEVER_14
 #define NUMCONKEYWORDS  98
@@ -157,7 +160,11 @@ char *keyw[NUMKEYWORDS] =
     "soundonce",         // 87
     "addkills",         // 88
     "stopsound",        // 89
+#if DUKE3D_GAMEVER < GAMEVER_11
+    "debugprint",       // 90
+#else
     "ifawayfromwall",       // 90
+#endif
     "ifcanseetarget",   // 91
     "globalsound",  // 92
 #if DUKE3D_GAMEVER < GAMEVER_13D
@@ -226,10 +233,18 @@ char isaltok(char c)
 void getglobalz(short i)
 {
     int32_t hz,lz,zr;
+#if DUKE3D_GAMEVER < GAMEVER_11
+    short j;
+#endif
 
     spritetype *s = &sprite[i];
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_11
+    // 1.0: players too, and zr is always 127 (C10-005).
+    if( s->statnum == 6 || s->statnum == 2 || s->statnum == 1 || s->statnum == 10 || s->statnum == 4)
+    {
+        zr = 127L;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
     // 1.1: players take the sector's heights, and zr is always 127 (C11-024).
     if( s->statnum == 6 || s->statnum == 2 || s->statnum == 1 || s->statnum == 4)
     {
@@ -250,6 +265,16 @@ void getglobalz(short i)
 #if DUKE3D_GAMEVER < GAMEVER_13D
             if( badguy(&sprite[lz]) )
             {
+#if DUKE3D_GAMEVER < GAMEVER_11
+                // 1.0 pushes a player off a big badguy here (C10-005).
+                if( s->statnum == 10 && sprite[lz].xrepeat > 24 && klabs(s->z-sprite[lz].z) < (84<<8) )
+                {
+                    j = sprite[lz].ang+1024;
+                    ps[s->yvel].posxv += sintable[(j+512)&2047]<<6;
+                    ps[s->yvel].posyv += sintable[j&2047]<<6;
+                    return;
+                }
+#endif
                 if( s->statnum != 4 )
                 {
                     hittype[i].dispicnum = -4; // No shadows on actors
@@ -1116,7 +1141,9 @@ char parsecommand(void)
         case 71:
         case 81:
         case 82:
+#if DUKE3D_GAMEVER >= GAMEVER_11
         case 90:
+#endif
         case 91:
         case 109:
 
@@ -1414,7 +1441,9 @@ char parsecommand(void)
         case 47:
         case 61:
         case 66:
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_11
+        case 90: // debugprint
+#elif DUKE3D_GAMEVER < GAMEVER_13D
         case 93: // debugprint
 #else
         case 83:
@@ -1462,7 +1491,15 @@ char parsecommand(void)
 		    };
 		    if(j>27)
 			continue;
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_11
+		    // 1.0's has 13: also no respawnitemtime, dukefriction or
+		    // blast radii (5-14) (C10-001).
+		    if((j > 4 && j < 15) || j == 23 || (j > 24 && j < 28))
+		    {
+			++j;
+			continue;
+		    }
+#elif DUKE3D_GAMEVER < GAMEVER_13D
 		    // 1.1's has 22: no max_ammo_amount[9] (23), camerashitable,
 		    // numfreezebounces or freezerhurtowner (25-27).
 		    if(j == 23 || (j > 24 && j < 28))
@@ -1968,6 +2005,7 @@ void move()
     }
 #endif
 
+#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no faceplayersmart (C10-006)
     if(a&face_player_smart)
     {
         int32_t newx,newy;
@@ -1984,6 +2022,7 @@ void move()
         if(angdif > -8 && angdif < 0) angdif = 0;
         g_sp->ang += angdif;
     }
+#endif
 
     if( g_t[1] == 0 || a == 0 )
     {
@@ -2120,8 +2159,14 @@ void move()
                 }
                 else
                 {
+#if DUKE3D_GAMEVER < GAMEVER_11
+                    // 1.0 has no dukefriction: a constant (C10-006).
+                    ps[g_p].posxv = mulscale(ps[g_p].posxv,0xab00,16);
+                    ps[g_p].posyv = mulscale(ps[g_p].posyv,0xab00,16);
+#else
                     ps[g_p].posxv = mulscale(ps[g_p].posxv,dukefriction-0x2000,16);
                     ps[g_p].posyv = mulscale(ps[g_p].posyv,dukefriction-0x2000,16);
+#endif
                 }
             }
 #if DUKE3D_GAMEVER < GAMEVER_13D
@@ -2206,7 +2251,9 @@ char parse(void)
             {
                 short temphit, sclip, angdif;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_11
+                if( g_sp->picnum == BOSS1 || g_sp->picnum == BOSS2 ) // any size (C10-003)
+#elif DUKE3D_GAMEVER < GAMEVER_13D
                 if( (g_sp->picnum == BOSS1 || g_sp->picnum == BOSS2) && g_sp->xrepeat > 60 )
 #else
                 if( badguy(g_sp) && g_sp->xrepeat > 56 )
@@ -2936,6 +2983,25 @@ char parse(void)
             }
             else
             {
+#if DUKE3D_GAMEVER < GAMEVER_11
+                // 1.0 resets first, keeps the keys in co-op, and moves the
+                // sprite before setting its position (C10-004).
+                j = ps[g_p].got_access;
+                resetinventory(g_p);
+                resetweapons(g_p);
+                pickrandomspot(g_p);
+                if(ud.coop == 1) ps[g_p].got_access = j;
+
+                g_sp->shade = -12;
+                g_sp->clipdist = 64;
+                g_sp->xrepeat = 42;
+                g_sp->yrepeat = 36;
+                g_sp->cstat = 257;
+                g_sp->owner = g_i;
+                g_sp->xoffset = 0;
+                g_sp->pal = ps[g_p].palookup;
+                setsprite(ps[g_p].i,ps[g_p].posx,ps[g_p].posy,ps[g_p].posz+PHEIGHT);
+#else
                 pickrandomspot(g_p);
 #if DUKE3D_GAMEVER < GAMEVER_13D
                 // 1.1 leaves bobpos and opos alone (C11-018).
@@ -2958,6 +3024,7 @@ char parse(void)
                 g_sp->owner = g_i;
                 g_sp->xoffset = 0;
                 g_sp->pal = ps[g_p].palookup;
+#endif
 
                 ps[g_p].last_extra = g_sp->extra = max_player_health;
 #if DUKE3D_GAMEVER >= GAMEVER_14
@@ -2995,11 +3062,18 @@ char parse(void)
                 hittype[g_i].dispicnum = 0;
                 hittype[g_i].owner = ps[g_p].i;
 
+#if DUKE3D_GAMEVER < GAMEVER_11
+                updatesector(ps[g_p].posx,ps[g_p].posy,&ps[g_p].cursectnum);
+                g_sp->x = hittype[g_i].bposx = ps[g_p].posx;
+                g_sp->y = hittype[g_i].bposy = ps[g_p].posy;
+                g_sp->z = hittype[g_i].bposy = ps[g_p].posz;
+#else
                 resetinventory(g_p);
                 resetweapons(g_p);
 
                 cameradist = 0;
                 cameraclock = totalclock;
+#endif
             }
             setpal(&ps[g_p]);
 
@@ -3336,6 +3410,12 @@ char parse(void)
             }
             break;
         case 90:
+#if DUKE3D_GAMEVER < GAMEVER_11
+            // 1.0's debugprint plays a random sound, by the C library's
+            // rand() (C10-002).
+            insptr++;
+            sound(rand()%254);
+#else
             {
                 short s1;
 
@@ -3360,6 +3440,7 @@ char parse(void)
                     }
                     parseifelse( j );
             }
+#endif
 
             break;
         case 80:
@@ -3494,6 +3575,10 @@ void execute(short i,short p,int32_t x)
 
         if( g_sp->statnum == 1)
         {
+#if DUKE3D_GAMEVER < GAMEVER_11
+            // 1.0's bosses never fall asleep, whatever their size (C10-007).
+            if( g_sp->picnum == BOSS1 || g_sp->picnum == BOSS2 ) return;
+#endif
 #if DUKE3D_GAMEVER < GAMEVER_13D
             // 1.1's big-badguy test (picnum both BOSS1 and BOSS2) never
             // holds, and the respawn_items test covers badguys too (C11-030).

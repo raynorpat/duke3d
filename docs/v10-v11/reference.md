@@ -375,8 +375,9 @@ stride is `0x16` in both.
   converted, which round-trips in DOS. Neither 1.0 CON file contains a 7-digit
   constant, so in practice only pointers are marked.
 - `actorscrptr[]`: **every** entry, zero included, is stored as `v - 0x102f08`
-  (`0x38c4a`–`0x38c58`), and `loadplayer` adds the base back to every entry. An empty
-  slot is stored as `0xffefd0f8`.
+  (`0x38c4a`–`0x38c58`), and `loadplayer` adds the base back to every entry. The base is
+  `script`'s run-time address, not its link address, so an empty slot is stored as
+  `-0x2d5f08` (`0xffd2a0f8`) in the DOSBox reference saves.
 - `hittype[]`: written **raw**, as item 12 above, with no bitmap and no conversion. So
   `temp_data[1]`, `[4]` and `[5]` hold **raw DOS addresses** inside 1.0's `script[]`
   (`0x102f08`–`0x10cf07`). 1.0 `execute` (`0x377f0`) uses `temp_data[4]` (`0xda3af`) as a

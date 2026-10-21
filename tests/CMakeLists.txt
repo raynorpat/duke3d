@@ -670,6 +670,13 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
               "-DOTHERS=${DUKE3D_V10_SW_DATA_DIR}$<SEMICOLON>${DUKE3D_V13D_SW_DATA_DIR}"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/v13d_check.cmake")
   endif()
+  # And the 1.1 and 1.3D shareware as 1.0.
+  if(_vold_edition STREQUAL "sw10" AND DUKE3D_V11_SW_DATA_DIR AND DUKE3D_V13D_SW_DATA_DIR)
+    add_test(NAME v10_edition_mismatch
+      COMMAND "${CMAKE_COMMAND}" -DEDITION=sw10
+              "-DOTHERS=${DUKE3D_V11_SW_DATA_DIR}$<SEMICOLON>${DUKE3D_V13D_SW_DATA_DIR}"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/v13d_check.cmake")
+  endif()
 endif()
 
 # The editor build.cfg reader and writer; engine-free, so it runs everywhere.
