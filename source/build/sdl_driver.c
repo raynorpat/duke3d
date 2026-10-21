@@ -1908,9 +1908,10 @@ static void set_sdl_renderer(void)
     } /* else */
 
 #if defined(__APPLE__) && defined(USE_OPENGL)
-    /* present the 8-bit modes through GL, not Metal: Apple's GL on Metal can
-       crash the next Metal renderer after renderer 3's context goes. A
-       user's SDL_RENDER_DRIVER still wins. */
+    /* present the 8-bit modes (before any renderer 3) through SDL's GL
+       renderer, not Metal: it presents faster with vsync off and its
+       scaling keeps the palette's colours. A user's
+       SDL_RENDER_DRIVER still wins. */
     SDL_SetHintWithPriority(SDL_HINT_RENDER_DRIVER, "opengl", SDL_HINT_DEFAULT);
 #endif
 
