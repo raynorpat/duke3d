@@ -49,6 +49,7 @@ int main(void)
     int32_t hitx, hity, hitz, x, y, z;
     int i, r;
 
+    initengine(); // initialize the 1996 square-root tables for the slope cases
     square(0, 0, 0);
     square(1, 4, 1024);
     /* Wall 1 (sector 0's east side) and wall 7 (sector 1's west side) meet. */
@@ -122,6 +123,42 @@ int main(void)
     check("clipmove bad sector: x", x, 300);
     check("clipmove bad sector: sector", sect, -1);
 #endif
+
+    /* E099-001/002: measured by running beta hitscan at0x5c1c1 on this
+     * square in x86 emulation (docs/v099/reference.md). */
+    square(0,0,0); numsectors=1; initspritelists();
+    sector[0].ceilingz=-32768; sector[0].floorstat=2; sector[0].floorheinum=1024;
+    hitscan(512,512,0,0,100,0,-8192,&hitsect,&hitwall,&hitsprite,&hitx,&hity,&hitz,CLIPMASK0);
+    check("sloped floor backwards: sector",hitsect,0);
+#if BUILD_ENGINEREV < 19960129L
+    check("sloped floor backwards: x",hitx,387);
+    check("sloped floor backwards: z",hitz,10240);
+#else
+    check("sloped floor backwards: forward wall",hitwall,1);
+    check("sloped floor backwards: forward x",hitx>512,1);
+#endif
+    sector[0].ceilingz=-8192; sector[0].floorz=32768;
+    sector[0].ceilingstat=2; sector[0].floorstat=0; sector[0].ceilingheinum=1024;
+    hitscan(512,512,0,0,100,0,8192,&hitsect,&hitwall,&hitsprite,&hitx,&hity,&hitz,CLIPMASK0);
+#if BUILD_ENGINEREV < 19960129L
+    check("sloped ceiling backwards: x",hitx,437);
+    check("sloped ceiling backwards: z",hitz,-6144);
+#else
+    check("sloped ceiling backwards: forward wall",hitwall,1);
+    check("sloped ceiling backwards: forward x",hitx>512,1);
+#endif
+    for(i=0;i<3;i++) {
+        sector[0].ceilingstat=(i==1)?2:0; sector[0].floorstat=(i==2)?2:0;
+        sector[0].ceilingheinum=sector[0].floorheinum=-1;
+        sector[0].ceilingz=(i==0)?-511:((i==1)?0:-32768);
+        sector[0].floorz=(i==2)?0:8192;
+        hitscan(512,511,0,0,0,0,(i==0)?-256:-1,&hitsect,&hitwall,&hitsprite,&hitx,&hity,&hitz,CLIPMASK0);
+#if BUILD_ENGINEREV < 19960129L
+        check("negative odd height boundary rejected",hitsect,-1);
+#else
+        check("negative odd height boundary accepted",hitsect,0);
+#endif
+    }
 
     if (failures) return 1;
     printf("engine trace: ok\n");

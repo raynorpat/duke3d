@@ -6334,7 +6334,11 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 			if (j != 0)
 			{
 				i = ((sec->ceilingz-zs)<<8)+dmulscale15(dax,ys-wal->y,-day,xs-wal->x);
+#if (BUILD_ENGINEREV < 19960129L)
+				if (klabs(i>>1) < klabs(j))
+#else
 				if (((i^j) >= 0) && ((klabs(i)>>1) < klabs(j)))
+#endif
 				{
 					i = divscale30(i,j);
 					x1 = xs + mulscale30(vx,i);
@@ -6346,7 +6350,11 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 		else if ((vz < 0) && (zs >= sec->ceilingz))
 		{
 			z1 = sec->ceilingz; i = z1-zs;
+#if (BUILD_ENGINEREV < 19960129L)
+			if (klabs(i>>1) < -vz)
+#else
 			if ((klabs(i)>>1) < -vz)
+#endif
 			{
 				i = divscale30(i,vz);
 				x1 = xs + mulscale30(vx,i);
@@ -6373,7 +6381,11 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 			if (j != 0)
 			{
 				i = ((sec->floorz-zs)<<8)+dmulscale15(dax,ys-wal->y,-day,xs-wal->x);
+#if (BUILD_ENGINEREV < 19960129L)
+				if (klabs(i>>1) < klabs(j))
+#else
 				if (((i^j) >= 0) && ((klabs(i)>>1) < klabs(j)))
+#endif
 				{
 					i = divscale30(i,j);
 					x1 = xs + mulscale30(vx,i);
@@ -6385,7 +6397,11 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 		else if ((vz > 0) && (zs <= sec->floorz))
 		{
 			z1 = sec->floorz; i = z1-zs;
+#if (BUILD_ENGINEREV < 19960129L)
+			if (klabs(i>>1) < vz)
+#else
 			if ((klabs(i)>>1) < vz)
+#endif
 			{
 				i = divscale30(i,vz);
 				x1 = xs + mulscale30(vx,i);
