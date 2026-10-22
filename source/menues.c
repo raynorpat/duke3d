@@ -213,6 +213,8 @@ int loadplayer(signed char spot)
      char mpfn[] = "gameA_00.sav";
      char fullname[MAX_PATH];
 
+     video_flushpending();  // shows frames of its own
+
      if(spot < 0)
      {
 #if DUKE3D_GAMEVER < GAMEVER_14
@@ -4531,6 +4533,7 @@ void playanm(char *fn,char t)
     int32_t i, j, k, length=0, numframes=0;
     int32 handle=-1;
 
+    video_flushpending();  // shows frames of its own
 //    return;
 
     if(t != 7 && t != 9 && t != 10 && t != 11)

@@ -454,7 +454,8 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
     endforeach()
     # Demo 1 again, drawn, with the renderer and mode switched every 100 tics
     # as the VIDEO page does, each faded and waited for (OpenGL fails
-    # headless, and stays off): still in sync.
+    # headless, and stays off): still in sync. The demo stands still during
+    # each switch; net_videocycle switches while play goes on.
     add_test(NAME demo_switch_v13d_${_v13d_edition}
       COMMAND "${CMAKE_COMMAND}"
               "-DDUKE3D=$<TARGET_FILE:duke3d>"

@@ -2337,11 +2337,9 @@ void video_requestmode(int displaymode, int w, int h)
 
 static void video_testprint(void);
 
-// After nextpage: the changes asked for, once the frame shown was black.
-void video_applypending(void)
+// Makes the changes asked for, and fades back in (also when one failed).
+static void video_makepending(void)
 {
-    if (((video_pendingmode < 0) && (video_pendingrenderer < 0)) || (getvideofade() < 256))
-        return;
     if (video_pendingmode >= 0)
         video_setmode(video_pendingmode,video_pendingw,video_pendingh);
     if (video_pendingrenderer >= 0)
@@ -2350,6 +2348,29 @@ void video_applypending(void)
     setvideofadein();
     if (video_testtag[0])
         video_testprint();
+}
+
+// After nextpage: the changes asked for, once the frame shown was black. If
+// the driver gave up holding the black (a loop that showed frames without
+// coming here), the fade out starts again.
+void video_applypending(void)
+{
+    if ((video_pendingmode < 0) && (video_pendingrenderer < 0))
+        return;
+    if (getvideofade() == 256)
+        video_makepending();
+    else if (!videofading())
+        setvideofadeout();
+}
+
+// The changes asked for, made now without waiting for the black: at the
+// start of the loops that show frames of their own and don't come to
+// video_applypending (dobonus, playanm, newgame, enterlevel, loadplayer),
+// which then draw the whole screen again.
+void video_flushpending(void)
+{
+    if ((video_pendingmode >= 0) || (video_pendingrenderer >= 0))
+        video_makepending();
 }
 
 // -videocycle n: video_teststep every n frames in the game loop (the net
@@ -9596,6 +9617,7 @@ int demoverify(int n, char *dumpname, int draw, int switchevery)
 {
     int32_t i, j, l, cnt, tics = 0;
     short k;
+    uint32_t waited;
 
     if( !opendemoread(n) )
     {
@@ -9654,8 +9676,14 @@ int demoverify(int n, char *dumpname, int draw, int switchevery)
                 char tag[32];
                 sprintf(tag,"DEMOSWITCH tic %d:",(int)tics);
                 video_teststep(tag);
+                waited = getticks();
                 while(videofading())  // this tic drawn until the switch is done: one per k tics
                 {
+                    if(getticks() - waited > 10000)
+                    {
+                        printf("DEMOSWITCH FAIL: tic %d: the switch's fade didn't end in 10 s\n",(int)tics);
+                        exit(1);
+                    }
                     gldrawframe();
                     displayrooms(screenpeek,65536);
                     displayrest(65536);
@@ -10653,6 +10681,7 @@ void dobonus(char bonusonly)
        350, 380,VICTORY1+8,86,59
     };
 
+    video_flushpending();  // shows frames of its own
     bonuscnt = 0;
 
     for(t=0;t<64;t+=7) palto(0,0,0,t);

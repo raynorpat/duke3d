@@ -179,7 +179,9 @@ int getvideodisplaymode(void);  /* the window's */
  * The VIDEO page's fade around a change, at the present, over the game's own
  *  palette and fade (left alone), in real time. setvideofadeout fades to
  *  black over VIDEOFADE_MS (from where a fade-in has got to) and holds it;
- *  setvideofadein then fades back in over VIDEOFADE_MS. getvideofade: the
+ *  setvideofadein then fades back in over VIDEOFADE_MS, as it does by
+ *  itself after 2 * VIDEOFADE_MS held (frames shown with nothing to make
+ *  the change). getvideofade: the
  *  last frame shown's darkness, 0 (none) to 256 (black); videofading: one
  *  is under way. videofade_at: the darkness ms into one never held.
  */

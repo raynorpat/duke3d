@@ -329,6 +329,12 @@ static int vfade_now(void)
 {
     Uint32 ms = SDL_GetTicks() - vfade_start;
 
+    if ((vfade_state == 1) && (ms >= 3 * VIDEOFADE_MS))
+    {   /* black held 2 * VIDEOFADE_MS with no setvideofadein: given up, faded in */
+        vfade_state = 2;
+        vfade_start = SDL_GetTicks() - VIDEOFADE_MS;
+        ms = VIDEOFADE_MS;
+    } /* if */
     if (vfade_state == 0)
         vfade_shown = 0;
     else if (vfade_state == 1)  /* black until setvideofadein */
@@ -2382,6 +2388,9 @@ static unsigned char *gl_screencapture(int *w, int *h)
     {
         glReadBuffer(GL_FRONT);
         a = 0;  /* the swap drew the fade there already. */
+        /* The VIDEO page's fade too (gl_draw_dark), which can't be taken
+         *  out: at black nothing of the frame is left. Only here, with no
+         *  last-frame texture to read instead. */
     } /* if */
     while (glGetError() != GL_NO_ERROR) {}  /* only the read's own error counts. */
     glReadPixels(0, 0, *w, *h, GL_RGB, GL_UNSIGNED_BYTE, rgb);

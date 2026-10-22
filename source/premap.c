@@ -1106,6 +1106,8 @@ void newgame(char vn,char ln,char sk)
     struct player_struct *p = &ps[0];
     short i;
 
+    video_flushpending();  // shows frames of its own
+
 #if DUKE3D_GAMEVER < GAMEVER_14
     if(ud.multimode < 2) p->aim_mode = 0;
 #else
@@ -1545,6 +1547,7 @@ void enterlevel(char g)
     int32_t l;
     char levname[256];
 
+    video_flushpending();  // shows frames of its own
     if( (g&MODE_DEMO) != MODE_DEMO ) ud.recstat = ud.m_recstat;
     ud.respawn_monsters = ud.m_respawn_monsters;
     ud.respawn_items    = ud.m_respawn_items;

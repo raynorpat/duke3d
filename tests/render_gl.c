@@ -122,6 +122,7 @@ void video_requestrenderer(int r);  /* game.c */
 void video_requestmode(int displaymode, int w, int h);  /* game.c */
 void video_getmode(int32_t *w, int32_t *h);  /* game.c */
 void video_applypending(void);  /* game.c */
+void video_flushpending(void);  /* game.c */
 extern int32_t GLDrawPath;  /* config.c */
 extern int32_t video_glunavailable;  /* game.c */
 extern SDL_Surface *surface;  /* sdl_driver.c: the 8-bit frame */
@@ -1876,6 +1877,64 @@ static int video_fade_run(SDL_Window *win, int sdl, int midw, int midh, const ch
     return ok;
 }
 
+/* Frames shown for ms with no video_applypending, as a loop of the game's
+ *  own (dobonus, playanm, ...) shows them: the last one's darkness. */
+static int frames_unapplied(Uint32 ms)
+{
+    Uint32 t0;
+
+    for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < ms; )
+        fade_frame();
+    return getvideofade();
+}
+
+/*
+ * A change asked for just before the game goes into a loop that shows
+ *  frames without making it (the level's end to dobonus, a new game's
+ *  cutscenes): that loop's video_flushpending makes it at once and the
+ *  screen fades back in; a loop without one gets the screen back after
+ *  2 * VIDEOFADE_MS held black, and the change is faded out for and made
+ *  when video_applypending runs again. 1: pass.
+ */
+static int video_flush_check(void)
+{
+    int32_t w, h;
+    int d, ok = 1;
+
+    video_requestmode(DISPLAY_WINDOWED, 640, 480);
+    d = frames_unapplied(VIDEOFADE_MS + 100);
+    video_flushpending();  /* dobonus's */
+    video_getmode(&w, &h);
+    printf("flushed at darkness %d: %dx%d\n", d, (int) w, (int) h);
+    if ((d != 256) || (w != 640) || (h != 480))
+        { fprintf(stderr, "FAIL: video_flushpending didn't make the change\n"); ok = 0; }
+    d = frames_unapplied(VIDEOFADE_MS + 100);
+    printf("then %d, fading %d\n", d, videofading());
+    if ((d != 0) || (videofading()))
+        { fprintf(stderr, "FAIL: the screen stayed dark after video_flushpending\n"); ok = 0; }
+
+    video_requestmode(DISPLAY_WINDOWED, 800, 600);
+    d = frames_unapplied(5 * VIDEOFADE_MS);  /* a loop with no flush */
+    video_getmode(&w, &h);
+    printf("a loop with no flush: darkness %d after %d ms, fading %d, %dx%d\n", d, 5 * VIDEOFADE_MS,
+           videofading(), (int) w, (int) h);
+    if ((d != 0) || (videofading()) || (w != 640))
+        { fprintf(stderr, "FAIL: the screen stayed black through a loop that doesn't make the change\n"); ok = 0; }
+    video_applypending();  /* back in the game loop: faded out for again */
+    if (!videofading())
+        { fprintf(stderr, "FAIL: the change wasn't faded out for again\n"); ok = 0; }
+    for (d = 0; (d < 1000) && ((w != 800) || (videofading())); d++)
+    {
+        fade_frame();
+        video_applypending();
+        video_getmode(&w, &h);
+    }
+    printf("then made: %dx%d, fading %d\n", (int) w, (int) h, videofading());
+    if ((w != 800) || (h != 600) || (videofading()))
+        { fprintf(stderr, "FAIL: the change wasn't made after the loop\n"); ok = 0; }
+    return ok;
+}
+
 /*
  * The VIDEO page's renderer switch (game.c video_setrenderer) in a run that
  *  starts in renderers 0-2, so in its own process (render_gl_video). OpenGL
@@ -2068,6 +2127,7 @@ static int video_mode_check(void)
     GLDrawPath = GLPATH_AUTO;
     video_setrenderer(0);
     if (!video_fade_run(win, 0, 0, 0, "fade, renderer 0 through OpenGL")) ok = 0;
+    if (!video_flush_check()) ok = 0;
     set_build_windowed(1);
     return ok;
 }

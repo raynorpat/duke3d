@@ -650,6 +650,17 @@ static int video_fade(int argc, char **argv)
     _nextpage();
     if ((getvideofade() != 0) || (videofading())) { fprintf(stderr, "FAIL: a fade-in with none under way\n"); return 1; }
 
+    /* No setvideofadein (frames shown by a loop that doesn't make the
+     *  change): black held 2 * VIDEOFADE_MS, then faded in by itself. */
+    setvideofadeout();
+    for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < 3 * VIDEOFADE_MS - 20; SDL_Delay(5))
+        _nextpage();
+    if (getvideofade() != 256) { fprintf(stderr, "FAIL: not held black: %d\n", getvideofade()); return 1; }
+    for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < VIDEOFADE_MS + 60; SDL_Delay(5))
+        _nextpage();
+    printf("held black with no fade-in: %d after %d ms\n", getvideofade(), 4 * VIDEOFADE_MS + 40);
+    if ((getvideofade() != 0) || (videofading())) { fprintf(stderr, "FAIL: black held with no end\n"); return 1; }
+
     _uninitengine();
     printf("PASS: video_fade\n");
     return 0;

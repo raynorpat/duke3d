@@ -425,7 +425,8 @@ Ported from later JFBuild commits, retyped as above:
   colour mod, `gl_present8`'s colour, a black quad after the fixed function
   tiers' fade quad, and on the shader tier the palette
   `polymost_present_shader` shows through (its new `dark` argument).
-  Captures leave it out, except a front-buffer read.
+  Black held over 2 * `VIDEOFADE_MS` with no `setvideofadein` fades back
+  in by itself. Captures leave it out, except a front-buffer read.
 - `glext.c`/`glext.h` (ours, not JFBuild's): renderer 3's draw paths
   (`GLPATH_AUTO`, `IMMEDIATE`, `VBO`, `SHADER`) and their setting names,
   the pure `gl_choosepath`, and the GL entry points past 1.1 as `bgl…`
