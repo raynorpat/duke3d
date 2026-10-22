@@ -6,7 +6,7 @@ reviewed and judged safe to leave for now. Ledger row IDs refer to the Differenc
 
 ## Code
 
-- [ ] **Signed overflow in `inside()`** (`source/build/engine.c`). The 1.0/1.1 and 1.3D forms
+- [x] **Signed overflow in `inside()`** (`source/build/engine.c`). The 1.0/1.1 and 1.3D forms
   (E11-001, E-004) rely on `int32` products wrapping, which is undefined in C. Compute them
   with `uint32_t` casts, or build `buildengine` with `-fwrapv`. Watch for it if demo sync ever
   breaks under a new compiler.

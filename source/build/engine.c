@@ -4413,19 +4413,22 @@ int inside(int32_t x, int32_t y, short sectnum)
 	i = sector[sectnum].wallnum;
 	do
 	{
-		y1 = wal->y-y; y2 = wall[wal->point2].y-y;
+		y1 = (int32_t)((uint32_t)wal->y-(uint32_t)y);
+		y2 = (int32_t)((uint32_t)wall[wal->point2].y-(uint32_t)y);
 		if ((y1^y2) < 0)
 		{
-			x1 = wal->x-x; x2 = wall[wal->point2].x-x;
+			x1 = (int32_t)((uint32_t)wal->x-(uint32_t)x);
+			x2 = (int32_t)((uint32_t)wall[wal->point2].x-(uint32_t)x);
+			// Preserve the DOS 32-bit products and differences without signed overflow.
 #if (BUILD_ENGINEREV < 19960320L)
 			if ((x1^x2) < 0)
-				cnt ^= (x1*y2<x2*y1)^(y1<y2);
+				cnt ^= ((int32_t)((uint32_t)x1*(uint32_t)y2)<(int32_t)((uint32_t)x2*(uint32_t)y1))^(y1<y2);
 			else if (x1 >= 0)
 				cnt ^= 1;
 #elif (BUILD_ENGINEREV < 19960427L)
-			if ((x1^x2) < 0) cnt ^= (x1*y2-x2*y1)^(y1-y2); else cnt ^= ~x1;
+			if ((x1^x2) < 0) cnt ^= (int32_t)(((uint32_t)x1*(uint32_t)y2-(uint32_t)x2*(uint32_t)y1)^((uint32_t)y1-(uint32_t)y2)); else cnt ^= ~x1;
 #else
-			if ((x1^x2) >= 0) cnt ^= x1; else cnt ^= (x1*y2-x2*y1)^y2;
+			if ((x1^x2) >= 0) cnt ^= x1; else cnt ^= ((uint32_t)x1*(uint32_t)y2-(uint32_t)x2*(uint32_t)y1)^(uint32_t)y2;
 #endif
 		}
 		wal++; i--;

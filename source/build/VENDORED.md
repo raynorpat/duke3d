@@ -93,6 +93,9 @@ BUILDLIC.TXT LICENSE.md
 - `engine.c`: version-guarded 1.1 and 1.0 engine logic, on `BUILD_ENGINEREV`:
   the early `inside`, which compares the two products and keeps a one-byte
   count (see ledger E11-001)
+- `engine.c`: `inside` computes coordinate differences, products and determinants
+  as unsigned 32-bit arithmetic, preserving each revision's DOS wraparound
+  without C signed overflow (E11-001, E-004).
 - `engine.c`: version-guarded 1.0 engine logic, on `BUILD_ENGINEREV <
   19960220L`: `cansee`'s side test and `lintersect`; `hitscan` without a
   cliptype (always `CLIPMASK1`) that resets only `*hitsect`; `clipmove`
