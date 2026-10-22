@@ -3295,7 +3295,7 @@ void menus(void)
                             break;
                         case 7:
                             i = videopage_next(ss,dir,SS_COUNT,ssavail);
-                            if(i != ss && !ssgrey)
+                            if(i != ss && (!ssgrey || i == SS_OFF))  // greyed, a level kept can still go off
                             {
                                 video_requestsupersample(i);
                                 video_pagetouch(VROW_SUPERSAMPLING);
@@ -3336,7 +3336,7 @@ void menus(void)
                 if(shorttmp != was)
                 {
                     ud.brightness = (int32) shorttmp;
-                    setbrightness(ud.brightness>>2,&ps[myconnectindex].palette[0]);
+                    setbrightness(ud.brightness>>2,(unsigned char *)gameviewpalette());
                     video_pagetouch(VROW_BRIGHTNESS);
                 }
 

@@ -305,6 +305,14 @@ int main(void)
         video_pagebegin();
         video_flushpending();
         check("page reopened while pending: saved", GLSupersampling, SS_2K);
+
+        /* Leaving the game during a change's fade saves the change asked for. */
+        video_pagebegin();
+        video_requestsupersample(SS_4K);
+        video_pagetouch(VROW_SUPERSAMPLING);
+        video_pagesettle(1);
+        check("page exit while pending: the change saved", GLSupersampling, SS_4K);
+        video_flushpending();
 #endif
 
         /* DISPLAY saves the choice, not the mode in effect (a fallback from

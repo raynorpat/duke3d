@@ -283,6 +283,7 @@ extern void video_applypending(void);
 extern void video_flushpending(void);
 extern int video_pending(void);
 extern void video_pagebegin(void);
+extern void video_pagesettle(int now);
 extern void video_pagetouch(int row);
 extern void video_pagesetdisplay(int mode);
 extern int video_pagegetdisplay(void);

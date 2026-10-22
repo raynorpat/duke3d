@@ -2406,7 +2406,6 @@ void video_requestmode(int displaymode, int w, int h)
 }
 
 static void video_testprint(void);
-static void video_pagesettle(int now);
 
 // Makes the changes asked for, and fades back in (also when one failed).
 static void video_makepending(void)
@@ -2499,8 +2498,9 @@ static void video_configvals(videovals_t *v)
 }
 
 // Copies the rows changed into duke3d.cfg's values and writes the file,
-// once no change is waiting (now: at once, at the exit).
-static void video_pagesettle(int now)
+// once no change is waiting (now: at once, at the exit, with any change
+// still waiting saved as asked for).
+void video_pagesettle(int now)
 {
     videovals_t inuse, out;
 
@@ -2519,6 +2519,15 @@ static void video_pagesettle(int now)
         inuse.supersampling = glsupersample;
         inuse.texfilter = gltexturefilter;
 #endif
+        // the exit during a change's fade: the change asked for
+        if (video_pendingrenderer >= 0) inuse.renderer = clamprenderer(video_pendingrenderer);
+        if (video_pendingmode >= 0)
+        {
+            inuse.width = video_pendingw;
+            inuse.height = video_pendingh;
+        }
+        if (video_pendingss >= 0) inuse.supersampling = video_pendingss;
+        if (video_pendingfilter >= 0) inuse.texfilter = video_pendingfilter;
         videoopts_saveinto(&video_page,&inuse,&out);
         RendererSetting = out.renderer;
         DisplayMode = out.displaymode;
