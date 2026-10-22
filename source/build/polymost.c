@@ -252,7 +252,8 @@ static float glskyshade = 0.f; //classic's distance shade of the parallaxed sky,
 	//   a texel, each looked up the same.
 static GLuint glshcprog[2] = {0,0}; //the colour programs: bilinear, trilinear (0: not linked yet)
 static GLuint glshcres = 0, glshcdown = 0; //the present of colour, and of a supersampled frame
-static int32_t glshcfailed = 0; //their shaders didn't link: 1 for the run, 2 the test hook (until a mode set)
+static int32_t glshcfailed[4]; //bilinear's, trilinear's, the present's and the supersampled present's
+	//   didn't link: 1 for the run, 2 a test hook's (until a mode set)
 static int32_t glshcolor = 0; //the frame holds colour, drawn with this filter (0: indices)
 static GLuint glshrgb = 0; //the palookups' colours (on unit 1, as glshlookup)
 static palette_t glshrgbpal[256]; //the palette glshrgb was made with
@@ -582,7 +583,7 @@ static const char glshdownfrag[] =
 	"        if (float(k) >= l) break;\n" \
 	"        off += sz.x;\n" \
 	"    }\n" \
-	"    vec2 t = uv*tsize/exp2(l)-0.5, f = fract(t), b = floor(t);\n" \
+	"    vec2 t = uv*sz-0.5, f = fract(t), b = floor(t);\n" \
 	"    return mix(mix(mtexel(b,sz,off),mtexel(b+vec2(1.0,0.0),sz,off),f.x),\n" \
 	"               mix(mtexel(b+vec2(0.0,1.0),sz,off),mtexel(b+1.0,sz,off),f.x),f.y);\n" \
 	"}\n" \
@@ -728,7 +729,7 @@ static void polymost_shaderfree ()
 	glshrgbdirty = 1;
 	glshcolor = 0;
 	glshmipon = 0;
-	if (glshcfailed == 2) glshcfailed = 0; //the test hook's, until a mode set
+	for(i=0;i<4;i++) if (glshcfailed[i] == 2) glshcfailed[i] = 0; //the test hooks', until a mode set
 	if (glshprog) { bglDeleteProgram(glshprog); glshprog = 0; }
 	if (glshtprog) { bglDeleteProgram(glshtprog); glshtprog = 0; }
 	if (glshresolve) { bglDeleteProgram(glshresolve); glshresolve = 0; }
@@ -752,7 +753,7 @@ static void polymost_shaderfree ()
 int32_t polymost_supersample_ready ()
 {
 	if ((!glinfo.glsl) || (glshdownfailed)) return(0);
-	if ((glshdown) && (glshcdown) && (gl_forcefail != 5)) return(1);
+	if ((glshdown) && (gl_forcefail != 5)) return(1);
 	glsub_flush();
 	if (gl_forcefail == 5)
 	{
@@ -763,12 +764,9 @@ int32_t polymost_supersample_ready ()
 		return(0);
 	}
 	glshdown = polymost_shlink(glshresvert,glshdownfrag,"frame","pal");
-	glshcdown = polymost_shlink(glshresvert,glshcdownfrag,"frame",""); //(texture filtering's)
 	glshprogon = 0; //polymost_shlink leaves no program in use
-	if ((!glshdown) || (!glshcdown))
+	if (!glshdown)
 	{
-		if (glshdown) { bglDeleteProgram(glshdown); glshdown = 0; }
-		if (glshcdown) { bglDeleteProgram(glshcdown); glshcdown = 0; }
 		glshdownfailed = 1;
 		printf("OpenGL supersampling is unavailable: its shader doesn't compile or link.\n");
 		return(0);
@@ -787,42 +785,56 @@ static void polymost_shaderfail (const char *why)
 	polymost_buildshaderamp();
 }
 
-	//The colour programs for filter f (and the present's), linked on their own
-	//   when first wanted: a driver that can't link them draws nearest. f
-	//   when they're ready, 0 when not. gl_forcefail 6 (a test hook) breaks
-	//   them until a mode set.
-static int32_t polymost_colorready (int32_t f)
+	//Colour program k (0 bilinear, 1 trilinear, 2 the present, 3 the
+	//   supersampled present), linked on its own when first wanted; one that
+	//   doesn't link is unavailable for the run, the others not. 1: ready.
+	//   Test hooks break some until a mode set: gl_forcefail 6 all but the
+	//   supersampled present, 7 trilinear, 8 the supersampled present.
+static int32_t polymost_clink (int32_t k)
 {
+	static const char *const fs[4] = { glshbilfrag, glshtrifrag, glshcresfrag, glshcdownfrag };
+	static const char *const what[4] = { "bilinear texture filtering", "trilinear texture filtering",
+		"texture filtering", "texture filtering while supersampling" };
 	static const char *const locname[3] = { "tsize", "msize", "clampuv" };
-	GLuint p;
-	int32_t i;
+	GLuint *prog = (k < 2) ? &glshcprog[k] : ((k == 2) ? &glshcres : &glshcdown), p;
+	int32_t i, broken;
 
-	if ((f <= 0) || (f > 2) || (glshcfailed) || (!glinfo.glsl)) return(0);
-	if ((glshcprog[f-1]) && (glshcres) && (gl_forcefail != 6)) return(f);
+	broken = ((gl_forcefail == 6) && (k < 3)) || ((gl_forcefail == 7) && (k == 1)) || ((gl_forcefail == 8) && (k == 3));
+	if (glshcfailed[k]) return(0);
+	if ((*prog) && (!broken)) return(1);
 	glsub_flush();
-	if (gl_forcefail == 6)
+	if (broken)
 	{
 		p = polymost_shlink(glshresvert,glshbroken,"frame","");
 		if (p) bglDeleteProgram(p);
 	}
-	else
-	{
-		if (!glshcprog[f-1]) glshcprog[f-1] = polymost_shlink(glshidxvert,(f == 2)?glshtrifrag:glshbilfrag,"tile","rgb");
-		if (!glshcres) glshcres = polymost_shlink(glshresvert,glshcresfrag,"frame","");
-	}
+	else *prog = polymost_shlink((k < 2)?glshidxvert:glshresvert,fs[k],(k < 2)?"tile":"frame",(k < 2)?"rgb":"");
 	glshprogon = 0; //polymost_shlink leaves no program in use
-	if ((gl_forcefail == 6) || (!glshcprog[f-1]) || (!glshcres))
+	if ((broken) || (!*prog))
 	{
-		glshcfailed = (gl_forcefail == 6) ? 2 : 1;
-		printf("OpenGL texture filtering is unavailable: its shaders don't compile or link.\n");
+		glshcfailed[k] = broken ? 2 : 1;
+		printf("OpenGL %s is unavailable: its shader doesn't compile or link.\n",what[k]);
 		return(0);
 	}
-	p = glshcprog[f-1];
-	bglUseProgram(p);
-	bglUniform1i(bglGetUniformLocation(p,"mips"),5);
-	bglUseProgram(0);
-	for(i=0;i<3;i++) glshcloc[f-1][i] = bglGetUniformLocation(p,locname[i]);
-	glshlookupdirty = 1; //(its numshades and rowscale)
+	if (k < 2)
+	{
+		bglUseProgram(*prog);
+		bglUniform1i(bglGetUniformLocation(*prog,"mips"),5);
+		bglUseProgram(0);
+		for(i=0;i<3;i++) glshcloc[k][i] = bglGetUniformLocation(*prog,locname[i]);
+		glshlookupdirty = 1; //(its numshades and rowscale)
+	}
+	return(1);
+}
+
+	//Filter f's programs (and the present's; a supersampled frame's too while
+	//   supersampled: without it filtering isn't offered then, and the frame is
+	//   drawn nearest, supersampled). f when they're ready, 0 when not.
+static int32_t polymost_colorready (int32_t f)
+{
+	if ((f <= 0) || (f > 2) || (!glinfo.glsl)) return(0);
+	if ((!polymost_clink(f-1)) || (!polymost_clink(2))) return(0);
+	if ((glshsupersampled) && (!polymost_clink(3))) return(0);
 	return(f);
 }
 
@@ -1296,7 +1308,7 @@ int32_t polymost_present_shader (const int32_t *r, int32_t dw, int32_t dh, int32
 	if (glshcolor) //colour (texture filtering): faded, corrected and darkened by its program
 	{
 		float f[4];
-		GLuint p = ((glshsupersampled) && (polymost_supersample_ready())) ? glshcdown : glshcres;
+		GLuint p = ((glshsupersampled) && (glshcdown) && (polymost_supersample_ready())) ? glshcdown : glshcres;
 
 		bglUseProgram(p);
 		if (p == glshcdown) //scaled down

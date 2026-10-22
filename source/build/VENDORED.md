@@ -498,8 +498,12 @@ Ported from later JFBuild commits, retyped as above:
   colour. Screenshots read the colour and fade it the same way on the CPU.
   A switch between nearest and the others clears the frame to black. The
   colour programs link on their own when first wanted
-  (`polymost_colorready`); if they don't, filtering isn't offered and the
-  shader path draws nearest (`gl_forcefail` 6 tests it).
+  (`polymost_clink`), each failing alone: bilinear or trilinear that
+  doesn't link isn't offered (the other still is), a colour present that
+  doesn't link takes both, and the shader path draws nearest; a
+  supersampled colour present (`glshcdownfrag`) that doesn't link takes
+  filtering only while supersampled, so supersampling keeps working at
+  nearest (`gl_forcefail` 6, 7 and 8 test them).
 - `glsubmit.c`/`glsubmit.h` (ours): renderer 3's vertex submission.
   `polymost.c`'s and `engine.c`'s `glBegin`/`glTexCoord`/`glColor`/
   `glVertex`/`glEnd` (drawpoly, `drawtrap`/`tessectrap`, the tile picker,

@@ -2585,7 +2585,7 @@ static int fl_check(const char *dir)
     static const struct { int32_t path; const char *name; } flpath[] = {
         { GLPATH_SHADER, "shader" }, { GLPATH_VBO, "vbo" }, { GLPATH_IMMEDIATE, "immediate" },
     };
-    unsigned char *near[FLFRAMES], *buf, *ssnear, *ssfilt;
+    unsigned char *near[FLFRAMES], *buf, *ssnear, *ssfilt, *bil0 = NULL;
     char what[64];
     int p, f, i, ok = 1, most, filt;
     double d, m0, m1, trans0, trans1, fade0, fade1;
@@ -2650,6 +2650,15 @@ static int fl_check(const char *dir)
                 printf("filtering, %s: %s mean |%s - nearest| %.2f (most 8)%s", flpath[p].name, flframename[f],
                        videoopts_filtername(filt), d, (f < 4) ? " (must differ)" : "");
                 if ((d > 8) || ((f < 4) && (memcmp(buf, near[f], (size_t) n * 3) == 0))) ok = 0;
+                if ((f == 0) && (flpath[p].path == GLPATH_SHADER) && (filt == TEXFILTER_BILINEAR))
+                    bil0 = memcpy(malloc((size_t) n * 3), buf, (size_t) n * 3);
+                else if ((f == 0) && (bil0 != NULL))  /* trilinear's mip levels are used */
+                {
+                    printf("; |trilinear - bilinear| %.2f (must differ)", front_diff(buf, bil0));
+                    if (memcmp(buf, bil0, (size_t) n * 3) == 0) ok = 0;
+                    free(bil0);
+                    bil0 = NULL;
+                }
                 if ((f == 4) || (f == 5))
                 {
                     printf("; screenshot most %d from the screen", most);
@@ -2758,9 +2767,56 @@ static int fl_check(const char *dir)
            videotexfilteravailable(TEXFILTER_BILINEAR), memcmp(buf, near[0], (size_t) n * 3) ? "not" : "IS");
     if (!videotexfilteravailable(TEXFILTER_BILINEAR) || !memcmp(buf, near[0], (size_t) n * 3))
         { fprintf(stderr, "FAIL: filtering not back after its shader\n"); ok = 0; }
+
+    /* Trilinear's shader failing (asked about first): bilinear stays */
+    video_settexfilter(TEXFILTER_NEAREST);
+    gl_forcefail = 7;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    i = videotexfilteravailable(TEXFILTER_TRILINEAR);
+    filt = video_settexfilter(TEXFILTER_BILINEAR);
+    fl_frame(0, buf, dir, "trifail");
+    printf("filtering, trilinear's shader failing: trilinear offered %d, bilinear %d (set %d), frame %s nearest's\n",
+           i, videotexfilteravailable(TEXFILTER_BILINEAR), filt, memcmp(buf, near[0], (size_t) n * 3) ? "not" : "IS");
+    if (i || videotexfilteravailable(TEXFILTER_TRILINEAR) || !filt || !videotexfilteravailable(TEXFILTER_BILINEAR) ||
+        !memcmp(buf, near[0], (size_t) n * 3) || (gldrawpath != GLPATH_SHADER))
+        { fprintf(stderr, "FAIL: trilinear's shader failing took bilinear with it\n"); ok = 0; }
+    gl_forcefail = 0;
+    video_settexfilter(TEXFILTER_NEAREST);
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    if (!videotexfilteravailable(TEXFILTER_TRILINEAR)) { fprintf(stderr, "FAIL: trilinear not back\n"); ok = 0; }
+
+    /* The supersampled colour present failing: supersampling stays at
+     * nearest; filtering isn't offered while supersampled */
+    gl_forcefail = 8;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    video_setsupersample(SS_4K);
+    i = videosupersampleavailable(SS_4K);
+    ok &= ss_shown(dir, "4k_nocolordown", 1, NULL, &ssnear);
+    filt = video_settexfilter(TEXFILTER_BILINEAR);
+    ok &= ss_shown(dir, "4k_nocolordown_bilinear", 1, NULL, &ssfilt);
+    {
+        int dw, dh, w, h;
+
+        SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+        videoopts_sssize(SS_4K, dw, dh, 0, &w, &h);
+        printf("filtering, the supersampled colour present failing: 4k offered %d, drawn at %dx%d (want %dx%d); "
+               "bilinear set %d, offered %d, shown %s 4k nearest's\n", i, (int) xdim, (int) ydim, w, h, filt,
+               videotexfilteravailable(TEXFILTER_BILINEAR), memcmp(ssnear, ssfilt, (size_t) dw * dh * 3) ? "NOT" : "is");
+        if (!i || (xdim != w) || (ydim != h) || filt || videotexfilteravailable(TEXFILTER_BILINEAR) ||
+            memcmp(ssnear, ssfilt, (size_t) dw * dh * 3))
+            { fprintf(stderr, "FAIL: the supersampled colour present failing took supersampling or drew filtered\n"); ok = 0; }
+    }
+    free(ssnear);
+    free(ssfilt);
+    video_setsupersample(SS_OFF);
+    i = videotexfilteravailable(TEXFILTER_BILINEAR);
+    printf("filtering, the supersampled colour present failing, supersampling off: bilinear offered %d\n", i);
+    if (!i) { fprintf(stderr, "FAIL: bilinear not offered without supersampling\n"); ok = 0; }
+    gl_forcefail = 0;
+    video_settexfilter(TEXFILTER_NEAREST);
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
     free(near[0]);
     free(buf);
-    video_settexfilter(TEXFILTER_NEAREST);
 
     /* Asked for as the VIDEO page asks: made after the fade out */
     video_requesttexfilter(TEXFILTER_TRILINEAR);
