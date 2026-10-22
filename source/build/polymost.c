@@ -217,6 +217,7 @@ static int32_t gltexcacind[GLTEXMAX], gltexcacnext[GLTEXMAX], gltexcacnum = -1;
 static GLuint glshprog = 0, glshtprog = 0, glshresolve = 0; //the index, translucent index and resolve programs
 static GLuint glshdown = 0; //the resolve of a supersampled frame (linked on its own)
 static int32_t glshdownfailed = 0; //it didn't compile or link: no supersampling this run
+static int32_t glshssfbofailed = 0; //the supersampled frame's framebuffer failed (polymost_supersample_failed)
 int32_t glshsupersampled = 0; //sdl_driver.c: the frame is supersampled, shown with glshdown
 static GLuint glshfbo = 0, glshfbotex = 0, glshdepth = 0; //the framebuffer: an index in red, and depth
 static int32_t glshfbox = 0, glshfboy = 0; //its size
@@ -1021,7 +1022,7 @@ static int32_t polymost_shaderready ()
 		bglBindRenderbuffer(GL_RENDERBUFFER,0);
 		bglGenFramebuffers(1,&glshfbo);
 		bglBindFramebuffer(GL_FRAMEBUFFER,glshfbo);
-		if (gl_forcefail != 3) //the test hook leaves it with nothing attached
+		if ((gl_forcefail != 3) && ((gl_forcefail != 9) || (!glshsupersampled))) //test hooks leave it with nothing attached (9: supersampled only)
 		{
 			bglFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,glshfbotex,0);
 			bglFramebufferRenderbuffer(GL_FRAMEBUFFER,GL_DEPTH_ATTACHMENT,GL_RENDERBUFFER,glshdepth);
@@ -1034,6 +1035,18 @@ static int32_t polymost_shaderready ()
 		}
 		bglBindFramebuffer(GL_FRAMEBUFFER,0);
 		glshbound = 0;
+		if ((status != GL_FRAMEBUFFER_COMPLETE) && (glshsupersampled)) //too big, say: only supersampling is lost
+		{
+			printf("OpenGL supersampling failed (its %dx%d framebuffer is incomplete); drawing at the window's size.\n",
+				(int)xres,(int)yres);
+			bglDeleteFramebuffers(1,&glshfbo); glshfbo = 0; //its memory freed for the frame at the window's size
+			bglDeleteRenderbuffers(1,&glshdepth); glshdepth = 0;
+			glDeleteTextures(1,&glshfbotex); glshfbotex = 0;
+			glDeleteTextures(1,&glshdst); glshdst = 0;
+			glshfbox = glshfboy = 0;
+			glshssfbofailed = 1;
+			return(0);
+		}
 		if (status != GL_FRAMEBUFFER_COMPLETE) { polymost_shaderfail("its framebuffer is incomplete"); return(0); }
 	}
 	f = polymost_colorready(gltexturefilter); //texture filtering: colour
@@ -1395,6 +1408,16 @@ unsigned char *polymost_capture_shader ()
 void polymost_prepare_shader ()
 {
 	polymost_shaderready();
+}
+
+	//1 once if the supersampled frame's framebuffer failed since the last call: the
+	//   driver then draws at the window's size, still on the GL 2.1 tier
+int32_t polymost_supersample_failed ()
+{
+	int32_t failed = glshssfbofailed;
+
+	glshssfbofailed = 0;
+	return(failed);
 }
 
 	//A window resize, before polymost_glreset: takes the frame's texture from the

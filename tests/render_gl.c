@@ -2465,13 +2465,45 @@ static int ss_check(const char *dir)
     GLDrawPath = GLPATH_VBO;
     ok &= ss_mode("vbo");
     GLDrawPath = GLPATH_AUTO;
-    gl_forcefail = 3;
+    gl_forcefail = 3;  /* no framebuffer at any size: the vbo path, and supersampling turned off */
     ok &= ss_mode("an incomplete framebuffer");
+    if (glsupersample != SS_OFF) { fprintf(stderr, "FAIL: supersampling kept after its framebuffer failed\n"); ok = 0; }
     gl_forcefail = 0;
+    video_setsupersample(SS_4K);
     video_setmode(DISPLAY_WINDOWED, 640, 400);
     videoopts_sssize(SS_4K, dw, dh, 0, &w, &h);
     printf("supersampling 4k, shader path again: drawn at %dx%d\n", (int) xdim, (int) ydim);
     if ((xdim != w) || (ydim != h)) { fprintf(stderr, "FAIL: supersampling not back on the shader path\n"); ok = 0; }
+
+    /* the supersampled framebuffer alone failing (out of video memory, say),
+     * asked for on the page and at a mode set: only supersampling is lost,
+     * off (so the page shows and saves off), and the shader path draws at
+     * the window's size; 4k works again after */
+    gl_forcefail = 9;
+    for (i = 0; i < 2; i++)
+    {
+        if (i == 0)
+        {
+            video_setsupersample(SS_OFF);
+            video_setsupersample(SS_4K);
+        }
+        else
+        {
+            glsupersample = SS_4K;
+            video_setmode(DISPLAY_WINDOWED, 640, 400);
+        }
+        printf("supersampling 4k, its framebuffer failing (%s): path %s, level %s, drawn at %dx%d, offered %d\n",
+               (i == 0) ? "asked for" : "a mode set", gl_pathname(gldrawpath), videoopts_ssname(glsupersample),
+               (int) xdim, (int) ydim, videosupersampleavailable(SS_4K));
+        if ((gldrawpath != GLPATH_SHADER) || (glsupersample != SS_OFF) || (xdim != dw) || (ydim != dh) ||
+            (!videosupersampleavailable(SS_4K)))
+            { fprintf(stderr, "FAIL: supersampling's framebuffer failing lost more than supersampling\n"); ok = 0; }
+    }
+    ok &= ss_shown(dir, "4k_nofbo", 1, NULL, NULL);
+    gl_forcefail = 0;
+    video_setsupersample(SS_4K);
+    if ((xdim != w) || (ydim != h) || (gldrawpath != GLPATH_SHADER))
+        { fprintf(stderr, "FAIL: supersampling not back after its framebuffer\n"); ok = 0; }
 
     gl_forcefail = 5;  /* supersampling's shader doesn't compile: the shader path stays, without it */
     video_setmode(DISPLAY_WINDOWED, 640, 400);

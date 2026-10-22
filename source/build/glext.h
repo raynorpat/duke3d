@@ -84,7 +84,8 @@ void gl_fitrect(int32_t w, int32_t h, int32_t dw, int32_t dh, int32_t *r);
 	 * makes the run's first GL context fail, as on a machine without GL; 5
 	 * makes supersampling's shader not compile; 6 texture filtering's (but
 	 * its supersampled present's), 7 trilinear's alone, 8 filtering's
-	 * supersampled present alone. */
+	 * supersampled present alone; 9 makes the framebuffer incomplete only
+	 * at a supersampled size. */
 extern int32_t gl_forcefail;
 	/* Test hooks (polymost.c): RGB tile textures made, and times they were all
 	 * made dirty (gltexinvalidateall); the shader path makes none. */

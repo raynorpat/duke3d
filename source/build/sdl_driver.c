@@ -148,6 +148,7 @@ char nofog = 0;
 extern void polymost_glreset(void);
 extern int32_t polymost_present_shader(const int32_t *r, int32_t dw, int32_t dh, int32_t dark);
 extern void polymost_prepare_shader(void);
+extern int32_t polymost_supersample_failed(void);
 extern unsigned char *polymost_capture_shader(void);
 extern int32_t polymost_supersample_ready(void);
 extern int32_t polymost_filter_ready(int32_t filter);
@@ -1350,6 +1351,27 @@ static void init_gl_res_vars(int say)
  */
 static void gl_remake(int say);
 
+/*
+ * After init_gl_res_vars, at an internal or supersampled size: makes the
+ *  shader path's frame now, so a failure is dealt with before anything is
+ *  drawn. A supersampled frame that can't be made (too big for the video
+ *  memory) turns supersampling off, and it draws at the window's size on
+ *  the shader path; any other failure leaves the shader path, also drawing
+ *  at the window's size. say: as init_gl_res_vars's.
+ */
+static void gl_prepare(int say)
+{
+    polymost_prepare_shader();
+    if (polymost_supersample_failed())
+    {
+        glsupersample = SS_OFF;  /* so the VIDEO page shows, and saves, off */
+        init_gl_res_vars(say);
+        polymost_prepare_shader();
+    } /* if */
+    if (gldrawpath != GLPATH_SHADER)
+        init_gl_res_vars(say);
+} /* gl_prepare */
+
 static void gl_resize(void)
 {
     int w, h;
@@ -1403,12 +1425,8 @@ static void gl_remake(int say)
     shframe = polymost_takeframe_shader();  /* the GL 2.1 tier's, drawn or being drawn */
     polymost_glreset();
     init_gl_res_vars(say);
-    if (gl_ss)  /* a framebuffer that big failing: the window's size, on the vbo path */
-    {
-        polymost_prepare_shader();
-        if (gldrawpath != GLPATH_SHADER)
-            init_gl_res_vars(say);
-    } /* if */
+    if (gl_ss)  /* a framebuffer that big failing: the window's size, without supersampling */
+        gl_prepare(say);
     memcpy(curpalette, pal, sizeof (pal));
     memcpy(getbasepalette(), base, sizeof (base));
     palfadergb = fadergb;
@@ -1601,11 +1619,7 @@ int setgamemode_gl(char davidoption)
     setrendermode(3);
     polymost_glreset();
     if ((gl_scaled) || (gl_ss))  /* the shader path failing now draws at the window's size. */
-    {
-        polymost_prepare_shader();
-        if (gldrawpath != GLPATH_SHADER)
-            init_gl_res_vars(1);
-    } /* if */
+        gl_prepare(1);
     last_render_ticks = SDL_GetTicks();
     return(0);
 #else
