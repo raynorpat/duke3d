@@ -53,6 +53,15 @@ int main(void)
 #if DUKE3D_GAMEVER < GAMEVER_14
     /* 1.3D CONs have no definevolumename or defineskillname. */
     check_str("volume_names[0]", volume_names[0], "L.A. MELTDOWN");
+#if DUKE3D_GAMEVER < GAMEVER_10
+    check_str("volume_names[1]", volume_names[1], "COSMIC WASTELAND");
+    check_str("volume_names[2]", volume_names[2], "SHUTDOWN AT GROUND ZERO");
+    check_str("skill_names[0]", skill_names[0], "EASY");
+    check_str("skill_names[1]", skill_names[1], "MEDIUM");
+    check_str("skill_names[2]", skill_names[2], "NORMAL");
+    check_str("skill_names[3]", skill_names[3], "HARD");
+    check_str("skill_names[4]", skill_names[4], "HEADACHE");
+#else
     check_str("volume_names[1]", volume_names[1], "LUNAR APOCALYPSE");
 #if DUKE3D_GAMEVER < GAMEVER_13D
     check_str("volume_names[2]", volume_names[2], "SCHRAPNEL CITY"); /* the 1.1 EXE's spelling */
@@ -63,6 +72,7 @@ int main(void)
     check_str("skill_names[1]", skill_names[1], "LET'S ROCK");
     check_str("skill_names[2]", skill_names[2], "COME GET SOME");
     check_str("skill_names[3]", skill_names[3], "DAMN I'M GOOD");
+#endif
 
     /* 1.3D saves and loads locally even in a network game: a negative slot
        (the menu's multiplayer request) must not queue a request that 1.3D
@@ -111,7 +121,12 @@ int main(void)
     check("grpcrc32(\"123456789\")", (int)grpcrc32(0, (const unsigned char *)"123456789", 9), (int)0xCBF43926);
     check("unknown GRP", grpmismatch(123456, 0x12345678) != NULL, 0);
     check("modded GRP the size of a release", grpmismatch(26524524, 0x12345678) != NULL, 0);
-#if DUKE3D_GAMEVER < GAMEVER_11
+#if DUKE3D_GAMEVER < GAMEVER_10
+    check("0.99 shareware GRP", grpmismatch(9690241, 0x02F18900) != NULL, 0);
+    check("1.0 shareware GRP", grpmismatch(10429258, 0xA28AA589) != NULL, 1);
+    check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
+    check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
+#elif DUKE3D_GAMEVER < GAMEVER_11
     check("1.0 shareware GRP", grpmismatch(10429258, 0xA28AA589) != NULL, 0);
     check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
     check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
@@ -136,6 +151,9 @@ int main(void)
     check("Atomic GRP", grpmismatch(44356548, 0xFD3DCFF1) != NULL, 0);
     check("1.4 GRP", grpmismatch(44348015, 0xF514A6AC) != NULL, 1);
     check("1.3D full GRP", grpmismatch(26524524, 0xBBC9CE44) != NULL, 1);
+#endif
+#if DUKE3D_GAMEVER >= GAMEVER_10
+    check("0.99 shareware GRP", grpmismatch(9690241, 0x02F18900) != NULL, 1);
 #endif
 #if DUKE3D_GAMEVER >= GAMEVER_13D
     check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);

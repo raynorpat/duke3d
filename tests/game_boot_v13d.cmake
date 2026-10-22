@@ -1,10 +1,10 @@
-# Boots a 1.3D, 1.1 or 1.0 build headless on the original data of its
+# Boots a 1.3D, 1.1, 1.0 or 0.99 build headless on the original data of its
 # version: to the title/demo loop, into E1L1, and (full only) into E3L1. Each
 # run must still be alive when the 15 s timeout kills it. (con_compile_v13d
 # checks the CONs compile cleanly; the game's own output is lost when the
 # timeout kills it.)
 #
-#   cmake -DDUKE3D=<exe> -DDATA=<data dir> -DEDITION=<full|sw|sw11|sw10>
+#   cmake -DDUKE3D=<exe> -DDATA=<data dir> -DEDITION=<full|sw|sw11|sw10|sw099>
 #         -DWORK=<scratch dir> -P game_boot_v13d.cmake
 include("${CMAKE_CURRENT_LIST_DIR}/v13d_data.cmake")
 v13d_check_edition("${DATA}" "${EDITION}")

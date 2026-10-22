@@ -319,6 +319,12 @@ add_test(NAME game_helpers COMMAND game_helpers)
 if(DUKE3D_VERSION STREQUAL "0.99")
   add_executable(con_runtime_v099 con_runtime_v099.c "${_game_c}")
   target_link_libraries(con_runtime_v099 PRIVATE duke3d_game)
+  foreach(_module actors player sector game menus)
+    add_executable(v099_${_module} v099_${_module}.c "${_game_c}")
+    target_link_libraries(v099_${_module} PRIVATE duke3d_game)
+    add_test(NAME v099_${_module} COMMAND v099_${_module})
+    set_tests_properties(v099_${_module} PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 30)
+  endforeach()
   add_test(NAME con_runtime_v099 COMMAND con_runtime_v099)
   set_tests_properties(con_runtime_v099 PROPERTIES TIMEOUT 30)
 endif()
@@ -583,7 +589,7 @@ if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3
               -P "${CMAKE_CURRENT_SOURCE_DIR}/con_compile_v13d.cmake")
     set_tests_properties(con_compile_${_vold_name} PROPERTIES TIMEOUT 120)
   endif()
-  if(_vold_data AND NOT _vold_edition STREQUAL "sw099")
+  if(_vold_data)
     add_test(NAME game_boot_${_vold_name}
       COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
               "-DDATA=${_vold_data}" "-DEDITION=${_vold_edition}"

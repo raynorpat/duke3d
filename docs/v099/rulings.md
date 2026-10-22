@@ -51,3 +51,14 @@ Each names what was decided, why, and what it costs if it turns out wrong.
   confirms the beta can save directly after domovethings, so no AUTOTYPE save fallback
   is needed. The startup-banner Enter is still automated. Cost if wrong: regenerate the
   four saves with another recording path.
+- **Task 9: retain native single-player display/backend representation.** Redraw and
+  help use the port globals; DOS save fields will be translated in Task 14. Native
+  level/time tables retain eleven slots per episode, with beta E1 selecting equivalent
+  entries. DOS-only `/d`, `/i`, `/o`, `/~` switches have no SDL backend consumer; accepted
+  switches add no unused state. Sound menu device cleanup and safe load-failure handling
+  remain port infrastructure. Cost if wrong: display/backend behavior differs without
+  affecting the single-player simulation.
+- **Task 9: preserve native startup and configuration access.** The beta banner and
+  prompt are shown, but its blocking console wait is DOS-only so native automated boots
+  stay unattended. Modern Controls and Video entries remain after the eight original
+  beta Options entries. Cost if wrong: startup/menu navigation differs from DOS.
