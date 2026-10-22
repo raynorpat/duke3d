@@ -278,6 +278,14 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
       ENVIRONMENT "BUILD_WINDOWED=1"
       SKIP_RETURN_CODE 77
       TIMEOUT 60)
+    # Texture filtering on every draw path: close to nearest, translucency
+    # and fades kept, nearest again byte for byte, with supersampling too.
+    add_test(NAME render_gl_filter
+      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" filter)
+    set_tests_properties(render_gl_filter PROPERTIES
+      ENVIRONMENT "BUILD_WINDOWED=1"
+      SKIP_RETURN_CODE 77
+      TIMEOUT 90)
   endif()
 
   # Boots the real game to its title loop and into E1L1, headless. It uses

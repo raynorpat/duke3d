@@ -65,6 +65,7 @@ int editorsetgamemode(const editormode_t *m)
     glinternalwidth = m->glinternalwidth;
     glinternalheight = m->glinternalheight;
     glsupersample = m->supersampling;
+    setvideotexfilter(m->texfilter);
 #endif
     if (editorrendermode == 3 && editorglfailed)
         editorrendermode = 0;

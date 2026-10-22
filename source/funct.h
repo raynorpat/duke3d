@@ -275,6 +275,8 @@ extern int video_setmode(int displaymode, int w, int h);
 extern void video_requestmode(int displaymode, int w, int h);
 extern int video_setsupersample(int level);
 extern void video_requestsupersample(int level);
+extern int video_settexfilter(int filter);
+extern void video_requesttexfilter(int filter);
 extern void video_getmode(int32_t *w, int32_t *h);
 extern void video_applypending(void);
 extern void video_flushpending(void);

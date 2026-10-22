@@ -138,6 +138,8 @@ extern int getvideofade(void);
 extern int videofading(void);
 extern int setvideosupersample(int level);
 extern int videosupersampleavailable(int level);
+extern int setvideotexfilter(int filter);
+extern int videotexfilteravailable(int filter);
 extern void setvideovsync(int on);
 extern int getvideovsync(void);
 extern void glredrawlastframe(void);

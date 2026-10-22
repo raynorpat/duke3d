@@ -200,6 +200,17 @@ int videofade_at(uint32_t ms);
  */
 int setvideosupersample(int level);
 int videosupersampleavailable(int level);
+/*
+ * Renderer 3's texture filter (glext.h gltexturefilter, videoopts.h
+ *  TEXFILTER_*) set to filter now: the 1.1/1.5 paths' textures take it at
+ *  once, the shader path draws with it from its next frame (a switch to or
+ *  from nearest starts that frame black). 1 if it's in use now.
+ *  videotexfilteravailable: whether filter can be used now (nearest always;
+ *  the others in renderer 3, on the shader path when its filtering shaders
+ *  link).
+ */
+int setvideotexfilter(int filter);
+int videotexfilteravailable(int filter);
 void setvideovsync(int on);  /* 1: present on vsync (the default) */
 int getvideovsync(void);
 /* Renderer 3: draws the last frame shown, unfaded, as the new frame's start. */

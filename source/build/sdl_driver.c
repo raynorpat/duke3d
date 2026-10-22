@@ -150,6 +150,9 @@ extern int32_t polymost_present_shader(const int32_t *r, int32_t dw, int32_t dh,
 extern void polymost_prepare_shader(void);
 extern unsigned char *polymost_capture_shader(void);
 extern int32_t polymost_supersample_ready(void);
+extern int32_t polymost_filter_ready(int32_t filter);
+extern int32_t gltexfiltermode;
+extern void gltexapplyprops(void);
 extern int32_t glshsupersampled;
 extern GLuint polymost_takeframe_shader(void);
 extern void polymost_putframe_shader(GLuint tex);
@@ -1433,6 +1436,42 @@ int videosupersampleavailable(int level)
     return(level <= 0);
 #endif
 } /* videosupersampleavailable */
+
+
+int setvideotexfilter(int filter)
+{
+#ifdef USE_OPENGL
+    /* polymost.c's glfiltermodes: GL_NEAREST, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR */
+    static const int32_t modes[TEXFILTER_COUNT] = { 0, 1, 5 };
+
+    if ((filter < 0) || (filter >= TEXFILTER_COUNT))
+        filter = TEXFILTER_NEAREST;
+    gltexturefilter = filter;
+    gltexfiltermode = modes[filter];
+    if ((gl_drawing) && (gldrawpath != GLPATH_SHADER))
+        gltexapplyprops();  /* the textures made (with their mipmaps); new ones are made so */
+    return(videotexfilteravailable(filter));
+#else
+    (void) filter;
+    return(0);
+#endif
+} /* setvideotexfilter */
+
+
+int videotexfilteravailable(int filter)
+{
+#ifdef USE_OPENGL
+    if (filter <= TEXFILTER_NEAREST)
+        return(1);
+    if (!gl_drawing)
+        return(0);
+    if (gldrawpath == GLPATH_SHADER)
+        return(polymost_filter_ready(filter));
+    return(1);
+#else
+    return(filter <= 0);
+#endif
+} /* videotexfilteravailable */
 
 
 int setgamemode_gl(char davidoption)

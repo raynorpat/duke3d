@@ -440,7 +440,7 @@ Ported from later JFBuild commits, retyped as above:
   from `gldrawpathrequest` (the game's `GLDrawPath`, the editor's
   `gldrawpath`) and prints it. `gl_forcefail` (a test hook): 1 makes GLSL
   and FBOs unavailable, 2 breaks the shader path's shader, 3 leaves its
-  framebuffer incomplete. `glinternalwidth`/`glinternalheight` (the game's
+  framebuffer incomplete (5 and 6: below). `glinternalwidth`/`glinternalheight` (the game's
   `GLInternalWidth`/`Height`, the editor's `glinternalwidth`/`height`) set
   the shader path's internal size: `gl_internalsize` takes both or neither
   (one alone is the window's size) and at least 320x200, and
@@ -473,6 +473,33 @@ Ported from later JFBuild commits, retyped as above:
   resize's rebuild), works the size out again; if the framebuffer fails at
   it, the vbo path draws at the window's size. No `lastframe` texture is
   made at a supersampled size.
+  `gltexturefilter` (the game's `GLTextureFilter` through
+  `setvideotexfilter`, the editor's `gltexturefilter`) is renderer 3's
+  texture filter: nearest, bilinear or trilinear. The 1.1/1.5 paths map it
+  to `gltexfiltermode` (`GL_NEAREST`, `GL_LINEAR`,
+  `GL_LINEAR_MIPMAP_LINEAR`; their textures always have mipmaps) and
+  `gltexapplyprops` sets it on the textures made. On the shader path
+  nearest is the palette-index frame above, unchanged; bilinear and
+  trilinear draw colour into the same framebuffer instead (`glshcolor`):
+  each tap of a tile is its index looked up at the pixel's shade (as the
+  index program works it out) in `glshrgb`, the palette's colour of every
+  palookup row, so classic's shade tables stay exact, then blended. Masked
+  taps of 255 count as uncovered, and a pixel less than half covered is
+  discarded. Trilinear adds mip levels made per tile (`polymost_idxmip`):
+  four indices a texel, one for each texel of the level above it covers
+  (at level 1 the tile's own; deeper the one of that texel's four nearest
+  their mean colour), side by side in one texture and addressed in the
+  shader, which picks and blends two levels by the pixel's texel
+  footprint. Translucent draws blend at 0.66 and 0.33, and the present
+  (`glshcresfrag`, `glshcdownfrag` when supersampled) moves the colours
+  toward the fade's as `getfadedpalette` moves the palette, then applies
+  contrast, saturation and the VIDEO fade: approximations of classic's
+  `transluc` and faded palette. Lines, text and clears draw the palette's
+  colour. Screenshots read the colour and fade it the same way on the CPU.
+  A switch between nearest and the others clears the frame to black. The
+  colour programs link on their own when first wanted
+  (`polymost_colorready`); if they don't, filtering isn't offered and the
+  shader path draws nearest (`gl_forcefail` 6 tests it).
 - `glsubmit.c`/`glsubmit.h` (ours): renderer 3's vertex submission.
   `polymost.c`'s and `engine.c`'s `glBegin`/`glTexCoord`/`glColor`/
   `glVertex`/`glEnd` (drawpoly, `drawtrap`/`tessectrap`, the tile picker,

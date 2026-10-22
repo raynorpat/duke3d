@@ -126,6 +126,8 @@ void video_applypending(void);  /* game.c */
 void video_flushpending(void);  /* game.c */
 int video_setsupersample(int level);  /* game.c */
 void video_requestsupersample(int level);  /* game.c */
+int video_settexfilter(int filter);  /* game.c */
+void video_requesttexfilter(int filter);  /* game.c */
 extern int32_t GLDrawPath;  /* config.c */
 extern int32_t GLInternalWidth, GLInternalHeight;  /* config.c */
 extern double GLContrast, GLSaturation;  /* config.c */
@@ -2499,6 +2501,291 @@ static int ss_check(const char *dir)
     return ok;
 }
 
+/* The texture filtering frames: comparison views (the far street, the
+ *  back room behind the Pig Cop, translucent sprites, the web) and
+ *  shader_frame's HUD, fade, camera and map view. */
+#define FLFRAMES 8
+static const char *const flframename[FLFRAMES] = {
+    "distance", "sprites", "transprites", "translucent", "hud", "fade", "camera", "map"
+};
+static int32_t flx, fly, flz;  /* the start view, for shader_frame */
+static short fla, flsect;
+
+/* Draws filtering frame f and shows it; buf gets it (read_front). A
+ *  screenshot of the HUD and fade frames is taken as <dir>/flcap_<what>. */
+static int fl_frame(int f, unsigned char *buf, const char *dir, const char *what)
+{
+    static const int view[4] = { 0, 3, TRANSPRITEVIEW, 6 };
+    char path[1024];
+    SDL_Surface *b, *s;
+    int y, x, i, most = 0;
+
+    setbrightness(0, palette);
+    if (f < 4)
+    {
+        cmp_draw(view[f]);
+        nextpage();
+    }
+    else
+        shader_frame((f == 4) ? 0 : (f == 5) ? 2 : (f == 6) ? 3 : 4, flx, fly, flz, fla, flsect);
+    read_front(buf);
+    if ((f == 4) || (f == 5))  /* a screenshot is the screen, within 1 */
+    {
+        snprintf(path, sizeof (path), "%s/flcap_%s_%s0000.bmp", dir, what, flframename[f]);
+        remove(path);
+        snprintf(path, sizeof (path), "%s/flcap_%s_%sxxxx.bmp", dir, what, flframename[f]);
+        i = screencapture(path, 0);
+        snprintf(path, sizeof (path), "%s/flcap_%s_%s0000.bmp", dir, what, flframename[f]);
+        b = (i == 0) ? SDL_LoadBMP(path) : NULL;
+        s = (b != NULL) ? SDL_ConvertSurfaceFormat(b, SDL_PIXELFORMAT_RGB24, 0) : NULL;
+        if ((s == NULL) || (s->w != xdim) || (s->h != ydim))
+            most = 999;
+        for (y = 0; (most < 999) && (y < ydim); y++)  /* GL rows are bottom-up */
+            for (x = 0; x < xdim * 3; x++)
+                most = max(most, abs((int) ((unsigned char *) s->pixels)[y * s->pitch + x] -
+                                     (int) buf[(ydim - 1 - y) * xdim * 3 + x]));
+        SDL_FreeSurface(s);
+        SDL_FreeSurface(b);
+    }
+    if (f == 5) setpalettefade(0, 0, 0, 0);
+    return most;
+}
+
+/* Mean |a - b| per channel of two read_front frames over a box given in
+ *  640x480 terms (top-down). */
+static double fl_boxdiff(const unsigned char *a, const unsigned char *b, int x0, int y0, int x1, int y1)
+{
+    long x, y, i, j, d = 0, n = 0;
+
+    for (y = y0 * ydim / CMPH; y < y1 * ydim / CMPH; y++)
+        for (x = x0 * xdim / CMPW; x < x1 * xdim / CMPW; x++, n++)
+            for (i = 0, j = ((ydim - 1 - y) * xdim + x) * 3; i < 3; i++)
+                d += abs((int) a[j + i] - (int) b[j + i]);
+    return (double) d / ((double) n * 3);
+}
+
+/*
+ * Texture filtering (gltexturefilter; game.c video_settexfilter,
+ *  video_requesttexfilter) in a 640x400 window, on the shader, vbo and
+ *  immediate paths. Bilinear and trilinear draw the 3D views differently
+ *  from nearest but close to it: every frame within 8, the far street's
+ *  and back room's means (classic's distance darkening) within 3 of
+ *  nearest's; translucent sprites and the fade still show (at least half
+ *  the change nearest shows); screenshots are the screen within 1; on the
+ *  shader path no RGB textures are made. Nearest again draws every frame
+ *  as before, byte for byte. With supersampling 4k the frame shown is the
+ *  filtered frame box-filtered down and differs from nearest's. A filtering
+ *  shader that doesn't link (gl_forcefail 6) leaves the shader path drawing
+ *  as nearest, filtering not offered; asked for as the VIDEO page asks, it
+ *  is set after the fade; renderer 0 doesn't offer it. 1: pass, 0: fail,
+ *  77: no shader path.
+ */
+static int fl_check(const char *dir)
+{
+    static const struct { int32_t path; const char *name; } flpath[] = {
+        { GLPATH_SHADER, "shader" }, { GLPATH_VBO, "vbo" }, { GLPATH_IMMEDIATE, "immediate" },
+    };
+    unsigned char *near[FLFRAMES], *buf, *ssnear, *ssfilt;
+    char what[64];
+    int p, f, i, ok = 1, most, filt;
+    double d, m0, m1, trans0, trans1, fade0, fade1;
+    uint32_t loads;
+    long n;
+    Uint32 t0;
+    GLenum err;
+
+    videoswitch_setup();
+    GLContrast = GLSaturation = 1.0;
+    polymosttexfullbright = 240;
+    memset(show2dsector, 0xff, sizeof (show2dsector));  /* the map view shows every sector */
+    for (p = 0; p < (int) (sizeof (flpath) / sizeof (flpath[0])); p++)
+    {
+        GLDrawPath = flpath[p].path;
+        video_settexfilter(TEXFILTER_NEAREST);
+        if (video_setmode(DISPLAY_WINDOWED, 640, 400) != 0) { fprintf(stderr, "FAIL: video_setmode(640x400)\n"); return 0; }
+        if (video_setrenderer(3) != 3) { printf("SKIP: no OpenGL (%s)\n", SDL_GetError()); return 77; }
+        if (gldrawpath != flpath[p].path)
+        {
+            if (p == 0) { printf("SKIP: no shader path\n"); return 77; }
+            printf("filtering, %s: not on this driver, skipped\n", flpath[p].name);
+            continue;
+        }
+        n = (long) xdim * ydim;
+        buf = malloc((size_t) n * 3);
+        for (f = 0; f < FLFRAMES; f++)
+        {
+            near[f] = malloc((size_t) n * 3);
+            snprintf(what, sizeof (what), "%s_nearest", flpath[p].name);
+            fl_frame(f, near[f], dir, what);
+        }
+        trans0 = fl_boxdiff(near[2], near[0], cmpbox[1].x0, cmpbox[1].y0, cmpbox[1].x1, cmpbox[1].y1);
+        fade0 = front_diff(near[5], near[4]);
+        for (filt = TEXFILTER_BILINEAR; filt <= TEXFILTER_TRILINEAR; filt++)
+        {
+            int was = ok;  /* (each filter's own failure said) */
+
+            ok = 1;
+            i = video_settexfilter(filt);
+            printf("filtering, %s %s: offered %d (nearest %d)\n", flpath[p].name, videoopts_filtername(filt), i,
+                   videotexfilteravailable(TEXFILTER_NEAREST));
+            if (!i) { fprintf(stderr, "FAIL: filtering %s not offered\n", videoopts_filtername(filt)); ok = 0; }
+            loads = gl_rgbtexloads;
+            snprintf(what, sizeof (what), "%s_%s", flpath[p].name, videoopts_filtername(filt));
+            for (f = 0; f < FLFRAMES; f++)
+            {
+                double rs, gs;
+                char path[1024];
+
+                most = fl_frame(f, buf, dir, what);
+                snprintf(path, sizeof (path), "%s/fl_%s_%s.bmp", dir, what, flframename[f]);
+                if (f == 5)  /* (faded again for the picture) */
+                {
+                    setpalettefade(63, 0, 0, 32);
+                    save_front(path, &rs, &gs);
+                    setpalettefade(0, 0, 0, 0);
+                }
+                else
+                    save_front(path, &rs, &gs);
+                d = front_diff(buf, near[f]);
+                printf("filtering, %s: %s mean |%s - nearest| %.2f (most 8)%s", flpath[p].name, flframename[f],
+                       videoopts_filtername(filt), d, (f < 4) ? " (must differ)" : "");
+                if ((d > 8) || ((f < 4) && (memcmp(buf, near[f], (size_t) n * 3) == 0))) ok = 0;
+                if ((f == 4) || (f == 5))
+                {
+                    printf("; screenshot most %d from the screen", most);
+                    if (most > 1) ok = 0;
+                }
+                printf("\n");
+                for (i = 0; i < NCMPREGIONS; i++)
+                {
+                    if (cmpregion[i].view != ((f == 0) ? 0 : (f == 1) ? 3 : -1)) continue;
+                    m0 = cmp_mean(near[f], xdim, ydim, 1, cmpregion[i].x0, cmpregion[i].y0, cmpregion[i].x1, cmpregion[i].y1);
+                    m1 = cmp_mean(buf, xdim, ydim, 1, cmpregion[i].x0, cmpregion[i].y0, cmpregion[i].x1, cmpregion[i].y1);
+                    printf("filtering, %s: %s mean nearest %.1f, %s %.1f (most apart 3)\n", flpath[p].name,
+                           cmpregion[i].name, m0, videoopts_filtername(filt), m1);
+                    if (fabs(m1 - m0) > 3) ok = 0;
+                }
+                if (f == 2)
+                {
+                    trans1 = fl_boxdiff(buf, near[0], cmpbox[1].x0, cmpbox[1].y0, cmpbox[1].x1, cmpbox[1].y1);
+                    d = fl_boxdiff(buf, near[2], cmpbox[1].x0, cmpbox[1].y0, cmpbox[1].x1, cmpbox[1].y1);
+                    printf("filtering, %s: translucent sprites change their box by %.2f (nearest %.2f), "
+                           "%.2f from nearest's\n", flpath[p].name, trans1, trans0, d);
+                    if ((trans1 < trans0 * 0.5) || (d > 8)) ok = 0;
+                }
+                if (f == 3)
+                {
+                    d = fl_boxdiff(buf, near[3], cmpbox[0].x0, cmpbox[0].y0, cmpbox[0].x1, cmpbox[0].y1);
+                    printf("filtering, %s: the web %.2f from nearest's (most 8)\n", flpath[p].name, d);
+                    if (d > 8) ok = 0;
+                }
+                if (f == 5)
+                {
+                    unsigned char *hud = malloc((size_t) n * 3);
+                    fl_frame(4, hud, dir, what);
+                    fade1 = front_diff(buf, hud);
+                    free(hud);
+                    printf("filtering, %s: the fade changes the frame by %.2f (nearest %.2f)\n", flpath[p].name,
+                           fade1, fade0);
+                    if (fade1 < fade0 * 0.5) ok = 0;
+                }
+            }
+            if ((flpath[p].path == GLPATH_SHADER) && (gl_rgbtexloads != loads))
+                { fprintf(stderr, "FAIL: filtering on the shader path made %u RGB textures\n",
+                          (unsigned) (gl_rgbtexloads - loads)); ok = 0; }
+            if (!ok) fprintf(stderr, "FAIL: filtering %s on the %s path\n", videoopts_filtername(filt), flpath[p].name);
+            ok &= was;
+        }
+        video_settexfilter(TEXFILTER_NEAREST);
+        for (f = 0; f < FLFRAMES; f++)
+        {
+            snprintf(what, sizeof (what), "%s_nearest2", flpath[p].name);
+            fl_frame(f, buf, dir, what);
+            if (memcmp(buf, near[f], (size_t) n * 3))
+            {
+                fprintf(stderr, "FAIL: %s, %s: nearest after filtering isn't nearest before (mean %.2f)\n",
+                        flpath[p].name, flframename[f], front_diff(buf, near[f]));
+                ok = 0;
+            }
+            free(near[f]);
+        }
+        free(buf);
+        if ((err = glGetError()) != GL_NO_ERROR) { fprintf(stderr, "FAIL: GL error 0x%x\n", (unsigned) err); ok = 0; }
+    }
+    GLDrawPath = GLPATH_AUTO;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+
+    /* With supersampling: the frame shown is the frame drawn scaled down */
+    video_setsupersample(SS_4K);
+    ok &= ss_shown(dir, "4k_nearest", 1, NULL, &ssnear);
+    for (filt = TEXFILTER_BILINEAR; filt <= TEXFILTER_TRILINEAR; filt++)
+    {
+        int dw, dh;
+
+        video_settexfilter(filt);
+        snprintf(what, sizeof (what), "4k_%s", videoopts_filtername(filt));
+        ok &= ss_shown(dir, what, 1, NULL, &ssfilt);
+        SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+        most = max_diff(ssnear, ssfilt, (long) dw * dh, &d);  /* (the part shown is the window: no bars) */
+        printf("4k %s: mean |shown - 4k nearest's| %.2f\n", videoopts_filtername(filt), d);
+        if (d == 0) { fprintf(stderr, "FAIL: 4k %s is 4k nearest\n", videoopts_filtername(filt)); ok = 0; }
+        free(ssfilt);
+    }
+    free(ssnear);
+    video_settexfilter(TEXFILTER_NEAREST);
+    video_setsupersample(SS_OFF);
+
+    /* Its shader failing: the shader path stays, drawing as nearest */
+    n = (long) xdim * ydim;
+    near[0] = malloc((size_t) n * 3);
+    buf = malloc((size_t) n * 3);
+    fl_frame(0, near[0], dir, "fail");
+    gl_forcefail = 6;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    i = video_settexfilter(TEXFILTER_BILINEAR);
+    fl_frame(0, buf, dir, "fail");
+    printf("filtering, its shader failing: path %s, bilinear offered %d (set %d), nearest %d, frame %s nearest's\n",
+           gl_pathname(gldrawpath), videotexfilteravailable(TEXFILTER_BILINEAR), i,
+           videotexfilteravailable(TEXFILTER_NEAREST), memcmp(buf, near[0], (size_t) n * 3) ? "NOT" : "is");
+    if ((gldrawpath != GLPATH_SHADER) || i || videotexfilteravailable(TEXFILTER_BILINEAR) ||
+        videotexfilteravailable(TEXFILTER_TRILINEAR) || !videotexfilteravailable(TEXFILTER_NEAREST) ||
+        memcmp(buf, near[0], (size_t) n * 3))
+        { fprintf(stderr, "FAIL: a filtering shader failing didn't keep the shader path at nearest\n"); ok = 0; }
+    gl_forcefail = 0;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    fl_frame(0, buf, dir, "fail");
+    printf("filtering, its shader back: bilinear offered %d, frame %s nearest's\n",
+           videotexfilteravailable(TEXFILTER_BILINEAR), memcmp(buf, near[0], (size_t) n * 3) ? "not" : "IS");
+    if (!videotexfilteravailable(TEXFILTER_BILINEAR) || !memcmp(buf, near[0], (size_t) n * 3))
+        { fprintf(stderr, "FAIL: filtering not back after its shader\n"); ok = 0; }
+    free(near[0]);
+    free(buf);
+    video_settexfilter(TEXFILTER_NEAREST);
+
+    /* Asked for as the VIDEO page asks: made after the fade out */
+    video_requesttexfilter(TEXFILTER_TRILINEAR);
+    for (t0 = SDL_GetTicks(); (videofading()) && (SDL_GetTicks() - t0 < 3000); )
+    {
+        fade_frame();
+        video_applypending();
+    }
+    printf("trilinear asked for: filter %s, fading %d, darkness %d\n", videoopts_filtername(gltexturefilter),
+           videofading(), getvideofade());
+    if ((gltexturefilter != TEXFILTER_TRILINEAR) || videofading() || getvideofade())
+        { fprintf(stderr, "FAIL: trilinear asked for isn't set\n"); ok = 0; }
+
+    video_setrenderer(0);
+    printf("renderer 0: bilinear offered %d, nearest %d\n", videotexfilteravailable(TEXFILTER_BILINEAR),
+           videotexfilteravailable(TEXFILTER_NEAREST));
+    if (videotexfilteravailable(TEXFILTER_BILINEAR) || !videotexfilteravailable(TEXFILTER_NEAREST))
+        { fprintf(stderr, "FAIL: renderer 0 offers filtering\n"); ok = 0; }
+    video_setrenderer(3);
+    video_settexfilter(TEXFILTER_NEAREST);
+    if ((err = glGetError()) != GL_NO_ERROR) { fprintf(stderr, "FAIL: GL error 0x%x\n", (unsigned) err); ok = 0; }
+    polymosttexfullbright = 256;
+    return ok;
+}
+
 int main(int argc, char **argv)
 {
     int32_t posx, posy, posz;
@@ -2552,7 +2839,7 @@ int main(int argc, char **argv)
 
     if (argc < 3)
     {
-        fprintf(stderr, "usage: %s <DUKE3D.GRP> <dir> [video|supersample]\n", argv[0]);
+        fprintf(stderr, "usage: %s <DUKE3D.GRP> <dir> [video|supersample|filter]\n", argv[0]);
         return 2;
     }
 
@@ -2581,6 +2868,12 @@ int main(int argc, char **argv)
     if ((argc > 3) && (strcmp(argv[3], "supersample") == 0))
     {
         i = ss_check(argv[2]);
+        return (i == 1) ? 0 : (i == 77) ? 77 : 1;
+    }
+    if ((argc > 3) && (strcmp(argv[3], "filter") == 0))
+    {
+        flx = posx; fly = posy; flz = posz; fla = ang; flsect = sectnum;
+        i = fl_check(argv[2]);
         return (i == 1) ? 0 : (i == 77) ? 77 : 1;
     }
     i = present8_check();

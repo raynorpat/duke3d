@@ -52,6 +52,11 @@ int gl_internalsize(int32_t w, int32_t h, int32_t *ow, int32_t *oh);
 	 * box-filtered down to the window. Not with an internal size, or when
 	 * that size isn't larger than the window (then the window's size). */
 extern int32_t glsupersample;
+	/* Renderer 3's texture filter (videoopts.h TEXFILTER_*: nearest,
+	 * bilinear, trilinear). The 1.1 and 1.5 paths filter their textures so;
+	 * the shader path draws colour instead of palette indices when it isn't
+	 * nearest. Set it with setvideotexfilter (display.h). */
+extern int32_t gltexturefilter;
 	/* Test hooks: the largest frame buffer, if less than GL's (0: GL's); and
 	 * the times supersampling was clamped to it, with a message. */
 extern int32_t gl_maxfbtest;
@@ -77,7 +82,7 @@ void gl_fitrect(int32_t w, int32_t h, int32_t dw, int32_t dh, int32_t *r);
 	/* Test hook: 1 makes GLSL and FBOs unavailable, as if they failed; 2 makes
 	 * the shader path's shader not compile, 3 its framebuffer incomplete; 4
 	 * makes the run's first GL context fail, as on a machine without GL; 5
-	 * makes supersampling's shader not compile. */
+	 * makes supersampling's shader not compile, 6 texture filtering's. */
 extern int32_t gl_forcefail;
 	/* Test hooks (polymost.c): RGB tile textures made, and times they were all
 	 * made dirty (gltexinvalidateall); the shader path makes none. */
