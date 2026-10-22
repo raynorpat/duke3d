@@ -29,6 +29,16 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 extern short otherp;
 
+#if DUKE3D_GAMEVER >= GAMEVER_10 && DUKE3D_GAMEVER < GAMEVER_11
+int game_rand(void)
+{
+    // Watcom rand at 0x97f61; seed at 0xd0a8c starts at 1 and is never reset.
+    static uint32_t seed = 1;
+    seed = seed * UINT32_C(0x41c64e6d) + UINT32_C(0x3039);
+    return (seed >> 16) & 0x7fff;
+}
+#endif
+
 static short total_lines,line_number;
 static char checking_ifelse,parsing_state,*last_used_text;
 static short num_squigilly_brackets;
@@ -1987,6 +1997,7 @@ void move()
     if(a&2048) // 1.1's "looking": face the owner, swaying (C11-028)
     {
         j = g_sp->owner;
+        // Safety guard: the 1.1 EXE has no j < 0 test here (C11-028).
         if( j < 0 || j == g_i || badguy(&sprite[j]) == 0 || sprite[j].extra <= 0 || sprite[j].statnum == MAXSTATUS )
             g_sp->owner = ps[g_p].i;
         g_sp->ang = getangle(sprite[g_sp->owner].x-g_sp->x,sprite[g_sp->owner].y-g_sp->y);

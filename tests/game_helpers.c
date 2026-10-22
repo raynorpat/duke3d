@@ -34,6 +34,22 @@ static void check_str(const char *what, const char *got, const char *want)
 
 int main(void)
 {
+#if DUKE3D_GAMEVER >= GAMEVER_10 && DUKE3D_GAMEVER < GAMEVER_11
+    {
+        /* DOS 1.0's Watcom rand, initial seed 1 (sw10 0x97f61, 0xd0a8c). */
+        static const int expected[] = {
+            16838, 5758, 10113, 17515, 31051, 5627, 23010, 7419,
+            16212, 4086, 2749, 12767, 9084, 12060, 32225, 17543
+        };
+        unsigned i;
+        for(i = 0; i < sizeof(expected)/sizeof(expected[0]); i++)
+        {
+            /* Native networking's host RNG must not reset the DOS game stream. */
+            if(i == 8) { srand(123); (void)(rand)(); }
+            check("1.0 Watcom rand", i&1 ? game_rand() : rand(), expected[i]);
+        }
+    }
+#endif
     /* On an axis the original returns the exact length, not the estimate. */
     check("FindDistance2D(1000,0)", FindDistance2D(1000, 0), 1000);
     check("FindDistance2D(0,-1000)", FindDistance2D(0, -1000), 1000);

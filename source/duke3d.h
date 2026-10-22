@@ -286,6 +286,12 @@ struct player_struct;
 
 #define TRAND krand()
 
+#if DUKE3D_GAMEVER >= GAMEVER_10 && DUKE3D_GAMEVER < GAMEVER_11
+// DOS 1.0 shares Watcom rand across game logic, drawing and sound (C10-002).
+int game_rand(void);
+#define rand() game_rand()
+#endif
+
 
 #define MAX_WEAPONS  12
 
