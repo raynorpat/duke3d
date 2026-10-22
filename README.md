@@ -266,12 +266,12 @@ cursor is on.
 | VSYNC | ON, OFF | As `VSync` above |
 | BRIGHTNESS | slider, 8 levels | Moved here from OPTIONS; F11 still steps it. It is the same setting as before |
 | CONTRAST, SATURATION | sliders | The 2.1 path only; greyed otherwise |
-| SUPERSAMPLE | OFF, 2K, 4K, 8K | Renderer 3 on the 2.1 path only. Draws at 1440, 2160 or 4320 pixels tall (2560x1440, 3840x2160 and 7680x4320 at 16:9) with the window's aspect, and scales down to the window, so the picture is smoothed. A level not taller than the window is greyed, so it only ever scales down, and a size over what the GPU can do is cut down with a message. It is greyed with the 1.1 and 1.5 paths and renderers 0-2, and while `GLInternalWidth`/`GLInternalHeight` is set (the internal size wins). 8K uses a lot of video memory |
+| SUPERSAMPLE | OFF, 2K, 4K, 8K | Renderer 3 on the 2.1 path only. Draws at 1440, 2160 or 4320 pixels tall (2560x1440, 3840x2160 and 7680x4320 at 16:9) with the window's aspect, and scales down to the window, so the picture is smoothed. A level not taller than the window is greyed, so it only ever scales down, and a size over what the GPU can do is cut down with a message. If the GPU can't make the frame (out of video memory, say), supersampling turns off with a message and the 2.1 path draws at the window's size; the row shows, and saves, OFF. It is greyed with the 1.1 and 1.5 paths and renderers 0-2, and while `GLInternalWidth`/`GLInternalHeight` is set (the internal size wins). 8K uses a lot of video memory. While greyed, a level kept from before can still be stepped to OFF |
 | FILTERING | NEAREST, BILINEAR, TRILINEAR | Renderer 3 only; greyed in renderers 0-2. On the 1.1 and 1.5 paths it sets the texture filter (trilinear uses mipmaps). On the 2.1 path, NEAREST keeps the exact palette-index drawing. BILINEAR and TRILINEAR switch it to colour drawing, see below |
 
 Resolution in the 8-bit renderers (0-2): the size chosen is the size the game
 draws its 8-bit picture at, up to the engine's 1600x1200 cap (the aspect is
-kept, and the width is rounded down to a multiple of 4). A bigger choice draws
+kept). A bigger choice draws
 at the largest size that fits and is scaled up to fill the window. The list
 also has the classic sizes such as 320x200, 640x400 and 640x480. In borderless
 they draw at the desktop's size, also up to the cap. Renderer 3 draws at the
@@ -292,8 +292,11 @@ Fades: a change of renderer, resolution or display mode fades the screen to
 black (about a quarter of a second), makes the change while it is black, and
 fades back in. The same goes for supersampling and filtering. Play and the
 menu keep running underneath. While a change is pending the rows that would
-ask for another ignore input, so a double press is one change. A failed
-change fades back in to what was kept.
+ask for another ignore input, so a double press is one change. A switch to
+OPENGL that fails keeps the renderer, and FULLSCREEN that the display can't
+take falls back to borderless (or the mode in effect); both fade back in. A
+resolution whose frame can't be allocated still quits with SDL's error, as it
+always has.
 
 What is saved: a row that you change on the page is saved to `duke3d.cfg`
 right away (and at exit), and rows you didn't change keep the value already in
