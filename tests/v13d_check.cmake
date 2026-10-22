@@ -1,4 +1,4 @@
-# Runs v13d_check_edition on DIR for EDITION (full, sw, sw11 or sw10).
+# Runs v13d_check_edition on DIR for EDITION (full, sw, sw11, sw10 or sw099).
 # With OTHERS, a list of folders, it instead expects each of them to be
 # refused as the wrong edition.
 include("${CMAKE_CURRENT_LIST_DIR}/v13d_data.cmake")

@@ -21,6 +21,7 @@ set_tests_properties(sdl_driver_smoke_gl_fallback sdl_driver_smoke_displaymode_s
 # Checks DUKE3D_GAMEVER, BUILD_ENGINEREV, BYTEVERSION and the volume macros
 # against this configuration's DUKE3D_VERSION. The table is kept here, apart
 # from the one that sets them, so a mistake in either shows up.
+set(_vexp_0.99_sw 199601040 19960104 9   0)
 set(_vexp_1.0_sw  199601290 19960129 10  0)
 set(_vexp_1.1_sw  199602200 19960220 12  0)
 set(_vexp_1.3D    199604190 19960419 103 0)
@@ -303,9 +304,9 @@ file(READ "${PROJECT_SOURCE_DIR}/testdata/game.con" _game_con)
 file(WRITE "${_con_dir}/prefix.con"
   "action CONCOMPILE_PREFIX 0 1 1 1 1\r\n${_game_con}")
 
-# The in-repo CONs are 1.5 scripts, which a 1.3D, 1.1 or 1.0 build can't
+# The in-repo CONs are 1.5 scripts, which a 1.3D, 1.1, 1.0 or 0.99 build can't
 # compile.
-if(NOT DUKE3D_VERSION MATCHES "^(1\\.3D|1\\.1|1\\.0)$")
+if(NOT DUKE3D_VERSION MATCHES "^(1\\.3D|1\\.1|1\\.0|0\\.99)$")
   add_test(NAME con_compile COMMAND con_compile WORKING_DIRECTORY "${_con_dir}")
   set_tests_properties(con_compile PROPERTIES TIMEOUT 30)
 endif()
@@ -545,21 +546,26 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
   endif()
 endif()
 
-# 1.1 and 1.0 shareware builds: the same scripts as the 1.3D tests, with the
-# editions sw11 and sw10 (docs/v10-v11/reference.md).
+# 1.1, 1.0 and 0.99 shareware builds: the same scripts as the 1.3D tests, with the
+# editions sw11, sw10 and sw099 (docs/v10-v11/ and docs/v099/).
 set(DUKE3D_V11_SW_DATA_DIR "" CACHE PATH "Duke Nukem 3D 1.1 shareware folder")
 set(DUKE3D_V10_SW_DATA_DIR "" CACHE PATH "Duke Nukem 3D 1.0 shareware folder")
-if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpreter_FOUND)
+set(DUKE3D_V099_SW_DATA_DIR "" CACHE PATH "Duke Nukem 3D 0.99 beta shareware folder")
+if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3_Interpreter_FOUND)
   if(DUKE3D_VERSION STREQUAL "1.1")
     set(_vold_edition sw11)
     set(_vold_name v11_sw)
     set(_vold_data "${DUKE3D_V11_SW_DATA_DIR}")
-  else()
+  elseif(DUKE3D_VERSION STREQUAL "1.0")
     set(_vold_edition sw10)
     set(_vold_name v10_sw)
     set(_vold_data "${DUKE3D_V10_SW_DATA_DIR}")
+  else()
+    set(_vold_edition sw099)
+    set(_vold_name v099_sw)
+    set(_vold_data "${DUKE3D_V099_SW_DATA_DIR}")
   endif()
-  if(_vold_data)
+  if(_vold_data AND NOT _vold_edition STREQUAL "sw099")
     add_test(NAME con_compile_${_vold_name}
       COMMAND "${CMAKE_COMMAND}"
               "-DDATA=${_vold_data}" "-DEDITION=${_vold_edition}"
@@ -577,7 +583,7 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
     set_tests_properties(game_boot_${_vold_name} PROPERTIES TIMEOUT 240)
   endif()
   # The original demos, played to the end and compared with the DOS state.
-  if(_vold_data)
+  if(_vold_data AND NOT _vold_edition STREQUAL "sw099")
     foreach(_demo 1 2 3)
       add_test(NAME demo_sync_${_vold_name}_${_demo}
         COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
@@ -604,7 +610,7 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
   endif()
   # Each DOS reference save of this release must load with the state its
   # status bar showed, and survive our own save and reload.
-  if(_vold_data)
+  if(_vold_data AND NOT _vold_edition STREQUAL "sw099")
     include("${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_save_refs.cmake")
     get_cmake_property(_vars VARIABLES)
     foreach(_var IN LISTS _vars)
@@ -653,7 +659,7 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
   # Two copies of the 1.1 build must meet over UDP on localhost, and both
   # peers must refuse each DUKE3D_NET_PEERS build (1.0, 1.3D sw, ...) by
   # BYTEVERSION alone (rulings.md). The same for the 1.0 build, on its own ports.
-  if(_vold_data)
+  if(_vold_data AND NOT _vold_edition STREQUAL "sw099")
     set(DUKE3D_NET_PEERS "" CACHE STRING "Other duke3d builds to test multiplayer refusal against")
     # DukeMatch (the default) and co-op (/c), both put straight into E1L1.
     if(_vold_edition STREQUAL "sw11")
@@ -695,18 +701,22 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
       set_tests_properties(net_refuse_${_vold_name}_${_net_n} PROPERTIES TIMEOUT 90)
     endforeach()
   endif()
-  # The edition check must refuse the 1.0 and 1.3D shareware as 1.1.
-  if(_vold_edition STREQUAL "sw11" AND DUKE3D_V10_SW_DATA_DIR AND DUKE3D_V13D_SW_DATA_DIR)
-    add_test(NAME v11_edition_mismatch
-      COMMAND "${CMAKE_COMMAND}" -DEDITION=sw11
-              "-DOTHERS=${DUKE3D_V10_SW_DATA_DIR}$<SEMICOLON>${DUKE3D_V13D_SW_DATA_DIR}"
-              -P "${CMAKE_CURRENT_SOURCE_DIR}/v13d_check.cmake")
-  endif()
-  # And the 1.1 and 1.3D shareware as 1.0.
-  if(_vold_edition STREQUAL "sw10" AND DUKE3D_V11_SW_DATA_DIR AND DUKE3D_V13D_SW_DATA_DIR)
-    add_test(NAME v10_edition_mismatch
-      COMMAND "${CMAKE_COMMAND}" -DEDITION=sw10
-              "-DOTHERS=${DUKE3D_V11_SW_DATA_DIR}$<SEMICOLON>${DUKE3D_V13D_SW_DATA_DIR}"
+  # Check every other folder that is available, even if only one is set.
+  set(_vold_other_dirs "")
+  foreach(_other "${DUKE3D_V11_SW_DATA_DIR}" "${DUKE3D_V10_SW_DATA_DIR}"
+                 "${DUKE3D_V13D_SW_DATA_DIR}" "${DUKE3D_V099_SW_DATA_DIR}")
+    if(_other AND NOT _other STREQUAL _vold_data)
+      if(_vold_other_dirs)
+        string(APPEND _vold_other_dirs "$<SEMICOLON>")
+      endif()
+      string(APPEND _vold_other_dirs "${_other}")
+    endif()
+  endforeach()
+  if(_vold_other_dirs)
+    string(REPLACE "_sw" "" _vold_short "${_vold_name}")
+    add_test(NAME ${_vold_short}_edition_mismatch
+      COMMAND "${CMAKE_COMMAND}" "-DEDITION=${_vold_edition}"
+              "-DOTHERS=${_vold_other_dirs}"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/v13d_check.cmake")
   endif()
 endif()

@@ -106,7 +106,10 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define MAXSLEEPDIST  16384
 #define SLEEPTIME 24*64
 
-#if DUKE3D_GAMEVER < GAMEVER_11
+#if DUKE3D_GAMEVER < GAMEVER_10
+    // 0.99: no version field in DOS; 9 distinguishes our net handshake.
+    #define BYTEVERSION 9
+#elif DUKE3D_GAMEVER < GAMEVER_11
     // 1.0: the shareware release has no version field; 10 is unused by any
     //  release and only guards this build's net handshake.
     #define BYTEVERSION 10
