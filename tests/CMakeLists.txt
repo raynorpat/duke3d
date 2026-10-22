@@ -10,11 +10,15 @@ set_tests_properties(sdl_driver_smoke PROPERTIES
 
 add_test(NAME sdl_driver_smoke_gl_fallback COMMAND sdl_driver_smoke gl_fallback)
 add_test(NAME sdl_driver_smoke_displaymode_setter COMMAND sdl_driver_smoke displaymode_setter)
+add_test(NAME sdl_driver_smoke_mode_sizes COMMAND sdl_driver_smoke mode_sizes)
 add_test(NAME sdl_driver_smoke_palette_fade COMMAND sdl_driver_smoke palette_fade)
 add_test(NAME sdl_driver_smoke_screencapture COMMAND sdl_driver_smoke screencapture_formats)
+add_test(NAME sdl_driver_smoke_video_fade COMMAND sdl_driver_smoke video_fade)
 set_tests_properties(sdl_driver_smoke_gl_fallback sdl_driver_smoke_displaymode_setter
+                     sdl_driver_smoke_mode_sizes
                      sdl_driver_smoke_palette_fade
-                     sdl_driver_smoke_screencapture PROPERTIES
+                     sdl_driver_smoke_screencapture
+                     sdl_driver_smoke_video_fade PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
   TIMEOUT 30)
 
@@ -258,6 +262,30 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
       ENVIRONMENT "BUILD_WINDOWED=1"
       SKIP_RETURN_CODE 77
       TIMEOUT 30)
+    # The VIDEO page's live renderer switch, from a run with no GL context
+    # yet, its modes, and the fade around them.
+    add_test(NAME render_gl_video
+      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" video)
+    set_tests_properties(render_gl_video PROPERTIES
+      ENVIRONMENT "BUILD_WINDOWED=1"
+      SKIP_RETURN_CODE 77
+      TIMEOUT 60)
+    # Supersampling on the shader path: the frame shown is the large one
+    # box-filtered down, its sizes, clamp and the settings that turn it off.
+    add_test(NAME render_gl_supersample
+      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" supersample)
+    set_tests_properties(render_gl_supersample PROPERTIES
+      ENVIRONMENT "BUILD_WINDOWED=1"
+      SKIP_RETURN_CODE 77
+      TIMEOUT 60)
+    # Texture filtering on every draw path: close to nearest, translucency
+    # and fades kept, nearest again byte for byte, with supersampling too.
+    add_test(NAME render_gl_filter
+      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" filter)
+    set_tests_properties(render_gl_filter PROPERTIES
+      ENVIRONMENT "BUILD_WINDOWED=1"
+      SKIP_RETURN_CODE 77
+      TIMEOUT 90)
   endif()
 
   # Boots the real game to its title loop and into E1L1, headless. It uses
@@ -314,6 +342,36 @@ endif()
 add_executable(game_helpers game_helpers.c "${_game_c}")
 target_link_libraries(game_helpers PRIVATE duke3d_game)
 add_test(NAME game_helpers COMMAND game_helpers)
+
+# The small full-screen HUD (screen_size 4) at several 8-bit modes: in
+# widescreen modes health sits at the screen's left edge and ammo and the
+# inventory at its right; 4:3 and tall modes keep their layout. Then a
+# deathmatch's frag bar and full status bar, which widescreen carries out to
+# the screen's edges. Each frame is drawn between guard bytes, so a write
+# past either end of the 8-bit frame fails. Pinned checksums, hex, of the
+# frame without and with an inventory item and of the bars; empty just
+# prints them. Needs game data.
+add_executable(minihud minihud.c "${_game_c}")
+target_link_libraries(minihud PRIVATE duke3d_game)
+if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
+  foreach(_pin "320x200;f2070c6d;f191ac15;12e20f57" "640x480;3444f9f9;fab217a1;7e4e5ac7"
+               "1280x1024;b324dd41;8b7c4151;b110fc47" "480x640;6b424f6e;b6211dae;46b43892"
+               "1280x720;d08e6033;f49c6dcd;22bd6018" "1600x900;742b8451;ac001fed;84cc6798"
+               "1600x675;43b810d6;14f9723b;383cc14b")
+    list(GET _pin 0 _size)
+    list(GET _pin 1 _plain)
+    list(GET _pin 2 _inv)
+    list(GET _pin 3 _bars)
+    string(REPLACE "x" ";" _wh "${_size}")
+    add_test(NAME minihud_${_size}
+      COMMAND minihud "${DUKE3D_GRP}"
+              "${CMAKE_CURRENT_BINARY_DIR}/minihud_${_size}" ${_wh}
+              "${_plain}" "${_inv}" "${_bars}")
+    set_tests_properties(minihud_${_size} PROPERTIES
+      ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+      TIMEOUT 30)
+  endforeach()
+endif()
 
 # Checks the save record codec against the DOS 1.5 byte layout. Needs no
 # game data.
@@ -440,6 +498,19 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
       set_tests_properties(demo_sync_v13d_${_v13d_edition}_${_demo} PROPERTIES TIMEOUT 400)
     endforeach()
+    # Demo 1 again, drawn, with the renderer and mode switched every 100 tics
+    # as the VIDEO page does, each faded and waited for (OpenGL fails
+    # headless, and stays off): still in sync. The demo stands still during
+    # each switch; net_videocycle switches while play goes on.
+    add_test(NAME demo_switch_v13d_${_v13d_edition}
+      COMMAND "${CMAKE_COMMAND}"
+              "-DDUKE3D=$<TARGET_FILE:duke3d>"
+              "-DDATA=${_v13d_data}" "-DEDITION=${_v13d_edition}"
+              -DDEMO=1 "-DFLAGS=-demoswitch 100"
+              "-DREFS=${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_demo_refs.cmake"
+              "-DWORK=${CMAKE_BINARY_DIR}/dsw13"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
+    set_tests_properties(demo_switch_v13d_${_v13d_edition} PROPERTIES TIMEOUT 400)
     add_test(NAME demo_refuse_v13d_${_v13d_edition}
       COMMAND "${CMAKE_COMMAND}"
               "-DDUKE3D=$<TARGET_FILE:duke3d>"
@@ -519,6 +590,19 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
               "-DWORK=${CMAKE_BINARY_DIR}/nc13"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
     set_tests_properties(net_connect_v13d_${_v13d_edition} PROPERTIES TIMEOUT 90)
+    # One peer changes renderer and resolution as the VIDEO page does, every
+    # 20 frames (OpenGL fails headless; BUILD_WINDOWED keeps both windowed):
+    # still in sync.
+    math(EXPR _net_cycle_port "${_net_port} + 50")
+    add_test(NAME net_videocycle_v13d_${_v13d_edition}
+      COMMAND "${CMAKE_COMMAND}"
+              "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_v13d_data}"
+              "-DB=$<TARGET_FILE:duke3d>" "-DB_DATA=${_v13d_data}"
+              -DPORT=${_net_cycle_port} -DMODE=connect "-DARGS=/v1 /l1"
+              "-DA_ARGS=-videocycle 20" "-DA_EXPECT=VIDEOCYCLE renderer [0-9] -> [12].*drawn at 1600x900"
+              "-DWORK=${CMAKE_BINARY_DIR}/nv13"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
+    set_tests_properties(net_videocycle_v13d_${_v13d_edition} PROPERTIES TIMEOUT 90)
     set(_net_n 0)
     foreach(_peer IN LISTS DUKE3D_NET_PEERS)
       string(REGEX REPLACE "=.*" "" _peer_exe "${_peer}")
@@ -712,7 +796,8 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
 endif()
 
 # The editor build.cfg reader and writer; engine-free, so it runs everywhere.
-add_executable(build_cfg build_cfg.c "${PROJECT_SOURCE_DIR}/source/buildcfg.c")
+add_executable(build_cfg build_cfg.c "${PROJECT_SOURCE_DIR}/source/buildcfg.c"
+  "${PROJECT_SOURCE_DIR}/source/videoopts.c")
 target_include_directories(build_cfg PRIVATE "${PROJECT_SOURCE_DIR}/source")
 add_test(NAME build_cfg COMMAND build_cfg)
 
@@ -724,3 +809,9 @@ add_test(NAME editor_mode COMMAND editor_mode)
 set_tests_properties(editor_mode PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
   TIMEOUT 30)
+
+# The VIDEO page's resolution list, draw size, supersampling and save
+# tracking; engine-free.
+add_executable(video_opts video_opts.c "${PROJECT_SOURCE_DIR}/source/videoopts.c")
+target_include_directories(video_opts PRIVATE "${PROJECT_SOURCE_DIR}/source")
+add_test(NAME video_opts COMMAND video_opts)

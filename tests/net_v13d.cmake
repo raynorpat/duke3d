@@ -2,10 +2,11 @@
 #
 #   cmake -DA=<exe> -DA_DATA=<dir> -DB=<exe> -DB_DATA=<dir> -DPORT=<n>
 #         -DMODE=<refuse|connect> -DWORK=<scratch dir> [-DARGS="<options>"]
-#         -P net_v13d.cmake
+#         [-DA_ARGS="<options>" -DA_EXPECT=<regex>] -P net_v13d.cmake
 #
 # ARGS, space-separated, go to both peers after "-net net.cfg"; "/v1 /l1"
 # puts them straight into a level, so the game runs and checks its sync.
+# A_ARGS go to peer A only, and A_EXPECT must then match its output.
 #
 # Each data dir holds DUKE3D.GRP and GAME.CON, DEFS.CON and USER.CON. The
 # peers use ports PORT and PORT+1. MODE refuse expects both peers to leave
@@ -56,7 +57,7 @@ set(ENV{BUILD_WINDOWED} 1)
 set(_seconds 20)
 execute_process(
   COMMAND "${CMAKE_COMMAND}" -DROLE=peer "-DEXE=${A}" "-DRUN=${WORK}/A"
-          -DSECONDS=${_seconds} "-DARGS=${ARGS}" -P "${CMAKE_CURRENT_LIST_FILE}"
+          -DSECONDS=${_seconds} "-DARGS=${ARGS} ${A_ARGS}" -P "${CMAKE_CURRENT_LIST_FILE}"
   COMMAND "${CMAKE_COMMAND}" -DROLE=peer "-DEXE=${B}" "-DRUN=${WORK}/B"
           -DSECONDS=${_seconds} -DDELAY=2 "-DARGS=${ARGS}" -P "${CMAKE_CURRENT_LIST_FILE}"
   RESULT_VARIABLE _ignored)
@@ -81,6 +82,8 @@ foreach(_peer A B)
       string(APPEND _fail "peer ${_peer} (${${_peer}}) went out of sync.\n")
     elseif(NOT _result MATCHES "timeout|terminated")
       string(APPEND _fail "peer ${_peer} (${${_peer}}) left the game early: \"${_result}\".\n")
+    elseif(_peer STREQUAL "A" AND A_EXPECT AND NOT _out MATCHES "${A_EXPECT}")
+      string(APPEND _fail "peer A's output doesn't show \"${A_EXPECT}\".\n")
     endif()
   endif()
 endforeach()

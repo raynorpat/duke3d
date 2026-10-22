@@ -41,6 +41,8 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #include "duke3d.h"
 #include "glext.h"
+#include "displaymode.h"
+#include "videoopts.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1663,6 +1665,18 @@ static int32_t sbarx16(int32_t x)
     return ((xdim<<15)+32768+scale(x-(320<<15),ydim<<16,200*pixelaspect))>>16;
 }
 
+// One of drawwidebarends' copies, its clip rectangle held to the screen (a
+// copy at the edge reaches past it, and classic writes there): none if
+// nothing of it is on screen.
+static void drawwidebarcopy(int32_t sx, int32_t sy, int32_t z, short a, short picnum, signed char shade,
+                            unsigned short stat, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2)
+{
+    cx1 = max(cx1,0); cy1 = max(cy1,0);
+    cx2 = min(cx2,xdim-1); cy2 = min(cy2,ydim-1);
+    if (cx1 > cx2 || cy1 > cy2) return;
+    rotatesprite(sx,sy,z,a,picnum,shade,0,stat,cx1,cy1,cx2,cy2);
+}
+
 // Widescreen: carry a 320-wide HUD bar (tile picnum at 320x200 x 0, y sy,
 // zoom z) out to the screen edges in rows y1..y2-1, with copies of its own
 // outer n columns mirrored back and forth so every join matches. Each
@@ -1679,14 +1693,14 @@ static void drawwidebarends(short picnum, int32_t sy, int32_t z, int32_t n, sign
     {
         e = -k*s;   // left side: this copy ends at e
         if (k&1)
-            rotatesprite(e-s-d,sy,z,0,picnum,shade,0,2+8+16+64+128,sbarx16(e-s),y1,sbarx16(e),y2-1);
+            drawwidebarcopy(e-s-d,sy,z,0,picnum,shade,2+8+16+64+128,sbarx16(e-s),y1,sbarx16(e),y2-1);
         else
-            rotatesprite(e+d,sy,z,1024,picnum,shade,0,2+4+8+16+64+128,sbarx16(e-s),y1,sbarx16(e),y2-1);
+            drawwidebarcopy(e+d,sy,z,1024,picnum,shade,2+4+8+16+64+128,sbarx16(e-s),y1,sbarx16(e),y2-1);
         e = w+k*s;  // right side: this copy starts at e
         if (k&1)
-            rotatesprite(e+s-w+d,sy,z,0,picnum,shade,0,2+8+16+64+128,sbarx16(e)-1,y1,sbarx16(e+s)-1,y2-1);
+            drawwidebarcopy(e+s-w+d,sy,z,0,picnum,shade,2+8+16+64+128,sbarx16(e)-1,y1,sbarx16(e+s)-1,y2-1);
         else
-            rotatesprite(e+w-d,sy,z,1024,picnum,shade,0,2+4+8+16+64+128,sbarx16(e)-1,y1,sbarx16(e+s)-1,y2-1);
+            drawwidebarcopy(e+w-d,sy,z,1024,picnum,shade,2+4+8+16+64+128,sbarx16(e)-1,y1,sbarx16(e+s)-1,y2-1);
     }
 }
 
@@ -1747,18 +1761,30 @@ void coolgaugetext(short snum)
 
     if (ss == 4)   //DRAW MINI STATUS BAR:
     {
-        rotatesprite(5<<16,(200-28)<<16,65536L,0,HEALTHBOX,0,21,10+16,0,0,xdim-1,ydim-1);
+        int32_t hx = 0, ax = 0, ix = 0;
+
+        // Widescreen: health at the screen's left edge, ammo and the
+        // inventory box (left of the ammo) at its right. The 320x200 x of
+        // the left edge is hx (<= 0), the right edge's is 320-hx.
+        if (widescreen)
+        {
+            hx = 160-scale(xdim,120,ydim);
+            ax = (320-hx)-5-tilesizx[AMMOBOX]-37;
+            ix = ax+37-tilesizx[INVENTORYBOX]-(69-37-tilesizx[AMMOBOX])-69;
+        }
+
+        rotatesprite((5+hx)<<16,(200-28)<<16,65536L,0,HEALTHBOX,0,21,10+16,0,0,xdim-1,ydim-1);
         if (p->inven_icon)
-            rotatesprite(69<<16,(200-30)<<16,65536L,0,INVENTORYBOX,0,21,10+16,0,0,xdim-1,ydim-1);
+            rotatesprite((69+ix)<<16,(200-30)<<16,65536L,0,INVENTORYBOX,0,21,10+16,0,0,xdim-1,ydim-1);
 
         if(sprite[p->i].pal == 1 && p->last_extra < 2)
-            digitalnumber(20,200-17,1,-16,10+16);
-        else digitalnumber(20,200-17,p->last_extra,-16,10+16);
+            digitalnumber(20+hx,200-17,1,-16,10+16);
+        else digitalnumber(20+hx,200-17,p->last_extra,-16,10+16);
 
-        rotatesprite(37<<16,(200-28)<<16,65536L,0,AMMOBOX,0,21,10+16,0,0,xdim-1,ydim-1);
+        rotatesprite((37+ax)<<16,(200-28)<<16,65536L,0,AMMOBOX,0,21,10+16,0,0,xdim-1,ydim-1);
 
         if (p->curr_weapon == HANDREMOTE_WEAPON) i = HANDBOMB_WEAPON; else i = p->curr_weapon;
-        digitalnumber(53,200-17,p->ammo_amount[i],-16,10+16);
+        digitalnumber(53+ax,200-17,p->ammo_amount[i],-16,10+16);
 
         o = 158; permbit = 0;
         if (p->inven_icon)
@@ -1779,9 +1805,9 @@ void coolgaugetext(short snum)
 #endif
                 default: i = -1;
             }
-            if (i >= 0) rotatesprite((231-o)<<16,(200-21)<<16,65536L,0,i,0,0,10+16+permbit,0,0,xdim-1,ydim-1);
+            if (i >= 0) rotatesprite((231-o+ix)<<16,(200-21)<<16,65536L,0,i,0,0,10+16+permbit,0,0,xdim-1,ydim-1);
 
-            minitext(292-30-o,190,"%",6,10+16+permbit);
+            minitext(292-30-o+ix,190,"%",6,10+16+permbit);
 
             j = 0x80000000;
             switch(p->inven_icon)
@@ -1799,10 +1825,10 @@ void coolgaugetext(short snum)
                 case 7: i = (p->boot_amount>>1); break;
 #endif
             }
-            invennum(284-30-o,200-6,(char)i,0,10+permbit);
-            if (j > 0) minitext(288-30-o,180,"ON",0,10+16+permbit);
-            else if ((uint32_t)j != 0x80000000) minitext(284-30-o,180,"OFF",2,10+16+permbit);
-            if (p->inven_icon >= 6) minitext(284-35-o,180,"AUTO",2,10+16+permbit);
+            invennum(284-30-o+ix,200-6,(char)i,0,10+permbit);
+            if (j > 0) minitext(288-30-o+ix,180,"ON",0,10+16+permbit);
+            else if ((uint32_t)j != 0x80000000) minitext(284-30-o+ix,180,"OFF",2,10+16+permbit);
+            if (p->inven_icon >= 6) minitext(284-35-o+ix,180,"AUTO",2,10+16+permbit);
         }
         return;
     }
@@ -2168,14 +2194,22 @@ void binscreen(void)
 }
 
 
-// The renderer for this run: duke3d.cfg's, or -renderer's; 0 if OpenGL failed.
+// The renderer for this run: duke3d.cfg's, or -renderer's, or the VIDEO
+// page's; 0 if OpenGL failed.
 static int32_t gamerenderer;
 
-// Sets the video mode from ScreenMode/Width/Height, then OpenGL when the
-// renderer is 3, so the renderer survives a mode change.
-static int setgamemoderenderer(void)
+// The resolution for this run: duke3d.cfg's, or the VIDEO page's.
+static int32_t gamewidth = 320, gameheight = 200;
+
+// OpenGL failed in this run (at the start or a switch): not tried again.
+int32_t video_glunavailable;
+
+// Sets the video mode from ScreenMode and the run's resolution, then OpenGL
+// when the renderer is 3, so the renderer survives a mode change. If OpenGL
+// fails, the 8-bit mode just set stays, with renderer fallback.
+static int setgamemoderenderer(int32_t fallback)
 {
-    if (setgamemode(ScreenMode,ScreenWidth,ScreenHeight) < 0)
+    if (setgamemode(ScreenMode,gamewidth,gameheight) < 0)
         return -1;
 #ifdef USE_OPENGL
     gltexmiplevel = GLTextureMipLevel;  // duke3d.cfg: drop this many mipmap levels
@@ -2185,14 +2219,403 @@ static int setgamemoderenderer(void)
     glcontrast = GLContrast;  // the shader path's, applied as it shows each frame
     glsaturation = GLSaturation;
 #endif
+    if (gamerenderer == 3 && video_glunavailable)
+        gamerenderer = 0;
     if (gamerenderer == 3 && setgamemode_gl(ScreenMode) != 0)
     {
-        printf("OpenGL renderer unavailable (%s); using the classic renderer.\n", SDL_GetError());
-        setgamemode(ScreenMode,ScreenWidth,ScreenHeight);
-        gamerenderer = 0;
+        if (fallback == 0)
+            printf("OpenGL renderer unavailable (%s); using the classic renderer.\n", SDL_GetError());
+        else
+            printf("OpenGL renderer unavailable (%s); keeping renderer %d.\n", SDL_GetError(), (int)fallback);
+        gamerenderer = fallback;
+        video_glunavailable = 1;
     }
     setrendermode(gamerenderer);
     return 0;
+}
+
+#ifdef POLYMOST
+static palette_t video_fadergb;  // the fade before a mode set (video_keepfade)
+static unsigned char video_fadedelta;
+#endif
+
+// Before a mode set, which drops the fade: keep it for video_restoreview.
+static void video_keepfade(void)
+{
+#ifdef POLYMOST
+    video_fadergb = palfadergb;
+    video_fadedelta = palfadedelta;
+#endif
+}
+
+// After a mode set: the palette and the fade (video_keepfade's) put back,
+// and the view, border and status bar laid out again.
+static void video_restoreview(void)
+{
+    glresetgamepalette();
+    if (getrendermode() == 3) glsetgamepalette();
+    else setbrightness(ud.brightness>>2,(unsigned char *)gameviewpalette());
+#ifdef POLYMOST
+    if (video_fadedelta)
+    {
+        if (getrendermode() == 3)
+        {
+            // shown with the next frame; setpalettefade would show one now
+            palfadergb = video_fadergb;
+            palfadedelta = video_fadedelta;
+        }
+        else setpalettefade(video_fadergb.r>>2,video_fadergb.g>>2,video_fadergb.b>>2,
+                            (video_fadedelta == 255) ? 64 : (video_fadedelta>>2));
+    }
+#endif
+
+    flushperms();
+    vscrn();  // the view, and the border and status bar drawn again
+}
+
+// Switches to renderer r now, keeping the window (the first switch to
+// OpenGL in a run that started in 0-2 makes it again, with GL); call it
+// between frames. Among 0-2 only the drawing changes; to or from 3 it's a
+// mode set. If OpenGL fails, the renderer stays as it was. A mode set drops
+// the palette and the view: both are put back, with any fade.
+// RendererSetting, what duke3d.cfg keeps, is left alone. Returns the
+// renderer in effect.
+int video_setrenderer(int r)
+{
+    int32_t previous = gamerenderer;
+
+#ifndef POLYMOST
+    r = 0;
+#endif
+    r = clamprenderer(r);
+    if (r == previous || (r == 3 && video_glunavailable))
+        return previous;
+
+    gamerenderer = r;
+    if (r != 3 && previous != 3)
+    {
+        setrendermode(gamerenderer);  // the 8-bit mode stays
+        flushperms();
+        vscrn();
+        return gamerenderer;
+    }
+    video_keepfade();
+    if (setgamemoderenderer(previous) < 0)
+    {
+        gamerenderer = previous;
+        setgamemoderenderer(previous);
+    }
+    video_restoreview();
+    return gamerenderer;
+}
+
+// Sets display mode displaymode (DISPLAY_*) and resolution w by h now, in
+// one mode set; call it between frames. Windowed: a w by h window;
+// fullscreen (exclusive): the display mode nearest w by h; borderless: the
+// desktop. Renderers 0-2 draw at that size up to 1600x1200 (borderless: the
+// desktop's), shown scaled; renderer 3 at the window's real size, in the
+// same GL context. The palette, fade and view are put back as for a renderer
+// switch. DisplayMode and ScreenWidth/Height, what duke3d.cfg keeps, are
+// left alone. Returns 0, or -1 if the mode set failed.
+int video_setmode(int displaymode, int w, int h)
+{
+    video_keepfade();
+    setvideodisplaymodenext(displaymode);
+    gamewidth = w;
+    gameheight = h;
+    if (setgamemoderenderer(0) < 0)
+        return -1;
+    video_restoreview();
+    return 0;
+}
+
+// Sets renderer 3's supersampling level (SS_*) now, the frame made again at
+// its size and the view laid out for it; in renderers 0-2 it's kept for
+// renderer 3. GLSupersampling, what duke3d.cfg keeps, is left alone.
+// Returns 1 if supersampling is in use (videosupersampleavailable: whether
+// a level can be).
+int video_setsupersample(int level)
+{
+    int on = setvideosupersample(level);
+
+    if (getrendermode() == 3)
+    {
+        flushperms();
+        vscrn();
+    }
+    return on;
+}
+
+// Sets renderer 3's texture filter (TEXFILTER_*) now; in renderers 0-2 it's
+// kept for renderer 3. GLTextureFilter, what duke3d.cfg keeps, is left alone.
+// Returns 1 if it's in use (videotexfilteravailable: whether a filter can
+// be).
+int video_settexfilter(int filter)
+{
+    int on = setvideotexfilter(filter);
+
+    if (getrendermode() == 3)  // a switch to or from nearest starts a frame black
+    {
+        flushperms();
+        vscrn();
+    }
+    return on;
+}
+
+// The run's resolution, as last set (the display mode: getvideodisplaymode).
+void video_getmode(int32_t *w, int32_t *h)
+{
+    *w = gamewidth;
+    *h = gameheight;
+}
+
+// Changes asked for mid-frame (the VIDEO page): the screen fades to black
+// (the driver's setvideofadeout, in real time, over the game's own palette
+// and fade, which stay as they are), they are made together after a black
+// frame is shown, and it fades back in, also when a change failed. Play
+// goes on underneath.
+static int32_t video_pendingrenderer = -1, video_pendingss = -1, video_pendingfilter = -1;
+static int32_t video_pendingmode = -1, video_pendingw, video_pendingh;
+static char video_testtag[32];  // video_teststep's, printed when made
+static int32_t video_testfrom, video_testmode;
+
+void video_requestrenderer(int r)
+{
+    video_pendingrenderer = r;
+    setvideofadeout();
+}
+
+void video_requestsupersample(int level)
+{
+    video_pendingss = level;
+    setvideofadeout();
+}
+
+void video_requesttexfilter(int filter)
+{
+    video_pendingfilter = filter;
+    setvideofadeout();
+}
+
+void video_requestmode(int displaymode, int w, int h)
+{
+    video_pendingmode = displaymode;
+    video_pendingw = w;
+    video_pendingh = h;
+    setvideofadeout();
+}
+
+static void video_testprint(void);
+
+// Makes the changes asked for, and fades back in (also when one failed).
+static void video_makepending(void)
+{
+    if (video_pendingss >= 0 && video_pendingmode >= 0)
+    {
+#ifdef USE_OPENGL
+        glsupersample = video_pendingss;  // the mode set makes it
+#endif
+    }
+    else if (video_pendingss >= 0)
+        video_setsupersample(video_pendingss);
+    if (video_pendingfilter >= 0)
+        video_settexfilter(video_pendingfilter);
+    if (video_pendingmode >= 0)
+        video_setmode(video_pendingmode,video_pendingw,video_pendingh);
+    if (video_pendingrenderer >= 0)
+        video_setrenderer(video_pendingrenderer);
+    video_pendingmode = video_pendingrenderer = video_pendingss = video_pendingfilter = -1;
+    setvideofadein();
+    video_pagesettle(0);
+    if (video_testtag[0])
+        video_testprint();
+}
+
+// After nextpage: the changes asked for, once the frame shown was black. If
+// the driver gave up holding the black (a loop that showed frames without
+// coming here), the fade out starts again.
+void video_applypending(void)
+{
+    if ((video_pendingmode < 0) && (video_pendingrenderer < 0) && (video_pendingss < 0) &&
+        (video_pendingfilter < 0))
+        return;
+    if (getvideofade() == 256)
+        video_makepending();
+    else if (!videofading())
+        setvideofadeout();
+}
+
+// The changes asked for, made now without waiting for the black: at the
+// start of the loops that show frames of their own and don't come to
+// video_applypending (dobonus, playanm, newgame, enterlevel, loadplayer),
+// which then draw the whole screen again.
+void video_flushpending(void)
+{
+    if (video_pending())
+        video_makepending();
+}
+
+// A change asked for isn't made yet (it waits for the fade's black).
+int video_pending(void)
+{
+    return (video_pendingmode >= 0) || (video_pendingrenderer >= 0) || (video_pendingss >= 0) ||
+           (video_pendingfilter >= 0);
+}
+
+// Alt+Enter (the driver's toggle hook): the display mode at the run's
+// resolution, a mode set as the VIDEO page's. Only for this run: duke3d.cfg
+// keeps its DisplayMode.
+static void video_toggle(int mode)
+{
+    video_requestmode(mode,gamewidth,gameheight);
+}
+
+// The VIDEO page's saving (videoopts.h). Opening it keeps duke3d.cfg's
+// values; a row the player changes takes the value in effect once the
+// changes asked for are made (so a failed switch to OpenGL saves the
+// renderer kept), and the others keep the file's, so a run's own values
+// (-renderer, Alt+Enter, BUILD_WINDOWED, a fallback from fullscreen) aren't
+// written. The file is written then, so it's saved however the page is
+// left (Esc in the attract demo goes straight to the main menu); the
+// game's exit writes it too. Brightness is ud.brightness, the run's and
+// the file's at once (as F11).
+static videoopts_t video_page;
+static int32_t video_pagecopy;
+static int32_t video_pagedisplay = -1;  // DISPLAY's choice, saved even when not in effect
+
+static void video_configvals(videovals_t *v)
+{
+    v->renderer = RendererSetting;
+    v->displaymode = DisplayMode;
+    v->width = ScreenWidth;
+    v->height = ScreenHeight;
+    v->vsync = VSync;
+    v->brightness = ud.brightness;
+    v->contrast = GLContrast;
+    v->saturation = GLSaturation;
+    v->supersampling = GLSupersampling;
+    v->texfilter = GLTextureFilter;
+}
+
+// Copies the rows changed into duke3d.cfg's values and writes the file,
+// once no change is waiting (now: at once, at the exit, with any change
+// still waiting saved as asked for).
+void video_pagesettle(int now)
+{
+    videovals_t inuse, out;
+
+    if (video_pending() && !now)
+        return;
+    if (video_pagecopy)
+    {
+        video_configvals(&inuse);
+        inuse.renderer = gamerenderer;
+        // the choice, not a fallback from fullscreen or BUILD_WINDOWED's window
+        inuse.displaymode = (video_pagedisplay >= 0) ? video_pagedisplay : getvideodisplaymode();
+        inuse.width = gamewidth;
+        inuse.height = gameheight;
+        inuse.vsync = getvideovsync();
+#ifdef USE_OPENGL
+        inuse.supersampling = glsupersample;
+        inuse.texfilter = gltexturefilter;
+#endif
+        // the exit during a change's fade: the change asked for
+        if (video_pendingrenderer >= 0) inuse.renderer = clamprenderer(video_pendingrenderer);
+        if (video_pendingmode >= 0)
+        {
+            inuse.width = video_pendingw;
+            inuse.height = video_pendingh;
+        }
+        if (video_pendingss >= 0) inuse.supersampling = video_pendingss;
+        if (video_pendingfilter >= 0) inuse.texfilter = video_pendingfilter;
+        videoopts_saveinto(&video_page,&inuse,&out);
+        RendererSetting = out.renderer;
+        DisplayMode = out.displaymode;
+        ScreenWidth = out.width;
+        ScreenHeight = out.height;
+        VSync = out.vsync;
+        GLContrast = out.contrast;
+        GLSaturation = out.saturation;
+        GLSupersampling = out.supersampling;
+        GLTextureFilter = out.texfilter;
+        video_pagecopy = 0;
+        CONFIG_SaveSetup();
+    }
+}
+
+// Opening the page. While a change is still to be saved (opened again
+// during its fade), what's kept so far stays, so the save isn't lost.
+void video_pagebegin(void)
+{
+    videovals_t saved;
+
+    if (video_pagecopy)
+        return;
+    video_configvals(&saved);
+    videoopts_begin(&video_page,&saved);
+    video_pagedisplay = -1;
+}
+
+// DISPLAY chosen (DISPLAY_*), after asking for it: saved as chosen.
+void video_pagesetdisplay(int mode)
+{
+    video_pagedisplay = mode;
+    video_pagetouch(VROW_DISPLAYMODE);
+}
+
+// The display mode DISPLAY steps from: the one chosen on the page, else the
+// one in effect.
+int video_pagegetdisplay(void)
+{
+    return (video_pagedisplay >= 0) ? video_pagedisplay : getvideodisplaymode();
+}
+
+// The player changed row (VROW_*), after asking for the change: saved.
+void video_pagetouch(int row)
+{
+    videoopts_touch(&video_page,row);
+    video_pagecopy = 1;
+    video_pagesettle(0);
+}
+
+// -videocycle n: video_teststep every n frames in the game loop (the net
+// sync test).
+static int32_t videocycle, videocycleframe;
+
+// The sync tests' stand-in for the VIDEO page (-demoswitch, -videocycle):
+// asks for the next renderer (skipping OpenGL once it has failed) and the
+// next of a few display modes and resolutions, faded as the page's are, and
+// prints them after tag when made. Skipped while a fade is under way.
+static const int32_t video_testmodes[][3] = {
+    { DISPLAY_WINDOWED, 640, 480 }, { DISPLAY_BORDERLESS, 800, 600 },
+    { DISPLAY_EXCLUSIVE, 1024, 768 }, { DISPLAY_WINDOWED, 2560, 1440 },
+    { DISPLAY_WINDOWED, 320, 200 }, { DISPLAY_WINDOWED, 1366, 768 }
+};
+
+static void video_teststep(const char *tag)
+{
+    static int32_t step;
+    int32_t r = gamerenderer;
+
+    if (videofading())
+        return;
+    video_testmode = step++ % (int32_t)(sizeof(video_testmodes)/sizeof(video_testmodes[0]));
+    video_testfrom = r;
+    strncpy(video_testtag,tag,sizeof(video_testtag)-1);
+    video_requestrenderer((r == 2 && video_glunavailable) ? 0 : (r+1)&3);
+    video_requestmode(video_testmodes[video_testmode][0],video_testmodes[video_testmode][1],
+                      video_testmodes[video_testmode][2]);
+}
+
+static void video_testprint(void)
+{
+    const int32_t *m = video_testmodes[video_testmode];
+
+    printf("%s renderer %d -> %d, %s %dx%d: display %s, drawn at %dx%d\n",video_testtag,
+           (int)video_testfrom,(int)gamerenderer,display_modename(m[0]),(int)m[1],(int)m[2],
+           display_modename(getvideodisplaymode()),(int)xdim,(int)ydim);
+    fflush(stdout);  // a killed run (the net test) still shows it
+    video_testtag[0] = 0;
 }
 
 // Renderer 3 redraws the whole screen each frame: the border and status bar
@@ -2249,7 +2672,7 @@ void gameexit(char *msg)
         dobonus(1);
 // CTW - MODIFICATION
 //      setgamemode();
-        setgamemoderenderer();
+        setgamemoderenderer(0);
 // CTW END - MODIFICATION
     }
 
@@ -8224,6 +8647,7 @@ void ShutDown( void )
     uninittimer();
     uninitengine();
     CONTROL_Shutdown();
+    video_pagesettle(1);  // the VIDEO page's changes, for the file
     CONFIG_WriteSetup();
     KB_Shutdown();
 }
@@ -8836,14 +9260,20 @@ int main(int argc,char **argv)
     gamerenderer = clamprenderer(i ? ((i+1 < _argc) ? atoi(_argv[i+1]) : 0) : RendererSetting);
     setvideodisplaymode(DisplayMode);  // the VIDEO menu changes them as it goes
     setvideovsync(VSync);
+    setvideosupersample(GLSupersampling);  // renderer 3's, this run's from here on
+    setvideotexfilter(GLTextureFilter);  // the same
+    setvideodrawfit(1);  // the VIDEO page's draw sizes (the editor keeps its own)
+    setvideotogglehook(video_toggle);  // Alt+Enter: a mode set, as the VIDEO page's
+    gamewidth = ScreenWidth;
+    gameheight = ScreenHeight;
 
-    if( setgamemoderenderer() < 0 )
+    if( setgamemoderenderer(0) < 0 )
     {
         printf("\nVESA driver for ( %d * %d ) not found/supported!\n",xdim,ydim);
         ScreenMode = 2;
-        ScreenWidth = 320;
-        ScreenHeight = 200;
-        setgamemoderenderer();
+        gamewidth = 320;  // for this run: duke3d.cfg keeps its size
+        gameheight = 200;
+        setgamemoderenderer(0);
     }
 // CTW END - MODIFICATION
 
@@ -8865,8 +9295,12 @@ int main(int argc,char **argv)
     if(i && i+1 < _argc)
     {
         j = CheckParm("DEMODUMP");
-        exit(demoverify(atoi(_argv[i+1]),(j && j+1 < _argc) ? _argv[j+1] : NULL));
+        l = CheckParm("DEMOSWITCH");
+        exit(demoverify(atoi(_argv[i+1]),(j && j+1 < _argc) ? _argv[j+1] : NULL,
+                        CheckParm("DEMODRAW") || l,(l && l+1 < _argc) ? atoi(_argv[l+1]) : 0));
     }
+    i = CheckParm("VIDEOCYCLE");
+    videocycle = (i && i+1 < _argc) ? atoi(_argv[i+1]) : 0;
 
     i = CheckParm("LOADVERIFY");
     if(i && i+1 < _argc)
@@ -9009,6 +9443,9 @@ int main(int argc,char **argv)
             rotatesprite((320-50)<<16,9<<16,65536L,0,BETAVERSION,0,0,2+8+16+128,0,0,xdim-1,ydim-1);
 #endif
         nextpage();
+        video_applypending();
+        if(videocycle > 0 && ++videocycleframe%videocycle == 0)
+            video_teststep("VIDEOCYCLE");
     }
 
     gameexit(" ");
@@ -9381,12 +9818,15 @@ char in_menu = 0;
  *  code: 0 played, 2 refused. With -demodump <file> it also writes the state
  *  in tools/v13d/mkcapture.py's STATE.BIN layout (reccnt, randomseed,
  *  sprite[]) followed by ps[0] as this build lays it out, for finding where
- *  a desync starts.
+ *  a desync starts. draw: show a frame after each tic, as playback does;
+ *  switchevery (with draw): move to the next renderer every that many tics,
+ *  as the VIDEO page does, which mustn't change the state.
  */
-int demoverify(int n, char *dumpname)
+int demoverify(int n, char *dumpname, int draw, int switchevery)
 {
     int32_t i, j, l, cnt, tics = 0;
     short k;
+    uint32_t waited;
 
     if( !opendemoread(n) )
     {
@@ -9395,6 +9835,8 @@ int demoverify(int n, char *dumpname)
     }
     ud.recstat = 2;
     enterlevel(MODE_DEMO);
+    ready2send = 0;  // as playback: no live input into the fifo while drawing
+    if(draw) setvideovsync(0);  // as fast as it can draw
 
     i = 0;
     while (ud.reccnt > 0)
@@ -9430,6 +9872,35 @@ int demoverify(int n, char *dumpname)
         }
         domovethings();
         tics++;
+
+        if(draw)
+        {
+            gldrawframe();
+            displayrooms(screenpeek,65536);
+            displayrest(65536);
+            nextpage();
+            video_applypending();
+            if(switchevery > 0 && tics%switchevery == 0)
+            {
+                char tag[32];
+                sprintf(tag,"DEMOSWITCH tic %d:",(int)tics);
+                video_teststep(tag);
+                waited = getticks();
+                while(videofading())  // this tic drawn until the switch is done: one per k tics
+                {
+                    if(getticks() - waited > 10000)
+                    {
+                        printf("DEMOSWITCH FAIL: tic %d: the switch's fade didn't end in 10 s\n",(int)tics);
+                        exit(1);
+                    }
+                    gldrawframe();
+                    displayrooms(screenpeek,65536);
+                    displayrest(65536);
+                    nextpage();
+                    video_applypending();
+                }
+            }
+        }
     }
 
     // The player sprite (statnum 10), as the DOS reference capture reads it.
@@ -9622,6 +10093,7 @@ int32_t playback(void)
 #endif
         getpackets();
         nextpage();
+        video_applypending();
 
         if( ps[myconnectindex].gm==MODE_END || ps[myconnectindex].gm==MODE_GAME )
         {
@@ -10418,6 +10890,7 @@ void dobonus(char bonusonly)
        350, 380,VICTORY1+8,86,59
     };
 
+    video_flushpending();  // shows frames of its own
     bonuscnt = 0;
 
     for(t=0;t<64;t+=7) palto(0,0,0,t);

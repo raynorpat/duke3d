@@ -167,7 +167,56 @@ int setgamemode_gl(char davidoption);
  *  set. BUILD_WINDOWED forces windowed. Alt+Enter toggles windowed and the
  *  full-screen style set here (borderless when windowed is set). */
 void setvideodisplaymode(int mode);
+/* The same, set by the next mode set together with its size: one change on
+ *  screen (the VIDEO page's DISPLAY and RESOLUTION). */
+void setvideodisplaymodenext(int mode);
+/* 1: game modes' 8-bit frames follow the game's VIDEO rule (borderless at
+ *  the window's size, over 1600x1200 capped keeping the aspect); 0 (the
+ *  default, the editor's): the size asked for, over 1600x1200 clamped. */
+void setvideodrawfit(int on);
 int getvideodisplaymode(void);  /* the window's */
+/* Alt+Enter calls hook with the display mode to go to instead of changing it
+ *  (the game makes it a mode set); NULL (the default): it changes now. */
+void setvideotogglehook(void (*hook)(int mode));
+/* The main display's modes as SDL lists them (w[i] by h[i], at most max) and
+ *  its desktop size; returns how many. */
+int getvideomodelist(int32_t *w, int32_t *h, int max, int32_t *desktopw, int32_t *desktoph);
+/*
+ * The VIDEO page's fade around a change, at the present, over the game's own
+ *  palette and fade (left alone), in real time. setvideofadeout fades to
+ *  black over VIDEOFADE_MS (from where a fade-in has got to) and holds it;
+ *  setvideofadein then fades back in over VIDEOFADE_MS, as it does by
+ *  itself after 2 * VIDEOFADE_MS held (frames shown with nothing to make
+ *  the change). getvideofade: the
+ *  last frame shown's darkness, 0 (none) to 256 (black); videofading: one
+ *  is under way. videofade_at: the darkness ms into one never held.
+ */
+#define VIDEOFADE_MS 250
+void setvideofadeout(void);
+void setvideofadein(void);
+int getvideofade(void);
+int videofading(void);
+int videofade_at(uint32_t ms);
+/*
+ * Renderer 3's supersampling (glext.h glsupersample) set to level now, the
+ *  frame made again at its size, keeping the palette and fade as a resize
+ *  does; 1 if it's in use. videosupersampleavailable: whether level can be
+ *  used now (off always; the others on the shader path without an internal
+ *  size, at a size larger than the window's: videoopts_ssavailable).
+ */
+int setvideosupersample(int level);
+int videosupersampleavailable(int level);
+/*
+ * Renderer 3's texture filter (glext.h gltexturefilter, videoopts.h
+ *  TEXFILTER_*) set to filter now: the 1.1/1.5 paths' textures take it at
+ *  once, the shader path draws with it from its next frame (a switch to or
+ *  from nearest starts that frame black). 1 if it's in use now.
+ *  videotexfilteravailable: whether filter can be used now (nearest always;
+ *  the others in renderer 3, on the shader path when its filtering shaders
+ *  link).
+ */
+int setvideotexfilter(int filter);
+int videotexfilteravailable(int filter);
 void setvideovsync(int on);  /* 1: present on vsync (the default) */
 int getvideovsync(void);
 /* Renderer 3: draws the last frame shown, unfaded, as the new frame's start. */

@@ -64,3 +64,56 @@ int glgamepalette_check(void)
     setbrightness(0, palette);
     return ok;
 }
+
+/* What video_setrenderer's mode sets use (the size: video_setmode's). */
+void videoswitch_setup(void)
+{
+    ScreenMode = 1;
+    setvideodrawfit(1);  /* as the game's main() */
+    genspriteremaps();  /* the game's water palette */
+    myconnectindex = screenpeek = 0;
+    ps[0].palette = (char *) palette;  /* as the game has it from the start */
+}
+
+/*
+ * video_setrenderer, from renderer 3: the viewed player's (water) palette
+ *  and a fade (63, 0, 0, 32) are what renderer 0 then shows, and back in 3
+ *  the palette is the water one again (not the base one the mode set put
+ *  in, nor skipped as already applied), with the fade kept for the quad.
+ *  Returns 1 if it all holds.
+ */
+int videoswitch_palette_check(void)
+{
+    palette_t water[256], got[256], want[256];
+    int ok = 1;
+
+    myconnectindex = screenpeek = 0;
+    ud.brightness = 0;
+    ps[0].gm = MODE_GAME;
+    ps[0].palette = waterpal;
+    if (video_setrenderer(3) != 3) { printf("videoswitch: not in renderer 3\n"); return 0; }
+    palette_of(waterpal, water);
+    glresetgamepalette();
+    glsetgamepalette();
+    setpalettefade(63, 0, 0, 32);
+
+    video_setrenderer(0);
+    memcpy(got, curpalette, sizeof (got));
+    setbrightness(0, (unsigned char *) waterpal);
+    setpalettefade(63, 0, 0, 32);  /* in renderer 0: blended into the palette */
+    memcpy(want, curpalette, sizeof (want));
+    if (memcmp(got, want, sizeof (want)) != 0)
+        { printf("videoswitch: renderer 0 doesn't show the faded water palette\n"); ok = 0; }
+
+    video_setrenderer(3);
+    if (memcmp(curpalette, water, sizeof (water)) != 0)
+        { printf("videoswitch: renderer 3 again doesn't have the water palette\n"); ok = 0; }
+    if ((palfadedelta != 128) || (palfadergb.r != 252) || (palfadergb.g != 0) || (palfadergb.b != 0))
+        { printf("videoswitch: renderer 3 again lost the fade\n"); ok = 0; }
+    printf("renderer 3 -> 0 -> 3 with the water palette and a fade: %s\n", ok ? "kept" : "lost");
+
+    ps[0].gm = 0;
+    ps[0].palette = (char *) palette;
+    setpalettefade(0, 0, 0, 0);
+    return ok;
+}

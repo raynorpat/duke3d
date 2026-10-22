@@ -8922,7 +8922,7 @@ void clearview(int32_t dacol)
 #if defined(POLYMOST) && defined(USE_OPENGL)
 	if (rendmode == 3)
 	{
-		if (polymost_shaderdraw(0))  /* GL 2.1: the index */
+		if ((polymost_shaderdraw(0)) && (!glshcolor))  /* GL 2.1: the index (but for texture filtering's colour) */
 			glClearColor((float)dacol/255.f,0,0,0);
 		else
 			glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
@@ -8966,7 +8966,7 @@ void clearallviews(int32_t dacol)
 #if defined(POLYMOST) && defined(USE_OPENGL)
 	if (rendmode == 3)
 	{
-		if (polymost_shaderdraw(0))  /* GL 2.1: the index */
+		if ((polymost_shaderdraw(0)) && (!glshcolor))  /* GL 2.1: the index (but for texture filtering's colour) */
 			glClearColor((float)dacol/255.f,0,0,0);
 		else
 			glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);

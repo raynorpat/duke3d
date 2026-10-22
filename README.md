@@ -156,16 +156,21 @@ JFBuild:
 | 2 | Polymost software (polygons into the 8-bit framebuffer) |
 | 3 | Polymost OpenGL |
 
-Set `Renderer` under `[Screen Setup]` in `duke3d.cfg`, or use `-renderer N`
-for one run (the config keeps its own value). A number outside 0-3 is taken
+Pick the renderer on the VIDEO page (OPTIONS, then VIDEO...) at any time,
+in a game or the attract demo, or set `Renderer` under `[Screen Setup]` in
+`duke3d.cfg`, or use `-renderer N` for one run (the config keeps its own
+value; see [The VIDEO page](#the-video-page)). A number outside 0-3 is taken
 as the nearest one. Renderer 3 draws at the window's real pixel size
 (unless `GLInternalWidth`/`GLInternalHeight` is set on the 2.1 path) and
 uses a legacy (non-core) OpenGL context. Windowed, it opens at the size
 asked for, even over the 1600x1200 the 8-bit modes stop at. Once renderer 3
 has been used, its window and context stay until the program exits, and
 renderers 0-2 and the editor's 2D mode are shown through them, looking as
-before (switching renderer doesn't make a new window). If OpenGL isn't
-available, the game prints a message and uses renderer 0. The map editor has
+before (switching renderer doesn't make a new window). A run that started in
+renderer 0-2 has no OpenGL context; the first switch to OpenGL builds the
+window once with one. If OpenGL isn't available, the game prints a message
+and uses renderer 0 (at startup) or keeps the renderer it was in (from the
+VIDEO page). The map editor has
 its own settings (see [Map editor](#map-editor)).
 
 A `DUKE3D_POLYMOST=OFF` build has renderer 0 only: 1 and 2 draw with it
@@ -178,7 +183,9 @@ Other settings, all under `[Screen Setup]`:
   status bar's artwork is carried out to both screen edges, while its
   numbers and icons and the rest of the HUD stay in the 4:3 area. This
   applies to every renderer. 320x200, 640x400 and other 4:3 modes draw as
-  before.
+  before. The small HUD (the smallest screen size, with no status bar) is
+  anchored to the screen edges in widescreen: health at the left edge, ammo
+  at the right, and the inventory box just left of the ammo.
 - `GLTextureMipLevel` (default 0, at most 15): in renderer 3, drop this many
   mipmap levels from every texture. Over 0 looks blocky.
 - `ScreenshotFormat`: `png` (default), `jpg` or `bmp`. Screenshots are named
@@ -219,7 +226,8 @@ Renderer 3 draws with one of three paths, each needing more of the driver:
   `duke3d.cfg` write them as quoted decimals, such as `GLContrast = "1.25"`;
   an unquoted decimal is read as a whole number. `build.cfg` has `glcontrast`
   and `glsaturation`; the editor has no control for them. The brightness
-  setting (`britable`, F11) is separate and works as before.
+  setting (`britable`) is separate and works as before; it is now a row on
+  the VIDEO page, and F11 still steps it.
 
 #### Display mode and vsync
 
@@ -238,9 +246,75 @@ Renderer 3 draws with one of three paths, each needing more of the driver:
   fallback, last for the run only and aren't saved. Setting the environment
   variable `BUILD_WINDOWED` forces a window for that run, in the game and the
   editor.
-- The VIDEO page, reached from OPTIONS, has CONTRAST and SATURATION sliders
-  (greyed unless renderer 3 is on the 2.1 path), and DISPLAY and VSYNC rows
-  that apply at once and are saved with the other settings.
+- All of these can be changed live on the VIDEO page, described next.
+
+#### The VIDEO page
+
+OPTIONS, then VIDEO..., has nine rows. Each change applies at once, in a game,
+in the attract demo or in a network game, without a restart, and it doesn't
+touch the game state or demo and network sync. Choice rows (RENDERER, DISPLAY,
+VSYNC, SUPERSAMPLE, FILTERING) step forward with Enter, a click or Right and
+back with Left, skipping choices that aren't available. A row with nothing
+else to offer is greyed, and a note under the rows says why for the row the
+cursor is on.
+
+| Row | Choices | Rules |
+|---|---|---|
+| RENDERER | CLASSIC, POLY SOLID, POLY SOFT, OPENGL (0-3) | The first switch to OPENGL in a run that started in renderer 0-2 builds the window once with OpenGL. If that fails, the previous renderer is kept with a message, OPENGL is skipped for the rest of the run and the page says `OPENGL COULD NOT START`. A `DUKE3D_POLYMOST=OFF` build offers CLASSIC only |
+| DISPLAY | WINDOWED, BORDERLESS, FULLSCREEN | FULLSCREEN is `exclusive` in the config. Going to FULLSCREEN keeps the size if the main display has it as a mode, else takes the desktop's size, else the largest mode. Going to WINDOWED keeps the size if it fits the desktop, else takes the largest that does |
+| RESOLUTION | a list of sizes | Left and Right pick a size and Enter applies it (moving off the row drops the pick). Windowed: sizes up to the desktop's from the display modes, plus the current size. Fullscreen: the modes the main display reports, at their highest refresh rate. Borderless: shows DESKTOP and is greyed, as the window fills the screen |
+| VSYNC | ON, OFF | As `VSync` above |
+| BRIGHTNESS | slider, 8 levels | Moved here from OPTIONS; F11 still steps it. It is the same setting as before |
+| CONTRAST, SATURATION | sliders | The 2.1 path only; greyed otherwise |
+| SUPERSAMPLE | OFF, 2K, 4K, 8K | Renderer 3 on the 2.1 path only. Draws at 1440, 2160 or 4320 pixels tall (2560x1440, 3840x2160 and 7680x4320 at 16:9) with the window's aspect, and scales down to the window, so the picture is smoothed. A level not taller than the window is greyed, so it only ever scales down, and a size over what the GPU can do is cut down with a message. If the GPU can't make the frame (out of video memory, say), supersampling turns off with a message and the 2.1 path draws at the window's size; the row shows, and saves, OFF. It is greyed with the 1.1 and 1.5 paths and renderers 0-2, and while `GLInternalWidth`/`GLInternalHeight` is set (the internal size wins). 8K uses a lot of video memory. While greyed, a level kept from before can still be stepped to OFF |
+| FILTERING | NEAREST, BILINEAR, TRILINEAR | Renderer 3 only; greyed in renderers 0-2. On the 1.1 and 1.5 paths it sets the texture filter (trilinear uses mipmaps). On the 2.1 path, NEAREST keeps the exact palette-index drawing. BILINEAR and TRILINEAR switch it to colour drawing, see below |
+
+Resolution in the 8-bit renderers (0-2): the size chosen is the size the game
+draws its 8-bit picture at, up to the engine's 1600x1200 cap (the aspect is
+kept). A bigger choice draws
+at the largest size that fits and is scaled up to fill the window. The list
+also has the classic sizes such as 320x200, 640x400 and 640x480. In borderless
+they draw at the desktop's size, also up to the cap. Renderer 3 draws at the
+window's real size, or its internal size, or the supersampled size.
+
+Filtering and the 2.1 path: BILINEAR and TRILINEAR draw colours rather than
+palette indices. Distance shading still goes through the game's shade tables
+and stays exact, with trilinear shading each of the texels it blends. Seeing
+through things (translucent sprites, walls and tiles) blends with fixed
+amounts, and fades and flashes are worked out by the present step: both are
+approximations while filtering is on, close to but not the same as classic's.
+Supersampling and the contrast and saturation sliders work with filtering.
+Switching to NEAREST and OFF gives the exact 2.1 drawing again. If the colour
+programs don't link, a message is printed and the path keeps drawing nearest,
+with the filtering choices not offered.
+
+Fades: a change of renderer, resolution or display mode fades the screen to
+black (about a quarter of a second), makes the change while it is black, and
+fades back in. The same goes for supersampling and filtering. Play and the
+menu keep running underneath. While a change is pending the rows that would
+ask for another ignore input, so a double press is one change. A switch to
+OPENGL that fails keeps the renderer, and FULLSCREEN that the display can't
+take falls back to borderless (or the mode in effect); both fade back in. A
+resolution whose frame can't be allocated still quits with SDL's error, as it
+always has.
+
+What is saved: a row that you change on the page is saved to `duke3d.cfg`
+right away (and at exit), and rows you didn't change keep the value already in
+the file. So a one-run override is not written: `-renderer N`, Alt+Enter, the
+`BUILD_WINDOWED` variable or a fullscreen-to-borderless fallback show on the
+page as what is in effect, but leave the file's value until you change that
+row. A row you change saves the value you chose even if
+the driver can't honour it fully (a supersampling level cut down to the
+largest frame, or drawn at the window's size), except that OPENGL, when OpenGL
+couldn't start, is saved as the renderer that was kept. The keys are `Renderer`, `ScreenWidth`, `ScreenHeight`,
+`DisplayMode`, `VSync`, `GLContrast`, `GLSaturation`, `Supersampling` and
+`GLTextureFilter`, all under `[Screen Setup]`. `ScreenWidth` and
+`ScreenHeight` are now written to the file as well as read.
+
+- `Supersampling` is `off` (the default), `2k`, `4k` or `8k`, and
+  `GLTextureFilter` is `nearest` (the default), `bilinear` or `trilinear`,
+  written in quotes like `DisplayMode`. Anything else reads as the default.
+  `GLDrawPath` and the internal size stay config-only.
 
 Known gaps:
 
@@ -274,6 +348,8 @@ working directory.
 | `glinternalwidth`, `glinternalheight` | 0, 0 | The 2.1 path's internal size, up to 7680 by 4320; 0 is the window's |
 | `glcontrast`, `glsaturation` | 1, 1 | The 2.1 path's contrast (0.5-1.5) and saturation (0-2) |
 | `gltexmiplevel` | 0 | Mipmap levels dropped in renderer 3, 0-15 |
+| `supersampling` | off | Renderer 3 on the 2.1 path draws at 2k, 4k or 8k (`off`, `2k`, `4k`, `8k`) and scales down, as on the VIDEO page |
+| `gltexturefilter` | nearest | Renderer 3's texture filter: `nearest`, `bilinear` or `trilinear`, as on the VIDEO page |
 | `mousesensitivity` | 1 | Mouse speed, 0.1-10 |
 | `keyforward` ... `keychat` | see below | Keys, as two-digit hex scancodes |
 

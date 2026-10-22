@@ -50,6 +50,7 @@ extern int32 GLDrawPath;
 extern int32 GLInternalWidth, GLInternalHeight;
 extern double GLContrast, GLSaturation;
 extern int32 DisplayMode, VSync;
+extern int32 GLSupersampling, GLTextureFilter;  // SS_*, TEXFILTER_* (videoopts.h)
 extern char ScreenshotFormat[4];
 extern int32 ScreenWidth;
 extern int32 ScreenHeight;
@@ -57,6 +58,7 @@ extern int32 ScreenHeight;
 void CONFIG_ReadSetup( void );
 void CONFIG_GetSetupFilename( void );
 void CONFIG_WriteSetup( void );
+void CONFIG_SaveSetup( void );
 
 void CONFIG_PutString( char *sectionname, char *entryname, char *string );
 

@@ -17,6 +17,7 @@
 #include "buildcfg.h"
 #include "build/glext.h"
 #include "build/displaymode.h"
+#include "videoopts.h"
 
 static int fails;
 
@@ -43,6 +44,7 @@ static int same(const buildcfg_t *a, const buildcfg_t *b)
            a->glinternalheight == b->glinternalheight &&
            a->mousesensitivity == b->mousesensitivity &&
            a->glcontrast == b->glcontrast && a->glsaturation == b->glsaturation &&
+           a->supersampling == b->supersampling && a->gltexturefilter == b->gltexturefilter &&
            !memcmp(a->keys, b->keys, sizeof(a->keys));
 }
 
@@ -86,6 +88,26 @@ int main(void)
     CHECK(d.gldrawpath == GLPATH_AUTO && d.glinternalwidth == 0 && d.glinternalheight == 0);
     CHECK(strstr(text, "glcontrast = 1\n") && strstr(text, "glsaturation = 1\n"));
     CHECK(d.glcontrast == 1.0 && d.glsaturation == 1.0);
+
+    /* supersampling and texture filter: off and nearest by default */
+    CHECK(strstr(text, "supersampling = off\n") && strstr(text, "gltexturefilter = nearest\n"));
+    CHECK(d.supersampling == SS_OFF && d.gltexturefilter == TEXFILTER_NEAREST);
+    putstr(cfg, "supersampling = 4K\ngltexturefilter = Trilinear\n");
+    CHECK(buildcfg_read(&c, cfg) == 0);
+    CHECK(c.supersampling == SS_4K && c.gltexturefilter == TEXFILTER_TRILINEAR);
+    CHECK(buildcfg_write(&c, cfg) == 0);
+    f = fopen(cfg, "r");
+    n = f ? fread(text, 1, sizeof(text) - 1, f) : 0;
+    if (f) fclose(f);
+    text[n] = '\0';
+    CHECK(strstr(text, "supersampling = 4k\n") && strstr(text, "gltexturefilter = trilinear\n"));
+    memset(&d, 0, sizeof(d));
+    CHECK(buildcfg_read(&d, cfg) == 0);
+    CHECK(same(&c, &d));
+    putstr(cfg, "supersampling = 16k\ngltexturefilter = bogus\n");
+    CHECK(buildcfg_read(&c, cfg) == 0);
+    CHECK(c.supersampling == SS_OFF && c.gltexturefilter == TEXFILTER_NEAREST);
+    buildcfg_defaults(&d);
 
     /* contrast and saturation: decimals */
     putstr(cfg, "glcontrast = 0.75\nglsaturation = 1.25\n");

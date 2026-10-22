@@ -8,6 +8,10 @@
 int32_t gldrawpathrequest = GLPATH_AUTO;
 int32_t gldrawpath = GLPATH_IMMEDIATE;
 int32_t glinternalwidth = 0, glinternalheight = 0;
+int32_t glsupersample = 0;
+int32_t gltexturefilter = 0;
+int32_t gl_maxfbtest = 0;
+uint32_t gl_ssclamps = 0;
 double glcontrast = 1.0, glsaturation = 1.0;
 int32_t gl_forcefail = 0;
 

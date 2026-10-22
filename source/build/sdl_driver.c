@@ -36,6 +36,7 @@
 #include "display.h"
 #include "pragmas.h"
 #include "engine.h"
+#include "../videoopts.h"
 #ifdef USE_OPENGL
 #include "SDL_opengl.h"
 #include "glext.h"
@@ -145,9 +146,15 @@ int32_t bpp = 8;
 struct glinfo_t glinfo;
 char nofog = 0;
 extern void polymost_glreset(void);
-extern int32_t polymost_present_shader(const int32_t *r, int32_t dw, int32_t dh);
+extern int32_t polymost_present_shader(const int32_t *r, int32_t dw, int32_t dh, int32_t dark);
 extern void polymost_prepare_shader(void);
+extern int32_t polymost_supersample_failed(void);
 extern unsigned char *polymost_capture_shader(void);
+extern int32_t polymost_supersample_ready(void);
+extern int32_t polymost_filter_ready(int32_t filter);
+extern int32_t gltexfiltermode;
+extern void gltexapplyprops(void);
+extern int32_t glshsupersampled;
 extern GLuint polymost_takeframe_shader(void);
 extern void polymost_putframe_shader(GLuint tex);
 extern void polymost_unbind_shader(void);
@@ -165,8 +172,6 @@ static GLuint gl8tex = 0;  /* an 8-bit mode's frame, as shown through it */
 static int gl8tex_w, gl8tex_h;  /* its texture size */
 static float gl8xrel = 0, gl8yrel = 0;  /* mouse motion under a pixel, carried */
 static char gl_davidoption = 1;
-static int gl_window_w = 640;  /* windowed size: the last 8-bit mode's, unclamped */
-static int gl_window_h = 480;
 static int framedrawn = 0;  /* something was drawn since the last swap */
 static GLuint lastframe = 0;  /* the last swapped frame, before its fade */
 static int lastframe_set = 0;  /* lastframe holds a frame yet */
@@ -175,6 +180,7 @@ static int lastframe_w, lastframe_h;  /* its texture size */
 static int gl_draw_w, gl_draw_h;  /* the drawable */
 static int gl_scaled = 0;  /* the shader path draws at its internal size (xres, yres)... */
 static int32_t gl_showrect[4];  /* ...shown here in the drawable (gl_fitrect) */
+static int gl_ss = 0;  /* ...or supersampled (glsupersample), shown scaled down */
 #endif
 
 SDL_Surface *surface = NULL; /* This isn't static so that we can use it elsewhere AH */
@@ -186,7 +192,13 @@ static int debug_hall_of_mirrors = 0;
 static int sdl_displaymode = DISPLAY_BORDERLESS;  /* the window's */
 static int sdl_displaymode_wanted = DISPLAY_BORDERLESS;  /* unless BUILD_WINDOWED */
 static int sdl_vsync = 1;
+static int sdl_displaymode_next = -1;  /* for the next mode set (setvideodisplaymodenext) */
 static int exclusive_w = 0, exclusive_h = 0;  /* exclusive's size: the game mode's */
+static int exclusive_shown_w = 0, exclusive_shown_h = 0;  /* the size it was last set at */
+static int window_w = 640, window_h = 480;  /* windowed size: the last mode's, unclamped */
+static int placed_w = 0, placed_h = 0;  /* the windowed size the window was last given */
+static int sdl_drawfit = 0;  /* the game's 8-bit draw size rule (setvideodrawfit) */
+static Uint8 *surface_pixels = NULL;  /* surface's, rows exactly its width apart */
 static int32_t mouse_x = 0;
 static int32_t mouse_y = 0;
 static int32_t mouse_relative_x = 0;
@@ -300,6 +312,81 @@ static void output_driver_info(void)
 } /* output_driver_info */
 
 
+/*
+ * The VIDEO page's fade around a change: a darkness (0 none, 256 black)
+ *  over every frame shown, on top of the game's own palette and fade,
+ *  which it leaves alone. It runs in real time: videofade_at.
+ */
+static int vfade_state = 0;  /* 0 none, 1 out (then held black), 2 in */
+static Uint32 vfade_start;  /* SDL_GetTicks of the timeline's 0 */
+static int vfade_shown = 0;  /* the darkness of the last frame shown */
+
+int videofade_at(uint32_t ms)
+{
+    if (ms <= VIDEOFADE_MS)
+        return((int) (ms * 256 / VIDEOFADE_MS));
+    if (ms < 2 * VIDEOFADE_MS)
+        return((int) ((2 * VIDEOFADE_MS - ms) * 256 / VIDEOFADE_MS));
+    return(0);
+} /* videofade_at */
+
+
+/* The darkness for a frame being shown now, kept as vfade_shown. */
+static int vfade_now(void)
+{
+    Uint32 ms = SDL_GetTicks() - vfade_start;
+
+    if ((vfade_state == 1) && (ms >= 3 * VIDEOFADE_MS))
+    {   /* black held 2 * VIDEOFADE_MS with no setvideofadein: given up, faded in */
+        vfade_state = 2;
+        vfade_start = SDL_GetTicks() - VIDEOFADE_MS;
+        ms = VIDEOFADE_MS;
+    } /* if */
+    if (vfade_state == 0)
+        vfade_shown = 0;
+    else if (vfade_state == 1)  /* black until setvideofadein */
+        vfade_shown = videofade_at((ms < VIDEOFADE_MS) ? ms : VIDEOFADE_MS);
+    else if (ms >= 2 * VIDEOFADE_MS)
+        vfade_state = vfade_shown = 0;
+    else
+        vfade_shown = videofade_at(ms);
+    return(vfade_shown);
+} /* vfade_now */
+
+
+void setvideofadeout(void)
+{
+    Uint32 now = SDL_GetTicks(), ms = now - vfade_start;
+
+    if (vfade_state == 0)
+        vfade_start = now;
+    else if (vfade_state == 2)  /* turned back from where it is */
+        vfade_start = now - ((ms < 2 * VIDEOFADE_MS) ? 2 * VIDEOFADE_MS - ms : 0);
+    vfade_state = 1;
+} /* setvideofadeout */
+
+
+void setvideofadein(void)
+{
+    if (vfade_state != 1)
+        return;
+    vfade_state = 2;
+    vfade_start = SDL_GetTicks() - VIDEOFADE_MS;
+} /* setvideofadein */
+
+
+int getvideofade(void)
+{
+    return(vfade_shown);
+} /* getvideofade */
+
+
+int videofading(void)
+{
+    return(vfade_state != 0);
+} /* videofading */
+
+
 #ifdef USE_OPENGL
 static void gl_present8(void);
 #endif
@@ -307,6 +394,8 @@ static void gl_present8(void);
 /* Push the 8-bit surface through the palette to the window. */
 static void present_surface(void)
 {
+    Uint8 k;
+
 #ifdef USE_OPENGL
     if (sdl_glcontext != NULL)
     {
@@ -317,6 +406,8 @@ static void present_surface(void)
     if ((surface == NULL) || (sdl_texture == NULL))
         return;
 
+    k = (Uint8) ((255 * (256 - vfade_now())) >> 8);
+    SDL_SetTextureColorMod(sdl_texture, k, k, k);  /* 255: as it was */
     SDL_BlitSurface(surface, NULL, sdl_rgbsurface, NULL);
     SDL_UpdateTexture(sdl_texture, NULL, sdl_rgbsurface->pixels,
                       sdl_rgbsurface->pitch);
@@ -351,6 +442,8 @@ static void free_video_surfaces(void)
         SDL_FreeSurface(surface);
         surface = NULL;
     } /* if */
+    free(surface_pixels);
+    surface_pixels = NULL;
 } /* free_video_surfaces */
 
 
@@ -405,7 +498,7 @@ static void gl_present8(void)
 {
     int32_t r[4];
     int dw, dh;
-    float u, v;
+    float u, v, k;
 
     if ((surface == NULL) || (gl8tex == 0) || (gl_drawing))
         return;
@@ -442,7 +535,8 @@ static void gl_present8(void)
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, surface->w, surface->h,
                     GL_RGBA, GL_UNSIGNED_BYTE, sdl_rgbsurface->pixels);
-    glColor4f(1, 1, 1, 1);
+    k = (float) (256 - vfade_now()) / 256.0f;  /* the VIDEO page's fade; 1: none */
+    glColor4f(k, k, k, 1);
     glBegin(GL_QUADS);  /* the surface's top row at the top */
     glTexCoord2f(0, v); glVertex2f(-1, -1);
     glTexCoord2f(u, v); glVertex2f(1, -1);
@@ -638,25 +732,55 @@ static void init_res_lookups(int davidoption, int framebuffer)
 } /* init_res_lookups */
 
 
+static void centre_window_pos(int d, int w, int h, int *x, int *y);
+
 /*
- * Moves a window from display mode now to mode, exclusive at the display
- *  mode nearest exclusive_w by exclusive_h (borderless when there's none).
- *  Between the full-screen styles it goes through windowed. Returns the mode
- *  it's in. (Its flags can't always tell: under sdl2-compat the dummy
- *  driver reports exclusive as desktop full screen.)
+ * The main display's mode exactly w by h (the first SDL lists, its highest
+ *  refresh rate), else the one nearest; 0 if there's none.
+ */
+static int main_display_mode(int w, int h, SDL_DisplayMode *got)
+{
+    SDL_DisplayMode want;
+    int i, n = SDL_GetNumDisplayModes(0);
+
+    for (i = 0; i < n; i++)
+        if ((SDL_GetDisplayMode(0, i, got) == 0) && (got->w == w) && (got->h == h))
+            return(1);
+    memset(&want, '\0', sizeof (want));
+    want.w = w;
+    want.h = h;
+    return(SDL_GetClosestDisplayMode(0, &want, got) != NULL);
+} /* main_display_mode */
+
+
+/*
+ * Moves a window from display mode now to mode, exclusive at the main
+ *  display's mode exactly exclusive_w by exclusive_h (the VIDEO page lists
+ *  those), or the one nearest (borderless when there's none). Full screen is
+ *  on the main display: a window on another is moved there first (not tried
+ *  with more than one display). Between the full-screen styles it goes
+ *  through windowed. Returns the mode it's in. (Its flags can't always tell:
+ *  under sdl2-compat the dummy driver reports exclusive as desktop full
+ *  screen.)
  */
 static int set_window_display(SDL_Window *window, int now, int mode)
 {
-    SDL_DisplayMode want, got;
+    SDL_DisplayMode got;
     Uint32 flags = (mode == DISPLAY_EXCLUSIVE) ? SDL_WINDOW_FULLSCREEN :
                    (mode == DISPLAY_BORDERLESS) ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
 
+    if ((mode != DISPLAY_WINDOWED) && (now == DISPLAY_WINDOWED) &&
+        (SDL_GetWindowDisplayIndex(window) > 0))
+    {
+        int x, y, w, h;
+        SDL_GetWindowSize(window, &w, &h);
+        centre_window_pos(0, w, h, &x, &y);
+        SDL_SetWindowPosition(window, x, y);
+    } /* if */
+
     if (mode == DISPLAY_EXCLUSIVE)
     {
-        memset(&want, '\0', sizeof (want));
-        want.w = exclusive_w;
-        want.h = exclusive_h;
-        if ((SDL_GetClosestDisplayMode(SDL_GetWindowDisplayIndex(window), &want, &got) == NULL) ||
+        if ((!main_display_mode(exclusive_w, exclusive_h, &got)) ||
             (SDL_SetWindowDisplayMode(window, &got) != 0))
         {
             printf("No exclusive fullscreen display mode fits %dx%d (%s); using borderless.\n",
@@ -664,6 +788,8 @@ static int set_window_display(SDL_Window *window, int now, int mode)
             return(set_window_display(window, now, DISPLAY_BORDERLESS));
         } /* if */
         sdldebug("exclusive fullscreen at %dx%d, %d Hz.", got.w, got.h, got.refresh_rate);
+        exclusive_shown_w = exclusive_w;
+        exclusive_shown_h = exclusive_h;
     } /* if */
 
     if (now == mode)
@@ -681,19 +807,44 @@ static int set_window_display(SDL_Window *window, int now, int mode)
 
 
 /*
+ * Where a w by h window is centred on display d: on its bounds, as SDL's own
+ *  centring is not (on macOS, sdl2-compat 2.32 after exclusive keeps the
+ *  exclusive mode's usable area, putting the window half off the screen).
+ */
+static void centre_window_pos(int d, int w, int h, int *x, int *y)
+{
+    SDL_Rect b;
+
+    *x = *y = SDL_WINDOWPOS_CENTERED;
+    if ((d < 0) || (SDL_GetDisplayBounds(d, &b) != 0))
+        return;
+    *x = b.x + ((b.w > w) ? (b.w - w) / 2 : 0);
+    *y = b.y + ((b.h > h) ? (b.h - h) / 2 : 0);
+} /* centre_window_pos */
+
+
+/*
  * A window in sdl_displaymode. An exclusive one is made hidden and shown
  *  once its display mode is set, so the display changes mode only once.
+ *  One that replaces a window of its size (the first OpenGL one) goes where
+ *  that one is.
  */
 static SDL_Window *create_window(int w, int h, Uint32 flags)
 {
     SDL_Window *window;
+    int x, y;
 
     if (sdl_displaymode == DISPLAY_BORDERLESS)
         flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
     else if (sdl_displaymode == DISPLAY_EXCLUSIVE)
         flags |= SDL_WINDOW_HIDDEN;
-    window = SDL_CreateWindow(titlelong,
-                    SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, w, h, flags);
+    if ((sdl_window != NULL) && (sdl_displaymode == DISPLAY_WINDOWED) &&
+        (w == placed_w) && (h == placed_h))
+        SDL_GetWindowPosition(sdl_window, &x, &y);
+    else
+        centre_window_pos((sdl_window != NULL) ? SDL_GetWindowDisplayIndex(sdl_window) : 0,
+                          w, h, &x, &y);
+    window = SDL_CreateWindow(titlelong, x, y, w, h, flags);
     if ((window != NULL) && (sdl_displaymode == DISPLAY_EXCLUSIVE))
     {
         sdl_displaymode = set_window_display(window, DISPLAY_WINDOWED, DISPLAY_EXCLUSIVE);
@@ -703,9 +854,77 @@ static SDL_Window *create_window(int w, int h, Uint32 flags)
 } /* create_window */
 
 
-static void go_to_new_vid_mode(int vidoption, int w, int h)
+/* The display mode a mode set puts the window in. */
+static int take_next_displaymode(void)
 {
-    int scale;
+    int mode = (sdl_displaymode_next >= 0) ? sdl_displaymode_next : sdl_displaymode;
+
+    sdl_displaymode_next = -1;
+    return(mode);
+} /* take_next_displaymode */
+
+
+/*
+ * A mode set's window: the windowed size (window_w by window_h) and display
+ *  mode. What hasn't changed is left alone, so a window the player moved
+ *  stays where it is. A new windowed size is given only while windowed (in
+ *  full screen it waits for the return, so the screen changes once), and
+ *  then centred on the display the window was on.
+ */
+static void place_window(int mode)
+{
+    int d = SDL_GetWindowDisplayIndex(sdl_window);
+    int x, y;
+
+    if ((mode != sdl_displaymode) ||
+        ((mode == DISPLAY_EXCLUSIVE) &&
+         ((exclusive_w != exclusive_shown_w) || (exclusive_h != exclusive_shown_h))))
+        sdl_displaymode = set_window_display(sdl_window, sdl_displaymode, mode);
+    if ((sdl_displaymode != DISPLAY_WINDOWED) ||
+        ((window_w == placed_w) && (window_h == placed_h)))
+        return;
+    SDL_SetWindowSize(sdl_window, window_w, window_h);
+    placed_w = window_w;
+    placed_h = window_h;
+    centre_window_pos(d, window_w, window_h, &x, &y);
+    SDL_SetWindowPosition(sdl_window, x, y);
+} /* place_window */
+
+
+/*
+ * The size a game mode's 8-bit frame is drawn at. The game's rule
+ *  (setvideodrawfit): the size asked for, or in borderless the window's,
+ *  which fills the desktop (on macOS, below a notch), capped to 1600x1200
+ *  keeping the aspect. Otherwise (the editor) the size asked for, over
+ *  1600x1200 clamped to it. The window shows it scaled.
+ */
+static void fit_draw_size(int *w, int *h)
+{
+    if (!sdl_drawfit)
+    {
+        if ((*w > 1600) || (*h > 1200))
+        {
+            *w = 1600;
+            *h = 1200;
+        } /* if */
+        return;
+    } /* if */
+    if (sdl_displaymode == DISPLAY_BORDERLESS)
+        SDL_GetWindowSize(sdl_window, w, h);
+    videoopts_drawsize(*w, *h, 0, w, h);
+} /* fit_draw_size */
+
+
+void setvideodrawfit(int on)
+{
+    sdl_drawfit = (on != 0);
+} /* setvideodrawfit */
+
+
+/* fit: a game mode, drawn at fit_draw_size's size in a w by h window. */
+static void go_to_new_vid_mode(int vidoption, int w, int h, int fit)
+{
+    int scale, mode;
 
     getvalidvesamodes();
     SDL_ClearError();
@@ -718,14 +937,14 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
     gl_leave();  /* the GL window, if there is one, shows the 8-bit mode */
 #endif
 
+    mode = take_next_displaymode();
+
     /* low-res modes get a bigger window so they aren't a postage stamp. */
     scale = (w < 640) ? (640 / w) : 1;
     if (scale < 1)
         scale = 1;
-#ifdef USE_OPENGL
-    gl_window_w = w * scale;  /* a fullscreen window reports the desktop size. */
-    gl_window_h = h * scale;
-#endif
+    window_w = w * scale;  /* a fullscreen window reports the desktop size. */
+    window_h = h * scale;
 
     if (exclusive_w == 0)  /* no game mode yet (the editor's 2D) */
     {
@@ -735,9 +954,12 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
 
     if (sdl_window == NULL)
     {
-        sdl_window = create_window(w * scale, h * scale, 0);
+        sdl_displaymode = mode;
+        sdl_window = create_window(window_w, window_h, 0);
         if (sdl_window == NULL)
             goto vidmode_failed;
+        placed_w = window_w;
+        placed_h = window_h;
 
         sdl_renderer = SDL_CreateRenderer(sdl_window, -1,
                                           sdl_vsync ? SDL_RENDERER_PRESENTVSYNC : 0);
@@ -753,17 +975,14 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
             goto vidmode_failed;
     } /* if */
     else
-    {
-        /* set the size even when fullscreen, so going windowed restores it. */
-        SDL_SetWindowSize(sdl_window, w * scale, h * scale);
-        if (sdl_displaymode == DISPLAY_WINDOWED)
-            SDL_SetWindowPosition(sdl_window, SDL_WINDOWPOS_CENTERED,
-                                  SDL_WINDOWPOS_CENTERED);
-        else  /* exclusive keeps the game mode's display mode. */
-            sdl_displaymode = set_window_display(sdl_window, sdl_displaymode, sdl_displaymode);
-    } /* else */
+        place_window(mode);
 
-    surface = SDL_CreateRGBSurface(0, w, h, 8, 0, 0, 0, 0);
+    if (fit)
+        fit_draw_size(&w, &h);
+    /* the engine assumes bytesperline == width; SDL would pad rows to 4. */
+    surface_pixels = (Uint8 *) malloc((size_t) w * h);
+    surface = (surface_pixels == NULL) ? NULL :
+              SDL_CreateRGBSurfaceFrom(surface_pixels, w, h, 8, w, 0, 0, 0, 0);
 #ifdef USE_OPENGL
     if (sdl_glcontext != NULL)  /* shown through the GL context: gl_present8 */
     {
@@ -785,7 +1004,6 @@ static void go_to_new_vid_mode(int vidoption, int w, int h)
             goto vidmode_failed;
     } /* else */
 
-    /* the engine assumes bytesperline == width. */
     assert(surface->pitch == surface->w);
 
     output_surface_info(surface);
@@ -817,6 +1035,8 @@ static void gl_alloc_lastframe(void)
     lastframe_set = 0;
     swapped = 0;
 
+    if (gl_ss)  /* the shader path keeps its own frame; one this big isn't wasted */
+        return;
     lastframe_w = xres;
     lastframe_h = yres;
     if (!glinfo.texnpot)
@@ -858,6 +1078,25 @@ static void gl_draw_fade(void)
 } /* gl_draw_fade */
 
 
+/* The VIDEO page's fade (vfade_now): black over the frame at dark/256. */
+static void gl_draw_dark(int dark)
+{
+    if (!dark)
+        return;
+    setpolymost2dview();
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glColor4ub(0, 0, 0, (dark > 255) ? 255 : dark);
+    glBegin(GL_QUADS);
+    glVertex2i(0, 0);
+    glVertex2i(xres, 0);
+    glVertex2i(xres, yres);
+    glVertex2i(0, yres);
+    glEnd();
+    glDisable(GL_BLEND);
+} /* gl_draw_dark */
+
+
 /* Fills the back buffer with (0,0)-(u,v) of a frame texture: bottom-up rows. */
 static void gl_draw_frame(GLuint tex, float u, float v)
 {
@@ -889,7 +1128,7 @@ static void gl_draw_lastframe(void)
  */
 static void gl_swap(void)
 {
-    if (polymost_present_shader(gl_showrect, gl_draw_w, gl_draw_h))
+    if (polymost_present_shader(gl_showrect, gl_draw_w, gl_draw_h, vfade_now()))
     {
         SDL_GL_SwapWindow(sdl_window);
         swapped = 1;
@@ -907,6 +1146,7 @@ static void gl_swap(void)
 
     if (palfadedelta)
         gl_draw_fade();
+    gl_draw_dark(vfade_now());
 
     SDL_GL_SwapWindow(sdl_window);
     swapped = 1;
@@ -941,7 +1181,7 @@ void _glpalettefade(void)
 {
     if ((!gl_drawing) || (framedrawn))
         return;
-    if (polymost_present_shader(gl_showrect, gl_draw_w, gl_draw_h))  /* the GL 2.1 tier keeps the frame */
+    if (polymost_present_shader(gl_showrect, gl_draw_w, gl_draw_h, vfade_now()))  /* the GL 2.1 tier keeps the frame */
     {
         SDL_GL_SwapWindow(sdl_window);
         swapped = 1;
@@ -954,20 +1194,105 @@ void _glpalettefade(void)
     gl_draw_lastframe();
     if (palfadedelta)
         gl_draw_fade();
+    gl_draw_dark(vfade_now());
     SDL_GL_SwapWindow(sdl_window);
     swapped = 1;
     framedrawn = 0;
 } /* _glpalettefade */
 
 
+/* The largest frame the shader path can draw: GL's texture, renderbuffer
+ *  and viewport limits, the engine's MAXXDIM, and gl_maxfbtest's. */
+static int gl_maxfb(void)
+{
+    GLint t = 0, vp[2] = { 0, 0 };
+    int m = MAXXDIM;
+
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &t);
+    if ((t > 0) && (t < m)) m = t;
+    if (glinfo.fbo)
+    {
+        t = 0;
+        glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE, &t);
+        if ((t > 0) && (t < m)) m = t;
+    } /* if */
+    glGetIntegerv(GL_MAX_VIEWPORT_DIMS, vp);
+    if ((vp[0] > 0) && (vp[0] < m)) m = vp[0];
+    if ((vp[1] > 0) && (vp[1] < m)) m = vp[1];
+    if ((gl_maxfbtest > 0) && (gl_maxfbtest < m)) m = gl_maxfbtest;
+    return(m);
+} /* gl_maxfb */
+
+
+/* The largest supersampled frame for the drawable: gl_maxfb, and at most
+ *  GLSHDOWNMAXSCALE texels to a pixel (its larger side is the one clamped). */
+static int gl_ssmaxfb(void)
+{
+    int m = gl_maxfb(), d = (gl_draw_w > gl_draw_h) ? gl_draw_w : gl_draw_h;
+
+    if ((d > 0) && (d * GLSHDOWNMAXSCALE < m))
+        m = d * GLSHDOWNMAXSCALE;
+    return(m);
+} /* gl_ssmaxfb */
+
+
+/*
+ * Supersampling's size for the drawable (gl_draw_w by gl_draw_h), or 0 when
+ *  it isn't used: off, off the shader path, with an internal size
+ *  (internal), or not larger than the window. say: tell why, and when it's
+ *  clamped to the largest frame.
+ */
+static int gl_sssize(int internal, int say, int *w, int *h)
+{
+    int maxfb, fw, fh;
+    const char *name = videoopts_ssname(glsupersample);
+
+    if (glsupersample <= SS_OFF)
+        return(0);
+    if (gldrawpath != GLPATH_SHADER)
+    {
+        if (say)
+            printf("Supersampling %s needs draw path shader; drawing at the window's size.\n", name);
+        return(0);
+    } /* if */
+    if (internal)
+    {
+        if (say)
+            printf("Supersampling %s is off: the GL internal size is used instead.\n", name);
+        return(0);
+    } /* if */
+    if (!polymost_supersample_ready())
+        return(0);
+    maxfb = gl_ssmaxfb();
+    videoopts_sssize(glsupersample, gl_draw_w, gl_draw_h, 0, &fw, &fh);
+    videoopts_sssize(glsupersample, gl_draw_w, gl_draw_h, maxfb, w, h);
+    if ((say) && ((*w != fw) || (*h != fh)))
+    {
+        printf("Supersampling %s at %dx%d is over the largest frame, %d; drawing at %dx%d.\n",
+               name, fw, fh, maxfb, *w, *h);
+        gl_ssclamps++;
+    } /* if */
+    if (!videoopts_ssavailable(glsupersample, gl_draw_w, gl_draw_h, maxfb, 1, 0))
+    {
+        if (say)
+            printf("Supersampling %s at %dx%d isn't larger than the window (%dx%d); drawing at its size.\n",
+                   name, *w, *h, gl_draw_w, gl_draw_h);
+        return(0);
+    } /* if */
+    return(1);
+} /* gl_sssize */
+
+
 /*
  * xdim/ydim are the drawable size, clamped to what the engine's arrays hold,
  *  or on the shader path its internal size (glinternalwidth/height), which
- *  the present scales up to the drawable. say: tell why a setting isn't used.
+ *  the present scales up to the drawable, or its supersampled size
+ *  (glsupersample), which it scales down. say: tell why a setting isn't
+ *  used.
  */
 static void init_gl_res_vars(int say)
 {
-    int w, h, why;
+    int w, h, why, internal, sw, sh;
     int32_t iw, ih;
 
     SDL_GL_GetDrawableSize(sdl_window, &gl_draw_w, &gl_draw_h);
@@ -981,6 +1306,7 @@ static void init_gl_res_vars(int say)
     else if ((say) && (why == 2))
         printf("GL internal size %dx%d is under 320x200; drawing at %dx%d.\n",
                (int) glinternalwidth, (int) glinternalheight, (int) iw, (int) ih);
+    internal = (iw != 0);
     if ((iw != 0) && (gldrawpath != GLPATH_SHADER))
     {
         if (say)
@@ -993,6 +1319,13 @@ static void init_gl_res_vars(int say)
     {
         w = iw;
         h = ih;
+    } /* if */
+    gl_ss = gl_sssize(internal, say, &sw, &sh);
+    glshsupersampled = gl_ss;
+    if (gl_ss)
+    {
+        w = sw;
+        h = sh;
     } /* if */
     gl_fitrect(w, h, gl_draw_w, gl_draw_h, gl_showrect);
 
@@ -1016,14 +1349,32 @@ static void init_gl_res_vars(int say)
  *  last frame is shown again, stretched to the new size, and kept as the
  *  new last frame, so the screen and its fades don't go black.
  */
+static void gl_remake(int say);
+
+/*
+ * After init_gl_res_vars, at an internal or supersampled size: makes the
+ *  shader path's frame now, so a failure is dealt with before anything is
+ *  drawn. A supersampled frame that can't be made (too big for the video
+ *  memory) turns supersampling off, and it draws at the window's size on
+ *  the shader path; any other failure leaves the shader path, also drawing
+ *  at the window's size. say: as init_gl_res_vars's.
+ */
+static void gl_prepare(int say)
+{
+    polymost_prepare_shader();
+    if (polymost_supersample_failed())
+    {
+        glsupersample = SS_OFF;  /* so the VIDEO page shows, and saves, off */
+        init_gl_res_vars(say);
+        polymost_prepare_shader();
+    } /* if */
+    if (gldrawpath != GLPATH_SHADER)
+        init_gl_res_vars(say);
+} /* gl_prepare */
+
 static void gl_resize(void)
 {
     int w, h;
-    palette_t pal[256], fadergb;
-    unsigned char fadedelta, base[768];
-    GLuint old, shframe;
-    float oldu = 0, oldv = 0;
-    int drawn;
 
     SDL_GL_GetDrawableSize(sdl_window, &w, &h);
     if ((w == gl_draw_w) && (h == gl_draw_h))
@@ -1033,7 +1384,7 @@ static void gl_resize(void)
         gl_draw_w = w;
         gl_draw_h = h;
         gl_fitrect(xres, yres, w, h, gl_showrect);
-        if ((!framedrawn) && (polymost_present_shader(gl_showrect, w, h)))
+        if ((!framedrawn) && (polymost_present_shader(gl_showrect, w, h, vfade_now())))
         {
             SDL_GL_SwapWindow(sdl_window);  /* a still screen: shown again. */
             swapped = 1;
@@ -1041,6 +1392,22 @@ static void gl_resize(void)
         } /* if */
         return;
     } /* if */
+    gl_remake(0);
+} /* gl_resize */
+
+
+/*
+ * The frame made again at the size init_gl_res_vars gives now (the
+ *  drawable's, or supersampling's): the palette, the fade and the frame
+ *  drawn or shown are kept, as in a resize. say: as init_gl_res_vars's.
+ */
+static void gl_remake(int say)
+{
+    palette_t pal[256], fadergb;
+    unsigned char fadedelta, base[768];
+    GLuint old, shframe;
+    float oldu = 0, oldv = 0;
+    int drawn;
 
     /* init_res_lookups sets the base palette and drops the fade: keep both. */
     memcpy(pal, curpalette, sizeof (pal));
@@ -1057,7 +1424,9 @@ static void gl_resize(void)
     } /* if */
     shframe = polymost_takeframe_shader();  /* the GL 2.1 tier's, drawn or being drawn */
     polymost_glreset();
-    init_gl_res_vars(0);
+    init_gl_res_vars(say);
+    if (gl_ss)  /* a framebuffer that big failing: the window's size, without supersampling */
+        gl_prepare(say);
     memcpy(curpalette, pal, sizeof (pal));
     memcpy(getbasepalette(), base, sizeof (base));
     palfadergb = fadergb;
@@ -1077,8 +1446,80 @@ static void gl_resize(void)
         glDeleteTextures(1, &old);
         gl_swap();  /* framedrawn: it becomes lastframe, faded and shown. */
     } /* if */
-} /* gl_resize */
+} /* gl_remake */
 #endif
+
+
+int setvideosupersample(int level)
+{
+#ifdef USE_OPENGL
+    if (level == glsupersample)
+        return(gl_ss);
+    glsupersample = level;
+    if ((gl_drawing) && (gldrawpath == GLPATH_SHADER) && (!gl_scaled))
+        gl_remake(1);
+    return(gl_ss);
+#else
+    (void) level;
+    return(0);
+#endif
+} /* setvideosupersample */
+
+
+int videosupersampleavailable(int level)
+{
+#ifdef USE_OPENGL
+    int32_t iw, ih;
+
+    if (level <= SS_OFF)
+        return(1);
+    if (!gl_drawing)
+        return(0);
+    gl_internalsize(glinternalwidth, glinternalheight, &iw, &ih);
+    if ((gldrawpath == GLPATH_SHADER) && (!polymost_supersample_ready()))
+        return(0);
+    return(videoopts_ssavailable(level, gl_draw_w, gl_draw_h, gl_ssmaxfb(),
+                                 gldrawpath == GLPATH_SHADER, iw != 0));
+#else
+    return(level <= 0);
+#endif
+} /* videosupersampleavailable */
+
+
+int setvideotexfilter(int filter)
+{
+#ifdef USE_OPENGL
+    /* polymost.c's glfiltermodes: GL_NEAREST, GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR */
+    static const int32_t modes[TEXFILTER_COUNT] = { 0, 1, 5 };
+
+    if ((filter < 0) || (filter >= TEXFILTER_COUNT))
+        filter = TEXFILTER_NEAREST;
+    gltexturefilter = filter;
+    gltexfiltermode = modes[filter];
+    if ((gl_drawing) && (gldrawpath != GLPATH_SHADER))
+        gltexapplyprops();  /* the textures made (with their mipmaps); new ones are made so */
+    return(videotexfilteravailable(filter));
+#else
+    (void) filter;
+    return(0);
+#endif
+} /* setvideotexfilter */
+
+
+int videotexfilteravailable(int filter)
+{
+#ifdef USE_OPENGL
+    if (filter <= TEXFILTER_NEAREST)
+        return(1);
+    if (!gl_drawing)
+        return(0);
+    if (gldrawpath == GLPATH_SHADER)
+        return(polymost_filter_ready(filter));
+    return(1);
+#else
+    return(filter <= 0);
+#endif
+} /* videotexfilteravailable */
 
 
 int setgamemode_gl(char davidoption)
@@ -1096,12 +1537,7 @@ int setgamemode_gl(char davidoption)
     {
         free_video_surfaces();
         gl_leave();
-        SDL_SetWindowSize(sdl_window, gl_window_w, gl_window_h);
-        if (sdl_displaymode == DISPLAY_WINDOWED)
-            SDL_SetWindowPosition(sdl_window, SDL_WINDOWPOS_CENTERED,
-                                  SDL_WINDOWPOS_CENTERED);
-        else  /* exclusive keeps the game mode's display mode. */
-            sdl_displaymode = set_window_display(sdl_window, sdl_displaymode, sdl_displaymode);
+        place_window(take_next_displaymode());
     } /* if */
     else
     {
@@ -1110,15 +1546,22 @@ int setgamemode_gl(char davidoption)
          *  leaves that mode as it was. SDL2 can't add GL to a window that
          *  has an SDL_Renderer, so it's a new window.
          */
+        int displaymode = sdl_displaymode;  /* create_window may change it */
+
         SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-        window = create_window(gl_window_w, gl_window_h,
+        window = create_window(window_w, window_h,
                                SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI);
-        context = (window != NULL) ? SDL_GL_CreateContext(window) : NULL;
+        context = ((window != NULL) && (gl_forcefail != 4)) ? SDL_GL_CreateContext(window) : NULL;
         if (context == NULL)
         {
             if (window != NULL)
                 SDL_DestroyWindow(window);
+            sdl_displaymode = displaymode;  /* the 8-bit window's, still */
+            if ((window != NULL) && (displaymode == DISPLAY_EXCLUSIVE))  /* its display mode again */
+                sdl_displaymode = set_window_display(sdl_window, displaymode, displaymode);
+            if (gl_forcefail == 4)
+                SDL_SetError("no context (gl_forcefail 4)");
             return(-1);
         } /* if */
 
@@ -1132,6 +1575,8 @@ int setgamemode_gl(char davidoption)
             SDL_DestroyWindow(sdl_window);
         sdl_window = window;
         sdl_glcontext = context;
+        placed_w = window_w;
+        placed_h = window_h;
     } /* else */
 
     /* destroying an SDL_Renderer can leave no context current. */
@@ -1173,12 +1618,8 @@ int setgamemode_gl(char davidoption)
     init_gl_res_vars(1);
     setrendermode(3);
     polymost_glreset();
-    if (gl_scaled)  /* the shader path failing now draws at the window's size. */
-    {
-        polymost_prepare_shader();
-        if (gldrawpath != GLPATH_SHADER)
-            init_gl_res_vars(1);
-    } /* if */
+    if ((gl_scaled) || (gl_ss))  /* the shader path failing now draws at the window's size. */
+        gl_prepare(1);
     last_render_ticks = SDL_GetTicks();
     return(0);
 #else
@@ -1375,8 +1816,24 @@ void setvideodisplaymode(int mode)
     if ((mode < 0) || (mode >= DISPLAY_COUNT))
         mode = DISPLAY_BORDERLESS;
     sdl_displaymode_wanted = mode;
+    sdl_displaymode_next = -1;
     show_display_mode((getenv(BUILD_WINDOWED) != NULL) ? DISPLAY_WINDOWED : mode);
 } /* setvideodisplaymode */
+
+
+void setvideodisplaymodenext(int mode)
+{
+    if ((mode < 0) || (mode >= DISPLAY_COUNT))
+        mode = DISPLAY_BORDERLESS;
+    if (mode != DISPLAY_WINDOWED)  /* Alt+Enter's full-screen style */
+        sdl_displaymode_wanted = mode;
+    if (getenv(BUILD_WINDOWED) != NULL)
+        mode = DISPLAY_WINDOWED;
+    if (sdl_window == NULL)
+        sdl_displaymode = mode;
+    else
+        sdl_displaymode_next = mode;
+} /* setvideodisplaymodenext */
 
 
 int getvideodisplaymode(void)
@@ -1407,7 +1864,18 @@ int getvideovsync(void)
 } /* getvideovsync */
 
 
-/* Alt+Enter: windowed, or the full-screen style set (borderless if none). */
+static void (*sdl_togglehook)(int mode) = NULL;
+
+void setvideotogglehook(void (*hook)(int mode))
+{
+    sdl_togglehook = hook;
+} /* setvideotogglehook */
+
+
+/*
+ * Alt+Enter: windowed, or the full-screen style set (borderless if none);
+ *  through the hook if there is one (the game's mode set), else now.
+ */
 static int attempt_fullscreen_toggle(void)
 {
     int mode = sdl_displaymode_wanted;
@@ -1421,9 +1889,39 @@ static int attempt_fullscreen_toggle(void)
         mode = DISPLAY_WINDOWED;
     else if (mode == DISPLAY_WINDOWED)
         mode = DISPLAY_BORDERLESS;
+    if (sdl_togglehook != NULL)
+    {
+        sdl_togglehook(mode);
+        return(1);
+    } /* if */
     show_display_mode(mode);
     return(sdl_displaymode == mode);
 } /* attempt_fullscreen_toggle */
+
+
+int getvideomodelist(int32_t *w, int32_t *h, int max, int32_t *desktopw, int32_t *desktoph)
+{
+    SDL_DisplayMode mode;
+    int i, n = 0, count;
+
+    *desktopw = *desktoph = 0;
+    if (SDL_GetDesktopDisplayMode(0, &mode) == 0)
+    {
+        *desktopw = mode.w;
+        *desktoph = mode.h;
+    } /* if */
+    count = SDL_GetNumDisplayModes(0);
+    for (i = 0; (i < count) && (n < max); i++)
+    {
+        if (SDL_GetDisplayMode(0, i, &mode) == 0)
+        {
+            w[n] = mode.w;
+            h[n] = mode.h;
+            n++;
+        } /* if */
+    } /* for */
+    return(n);
+} /* getvideomodelist */
 
 
     /*
@@ -2121,6 +2619,48 @@ int setvesa(int32_t x, int32_t y)
 
 #ifdef USE_OPENGL
 /*
+ * A top-down RGB frame (sw by sh, malloc'd, freed here) scaled down to dw
+ *  by dh as the shader path's present does: each pixel the mean of the
+ *  texels it covers, each weighted by how much of it is covered. NULL if
+ *  there's no memory.
+ */
+static unsigned char *gl_boxdown(unsigned char *src, int sw, int sh, int dw, int dh)
+{
+    unsigned char *out = (unsigned char *) malloc((size_t) dw * dh * 3);
+    double sx = (double) sw / dw, sy = (double) sh / dh, a, b, c, d, wy, wx, sum[3];
+    const unsigned char *p;
+    int ox, oy, x, y, i;
+
+    for (oy = 0; (out != NULL) && (oy < dh); oy++)
+    {
+        a = oy * sy;
+        b = a + sy;
+        for (ox = 0; ox < dw; ox++)
+        {
+            c = ox * sx;
+            d = c + sx;
+            sum[0] = sum[1] = sum[2] = 0;
+            for (y = (int) a; (y < b) && (y < sh); y++)
+            {
+                wy = (((y + 1) < b) ? (y + 1) : b) - ((y > a) ? y : a);
+                for (x = (int) c; (x < d) && (x < sw); x++)
+                {
+                    wx = (((x + 1) < d) ? (x + 1) : d) - ((x > c) ? x : c);
+                    p = &src[((size_t) y * sw + x) * 3];
+                    for (i = 0; i < 3; i++)
+                        sum[i] += wx * wy * p[i];
+                } /* for */
+            } /* for */
+            for (i = 0; i < 3; i++)
+                out[((size_t) oy * dw + ox) * 3 + i] = (unsigned char) (sum[i] / (sx * sy) + 0.5);
+        } /* for */
+    } /* for */
+    free(src);
+    return(out);
+} /* gl_boxdown */
+
+
+/*
  * RGB of the frame (JFBuild's GL branch), top row first, in a malloc'd
  *  buffer, or NULL. It's read from the back buffer: a frame being drawn is
  *  there; otherwise the last swapped frame is drawn there again first, as
@@ -2128,7 +2668,8 @@ int setvesa(int32_t x, int32_t y)
  *  The fade the swap puts over it is applied here the same way, so it's
  *  the picture on screen, as in 8-bit. With no last-frame texture (over
  *  GL_MAX_TEXTURE_SIZE) it reads the front buffer, fade and all. The size
- *  is the drawable's.
+ *  is the drawable's; supersampled, the frame is scaled down to it as the
+ *  present does (gl_boxdown).
  */
 static unsigned char *gl_screencapture(int *w, int *h)
 {
@@ -2139,6 +2680,14 @@ static unsigned char *gl_screencapture(int *w, int *h)
     *w = xdim;
     *h = ydim;
     rgb = polymost_capture_shader();  /* the GL 2.1 tier's frame, as shown */
+    if ((rgb == NULL) && (gl_ss))  /* the back buffer isn't the frame's size */
+        return(NULL);
+    if ((rgb != NULL) && (gl_ss))  /* supersampled: at the window's size, as shown */
+    {
+        *w = gl_showrect[2];
+        *h = gl_showrect[3];
+        return(gl_boxdown(rgb, xres, yres, *w, *h));
+    } /* if */
     if (rgb != NULL)
         return(rgb);
     if (!framedrawn)
@@ -2167,6 +2716,9 @@ static unsigned char *gl_screencapture(int *w, int *h)
     {
         glReadBuffer(GL_FRONT);
         a = 0;  /* the swap drew the fade there already. */
+        /* The VIDEO page's fade too (gl_draw_dark), which can't be taken
+         *  out: at black nothing of the frame is left. Only here, with no
+         *  last-frame texture to read instead. */
     } /* if */
     while (glGetError() != GL_NO_ERROR) {}  /* only the read's own error counts. */
     glReadPixels(0, 0, *w, *h, GL_RGB, GL_UNSIGNED_BYTE, rgb);
@@ -2352,38 +2904,24 @@ void setvmode(int mode)
     assert(w > 0);
     assert(h > 0);
 
-    go_to_new_vid_mode(-1, w, h);
+    go_to_new_vid_mode(-1, w, h, 0);
 } /* setvmode */
 
 
+/*
+ * A game mode: a daxdim by daydim window, or exclusive at the display mode
+ *  nearest that, or borderless. 8-bit modes draw at fit_draw_size's size;
+ *  renderer 3 (setgamemode_gl) at the drawable's.
+ */
 int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim)
 {
-#ifdef USE_OPENGL
-    int32_t glw = daxdim, glh = daydim;
-#endif
-
-    exclusive_w = daxdim;  /* the size asked for, before the clamp */
+    exclusive_w = daxdim;
     exclusive_h = daydim;
-
-    /* 8-bit modes keep the original limit; MAXXDIM/MAXYDIM grew for OpenGL. */
-    if (daxdim > 1600 || daydim > 1200)
-    {
-	    daxdim = 1600;
-	    daydim = 1200;
-    }
 
     if (in_egapalette)
         restore256_palette();
 
-    go_to_new_vid_mode((int) davidoption, daxdim, daydim);
-#ifdef USE_OPENGL
-    /* but renderer 3's window gets the size asked for. */
-    if ((glw != daxdim) || (glh != daydim))
-    {
-        gl_window_w = glw;
-        gl_window_h = glh;
-    } /* if */
-#endif
+    go_to_new_vid_mode((int) davidoption, daxdim, daydim, 1);
 
     qsetmode = 200;
     last_render_ticks = SDL_GetTicks();
@@ -2395,7 +2933,7 @@ void qsetmode640350(void)
 {
     assert(0);
 
-    go_to_new_vid_mode(-1, 640, 350);
+    go_to_new_vid_mode(-1, 640, 350, 0);
 } /* qsetmode640350 */
 
 
@@ -2404,7 +2942,7 @@ void qsetmode640480(void)
     if (!in_egapalette)
     	set16color_palette();
 
-    go_to_new_vid_mode(-1, 640, 480);
+    go_to_new_vid_mode(-1, 640, 480, 0);
     pageoffset = 0;	/* Make sure it goes to the right place - DDOI */
     fillscreen16(0L,8L,640L*144L);
 } /* qsetmode640480 */

@@ -8,6 +8,7 @@
 #include "duke3d.h"
 #include "glext.h"
 #include "displaymode.h"
+#include "videoopts.h"
 #if PLATFORM_WIN32
 #include <direct.h>
 #define mkdir(d, m) _mkdir(d)
@@ -170,7 +171,8 @@ int main(void)
               "ScreenshotFormat = \"JPG\"\nGLDrawPath = \"Shader\"\n"
               "GLInternalWidth = -5\nGLInternalHeight = 99999\n"
               "GLContrast = \"9.5\"\nGLSaturation = \"-1\"\n"
-              "DisplayMode = \"Exclusive\"\nVSync = 0\n", f);
+              "DisplayMode = \"Exclusive\"\nVSync = 0\n"
+              "Supersampling = \"8K\"\nGLTextureFilter = \"Trilinear\"\n", f);
         fclose(f);
         CONFIG_GetSetupFilename();
         CONFIG_ReadSetup();
@@ -184,6 +186,8 @@ int main(void)
         check("cfg GLSaturation -1", GLSaturation == GL_SATURATION_MIN, 1);
         check("cfg DisplayMode Exclusive", DisplayMode, DISPLAY_EXCLUSIVE);
         check("cfg VSync 0", VSync, 0);
+        check("cfg Supersampling 8K", GLSupersampling, SS_8K);
+        check("cfg GLTextureFilter Trilinear", GLTextureFilter, TEXFILTER_TRILINEAR);
         CONFIG_WriteSetup();
         f = fopen(cfg, "r");
         n = fread(text, 1, sizeof(text) - 1, f);
@@ -199,12 +203,15 @@ int main(void)
         check("cfg writes GLSaturation 0", strstr(text, "GLSaturation = \"0\"") != NULL, 1);
         check("cfg writes DisplayMode exclusive", strstr(text, "DisplayMode = \"exclusive\"") != NULL, 1);
         check("cfg writes VSync 0", strstr(text, "VSync = 0") != NULL, 1);
+        check("cfg writes Supersampling 8k", strstr(text, "Supersampling = \"8k\"") != NULL, 1);
+        check("cfg writes GLTextureFilter trilinear", strstr(text, "GLTextureFilter = \"trilinear\"") != NULL, 1);
 
         f = fopen(cfg, "w");
         fputs("[Screen Setup]\nRenderer = -2\nGLTextureMipLevel = -3\n"
               "GLDrawPath = \"bogus\"\nGLInternalWidth = 320\n"
               "GLContrast = \"0.75\"\nGLSaturation = \"1.25x\"\n"
-              "DisplayMode = \"bogus\"\nVSync = 7\n", f);
+              "DisplayMode = \"bogus\"\nVSync = 7\n"
+              "Supersampling = \"16k\"\nGLTextureFilter = \"bogus\"\n", f);
         fclose(f);
         CONFIG_ReadSetup();
         check("cfg Renderer -2", RendererSetting, 0);
@@ -215,6 +222,8 @@ int main(void)
         check("cfg GLSaturation 1.25x (not a number)", GLSaturation == 1.0, 1);
         check("cfg DisplayMode bogus", DisplayMode, DISPLAY_BORDERLESS);
         check("cfg VSync 7", VSync, 1);
+        check("cfg Supersampling 16k", GLSupersampling, SS_OFF);
+        check("cfg GLTextureFilter bogus", GLTextureFilter, TEXFILTER_NEAREST);
         CONFIG_WriteSetup();
         CONFIG_ReadSetup();
         check("cfg GLContrast 0.75 round trip", GLContrast == 0.75, 1);
@@ -241,6 +250,81 @@ int main(void)
         check("cfg writes VSync 1", strstr(text, "VSync = 1") != NULL, 1);
         CONFIG_ReadSetup();
         check("cfg GLContrast after", GLContrast == 1.0, 1);
+
+        /* The VIDEO page saves only the rows the player changed. The run
+           here is renderer 0 at 320x200 borderless (nothing set), the file
+           renderer 3 at 1024x768 windowed: a -renderer 0 run, say. */
+        RendererSetting = 3;
+        DisplayMode = DISPLAY_WINDOWED;
+        ScreenWidth = 1024;
+        ScreenHeight = 768;
+        VSync = !getvideovsync();
+        video_pagebegin();
+        video_pagetouch(VROW_VSYNC);
+        check("page untouched: Renderer kept", RendererSetting, 3);
+        check("page untouched: DisplayMode kept", DisplayMode, DISPLAY_WINDOWED);
+        check("page untouched: ScreenWidth kept", ScreenWidth, 1024);
+        check("page touched: VSync in effect", VSync, getvideovsync());
+        f = fopen(cfg, "r");
+        n = fread(text, 1, sizeof(text) - 1, f);
+        fclose(f);
+        text[n] = 0;
+        check("page untouched writes Renderer 3", strstr(text, "Renderer = 3") != NULL, 1);
+        check("page untouched writes windowed", strstr(text, "DisplayMode = \"windowed\"") != NULL, 1);
+        check("page untouched writes ScreenWidth 1024", strstr(text, "ScreenWidth = 1024") != NULL, 1);
+
+        video_pagebegin();
+        video_pagetouch(VROW_RENDERER);
+        check("page touched: Renderer in effect", RendererSetting, 0);
+        check("page touched others: DisplayMode kept", DisplayMode, DISPLAY_WINDOWED);
+        f = fopen(cfg, "r");
+        n = fread(text, 1, sizeof(text) - 1, f);
+        fclose(f);
+        text[n] = 0;
+        check("page touched writes Renderer 0", strstr(text, "Renderer = 0") != NULL, 1);
+
+#ifdef USE_OPENGL
+        /* A change waiting for its fade is saved once it's made. */
+        GLSupersampling = SS_OFF;
+        video_pagebegin();
+        video_requestsupersample(SS_4K);
+        video_pagetouch(VROW_SUPERSAMPLING);
+        check("page pending: not saved yet", GLSupersampling, SS_OFF);
+        video_flushpending();
+        check("page pending: saved once made", GLSupersampling, SS_4K);
+        f = fopen(cfg, "r");
+        n = fread(text, 1, sizeof(text) - 1, f);
+        fclose(f);
+        text[n] = 0;
+        check("page pending writes Supersampling 4k", strstr(text, "Supersampling = \"4k\"") != NULL, 1);
+
+        /* The page opened again during that fade keeps the change to save. */
+        video_pagebegin();
+        video_requestsupersample(SS_2K);
+        video_pagetouch(VROW_SUPERSAMPLING);
+        video_pagebegin();
+        video_flushpending();
+        check("page reopened while pending: saved", GLSupersampling, SS_2K);
+
+        /* Leaving the game during a change's fade saves the change asked for. */
+        video_pagebegin();
+        video_requestsupersample(SS_4K);
+        video_pagetouch(VROW_SUPERSAMPLING);
+        video_pagesettle(1);
+        check("page exit while pending: the change saved", GLSupersampling, SS_4K);
+        video_flushpending();
+#endif
+
+        /* DISPLAY saves the choice, not the mode in effect (a fallback from
+           fullscreen, or BUILD_WINDOWED): here no window, so borderless. */
+        DisplayMode = DISPLAY_WINDOWED;
+        video_pagebegin();
+        video_pagesetdisplay(DISPLAY_EXCLUSIVE);
+        check("page DISPLAY in effect differs", getvideodisplaymode() != DISPLAY_EXCLUSIVE, 1);
+        check("page DISPLAY saves the choice", DisplayMode, DISPLAY_EXCLUSIVE);
+        check("page DISPLAY steps from the choice", video_pagegetdisplay(), DISPLAY_EXCLUSIVE);
+        video_pagebegin();
+        check("page DISPLAY reopened: in effect", video_pagegetdisplay(), getvideodisplaymode());
         remove(cfg);
         while ((slash = strrchr(cfg, '/')) != NULL) {
             *slash = 0;

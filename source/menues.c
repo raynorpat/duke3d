@@ -31,6 +31,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "animlib.h"
 #include "glext.h"
 #include "displaymode.h"
+#include "videoopts.h"
 
 /* this should be a proper prototype included from a header file */
 #if PLATFORM_UNIX
@@ -212,6 +213,8 @@ int loadplayer(signed char spot)
      char fn[] = "game0.sav";
      char mpfn[] = "gameA_00.sav";
      char fullname[MAX_PATH];
+
+     video_flushpending();  // shows frames of its own
 
      if(spot < 0)
      {
@@ -1295,6 +1298,92 @@ void bar(int x,int y,short *p,short dainc,char damodify,short s, short pa)
 // ((x==X)?1:2)
 #define MWIN(X) rotatesprite( 320<<15,200<<15,X,0,MENUSCREEN,-16,0,10+64,0,0,xdim-1,ydim-1)
 #define MWINXY(X,OX,OY) rotatesprite( ( 320+(OX) )<<15, ( 200+(OY) )<<15,X,0,MENUSCREEN,-16,0,10+64,0,0,xdim-1,ydim-1)
+
+// The VIDEO page's RESOLUTION row: the size picked with the arrows, not yet
+// applied (videopage_browse).
+#define VIDEOPAGE_MAXMODES 256
+#define VIDEOPAGE_MAXRES 64
+static int32 videopage_browse, videopage_bw, videopage_bh;
+
+// The next of count choices from cur in direction dir that avail allows,
+// round and round; cur when there's no other.
+static int videopage_next(int cur, int dir, int count, const int *avail)
+{
+    int i, c = cur;
+
+    for(i=1;i<count;i++)
+    {
+        c = (c+dir+count)%count;
+        if(avail[c]) return c;
+    }
+    return cur;
+}
+
+// The RESOLUTION row's sizes in display mode display, smallest first
+// (videoopts_buildreslist, from the main display's modes); windowed, with
+// the run's size w by h (if not 0).
+static int videopage_reslist(int display, int32_t w, int32_t h, vmode_t *res)
+{
+    static int32_t mw[VIDEOPAGE_MAXMODES], mh[VIDEOPAGE_MAXMODES];
+    static vmode_t modes[VIDEOPAGE_MAXMODES];
+    int32_t dw, dh;
+    int i, n = getvideomodelist(mw,mh,VIDEOPAGE_MAXMODES,&dw,&dh);
+
+    for(i=0;i<n;i++)
+    {
+        modes[i].w = mw[i];
+        modes[i].h = mh[i];
+    }
+    n = videoopts_buildreslist(modes,n,dw,dh,display,res,VIDEOPAGE_MAXRES);
+    if(display == DISPLAY_WINDOWED && w > 0 && n < VIDEOPAGE_MAXRES)
+    {
+        for(i=0;i<n && (res[i].w < w || (res[i].w == w && res[i].h < h));i++);
+        if(i == n || res[i].w != w || res[i].h != h)
+        {
+            memmove(&res[i+1],&res[i],(n-i)*sizeof(res[0]));
+            res[i].w = w;
+            res[i].h = h;
+            n++;
+        }
+    }
+    return n;
+}
+
+// The size one step in direction dir from w by h among res's n (not in it:
+// the nearest that way); its index.
+static int videopage_resstep(const vmode_t *res, int n, int32_t w, int32_t h, int dir)
+{
+    int i;
+
+    for(i=0;i<n && (res[i].w < w || (res[i].w == w && res[i].h < h));i++);
+    if(i < n && res[i].w == w && res[i].h == h) i += dir;
+    else if(dir < 0) i--;
+    if(i < 0) i = 0;
+    if(i >= n) i = n-1;
+    return i;
+}
+
+// The size w by h keeps going to display mode display: in fullscreen one of
+// the main display's modes (this one, else the desktop's, else the
+// largest); windowed, this one if it fits the desktop, else the largest
+// that does.
+static void videopage_modesize(int display, int32_t *w, int32_t *h)
+{
+    vmode_t res[VIDEOPAGE_MAXRES];
+    int32_t dw, dh;
+    int i, n = videopage_reslist(display,0,0,res);
+
+    getvideomodelist(NULL,NULL,0,&dw,&dh);
+    if(n == 0 || display == DISPLAY_BORDERLESS) return;
+    if(display == DISPLAY_WINDOWED && *w <= dw && *h <= dh) return;
+    for(i=0;i<n;i++)
+        if(res[i].w == *w && res[i].h == *h) return;
+    for(i=0;i<n;i++)
+        if(res[i].w == dw && res[i].h == dh) break;
+    if(i == n) i = n-1;
+    *w = res[i].w;
+    *h = res[i].h;
+}
 
 
 int32 volnum,levnum,plrskl,numplr;
@@ -2952,8 +3041,8 @@ void menus(void)
 
             c = (320>>1)-120;
 
-            onbar = (probey == 3 || probey == 4 || probey == 5);
-            count = 10;
+            onbar = (probey == 3 || probey == 4);
+            count = 9;
 #if CONTROLS_CONFIG_MENU
             count++;
 #endif
@@ -2974,19 +3063,19 @@ void menus(void)
                 case 2:
                     ud.screen_tilting = 1-ud.screen_tilting;
                     break;
-                case 6:
+                case 5:
                     if ( ControllerType == controltype_keyboardandmouse )
                         ud.mouseflip = 1-ud.mouseflip;
                     break;
-                case 7:
+                case 6:
                     cmenu(700);
                     break;
-                case 8:
+                case 7:
 #ifndef AUSTRALIA
                     cmenu(10000);
 #endif
                     break;
-                case 9:
+                case 8:
                     if( (ps[myconnectindex].gm&MODE_GAME) )
                     {
                         closedemowrite();
@@ -2995,12 +3084,16 @@ void menus(void)
                     ud.m_recstat = !ud.m_recstat;
                     break;
 #if CONTROLS_CONFIG_MENU
-                case 10:
+                case 9:
                     cmenu(MENU_CONTROLS);
                     break;
 #endif
                 default:
-                    if(x == count-1) cmenu(710);
+                    if(x == count-1)
+                    {
+                        video_pagebegin();
+                        cmenu(710);
+                    }
                     break;
             }
 
@@ -3025,24 +3118,19 @@ void menus(void)
                 bar(c+167+40,31+15+15+15,(short *)&shorttmp,-4,x==3,SHX(-5),PHX(-5));
                 ud.screen_size = (int32) shorttmp;
 
-            menutext(c,31+15+15+15+15,SHX(-6),PHX(-6),"BRIGHTNESS");
-                shorttmp = (short) ud.brightness;
-                bar(c+167+40,31+15+15+15+15,(short *)&shorttmp,8,x==4,SHX(-6),PHX(-6));
-                ud.brightness = (int32) shorttmp;
-                if(x==4) setbrightness(ud.brightness>>2,&ps[myconnectindex].palette[0]);
-
+            // BRIGHTNESS is on the VIDEO page.
             if ( ControllerType == controltype_keyboardandmouse )
             {
                 short sense;
                 sense = CONTROL_GetMouseSensitivity()>>10;
 
-                menutext(c,31+15+15+15+15+15,SHX(-7),PHX(-7),"MOUSE SENSITIVITY");
-                bar(c+167+40,31+15+15+15+15+15,&sense,4,x==5,SHX(-7),PHX(-7));
+                menutext(c,31+15+15+15+15,SHX(-7),PHX(-7),"MOUSE SENSITIVITY");
+                bar(c+167+40,31+15+15+15+15,&sense,4,x==4,SHX(-7),PHX(-7));
                 CONTROL_SetMouseSensitivity( sense<<10 );
-                menutext(c,31+15+15+15+15+15+15,SHX(-7),PHX(-7),"MOUSE AIMING FLIP");
+                menutext(c,31+15+15+15+15+15,SHX(-7),PHX(-7),"MOUSE AIMING FLIP");
 
-                if(ud.mouseflip) menutext(c+160+40,31+15+15+15+15+15+15,SHX(-7),PHX(-7),"ON");
-                else menutext(c+160+40,31+15+15+15+15+15+15,SHX(-7),PHX(-7),"OFF");
+                if(ud.mouseflip) menutext(c+160+40,31+15+15+15+15+15,SHX(-7),PHX(-7),"ON");
+                else menutext(c+160+40,31+15+15+15+15+15,SHX(-7),PHX(-7),"OFF");
 
             }
             else
@@ -3050,103 +3138,265 @@ void menus(void)
                 short sense;
                 sense = CONTROL_GetMouseSensitivity()>>10;
 
-                menutext(c,31+15+15+15+15+15,SHX(-7),1,"MOUSE SENSITIVITY");
-                bar(c+167+40,31+15+15+15+15+15,&sense,4,x==99,SHX(-7),1);
-                menutext(c,31+15+15+15+15+15+15,SHX(-7),1,"MOUSE AIMING FLIP");
+                menutext(c,31+15+15+15+15,SHX(-7),1,"MOUSE SENSITIVITY");
+                bar(c+167+40,31+15+15+15+15,&sense,4,x==99,SHX(-7),1);
+                menutext(c,31+15+15+15+15+15,SHX(-7),1,"MOUSE AIMING FLIP");
 
-                if(ud.mouseflip) menutext(c+160+40,31+15+15+15+15+15+15,SHX(-7),1,"ON");
-                else menutext(c+160+40,31+15+15+15+15+15+15,SHX(-7),1,"OFF");
+                if(ud.mouseflip) menutext(c+160+40,31+15+15+15+15+15,SHX(-7),1,"ON");
+                else menutext(c+160+40,31+15+15+15+15+15,SHX(-7),1,"OFF");
             }
 
-            menutext(c,31+15+15+15+15+15+15+15,SHX(-8),PHX(-8),"SOUNDS");
+            menutext(c,31+15+15+15+15+15+15,SHX(-8),PHX(-8),"SOUNDS");
 #ifndef AUSTRALIA
-            menutext(c,31+15+15+15+15+15+15+15+15,SHX(-9),PHX(-9),"PARENTAL LOCK");
+            menutext(c,31+15+15+15+15+15+15+15,SHX(-9),PHX(-9),"PARENTAL LOCK");
 #else
-            menutext(c,31+15+15+15+15+15+15+15+15,SHX(-9),1,"PARENTAL LOCK");
+            menutext(c,31+15+15+15+15+15+15+15,SHX(-9),1,"PARENTAL LOCK");
 #endif
             if( (ps[myconnectindex].gm&MODE_GAME) && ud.m_recstat != 1 )
             {
-                menutext(c,31+15+15+15+15+15+15+15+15+15,SHX(-10),1,"RECORD");
-                menutext(c+160+40,31+15+15+15+15+15+15+15+15+15,SHX(-10),1,"OFF");
+                menutext(c,31+15+15+15+15+15+15+15+15,SHX(-10),1,"RECORD");
+                menutext(c+160+40,31+15+15+15+15+15+15+15+15,SHX(-10),1,"OFF");
             }
             else
             {
-                menutext(c,31+15+15+15+15+15+15+15+15+15,SHX(-10),PHX(-10),"RECORD");
+                menutext(c,31+15+15+15+15+15+15+15+15,SHX(-10),PHX(-10),"RECORD");
 
                 if(ud.m_recstat == 1)
-                    menutext(c+160+40,31+15+15+15+15+15+15+15+15+15,SHX(-10),PHX(-10),"ON");
-                else menutext(c+160+40,31+15+15+15+15+15+15+15+15+15,SHX(-10),PHX(-10),"OFF");
+                    menutext(c+160+40,31+15+15+15+15+15+15+15+15,SHX(-10),PHX(-10),"ON");
+                else menutext(c+160+40,31+15+15+15+15+15+15+15+15,SHX(-10),PHX(-10),"OFF");
             }
 
 #if CONTROLS_CONFIG_MENU
-            menutext(c,31+15+15+15+15+15+15+15+15+15+15,SHX(-11),PHX(-11),"CONTROLS...");
+            menutext(c,31+15+15+15+15+15+15+15+15+15,SHX(-11),PHX(-11),"CONTROLS...");
 #endif
             menutext(c,31+15*(count-1),SHX(-12),PHX(-12),"VIDEO...");
             break;
 
         case 710:
-            // VIDEO: the look of renderer 3's GL 2.1 shader path (greyed
-            // elsewhere), then the display mode and vsync, which change at
-            // once. Rows from y 50, 16 apart, as SOUNDS.
+            // VIDEO: every live video setting, rows from y 31, 15 apart, as
+            // OPTIONS. A change fades out, is made at black and fades back in
+            // (game.c video_request*), so the rows that ask for one only
+            // take a new one once the last is made, and only on a real
+            // change; RESOLUTION's arrows only pick a size, Enter applies it.
+            // A row changed is saved (video_pagetouch), the others aren't.
             {
-                int32 shader = 0;
+                static const char *const renderernames[4] = { "CLASSIC", "POLY SOLID", "POLY SOFT", "OPENGL" };
+                static const char *const displaynames[DISPLAY_COUNT] = { "WINDOWED", "BORDERLESS", "FULLSCREEN" };
+                static const char *const ssnames[SS_COUNT] = { "OFF", "2K", "4K", "8K" };
+                static const char *const filternames[TEXFILTER_COUNT] = { "NEAREST", "BILINEAR", "TRILINEAR" };
+                int32 shader = 0, internal = 0, busy = video_pending(), enter, dir = 0;
+                int32 renderer = getrendermode(), display = getvideodisplaymode();
+                int32 ss = 0, filter = 0, i, vx;
+                int32_t gw, gh;
+                int rendavail[4] = { 1, 0, 0, 0 }, displayavail[DISPLAY_COUNT] = { 1, 1, 1 };
+                int ssavail[SS_COUNT], filteravail[TEXFILTER_COUNT], ssgrey, filtergrey;
+                vmode_t res[VIDEOPAGE_MAXRES];
+                int nres;
+                char buf[32];
                 short was;
-#ifdef USE_OPENGL
-                shader = (getrendermode() == 3) && (gldrawpath == GLPATH_SHADER);
-#endif
-                c = (320>>1)-120;
-                rotatesprite(320<<15,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
-                menutext(320>>1,24,0,0,"VIDEO");
-                onbar = ( probey == 0 || probey == 1 );
+                const char *note = NULL;
 
-                x = probe(c,50,16,4);
-                if(x == -1) cmenu(200);
-                else if(x == 2)
+#ifdef POLYMOST
+                rendavail[1] = rendavail[2] = 1;
+#ifdef USE_OPENGL
+                rendavail[3] = !video_glunavailable;
+#endif
+#endif
+#ifdef USE_OPENGL
+                shader = (renderer == 3) && (gldrawpath == GLPATH_SHADER);
+                internal = (glinternalwidth != 0) && (glinternalheight != 0);
+                ss = glsupersample;
+                filter = gltexturefilter;
+#endif
+                for(i=0;i<SS_COUNT;i++) ssavail[i] = videosupersampleavailable(i);
+                for(i=0;i<TEXFILTER_COUNT;i++) filteravail[i] = videotexfilteravailable(i);
+                // greyed with only off (nearest) to offer, showing the level kept
+                ssgrey = !(ssavail[SS_2K] || ssavail[SS_4K] || ssavail[SS_8K]);
+                filtergrey = !(filteravail[TEXFILTER_BILINEAR] || filteravail[TEXFILTER_TRILINEAR]);
+                video_getmode(&gw,&gh);
+                nres = videopage_reslist(display,gw,gh,res);
+                c = 46;  // labels (the cursor all on screen at 4:3); values from vx
+                vx = c+144;
+
+                rotatesprite(320<<15,10<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
+                menutext(320>>1,15,0,0,"VIDEO");
+                onbar = ( probey == 4 || probey == 5 || probey == 6 );
+
+                x = probe(c,31,15,9);
+                enter = (x >= 0) && !onbar;  // Enter, Space or a click
+                if(!onbar && x < -1)
                 {
-                    DisplayMode = (DisplayMode+1)%DISPLAY_COUNT;
-                    setvideodisplaymode(DisplayMode);
+                    if( KB_KeyPressed( sc_LeftArrow ) || KB_KeyPressed( sc_kpad_4 ) ) dir = -1;
+                    else if( KB_KeyPressed( sc_RightArrow ) || KB_KeyPressed( sc_kpad_6 ) ) dir = 1;
+                    KB_ClearKeyDown( sc_LeftArrow );
+                    KB_ClearKeyDown( sc_kpad_4 );
+                    KB_ClearKeyDown( sc_RightArrow );
+                    KB_ClearKeyDown( sc_kpad_6 );
+                    if(dir) sound(KICK_HIT);
                 }
-                else if(x == 3)
+                if(probey != 2) videopage_browse = 0;  // the size picked only stays on its row
+
+                if(x == -1)
                 {
-                    VSync = !VSync;
-                    setvideovsync(VSync);
+                    videopage_browse = 0;
+                    cmenu(200);
+                }
+                else if(probey == 2)  // RESOLUTION: arrows pick, Enter applies
+                {
+                    if(dir && nres > 0 && display != DISPLAY_BORDERLESS)
+                    {
+                        if(!videopage_browse) { videopage_bw = gw; videopage_bh = gh; }
+                        i = videopage_resstep(res,nres,videopage_bw,videopage_bh,dir);
+                        videopage_bw = res[i].w;
+                        videopage_bh = res[i].h;
+                        videopage_browse = 1;
+                    }
+                    if(enter && videopage_browse && !busy)
+                    {
+                        if(videopage_bw != gw || videopage_bh != gh)
+                        {
+                            video_requestmode(display,videopage_bw,videopage_bh);
+                            video_pagetouch(VROW_RESOLUTION);
+                        }
+                        videopage_browse = 0;
+                    }
+                }
+                else
+                {
+                    if(enter) dir = 1;
+                    if(dir && !busy) switch(probey)
+                    {
+                        case 0:
+                            i = videopage_next(renderer,dir,4,rendavail);
+                            if(i != renderer)
+                            {
+                                video_requestrenderer(i);
+                                video_pagetouch(VROW_RENDERER);
+                            }
+                            break;
+                        case 1:
+                            // from the last choice, which a fallback (from
+                            // fullscreen, or BUILD_WINDOWED) doesn't change
+                            i = videopage_next(video_pagegetdisplay(),dir,DISPLAY_COUNT,displayavail);
+                            if(i != video_pagegetdisplay())
+                            {
+                                int32 w = gw, h = gh;
+
+                                videopage_modesize(i,&w,&h);
+                                video_requestmode(i,w,h);
+                                video_pagesetdisplay(i);
+                                if(w != gw || h != gh)
+                                    video_pagetouch(VROW_RESOLUTION);
+                            }
+                            break;
+                        case 3:
+                            setvideovsync(!getvideovsync());
+                            video_pagetouch(VROW_VSYNC);
+                            break;
+                        case 7:
+                            i = videopage_next(ss,dir,SS_COUNT,ssavail);
+                            if(i != ss && (!ssgrey || i == SS_OFF))  // greyed, a level kept can still go off
+                            {
+                                video_requestsupersample(i);
+                                video_pagetouch(VROW_SUPERSAMPLING);
+                            }
+                            break;
+                        case 8:
+                            i = videopage_next(filter,dir,TEXFILTER_COUNT,filteravail);
+                            if(i != filter && !filtergrey)
+                            {
+                                video_requesttexfilter(i);
+                                video_pagetouch(VROW_TEXFILTER);
+                            }
+                            break;
+                    }
+                }
+
+                i = videopage_next(renderer,1,4,rendavail) == renderer;
+                menutext(c,31,0,i,"RENDERER");
+                menutext(vx,31,0,i,(char *)renderernames[renderer&3]);
+
+                menutext(c,31+15,0,0,"DISPLAY");
+                menutext(vx,31+15,0,0,(char *)displaynames[display]);
+
+                menutext(c,31+15*2,0,display == DISPLAY_BORDERLESS || nres == 0,"RESOLUTION");
+                if(display == DISPLAY_BORDERLESS)
+                    strcpy(buf,"DESKTOP");
+                else if(videopage_browse)
+                    sprintf(buf,"%dX%d",(int)videopage_bw,(int)videopage_bh);
+                else sprintf(buf,"%dX%d",(int)gw,(int)gh);
+                menutext(vx,31+15*2,0,display == DISPLAY_BORDERLESS,buf);
+
+                menutext(c,31+15*3,0,0,"VSYNC");
+                menutext(vx,31+15*3,0,0,getvideovsync() ? "ON" : "OFF");
+
+                menutext(c,31+15*4,0,0,"BRIGHTNESS");
+                was = shorttmp = (short) ud.brightness;
+                bar(vx+18,31+15*4,(short *)&shorttmp,8,x==4,0,0);
+                if(shorttmp != was)
+                {
+                    ud.brightness = (int32) shorttmp;
+                    setbrightness(ud.brightness>>2,(unsigned char *)gameviewpalette());
+                    video_pagetouch(VROW_BRIGHTNESS);
                 }
 
                 // Slider positions 0..60, 1.0 at 30: contrast 0.5..1.5 in
                 // steps of 0.1, saturation 0..2 in steps of 0.1. The setting
                 // changes only when its slider moves.
-                menutext(c,50,SHX(-2),!shader,"CONTRAST");
+                menutext(c,31+15*5,0,!shader,"CONTRAST");
                 was = shorttmp = (short) ((GLContrast-GL_CONTRAST_MIN)*60.0+0.5);
-                bar(c+167+40,50,(short *)&shorttmp,6,shader && x==0,SHX(-2),!shader);
+                bar(vx+18,31+15*5,(short *)&shorttmp,6,shader && x==5,0,!shader);
                 if(shorttmp != was)
+                {
                     GLContrast = GL_CONTRAST_MIN+min(shorttmp,60)/60.0;
+                    video_pagetouch(VROW_CONTRAST);
+                }
 
-                menutext(c,50+16,SHX(-3),!shader,"SATURATION");
+                menutext(c,31+15*6,0,!shader,"SATURATION");
                 was = shorttmp = (short) (GLSaturation*30.0+0.5);
-                bar(c+167+40,50+16,(short *)&shorttmp,3,shader && x==1,SHX(-3),!shader);
+                bar(vx+18,31+15*6,(short *)&shorttmp,3,shader && x==6,0,!shader);
                 if(shorttmp != was)
+                {
                     GLSaturation = min(shorttmp,60)/30.0;
+                    video_pagetouch(VROW_SATURATION);
+                }
 
 #ifdef USE_OPENGL
                 glcontrast = GLContrast;
                 glsaturation = GLSaturation;
 #endif
 
-                menutext(c,50+16+16,SHX(-4),PHX(-4),"DISPLAY");
-                switch(DisplayMode)
-                {
-                    case DISPLAY_WINDOWED: menutext(c+110,50+16+16,0,0,"WINDOWED");break;
-                    case DISPLAY_BORDERLESS: menutext(c+110,50+16+16,0,0,"BORDERLESS");break;
-                    default: menutext(c+110,50+16+16,0,0,"EXCLUSIVE");break;
-                }
+                menutext(c,31+15*7,0,ssgrey,"SUPERSAMPLE");
+                menutext(vx,31+15*7,0,ssgrey,(char *)ssnames[ss&3]);
 
-                menutext(c,50+16+16+16,SHX(-5),PHX(-5),"VSYNC");
-                menutext(c+110,50+16+16+16,0,0,VSync ? "ON" : "OFF");
-                if(!shader)
+                menutext(c,31+15*8,0,filtergrey,"FILTERING");
+                menutext(vx,31+15*8,0,filtergrey,(char *)filternames[filter%TEXFILTER_COUNT]);
+
+                // A note on the row under the cursor; OpenGL's failure on any.
+                switch(probey)
                 {
-                    gametext(160,170,"CONTRAST AND SATURATION NEED",0,2+8+16);
-                    gametext(160,170+9,"THE OPENGL 2.1 SHADER PATH",0,2+8+16);
+                    case 2:
+                        if(display == DISPLAY_BORDERLESS) note = "BORDERLESS FILLS THE SCREEN";
+                        else if(videopage_browse) note = "PRESS ENTER TO USE THIS SIZE";
+                        break;
+                    case 5: case 6:
+                        if(!shader) note = "NEEDS THE OPENGL 2.1 SHADER PATH";
+                        break;
+                    case 7:
+                        if(!ssgrey) break;
+                        if(!shader) note = "NEEDS THE OPENGL 2.1 SHADER PATH";
+                        else if(internal) note = "OFF WHILE AN INTERNAL SIZE IS SET";
+                        else note = "NOT LARGER THAN THIS WINDOW";
+                        break;
+                    case 8:
+                        if(filtergrey)
+                            note = (renderer == 3) ? "UNAVAILABLE ON THIS DRIVER" : "NEEDS THE OPENGL RENDERER";
+                        break;
                 }
+                if(video_glunavailable)
+                    gametext(160,159,"OPENGL COULD NOT START",0,2+8+16);
+                if(note)
+                    gametext(160,168,(char *)note,0,2+8+16);
             }
             break;
 
@@ -4004,6 +4254,20 @@ void menus(void)
 static char *glgamepalette;
 static int32_t glgamebrightness;
 
+/* The player palette on screen: in a game or demo the viewed player's
+   (screenpeek), elsewhere myconnectindex's (see glsetgamepalette). */
+char *gameviewpalette(void)
+{
+    return ps[((ps[myconnectindex].gm&(MODE_GAME|MODE_DEMO)) &&
+               !(ps[myconnectindex].gm&MODE_EOL)) ? screenpeek : myconnectindex].palette;
+}
+
+/* After a mode set, which resets the palette: glsetgamepalette applies it again. */
+void glresetgamepalette(void)
+{
+    glgamepalette = NULL;
+}
+
 /*
  * Renderer 3 bakes the palette into textures as it draws, so a new player
  *  palette must reach the engine before the next draw, not at the next
@@ -4017,8 +4281,7 @@ void glsetgamepalette(void)
 #ifdef POLYMOST
     palette_t fadergb;
     unsigned char fadedelta;
-    char *pal = ps[((ps[myconnectindex].gm&(MODE_GAME|MODE_DEMO)) &&
-                    !(ps[myconnectindex].gm&MODE_EOL)) ? screenpeek : myconnectindex].palette;
+    char *pal = gameviewpalette();
 #ifdef USE_OPENGL
     /* Lights glow in the game's palettes, not in the title, ending or 3DR ones. */
     int32_t fullbright = (pal == (char *)palette || pal == waterpal || pal == slimepal) ? 240 : 256;
@@ -4518,6 +4781,7 @@ void playanm(char *fn,char t)
     int32_t i, j, k, length=0, numframes=0;
     int32 handle=-1;
 
+    video_flushpending();  // shows frames of its own
 //    return;
 
     if(t != 7 && t != 9 && t != 10 && t != 11)
