@@ -133,6 +133,21 @@ int main(void)
     for(i=headspritestat[5],k=15;i>=0;i=nextspritestat[i],k--)
         check("fan scrap owns loop index",sprite[i].owner,k);
     check("fan makes16 scrap pieces",k,-1);
+    setup(); wall[1].overpicnum=GLASS; wall[1].nextsector=1;
+    wall[1].nextwall=4; wall[1].cstat=wall[4].cstat=wall[5].cstat=0x2dd;
+    checkhitwall(projectile,1,512,512,0,SHOTSPARK1);
+    check("glass clears hit wall",wall[1].cstat,0);
+    check("beta glass leaves opposite wall blocking",wall[4].cstat,0x2dd);
+    check("beta glass clears wall relative to hit wall",wall[5].cstat,0);
+    setup(); wall[1].overpicnum=GLASS; wall[1].nextsector=1;
+    wall[1].nextwall=MAXWALLS-1; wall[MAXWALLS-1].cstat=0x2dd;
+    checkhitwall(projectile,1,512,512,0,SHOTSPARK1);
+    check("unsafe glass target leaves opposite wall",wall[MAXWALLS-1].cstat,0x2dd);
+    setup(); wall[1].overpicnum=STAINGLASS1; wall[1].nextsector=1;
+    wall[1].nextwall=4; wall[1].cstat=wall[4].cstat=wall[5].cstat=0x2dd;
+    checkhitwall(projectile,1,512,512,0,SHOTSPARK1);
+    check("stained glass clears opposite wall",wall[4].cstat,0);
+    check("stained glass keeps unrelated wall",wall[5].cstat,0x2dd);
     setup(); i=add(0,0,MONK); checkhitsprite(i,projectile);
     check("MONK fifth gib count",count_tile(JIBS5),7);
     setup(); i=add(0,1,ROTATEGUN); sprite[i].xrepeat=48; sprite[projectile].picnum=RPG;

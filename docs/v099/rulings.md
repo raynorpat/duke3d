@@ -104,9 +104,19 @@ Each names what was decided, why, and what it costs if it turns out wrong.
   respawn and causing late replay desyncs. Both command-line parsers now skip
   arguments belonging to demo/save verification and dumps. Cost if wrong: a
   diagnostic argument no longer doubles as an unrelated game switch.
-- **G099-124: render from the measured beta camera fields.** The beta has no
+- **G099-125: render from the measured beta camera fields.** The beta has no
   `opyoff`, `truefz` or `truecz`; its camera uses current bob and a hittype floor
   cap. The guarded renderer follows those calculations and the measured camera
   branches. The existing native representation still lacks the display-only
   per-player on-sector-effector interpolation flag. Cost if wrong: smoothing
   on some moving sectors differs; simulation and save layout are unchanged.
+
+- **G099-126: preserve the beta glass-wall target within the wall array.**
+  Beta `checkhitwall` at `0x48e0b` addresses `wal + nextwall*32`,
+  clearing `wall[dawallnum + nextwall].cstat`. The opposite wall remains
+  blocking. Version 1.0 (`0x4d953`) and beta stained glass (`0x48ecb`) use
+  the wall-array base correctly. Preserve the beta outcome when the sum is
+  below MAXWALLS; skip a store beyond that array rather than corrupt memory.
+  E1L3 first diverged at tic95 because wall1773 was incorrectly cleared by
+  the port when shooting wall2331; beta instead clears unused wall4104.
+  The corrected native replay matches the DOS1875-tic player/RNG trace.

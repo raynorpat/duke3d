@@ -1839,7 +1839,15 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
             wal->cstat = 0;
 
             if(wal->nextwall >= 0)
+#if DUKE3D_GAMEVER < GAMEVER_10
+            {
+                /* Beta uses wal, rather than wall, as the second wall's base. */
+                int other = dawallnum + wal->nextwall;
+                if(other < MAXWALLS) wall[other].cstat = 0;
+            }
+#else
                 wall[wal->nextwall].cstat = 0;
+#endif
 
             i = EGS(sn,x,y,z,SECTOREFFECTOR,0,0,0,ps[0].ang,0,0,spr,3);
             SLT = 128; T2 = 5; T3 = dawallnum;
