@@ -311,6 +311,15 @@ int loadplayerfile(char *fnptr, signed char spot)
         ready2send = 1;
         return 1;
      }
+     if(!sg_checksave(fil))
+     {
+        printf("%s has an invalid or truncated save layout.\n",fnptr);
+        FTA(114,&ps[myconnectindex]);
+        kclose(fil);
+        ototalclock = totalclock;
+        ready2send = 1;
+        return 1;
+     }
 #endif
 
 #if DUKE3D_GAMEVER < GAMEVER_14
@@ -385,6 +394,10 @@ int loadplayerfile(char *fnptr, signed char spot)
      sg_read16s(fil,nextspritestat,2,MAXSPRITES);
      numcyclers = clampcount(sg_read16(fil),MAXCYCLERS);
      sg_read16s(fil,&cyclers[0][0],12,MAXCYCLERS);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     memset(&ps[SG_DOS_MAXPLAYERS],0,sizeof(ps)-SG_DOS_MAXPLAYERS*sizeof(ps[0]));
+     memset(&po[SG_DOS_MAXPLAYERS],0,sizeof(po)-SG_DOS_MAXPLAYERS*sizeof(po[0]));
+#endif
      sg_readrecs(fil,ps,sizeof(struct player_struct),sg_player,SG_DOS_MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
      for(i=0;i<MAXPLAYERS;i++) ps[i].palette = (char *) &palette[0];
      sg_readrecs(fil,po,sizeof(struct player_orig),sg_playerorig,SG_DOS_MAXPLAYERS,SG_PLAYERORIG_DFSIZE,SG_PLAYERORIG_DFCOUNT);
@@ -460,7 +473,7 @@ int loadplayerfile(char *fnptr, signed char spot)
      animatecnt = clampcount(sg_read32(fil),MAXANIMATES);
      sg_read16s(fil,animatesect,2,MAXANIMATES);
      sg_read32s(fil,animoffs,4,MAXANIMATES);
-     for(i = animatecnt-1;i>=0;i--) animateptr[i] = (int32_t *)((char *)&sector[0]+animoffs[i]);
+     for(i = animatecnt-1;i>=0;i--) animateptr[i] = sg_animptr(animoffs[i]);
      sg_read32s(fil,animategoal,4,MAXANIMATES);
      sg_read32s(fil,animatevel,4,MAXANIMATES);
 
@@ -684,6 +697,10 @@ int saveplayerfile(char *fnptr, signed char spot)
      char scriptptrs[MAXSCRIPTSIZE];
      FILE *fil;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     if(script[0] > SG_DOS_MAXSCRIPT*4)
+         printf("Warning: DOS saves store only %d script longs; this CON uses %d.\n",SG_DOS_MAXSCRIPT,script[0]/4);
+#endif
      if ((fil = fopen(fnptr,"wb")) == 0) return(-1);
 
      ready2send = 0;
@@ -727,7 +744,10 @@ int saveplayerfile(char *fnptr, signed char spot)
 #if DUKE3D_GAMEVER < GAMEVER_11
      // 1.0 saves hittype[] here, raw: an actor's script offsets in
      // temp_data[1], [4] and [5] go out as DOS addresses (F10-003), and
-     // scriptptrs marks them to undo after.
+     // scriptptrs marks them to undo after. Native slots have no type tags:
+     // a numeric value equal to an aligned script offset is ambiguous here.
+     // Correctly distinguishing it requires tracking slot types at assignment,
+     // including native actor code; the DOS save format has no such metadata.
      for(i=0;i<SG_DOS_MAXHITTYPES;i++)
          for(j=0;j<3;j++)
          {

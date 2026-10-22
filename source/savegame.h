@@ -91,6 +91,9 @@ void sg_read32s(int32_t fil, int32_t *a, int32_t dasizeof, int32_t count);
 void sg_writerecs(FILE *fil, void *recs, size_t stride, sg_rec fn, int32_t n, int32_t dasizeof, int32_t count);
 void sg_readrecs(int32_t fil, void *recs, size_t stride, sg_rec fn, int32_t n, int32_t dasizeof, int32_t count);
 
+/* Resolve an animation offset only when it names an animated map field. */
+int32_t *sg_animptr(int32_t offset);
+
 /* LZW blocks dfwrite emits for one call. */
 int32_t sg_dfblocks(int32_t dasizeof, int32_t count);
 
@@ -114,9 +117,16 @@ int32_t sg_check10(int32_t fil);
 extern const int32_t sg_scriptslots10[3];
 #endif
 
+#if DUKE3D_GAMEVER >= GAMEVER_11
+/* Check every compressed call, actor script table, flagged script/hittype
+   offsets and live animation offsets, starting just after the version block.
+   Leaves fil where it was. */
+int32_t sg_checksave(int32_t fil);
+
 /* Uncompressed size of the first ps[] block, found without loading anything.
    fil must be just past the version block, and is left there. Returns -1
    if the file ends first. */
 int32_t sg_playerblocksize(int32_t fil);
+#endif
 
 #endif

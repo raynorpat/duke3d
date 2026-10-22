@@ -351,14 +351,45 @@ static void test_dfblocks(void)
     CHECK(sg_dfblocks(71, 4096) == 18);
 }
 
-int main(void)
+static void test_animation_offsets(void)
 {
+    int32_t off = (int32_t)((intptr_t)&wall[MAXWALLS-1].y-(intptr_t)sector);
+
+    CHECK(sg_animptr(offsetof(sectortype,ceilingz)) == &sector[0].ceilingz);
+    CHECK(sg_animptr((MAXSECTORS-1)*sizeof(sectortype)+offsetof(sectortype,floorz)) == &sector[MAXSECTORS-1].floorz);
+    CHECK(sg_animptr(off) == &wall[MAXWALLS-1].y);
+    CHECK(sg_animptr(0) == NULL);
+    CHECK(sg_animptr(1) == NULL);
+    CHECK(sg_animptr(offsetof(sectortype,ceilingz)+1) == NULL);
+    CHECK(sg_animptr(INT32_MAX) == NULL);
+}
+
+int main(int argc, char **argv)
+{
+    if (argc > 1)
+    {
+        static unsigned char cache[4<<20];
+        int32_t fil, ok;
+
+        initcache((intptr_t)cache,sizeof(cache));
+        fil = kopen4load(argv[1],0);
+        if (fil < 0) return 1;
+#if DUKE3D_GAMEVER < GAMEVER_11
+        ok = sg_check10(fil) >= 0;
+#else
+        sg_read32(fil); /* The normal loader checks the edition separately. */
+        ok = sg_checksave(fil);
+#endif
+        kclose(fil);
+        return ok ? 0 : 2;
+    }
     test_wall();
     test_sector();
     test_sprite();
     test_player();
     test_small();
     test_dfblocks();
+    test_animation_offsets();
     if (failures)
         printf("%d check(s) failed\n", failures);
     else
