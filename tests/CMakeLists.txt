@@ -613,6 +613,19 @@ if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3
     set_tests_properties(game_boot_${_vold_name} PROPERTIES TIMEOUT 240)
   endif()
   if(_vold_data AND _vold_edition STREQUAL "sw099")
+    # Private game.c copy: ending automation is absent from the shipped game.
+    configure_file("${_game_c}" "${CMAKE_CURRENT_BINARY_DIR}/episode_game.c" COPYONLY)
+    set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/episode_game.c" PROPERTIES
+      COMPILE_DEFINITIONS "SDL_MAIN_HANDLED;main=duke3d_main;DUKE3D_EPISODE_TEST=1")
+    add_executable(v099_episode_end v099_episode_end.c "${CMAKE_CURRENT_BINARY_DIR}/episode_game.c")
+    target_link_libraries(v099_episode_end PRIVATE duke3d_game)
+    if(EXISTS "${_vold_data}/refdemos/E1L5.DMO")
+      add_test(NAME episode_end_v099_sw
+        COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:v099_episode_end>"
+          "-DDATA=${_vold_data}" "-DDEMO=${_vold_data}/refdemos/E1L5.DMO"
+          "-DWORK=${CMAKE_BINARY_DIR}/ee_v099" -P "${CMAKE_CURRENT_SOURCE_DIR}/episode_end_v099.cmake")
+      set_tests_properties(episode_end_v099_sw PROPERTIES TIMEOUT 140)
+    endif()
     add_test(NAME v099_render_camera
       COMMAND v099_render_camera "${_vold_data}/DUKE3D.GRP")
     set_tests_properties(v099_render_camera PROPERTIES

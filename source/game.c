@@ -45,6 +45,14 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #endif
 #include "glext.h"
 
+#ifdef DUKE3D_EPISODE_TEST
+void episode_test_fail(const char *reason);
+void episode_test_replay(void);
+void episode_test_frame(int phase, int frame);
+void episode_test_title(void);
+void episode_test_shutdown(void);
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -2141,14 +2149,26 @@ void showtwoscreens(void)
     if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,3291,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
-    while( !KB_KeyWaiting() ) getpackets();
+    while( !KB_KeyWaiting() )
+    {
+        getpackets();
+#ifdef DUKE3D_EPISODE_TEST
+        episode_test_frame(7,0);
+#endif
+    }
 
     for(i=0;i<64;i+=7) palto(0,0,0,i);
     KB_FlushKeyboardQueue();
     if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,3290,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
-    while( !KB_KeyWaiting() ) getpackets();
+    while( !KB_KeyWaiting() )
+    {
+        getpackets();
+#ifdef DUKE3D_EPISODE_TEST
+        episode_test_frame(8,0);
+#endif
+    }
 #else
 // CTW - REMOVED
 /*  setview(0,0,xdim-1,ydim-1);
@@ -2281,6 +2301,8 @@ void gameexit(char *msg)
 // CTW - MODIFICATION
 /*  if( *t != 0 && *(t+1) != 'V' && *(t+1) != 'Y' && playonten == 0 )
         showtwoscreens();*/
+/* Beta has only a DOS text exit screen, with no graphical-ad key waits. */
+#if DUKE3D_GAMEVER >= GAMEVER_10
 #if DUKE3D_GAMEVER < GAMEVER_11
     if( *(t+1) != 'V' && *(t+1) != 'Y' )
         showtwoscreens();
@@ -2291,11 +2313,15 @@ void gameexit(char *msg)
     if( *t != 0 && *(t+1) != 'V' && *(t+1) != 'Y' && true)
         showtwoscreens();
 #endif
+#endif
 // CTW END - MODIFICATION
 
     GOTOHERE:
 
     Shutdown();
+#ifdef DUKE3D_EPISODE_TEST
+    episode_test_shutdown();
+#endif
 
     if(*t != 0)
     {
@@ -9233,6 +9259,10 @@ int main(int argc,char **argv)
     setvideodisplaymode(DisplayMode);  // the VIDEO menu changes them as it goes
     setvideovsync(VSync);
 
+#ifdef DUKE3D_EPISODE_TEST
+    ScreenWidth = 320;
+    ScreenHeight = 200;
+#endif
     if( setgamemoderenderer() < 0 )
     {
         printf("\nVESA driver for ( %d * %d ) not found/supported!\n",xdim,ydim);
@@ -9272,7 +9302,21 @@ int main(int argc,char **argv)
     if(i && i+1 < _argc)
     {
         j = CheckParm("DEMODUMP");
+#ifdef DUKE3D_EPISODE_TEST
+        /* Attract playback normally returns to title. Only this private test
+           hands its final state into the real gameplay EOL path below. */
+        if(demoverify(atoi(_argv[i+1]),NULL)) episode_test_fail("demo replay refused");
+        episode_test_replay();
+        kclose(recfilep);
+        ud.recstat = 0;
+        ud.warp_on = 0;
+        ready2send = 0;
+        ps[myconnectindex].gm &= ~MODE_DEMO;
+        ps[myconnectindex].gm |= MODE_GAME;
+        goto EPISODE_TEST_RESUME;
+#else
         exit(demoverify(atoi(_argv[i+1]),(j && j+1 < _argc) ? _argv[j+1] : NULL));
+#endif
     }
 
     i = CheckParm("LOADVERIFY");
@@ -9302,7 +9346,12 @@ int main(int argc,char **argv)
     MAIN_LOOP_RESTART:
 
     if(ud.warp_on == 0)
+    {
         Logo();
+#ifdef DUKE3D_EPISODE_TEST
+        episode_test_title();
+#endif
+    }
     else if(ud.warp_on == 1)
     {
         newgame(ud.m_volume_number,ud.m_level_number,ud.m_player_skill);
@@ -9329,6 +9378,9 @@ int main(int argc,char **argv)
     if(waitabort) goto MAIN_LOOP_RESTART;
 #endif
 
+#ifdef DUKE3D_EPISODE_TEST
+    EPISODE_TEST_RESUME:
+#endif
     while ( !(ps[myconnectindex].gm&MODE_END) ) //The whole loop!!!!!!!!!!!!!!!!!!
     {
         if( ud.recstat == 2 || ud.multimode > 1 || ( ud.show_help == 0 && (ps[myconnectindex].gm&MODE_MENU) != MODE_MENU ) )
@@ -10829,7 +10881,13 @@ void doorders(void)
     if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,ORDERING,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
-    totalclock = 0;while( !KB_KeyWaiting() ) getpackets();
+    totalclock = 0;while( !KB_KeyWaiting() )
+    {
+        getpackets();
+#ifdef DUKE3D_EPISODE_TEST
+        episode_test_frame(2,0);
+#endif
+    }
 
     for(i=0;i<63;i+=7) palto(0,0,0,i);
     totalclock = 0;
@@ -10837,7 +10895,13 @@ void doorders(void)
     if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,ORDERING+1,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
-    totalclock = 0;while( !KB_KeyWaiting() ) getpackets();
+    totalclock = 0;while( !KB_KeyWaiting() )
+    {
+        getpackets();
+#ifdef DUKE3D_EPISODE_TEST
+        episode_test_frame(3,0);
+#endif
+    }
 
     for(i=0;i<63;i+=7) palto(0,0,0,i);
     totalclock = 0;
@@ -10845,7 +10909,13 @@ void doorders(void)
     if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,ORDERING+2,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
-    totalclock = 0;while( !KB_KeyWaiting() ) getpackets();
+    totalclock = 0;while( !KB_KeyWaiting() )
+    {
+        getpackets();
+#ifdef DUKE3D_EPISODE_TEST
+        episode_test_frame(4,0);
+#endif
+    }
 
     for(i=0;i<63;i+=7) palto(0,0,0,i);
     totalclock = 0;
@@ -10853,7 +10923,13 @@ void doorders(void)
     if (widescreen) clearallviews(0L);
     rotatesprite(0,0,65536L,0,ORDERING+3,0,0,2+8+16+64, 0,0,xdim-1,ydim-1);
     nextpage(); for(i=63;i>0;i-=7) palto(0,0,0,i);
-    totalclock = 0;while( !KB_KeyWaiting() ) getpackets();
+    totalclock = 0;while( !KB_KeyWaiting() )
+    {
+        getpackets();
+#ifdef DUKE3D_EPISODE_TEST
+        episode_test_frame(5,0);
+#endif
+    }
 }
 
 #if DUKE3D_GAMEVER < GAMEVER_10
@@ -10918,6 +10994,9 @@ static void betabonus(void)
                 rotatesprite(91<<16,58<<16,65536L,0,VICTORY1+frame,0,0,218,0,0,xdim-1,ydim-1);
             }
             nextpage();
+#ifdef DUKE3D_EPISODE_TEST
+            episode_test_frame(0,frame);
+#endif
             if(KB_KeyWaiting()) break;
         }
         for(t=0;t<64;t++) palto(0,0,0,t);
@@ -11020,6 +11099,9 @@ static void betabonus(void)
             else if(totalclock < 1000000000L) totalclock = 1000000000L;
         }
         nextpage();
+#ifdef DUKE3D_EPISODE_TEST
+        episode_test_frame(1,frame);
+#endif
     }
 }
 #endif
