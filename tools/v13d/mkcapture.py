@@ -1,12 +1,12 @@
-"""Make a scratch copy of a DUKE3D.EXE (1.3D full or shareware, or 1.1 or 1.0
+"""Make a scratch copy of a DUKE3D.EXE (1.3D full or shareware, or 1.1, 1.0 or 0.99
 shareware) that, when a demo ends, writes the game state to STATE.BIN and then
 hangs. Optionally starts the title demo loop at demo N.
 
-usage: mkcapture.py <full|sw|sw11|sw10> <in.exe> <out.exe> <demo number> [krandlog]
+usage: mkcapture.py <full|sw|sw11|sw10|sw099> <in.exe> <out.exe> <demo number> [krandlog]
 
 STATE.BIN = reccnt (4) + randomseed (4) + sprite[4096] (44 each) + ps[0] (0x552, the
 1.3D player_struct layout, see ledger F-007; 0x34e for sw11 and sw10, see
-docs/v10-v11/reference.md).
+docs/v10-v11/reference.md; 0x33f for sw099, docs/v099/reference.md).
 
 krandlog: every direct call to krand goes through a logger first, which records
 the caller while reccnt is 0 (the demo's last tic, when the demo is cut to end
@@ -25,6 +25,8 @@ ED = {
                  le=0x290fc, stub=0x26654, cavesize=0x900, pssize=0x34e, logn=41, flat='sw11.bin'),
     'sw10': dict(krand=0x661e7, randomseed=0x22aaf0, sprite=0x1a6d1c, reccnt=0x130ebb, which_demo=0xc6783, cave=0xa2aa0, log=0x2abaf0, ps=0x112ab0,
                  le=0x290fc, stub=0x26654, cavesize=0x560, pssize=0x34e, flat='sw10.bin'),
+    'sw099': dict(krand=0x6151e, randomseed=0x210c30, sprite=0x18ce5c, reccnt=0xf0cd8, which_demo=0xa5866, cave=0x99b20, log=0x2471a0, ps=0xf0f38,
+                  le=0x2a50, stub=0, cavesize=0x4e0, pssize=0x33f, flat='beta099.bin', demostack=8, codeend=0x9a000),
 }
 ed = ED[sys.argv[1]]
 LE, STUB = ed.get('le', 0x37c3c), ed.get('stub', 0x352a4)
@@ -43,9 +45,9 @@ def foff(addr):
     raise SystemExit(f'{addr:#x} not in a file-backed page')
 def rd(addr, n): o = foff(addr); return bytes(exe[o:o+n])
 def wr(addr, b): o = foff(addr); exe[o:o+len(b)] = b
-# the demo-end branch in playback: cmp [reccnt],0 / jg / cmp byte [esp+4],0 / jnz END
+# the demo-end branch in playback: cmp [reccnt],0 / jg / cmp byte [esp+4],0 / jnz END (esp+8 in 0.99)
 code = open(FLAT, 'rb').read()[:0x30000]  # flattened image (le_flatten.py), fixups applied
-pat = re.compile(rb'\x83\x3d' + re.escape(struct.pack('<I', ed['reccnt'])) + rb'\x00\x7f.\x80\x7c\x24\x04\x00\x0f\x85(....)', re.S)
+pat = re.compile(rb'\x83\x3d' + re.escape(struct.pack('<I', ed['reccnt'])) + rb'\x00\x7f.\x80\x7c\x24' + bytes([ed.get('demostack', 4)]) + rb'\x00\x0f\x85(....)', re.S)
 m = list(pat.finditer(code)); assert len(m) == 1, len(m)
 jnz = 0x10000 + m[0].start() + 14           # address of the 0f 85
 end = jnz + 6 + struct.unpack('<i', m[0].group(1))[0]
@@ -92,7 +94,7 @@ if krandlog:
     h += struct.pack('<i', ed['krand'] - (hook + len(h) + 4))   # jmp krand
     c += bytes(h)
     whole = open(FLAT, 'rb').read()
-    sites = [k + 0x10000 for k in range(0, 0xa0000 - 5) if whole[k] == 0xe8
+    sites = [k + 0x10000 for k in range(0, ed.get('codeend', 0xb0000) - 0x10000 - 5) if whole[k] == 0xe8
              and k + 0x10000 + 5 + struct.unpack_from('<i', whole, k + 1)[0] == ed['krand']]
     for k in sites: wr(k + 1, struct.pack('<i', hook - (k + 5)))
     print(f'krandlog: {len(sites)} krand calls go through {hook:#x}')

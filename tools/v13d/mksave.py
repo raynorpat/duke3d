@@ -1,11 +1,11 @@
-"""Make a scratch copy of a 1.1 or 1.0 shareware DUKE3D.EXE that plays demo N and,
+"""Make a scratch copy of a 1.1, 1.0 or 0.99 shareware DUKE3D.EXE that plays demo N and,
 right after tic T, saves the game into slot S with the game's own saveplayer
 (GAME<S>.SAV), then writes STATE.BIN and hangs as mkcapture.py does. With a
 generated demo (gendemo.py, optionally on a startnear.py GRP) this makes DOS
 reference saves without anyone at the keyboard.
 
-usage: mksave.py <sw11|sw10> <in.exe> <out.exe> <demo number> <tic> <slot>
-       mksave.py values <sw11|sw10> <STATE.BIN> <name> <level, like E1L1>
+usage: mksave.py <sw11|sw10|sw099> <in.exe> <out.exe> <demo number> <tic> <slot>
+       mksave.py values <sw11|sw10|sw099> <STATE.BIN> <name> <level, like E1L1>
 
 The first form runs mkcapture.py, then diverts playback's call to domovethings to
 a hook in the code cave after mkcapture's patch. The hook counts tics in the data
@@ -18,23 +18,26 @@ from that STATE.BIN, as V13D_SAVE_<edition>_<name>_* for refsaves/<name>.SAV:
 health is the player sprite's extra, armor ps[0].shield_amount,
 ammo ps[0].ammo_amount[curr_weapon], X/Y the player sprite's."""
 import os, re, struct, subprocess, sys
-ED = {  # docs/v10-v11/reference.md, "Address map"
+ED = {  # docs/v10-v11/reference.md and docs/v099/reference.md, "Address map"
     'sw11': dict(krand=0x67a71, randomseed=0x22ae04, log=0x2abf50, cave=0xa4700, domovethings=0x20ff0, saveplayer=0x38f60, flat='sw11.bin'),
     'sw10': dict(krand=0x661e7, randomseed=0x22aaf0, log=0x2abaf0, cave=0xa2aa0, domovethings=0x20ae0, saveplayer=0x388d0, flat='sw10.bin'),
+    'sw099': dict(krand=0x6151e, randomseed=0x210c30, log=0x2471a0, cave=0x99b20, domovethings=0x2bab0, saveplayer=0x35560, flat='beta099.bin',
+                  le=0x2a50, stub=0, pssize=0x33f, player=0x2bc, weapon=0x290, ammo=0x27c, armor=0x318, demostack=8),
 }
-LE, STUB, PS = 0x290fc, 0x26654, 0x34e   # both releases
+ed = ED[sys.argv[2] if sys.argv[1] == 'values' else sys.argv[1]]
+LE, STUB, PS = ed.get('le', 0x290fc), ed.get('stub', 0x26654), ed.get('pssize', 0x34e)
 
 if sys.argv[1] == 'values':
     d = open(sys.argv[3], 'rb').read(); name, level = sys.argv[4], sys.argv[5]
     assert len(d) == 8 + 44*4096 + PS, f'{len(d)} bytes: not a {sys.argv[2]} STATE.BIN'
     ps = d[8 + 44*4096:]
-    i = struct.unpack_from('<h', ps, 0x2ca)[0]                     # ps.i, the player sprite
+    i = struct.unpack_from('<h', ps, ed.get('player', 0x2ca))[0]                     # ps.i, the player sprite
     x, y = struct.unpack_from('<ii', d, 8 + 44*i)
     picnum, extra = struct.unpack_from('<h', d, 8 + 44*i + 0xe)[0], struct.unpack_from('<h', d, 8 + 44*i + 0x2a)[0]
     assert picnum == 1405, f'ps.i {i} is picnum {picnum}, not APLAYER'
-    cur = struct.unpack_from('<h', ps, 0x29e)[0]
-    ammo = struct.unpack_from('<h', ps, 0x288 + 2*cur)[0]
-    armor = struct.unpack_from('<h', ps, 0x2f6)[0]
+    cur = struct.unpack_from('<h', ps, ed.get('weapon', 0x29e))[0]
+    ammo = struct.unpack_from('<h', ps, ed.get('ammo', 0x288) + 2*cur)[0]
+    armor = struct.unpack_from('<h', ps, ed.get('armor', 0x2f6))[0]
     for k, v in (('EDITION', sys.argv[2]), ('FILE', name + '.SAV'), ('HEALTH', extra), ('ARMOR', armor),
                  ('CURWEAPON', cur), ('AMMO', ammo), ('LEVEL', level), ('X', x), ('Y', y)):
         print(f'set(V13D_SAVE_{sys.argv[2]}_{name}_{k} {v})')
@@ -62,7 +65,7 @@ rel = lambda target, after: struct.pack('<i', target - after)
 # playback's domovethings call: the only call to it between the demo-end jnz and the
 # loop's jmp back (mkcapture's own search pattern finds the jnz)
 code = open(os.environ.get('V13D_FLAT') or os.path.expanduser('~/Projects/ref/ghidra/' + ed['flat']), 'rb').read()[:0x30000]
-pat = re.compile(rb'\x83\x3d....\x00\x7f.\x80\x7c\x24\x04\x00\x0f\x85', re.S)
+pat = re.compile(rb'\x83\x3d....\x00\x7f.\x80\x7c\x24' + bytes([ed.get('demostack', 4)]) + rb'\x00\x0f\x85', re.S)
 jnz = [0x10000 + m.start() + 14 for m in pat.finditer(code)]; assert len(jnz) == 1, jnz
 sites = [k for k in range(jnz[0], jnz[0] + 0x200) if code[k-0x10000] == 0xe8
          and k + 5 + struct.unpack_from('<i', code, k - 0x10000 + 1)[0] == ed['domovethings']]

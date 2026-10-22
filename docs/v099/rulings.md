@@ -47,3 +47,7 @@ Each names what was decided, why, and what it costs if it turns out wrong.
 - **G099-061: the WATERDRIP krand drain is copied.** A landed map drip resets every tic and
   draws one krand per tic for the rest of the level. It is deterministic and demo sync
   depends on it. Cost if wrong: none; it is what the EXE does.
+- **Task 7: reference saves use the demo-playback saveplayer hook.** Runtime capture
+  confirms the beta can save directly after domovethings, so no AUTOTYPE save fallback
+  is needed. The startup-banner Enter is still automated. Cost if wrong: regenerate the
+  four saves with another recording path.

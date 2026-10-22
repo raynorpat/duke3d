@@ -188,7 +188,7 @@ sequence. 1.0 also calls `pan3dsound` (`0x51ed0`) every other tic, and the beta 
 | `lockclock` / `totalclock` | `0x108544` / `0x210c40` | | domovethings adds 4 to `lockclock` |
 | `BYTEVERSION` | none | none | see below |
 | Code cave | `0x99b20`, `0x4e0` bytes | `0xa2aa0`, `0x560` bytes | zero slack after the end of the code object (`0x99b1f`), to the end of its last file-backed page (`0x9a000`) |
-| Log slack | `0x2471a0`, `0xe60` bytes | `0x2abaf0` | end of object 2, up to the page end `0x248000`. Room for 256 krandlog entries (`12 + 4 × 256` bytes). Not used at run time yet |
+| Log slack | `0x2471a0`, `0xe60` bytes | `0x2abaf0` | end of object 2, up to the page end `0x248000`. Room for 256 krandlog entries (`12 + 4 × 256` bytes). Task 7 exercised the krand logger here |
 
 ### player_struct (partial)
 
@@ -495,3 +495,47 @@ scratch copies; nothing ran inside `~/Downloads/d3d_beta`.
 6. The five Task 1 checksums were rechecked afterwards and all match.
 
 The beta's demo playback is sound, so the spec's test method stands.
+
+## DOS capture and save tooling (Task 7)
+
+`tools/v13d/mkcapture.py sw099 <DUKE3D.EXE> <scratch.exe> 1 [krandlog]`
+uses the address table above, the `[esp+8]` demo-end pattern and a code scan that ends
+at `0x9a000` (before data). The plain patch is 213 bytes; krandlog is 319 bytes,
+well within the `0x4e0` cave. The dump contains 181,063 bytes (including `0x33f` of
+ps[0]); krandlog adds 1,036 bytes. The log at `0x2471a0` works at runtime.
+
+`gendemo.py sw099` writes the same header/records as sw10. For a 120-tic E1L1 demo
+(skill2, seed42), two separate DOSBox-X runs produced byte-identical **182,099-byte**
+krandlog dumps, MD5 `ddffd597928d01273ed2b9c2dda704c9`, with 14 logged calls on the
+last tic. The updated tools also produce byte-identical sw10/sw11 capture/save patches
+and sw10/sw11/1.3D demo files to the previous tools on the same inputs.
+
+Reference saves use the beta's own `saveplayer`, called after domovethings by
+`mksave.py sw099 <DUKE3D.EXE> <scratch.exe> 1 <tic> 0`. No AUTOTYPE save fallback is
+needed. AUTOTYPE only presses Enter at the startup banner. `startnear.py` needs no
+edition setting: beta maps use the layout it already supports. It changes only a
+scratch GRP's map start, leaving the reference GRP and CONs untouched.
+
+To regenerate: generate a demo with `gendemo.py sw099 <demo> 0 <zero-based level> 2
+<tics beyond save tic> <seed>`, patch a scratch EXE with mksave, and run it as DEMO1.DMO
+in a scratch DOSBox-X folder using the Task 2 SB16 setup (dynamic core, cycles=max,
+32MB, 220/5/3/7). Copy the scratch GAME0.SAV to `refsaves/<name>.SAV`. Obtain expected
+values with `mksave.py values sw099 STATE.BIN <name> E1L<n>`; never derive them from
+our game. All five original data checksums are checked after every DOS session.
+
+| Name | Map/start | Seed | Save tic | State checked |
+|---|---|---|---|---|
+| e1l1start | E1L1 original start | 42 | 1 | health100, pistol48 |
+| e1l1fight | E1L1 first LIZTROOP (sprite103) via startnear | 3 | 120 | health75, pistol36, live combat |
+| e1l2door | E1L2 original start | 1 | 40 | health100, six active sector animations |
+| e1inv | E1L1 first STEROIDS (sprite38) via startnear | 1 | 40 | health90, steroids400 |
+
+An initial combat capture at tic400 had a dead player; the reference was recaptured
+at tic120 so it exercises a live combat state. No cheats were used.
+
+| Save | MD5 |
+|---|---|
+| e1l1start | `aee18cc90643ffb1b3399a35f5a84021` |
+| e1l1fight | `b9f87d0adb5b372a2a0aedd7672606a9` |
+| e1l2door | `28980abe1d58e1d7ed7720ba645200b9` |
+| e1inv | `4915806be9daf7dc5a64e4c425af78e3` |
