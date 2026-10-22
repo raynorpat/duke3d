@@ -207,6 +207,7 @@ extern void CONFIG_SetupJoystick(int32 scripthandle);
 extern void readsavenames(void);
 extern void CONFIG_ReadSetup(void);
 extern void CONFIG_WriteSetup(void);
+extern void CONFIG_SaveSetup(void);
 
 /* animlib.c */
 extern void CheckAnimStarted(char *funcname);
@@ -280,6 +281,9 @@ extern void video_requesttexfilter(int filter);
 extern void video_getmode(int32_t *w, int32_t *h);
 extern void video_applypending(void);
 extern void video_flushpending(void);
+extern int video_pending(void);
+extern void video_pagebegin(void);
+extern void video_pagetouch(int row);
 extern short EGS(short whatsect, int32_t s_x, int32_t s_y, int32_t s_z, short s_pn, signed char s_s, signed char s_xr, signed char s_yr, short s_a, short s_ve, int32_t s_zv, short s_ow, signed char s_ss);
 extern char wallswitchcheck(short i);
 extern short spawn(short j, short pn);

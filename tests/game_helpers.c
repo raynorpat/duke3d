@@ -250,6 +250,54 @@ int main(void)
         check("cfg writes VSync 1", strstr(text, "VSync = 1") != NULL, 1);
         CONFIG_ReadSetup();
         check("cfg GLContrast after", GLContrast == 1.0, 1);
+
+        /* The VIDEO page saves only the rows the player changed. The run
+           here is renderer 0 at 320x200 borderless (nothing set), the file
+           renderer 3 at 1024x768 windowed: a -renderer 0 run, say. */
+        RendererSetting = 3;
+        DisplayMode = DISPLAY_WINDOWED;
+        ScreenWidth = 1024;
+        ScreenHeight = 768;
+        VSync = !getvideovsync();
+        video_pagebegin();
+        video_pagetouch(VROW_VSYNC);
+        check("page untouched: Renderer kept", RendererSetting, 3);
+        check("page untouched: DisplayMode kept", DisplayMode, DISPLAY_WINDOWED);
+        check("page untouched: ScreenWidth kept", ScreenWidth, 1024);
+        check("page touched: VSync in effect", VSync, getvideovsync());
+        f = fopen(cfg, "r");
+        n = fread(text, 1, sizeof(text) - 1, f);
+        fclose(f);
+        text[n] = 0;
+        check("page untouched writes Renderer 3", strstr(text, "Renderer = 3") != NULL, 1);
+        check("page untouched writes windowed", strstr(text, "DisplayMode = \"windowed\"") != NULL, 1);
+        check("page untouched writes ScreenWidth 1024", strstr(text, "ScreenWidth = 1024") != NULL, 1);
+
+        video_pagebegin();
+        video_pagetouch(VROW_RENDERER);
+        check("page touched: Renderer in effect", RendererSetting, 0);
+        check("page touched others: DisplayMode kept", DisplayMode, DISPLAY_WINDOWED);
+        f = fopen(cfg, "r");
+        n = fread(text, 1, sizeof(text) - 1, f);
+        fclose(f);
+        text[n] = 0;
+        check("page touched writes Renderer 0", strstr(text, "Renderer = 0") != NULL, 1);
+
+#ifdef USE_OPENGL
+        /* A change waiting for its fade is saved once it's made. */
+        GLSupersampling = SS_OFF;
+        video_pagebegin();
+        video_requestsupersample(SS_4K);
+        video_pagetouch(VROW_SUPERSAMPLING);
+        check("page pending: not saved yet", GLSupersampling, SS_OFF);
+        video_flushpending();
+        check("page pending: saved once made", GLSupersampling, SS_4K);
+        f = fopen(cfg, "r");
+        n = fread(text, 1, sizeof(text) - 1, f);
+        fclose(f);
+        text[n] = 0;
+        check("page pending writes Supersampling 4k", strstr(text, "Supersampling = \"4k\"") != NULL, 1);
+#endif
         remove(cfg);
         while ((slash = strrchr(cfg, '/')) != NULL) {
             *slash = 0;

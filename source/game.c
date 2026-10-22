@@ -42,6 +42,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "duke3d.h"
 #include "glext.h"
 #include "displaymode.h"
+#include "videoopts.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -2393,6 +2394,7 @@ void video_requestmode(int displaymode, int w, int h)
 }
 
 static void video_testprint(void);
+static void video_pagesettle(int now);
 
 // Makes the changes asked for, and fades back in (also when one failed).
 static void video_makepending(void)
@@ -2413,6 +2415,7 @@ static void video_makepending(void)
         video_setrenderer(video_pendingrenderer);
     video_pendingmode = video_pendingrenderer = video_pendingss = video_pendingfilter = -1;
     setvideofadein();
+    video_pagesettle(0);
     if (video_testtag[0])
         video_testprint();
 }
@@ -2437,9 +2440,101 @@ void video_applypending(void)
 // which then draw the whole screen again.
 void video_flushpending(void)
 {
-    if ((video_pendingmode >= 0) || (video_pendingrenderer >= 0) || (video_pendingss >= 0) ||
-        (video_pendingfilter >= 0))
+    if (video_pending())
         video_makepending();
+}
+
+// A change asked for isn't made yet (it waits for the fade's black).
+int video_pending(void)
+{
+    return (video_pendingmode >= 0) || (video_pendingrenderer >= 0) || (video_pendingss >= 0) ||
+           (video_pendingfilter >= 0);
+}
+
+// Alt+Enter (the driver's toggle hook): the display mode at the run's
+// resolution, a mode set as the VIDEO page's. Only for this run: duke3d.cfg
+// keeps its DisplayMode.
+static void video_toggle(int mode)
+{
+    video_requestmode(mode,gamewidth,gameheight);
+}
+
+// The VIDEO page's saving (videoopts.h). Opening it keeps duke3d.cfg's
+// values; a row the player changes takes the value in effect once the
+// changes asked for are made (so a failed switch to OpenGL saves the
+// renderer kept), and the others keep the file's, so a run's own values
+// (-renderer, Alt+Enter, BUILD_WINDOWED, a fallback from fullscreen) aren't
+// written. The file is written then, so it's saved however the page is
+// left (Esc in the attract demo goes straight to the main menu); the
+// game's exit writes it too. Brightness is ud.brightness, the run's and
+// the file's at once (as F11).
+static videoopts_t video_page;
+static int32_t video_pagecopy;
+
+static void video_configvals(videovals_t *v)
+{
+    v->renderer = RendererSetting;
+    v->displaymode = DisplayMode;
+    v->width = ScreenWidth;
+    v->height = ScreenHeight;
+    v->vsync = VSync;
+    v->brightness = ud.brightness;
+    v->contrast = GLContrast;
+    v->saturation = GLSaturation;
+    v->supersampling = GLSupersampling;
+    v->texfilter = GLTextureFilter;
+}
+
+// Copies the rows changed into duke3d.cfg's values and writes the file,
+// once no change is waiting (now: at once, at the exit).
+static void video_pagesettle(int now)
+{
+    videovals_t inuse, out;
+
+    if (video_pending() && !now)
+        return;
+    if (video_pagecopy)
+    {
+        video_configvals(&inuse);
+        inuse.renderer = gamerenderer;
+        inuse.displaymode = getvideodisplaymode();
+        inuse.width = gamewidth;
+        inuse.height = gameheight;
+        inuse.vsync = getvideovsync();
+#ifdef USE_OPENGL
+        inuse.supersampling = glsupersample;
+        inuse.texfilter = gltexturefilter;
+#endif
+        videoopts_saveinto(&video_page,&inuse,&out);
+        RendererSetting = out.renderer;
+        DisplayMode = out.displaymode;
+        ScreenWidth = out.width;
+        ScreenHeight = out.height;
+        VSync = out.vsync;
+        GLContrast = out.contrast;
+        GLSaturation = out.saturation;
+        GLSupersampling = out.supersampling;
+        GLTextureFilter = out.texfilter;
+        video_pagecopy = 0;
+        CONFIG_SaveSetup();
+    }
+}
+
+// Opening the page.
+void video_pagebegin(void)
+{
+    videovals_t saved;
+
+    video_configvals(&saved);
+    videoopts_begin(&video_page,&saved);
+}
+
+// The player changed row (VROW_*), after asking for the change: saved.
+void video_pagetouch(int row)
+{
+    videoopts_touch(&video_page,row);
+    video_pagecopy = 1;
+    video_pagesettle(0);
 }
 
 // -videocycle n: video_teststep every n frames in the game loop (the net
@@ -8511,6 +8606,7 @@ void ShutDown( void )
     uninittimer();
     uninitengine();
     CONTROL_Shutdown();
+    video_pagesettle(1);  // the VIDEO page's changes, for the file
     CONFIG_WriteSetup();
     KB_Shutdown();
 }
@@ -9126,6 +9222,7 @@ int main(int argc,char **argv)
     setvideosupersample(GLSupersampling);  // renderer 3's, this run's from here on
     setvideotexfilter(GLTextureFilter);  // the same
     setvideodrawfit(1);  // the VIDEO page's draw sizes (the editor keeps its own)
+    setvideotogglehook(video_toggle);  // Alt+Enter: a mode set, as the VIDEO page's
     gamewidth = ScreenWidth;
     gameheight = ScreenHeight;
 

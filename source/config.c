@@ -884,7 +884,16 @@ void CONFIG_ReadSetup( void )
 ===================
 */
 
+// Saves the setup file and frees it (the exit's); CONFIG_SaveSetup saves it
+// and keeps it, for a save mid-run (the VIDEO page's).
 void CONFIG_WriteSetup( void )
+   {
+   if (!setupread) return;
+   CONFIG_SaveSetup();
+   SCRIPT_Free (scripthandle);
+   }
+
+void CONFIG_SaveSetup( void )
    {
    int32 dummy;
 
@@ -905,6 +914,8 @@ void CONFIG_WriteSetup( void )
    SCRIPT_PutNumber( scripthandle, "Sound Setup", "ReverseStereo",ReverseStereo,false,false);
    SCRIPT_PutNumber( scripthandle, "Screen Setup", "ScreenSize",ud.screen_size,false,false);
    SCRIPT_PutNumber( scripthandle, "Screen Setup", "ScreenGamma",ud.brightness,false,false);
+   SCRIPT_PutNumber( scripthandle, "Screen Setup", "ScreenWidth",ScreenWidth,false,false);
+   SCRIPT_PutNumber( scripthandle, "Screen Setup", "ScreenHeight",ScreenHeight,false,false);
    SCRIPT_PutNumber( scripthandle, "Screen Setup", "Renderer",RendererSetting,false,false);
    SCRIPT_PutNumber( scripthandle, "Screen Setup", "GLTextureMipLevel",GLTextureMipLevel,false,false);
    SCRIPT_PutString( scripthandle, "Screen Setup", "GLDrawPath",(char *)gl_pathname(GLDrawPath));
@@ -940,7 +951,6 @@ void CONFIG_WriteSetup( void )
          break;
       }
    SCRIPT_Save (scripthandle, setupfilename);
-   SCRIPT_Free (scripthandle);
    }
 
 

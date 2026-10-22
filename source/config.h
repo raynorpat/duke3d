@@ -58,6 +58,7 @@ extern int32 ScreenHeight;
 void CONFIG_ReadSetup( void );
 void CONFIG_GetSetupFilename( void );
 void CONFIG_WriteSetup( void );
+void CONFIG_SaveSetup( void );
 
 void CONFIG_PutString( char *sectionname, char *entryname, char *string );
 
