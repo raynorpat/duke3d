@@ -1665,6 +1665,18 @@ static int32_t sbarx16(int32_t x)
     return ((xdim<<15)+32768+scale(x-(320<<15),ydim<<16,200*pixelaspect))>>16;
 }
 
+// One of drawwidebarends' copies, its clip rectangle held to the screen (a
+// copy at the edge reaches past it, and classic writes there): none if
+// nothing of it is on screen.
+static void drawwidebarcopy(int32_t sx, int32_t sy, int32_t z, short a, short picnum, signed char shade,
+                            unsigned short stat, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2)
+{
+    cx1 = max(cx1,0); cy1 = max(cy1,0);
+    cx2 = min(cx2,xdim-1); cy2 = min(cy2,ydim-1);
+    if (cx1 > cx2 || cy1 > cy2) return;
+    rotatesprite(sx,sy,z,a,picnum,shade,0,stat,cx1,cy1,cx2,cy2);
+}
+
 // Widescreen: carry a 320-wide HUD bar (tile picnum at 320x200 x 0, y sy,
 // zoom z) out to the screen edges in rows y1..y2-1, with copies of its own
 // outer n columns mirrored back and forth so every join matches. Each
@@ -1681,14 +1693,14 @@ static void drawwidebarends(short picnum, int32_t sy, int32_t z, int32_t n, sign
     {
         e = -k*s;   // left side: this copy ends at e
         if (k&1)
-            rotatesprite(e-s-d,sy,z,0,picnum,shade,0,2+8+16+64+128,sbarx16(e-s),y1,sbarx16(e),y2-1);
+            drawwidebarcopy(e-s-d,sy,z,0,picnum,shade,2+8+16+64+128,sbarx16(e-s),y1,sbarx16(e),y2-1);
         else
-            rotatesprite(e+d,sy,z,1024,picnum,shade,0,2+4+8+16+64+128,sbarx16(e-s),y1,sbarx16(e),y2-1);
+            drawwidebarcopy(e+d,sy,z,1024,picnum,shade,2+4+8+16+64+128,sbarx16(e-s),y1,sbarx16(e),y2-1);
         e = w+k*s;  // right side: this copy starts at e
         if (k&1)
-            rotatesprite(e+s-w+d,sy,z,0,picnum,shade,0,2+8+16+64+128,sbarx16(e)-1,y1,sbarx16(e+s)-1,y2-1);
+            drawwidebarcopy(e+s-w+d,sy,z,0,picnum,shade,2+8+16+64+128,sbarx16(e)-1,y1,sbarx16(e+s)-1,y2-1);
         else
-            rotatesprite(e+w-d,sy,z,1024,picnum,shade,0,2+4+8+16+64+128,sbarx16(e)-1,y1,sbarx16(e+s)-1,y2-1);
+            drawwidebarcopy(e+w-d,sy,z,1024,picnum,shade,2+4+8+16+64+128,sbarx16(e)-1,y1,sbarx16(e+s)-1,y2-1);
     }
 }
 
