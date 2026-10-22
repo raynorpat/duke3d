@@ -104,3 +104,9 @@ Each names what was decided, why, and what it costs if it turns out wrong.
   respawn and causing late replay desyncs. Both command-line parsers now skip
   arguments belonging to demo/save verification and dumps. Cost if wrong: a
   diagnostic argument no longer doubles as an unrelated game switch.
+- **G099-124: render from the measured beta camera fields.** The beta has no
+  `opyoff`, `truefz` or `truecz`; its camera uses current bob and a hittype floor
+  cap. The guarded renderer follows those calculations and the measured camera
+  branches. The existing native representation still lacks the display-only
+  per-player on-sector-effector interpolation flag. Cost if wrong: smoothing
+  on some moving sectors differs; simulation and save layout are unchanged.

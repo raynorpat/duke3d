@@ -3169,7 +3169,11 @@ void displayrooms(short snum,int32_t smoothratio)
         se40code(s->x,s->y,s->z,cang,s->yvel,smoothratio);
 #endif
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+        drawrooms(s->x,s->y,s->z,cang,s->yvel,s->sectnum);
+#else
         drawrooms(s->x,s->y,s->z-(4<<8),cang,s->yvel,s->sectnum);
+#endif
         animatesprites(s->x,s->y,cang,smoothratio);
         drawmasks();
     }
@@ -3278,6 +3282,19 @@ void displayrooms(short snum,int32_t smoothratio)
                                 smoothratio = 65536L;
                   }
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+                  else if(p->over_shoulder_on > 0)
+                  {
+                                view(p,&cposx,&cposy,&cposz,&sect,cang,choriz);
+                                getzrange(cposx,cposy,cposz-(1<<8),sect,&cz,&hz,&fz,&lz,127L,CLIPMASK0);
+                                cposz -= (16<<8);
+                                if(cposz > fz-(16<<8)) cposz = fz-(16<<8);
+                                if(cposz < cz+(16<<8)) cposz = cz+(16<<8);
+                  }
+
+        cposz += p->pyoff;
+        cposz = min(cposz,hittype[p->i].floorz-(8<<8));
+#else
                   else if( p->over_shoulder_on == 0 )
                                 cposz += p->opyoff+mulscale16((int32_t)(p->pyoff-p->opyoff),smoothratio);
                   else view(p,&cposx,&cposy,&cposz,&sect,cang,choriz);
@@ -3310,6 +3327,7 @@ void displayrooms(short snum,int32_t smoothratio)
 
         if(choriz > 299) choriz = 299;
         else if(choriz < -99) choriz = -99;
+#endif
 
 #if DUKE3D_GAMEVER >= GAMEVER_15
         se40code(cposx,cposy,cposz,cang,choriz,smoothratio);
@@ -3344,6 +3362,16 @@ void displayrooms(short snum,int32_t smoothratio)
             }
             gotpic[MIRROR>>3] &= ~(1<<(MIRROR&7));
         }
+
+#if DUKE3D_GAMEVER < GAMEVER_10
+        if(p->newowner >= 0)
+        {
+            cposz = max(cposz,sector[sect].ceilingz+(16<<8));
+            choriz = 100+sprite[p->newowner].shade;
+        }
+        if(choriz > 299) choriz = 299;
+        else if(choriz < -99) choriz = -99;
+#endif
 
         drawrooms(cposx,cposy,cposz,cang,choriz,sect);
         animatesprites(cposx,cposy,cang,smoothratio);
