@@ -62,3 +62,12 @@ Each names what was decided, why, and what it costs if it turns out wrong.
   prompt are shown, but its blocking console wait is DOS-only so native automated boots
   stay unattended. Modern Controls and Video entries remain after the eight original
   beta Options entries. Cost if wrong: startup/menu navigation differs from DOS.
+- **Task 10: share the measured 1.0 demo codec.** Beta and 1.0 use the same
+  nine-byte header and ten-byte records; their headers cannot identify the edition.
+  Refusal checks therefore omit 1.0 demos. Cost if wrong: DOS reference playback
+  will expose a format mismatch.
+- **Task 10: fix full-buffer demo finalization for every version.** The port only
+  rewrote the record count and cleared recording state when a partial batch remained.
+  Exactly 2520 records produced an invalid zero-count demo. Finalization now runs
+  after the optional partial write. Cost if wrong: closing an otherwise invalid
+  recording changes its header and state.

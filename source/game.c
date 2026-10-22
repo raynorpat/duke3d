@@ -9672,11 +9672,12 @@ void closedemowrite(void)
             #endif
             dfwrite(recsync,sizeof(input)*ud.multimode,ud.reccnt/ud.multimode,frecfilep);
 
-            fseek(frecfilep,SEEK_SET,0L);
-            val32 = BUILDSWAP_INTEL32(totalreccnt);
-            fwrite(&val32,sizeof(int32_t),1,frecfilep);
-            ud.recstat = ud.m_recstat = 0;
         }
+        // Finalize even when record() flushed an exactly full last batch.
+        fseek(frecfilep,SEEK_SET,0L);
+        val32 = BUILDSWAP_INTEL32(totalreccnt);
+        fwrite(&val32,sizeof(int32_t),1,frecfilep);
+        ud.recstat = ud.m_recstat = 0;
         fclose(frecfilep);
         frecfilep = NULL;
     }

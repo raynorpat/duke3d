@@ -316,6 +316,19 @@ add_executable(game_helpers game_helpers.c "${_game_c}")
 target_link_libraries(game_helpers PRIVATE duke3d_game)
 add_test(NAME game_helpers COMMAND game_helpers)
 
+if(DUKE3D_ROUTEBOT)
+  add_executable(routebot_test routebot.c "${_game_c}")
+  target_link_libraries(routebot_test PRIVATE duke3d_game)
+  add_test(NAME routebot COMMAND routebot_test)
+endif()
+
+add_executable(demo_writer demo_writer.c "${_game_c}")
+target_link_libraries(demo_writer PRIVATE duke3d_game)
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/demo_writer_run")
+add_test(NAME demo_writer COMMAND demo_writer)
+set_tests_properties(demo_writer PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/demo_writer_run"
+  PASS_REGULAR_EXPRESSION "demo writer checks reached completion" FAIL_REGULAR_EXPRESSION "FAIL;ERROR")
+
 if(DUKE3D_VERSION STREQUAL "0.99")
   add_executable(con_runtime_v099 con_runtime_v099.c "${_game_c}")
   target_link_libraries(con_runtime_v099 PRIVATE duke3d_game)
@@ -596,6 +609,24 @@ if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3
               "-DWORK=${CMAKE_BINARY_DIR}/gb_${_vold_name}"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/game_boot_v13d.cmake")
     set_tests_properties(game_boot_${_vold_name} PROPERTIES TIMEOUT 240)
+  endif()
+  if(_vold_data AND _vold_edition STREQUAL "sw099")
+    if(DUKE3D_ROUTEBOT)
+      add_test(NAME routebot_record_v099_sw
+        COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
+          "-DDATA=${_vold_data}" "-DWORK=${CMAKE_BINARY_DIR}/routebot_record"
+          -P "${CMAKE_CURRENT_SOURCE_DIR}/routebot_record.cmake")
+      set_tests_properties(routebot_record_v099_sw PROPERTIES TIMEOUT 90)
+    endif()
+    foreach(_mode refuse roundtrip)
+      add_test(NAME demo_${_mode}_${_vold_name}
+        COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
+          "-DDATA=${_vold_data}" -DEDITION=sw099 -DDEMO=1 "-DMODE=${_mode}"
+          "-DPYTHON=${Python3_EXECUTABLE}"
+          "-DWORK=${CMAKE_BINARY_DIR}/d${_mode}_${_vold_name}"
+          -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
+      set_tests_properties(demo_${_mode}_${_vold_name} PROPERTIES TIMEOUT 120)
+    endforeach()
   endif()
   # The original demos, played to the end and compared with the DOS state.
   if(_vold_data AND NOT _vold_edition STREQUAL "sw099")
