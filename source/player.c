@@ -3425,7 +3425,7 @@ void processinput(short snum)
         if(tempsect == psect)
         {
             k = getflorzofslope(tempsect,x,y);
-            p->horizoff += (((fz-k)>>2)-p->horizoff)>>2;
+            p->horizoff += (((j-k)>>2)-p->horizoff)>>2;
         }
     }
     else
