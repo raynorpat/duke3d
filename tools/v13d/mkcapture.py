@@ -15,36 +15,15 @@ there). STATE.BIN then also holds the runtime and link address of the logger
 subtract the runtime-minus-link difference to get EXE addresses; sw11 has room
 for 41). The code object is read-only, so the log lives in the slack after the
 data object."""
-import re, struct, sys
-ED = {
-    'full': dict(krand=0x6c241, randomseed=0x251998, sprite=0x1cdbc0, reccnt=0x14de0a, which_demo=0xc76d6, cave=0xaa620, log=0x2d5400, ps=0x11bd30),
-    'sw':   dict(krand=0x6bf61, randomseed=0x251ae8, sprite=0x1cdd10, reccnt=0x14df5a, which_demo=0xc782e, cave=0xaa330, log=0x2d5550, ps=0x11be80),
-    # 1.1 and 1.0 shareware (docs/v10-v11/reference.md): other LE offsets, 8 x 0x34e
-    # ps[], a smaller code cave, and only 0xb0 bytes of log slack in 1.1
-    'sw11': dict(krand=0x67a71, randomseed=0x22ae04, sprite=0x1a7030, reccnt=0x130562, which_demo=0xc6c8d, cave=0xa4700, log=0x2abf50, ps=0x1162e0,
-                 le=0x290fc, stub=0x26654, cavesize=0x900, pssize=0x34e, logn=41, flat='sw11.bin'),
-    'sw10': dict(krand=0x661e7, randomseed=0x22aaf0, sprite=0x1a6d1c, reccnt=0x130ebb, which_demo=0xc6783, cave=0xa2aa0, log=0x2abaf0, ps=0x112ab0,
-                 le=0x290fc, stub=0x26654, cavesize=0x560, pssize=0x34e, flat='sw10.bin'),
-    'sw099': dict(krand=0x6151e, randomseed=0x210c30, sprite=0x18ce5c, reccnt=0xf0cd8, which_demo=0xa5866, cave=0x99b20, log=0x2471a0, ps=0xf0f38,
-                  le=0x2a50, stub=0, cavesize=0x4e0, pssize=0x33f, flat='beta099.bin', demostack=8, codeend=0x9a000),
-}
+import importlib.util, os, re, struct, sys
+# Load by path so the tools also work with Python's isolated (-I) mode.
+spec = importlib.util.spec_from_file_location('capture_le', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'le.py'))
+le = importlib.util.module_from_spec(spec); spec.loader.exec_module(le)
+ED = le.ED
 ed = ED[sys.argv[1]]
-LE, STUB = ed.get('le', 0x37c3c), ed.get('stub', 0x352a4)
 FLAT = __import__('os').environ.get('V13D_FLAT') or __import__('os').path.expanduser('~/Projects/ref/ghidra/' + ed.get('flat', f'{sys.argv[1]}13.bin'))
 LOGN = ed.get('logn', 256); exe = bytearray(open(sys.argv[2], 'rb').read()); demo = int(sys.argv[4])
-H = lambda o, f: struct.unpack_from(f, exe, LE + o)[0]
-objtab, pmap, datapages = H(0x40, '<I'), H(0x48, '<I'), H(0x80, '<I')
-objs = [struct.unpack_from('<6I', exe, LE + objtab + i*24) for i in range(H(0x44, '<I'))]
-def foff(addr):
-    for vs, base, fl, pmi, pmn, _ in objs:
-        if base <= addr < base + pmn*0x1000:
-            j = (addr - base) // 0x1000
-            e = exe[LE + pmap + (pmi - 1 + j)*4: LE + pmap + (pmi + j)*4]
-            num = (e[0] << 16) | (e[1] << 8) | e[2]
-            return STUB + datapages + (num - 1)*0x1000 + (addr - base) % 0x1000
-    raise SystemExit(f'{addr:#x} not in a file-backed page')
-def rd(addr, n): o = foff(addr); return bytes(exe[o:o+n])
-def wr(addr, b): o = foff(addr); exe[o:o+len(b)] = b
+image = le.LEImage(exe, ed); rd, wr = image.rd, image.wr
 # the demo-end branch in playback: cmp [reccnt],0 / jg / cmp byte [esp+4],0 / jnz END (esp+8 in 0.99)
 code = open(FLAT, 'rb').read()[:0x30000]  # flattened image (le_flatten.py), fixups applied
 pat = re.compile(rb'\x83\x3d' + re.escape(struct.pack('<I', ed['reccnt'])) + rb'\x00\x7f.\x80\x7c\x24' + bytes([ed.get('demostack', 4)]) + rb'\x00\x0f\x85(....)', re.S)
@@ -72,7 +51,7 @@ if krandlog:
     write(ed['log'], 12 + LOGN*4)
 c += b'\x66\x89\xfb\xb4\x3e\xcd\x21'         # close
 c += b'\xeb\xfe'                             # hang
-fname = cave + len(c); c += b'STATE.BIN\x00'
+fname = cave + len(c); c += le.CAPTURE_FILE
 struct.pack_into('<i', c, fname_fix, fname - nxt)
 if krandlog:
     hook = cave + len(c); hn = hook + 9      # address of the pop after its call
