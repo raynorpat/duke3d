@@ -175,6 +175,12 @@ void setvideodisplaymodenext(int mode);
  *  default, the editor's): the size asked for, over 1600x1200 clamped. */
 void setvideodrawfit(int on);
 int getvideodisplaymode(void);  /* the window's */
+/* Alt+Enter calls hook with the display mode to go to instead of changing it
+ *  (the game makes it a mode set); NULL (the default): it changes now. */
+void setvideotogglehook(void (*hook)(int mode));
+/* The main display's modes as SDL lists them (w[i] by h[i], at most max) and
+ *  its desktop size; returns how many. */
+int getvideomodelist(int32_t *w, int32_t *h, int max, int32_t *desktopw, int32_t *desktoph);
 /*
  * The VIDEO page's fade around a change, at the present, over the game's own
  *  palette and fade (left alone), in real time. setvideofadeout fades to

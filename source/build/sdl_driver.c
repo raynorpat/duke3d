@@ -731,25 +731,55 @@ static void init_res_lookups(int davidoption, int framebuffer)
 } /* init_res_lookups */
 
 
+static void centre_window_pos(int d, int w, int h, int *x, int *y);
+
 /*
- * Moves a window from display mode now to mode, exclusive at the display
- *  mode nearest exclusive_w by exclusive_h (borderless when there's none).
- *  Between the full-screen styles it goes through windowed. Returns the mode
- *  it's in. (Its flags can't always tell: under sdl2-compat the dummy
- *  driver reports exclusive as desktop full screen.)
+ * The main display's mode exactly w by h (the first SDL lists, its highest
+ *  refresh rate), else the one nearest; 0 if there's none.
+ */
+static int main_display_mode(int w, int h, SDL_DisplayMode *got)
+{
+    SDL_DisplayMode want;
+    int i, n = SDL_GetNumDisplayModes(0);
+
+    for (i = 0; i < n; i++)
+        if ((SDL_GetDisplayMode(0, i, got) == 0) && (got->w == w) && (got->h == h))
+            return(1);
+    memset(&want, '\0', sizeof (want));
+    want.w = w;
+    want.h = h;
+    return(SDL_GetClosestDisplayMode(0, &want, got) != NULL);
+} /* main_display_mode */
+
+
+/*
+ * Moves a window from display mode now to mode, exclusive at the main
+ *  display's mode exactly exclusive_w by exclusive_h (the VIDEO page lists
+ *  those), or the one nearest (borderless when there's none). Full screen is
+ *  on the main display: a window on another is moved there first (not tried
+ *  with more than one display). Between the full-screen styles it goes
+ *  through windowed. Returns the mode it's in. (Its flags can't always tell:
+ *  under sdl2-compat the dummy driver reports exclusive as desktop full
+ *  screen.)
  */
 static int set_window_display(SDL_Window *window, int now, int mode)
 {
-    SDL_DisplayMode want, got;
+    SDL_DisplayMode got;
     Uint32 flags = (mode == DISPLAY_EXCLUSIVE) ? SDL_WINDOW_FULLSCREEN :
                    (mode == DISPLAY_BORDERLESS) ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
 
+    if ((mode != DISPLAY_WINDOWED) && (now == DISPLAY_WINDOWED) &&
+        (SDL_GetWindowDisplayIndex(window) > 0))
+    {
+        int x, y, w, h;
+        SDL_GetWindowSize(window, &w, &h);
+        centre_window_pos(0, w, h, &x, &y);
+        SDL_SetWindowPosition(window, x, y);
+    } /* if */
+
     if (mode == DISPLAY_EXCLUSIVE)
     {
-        memset(&want, '\0', sizeof (want));
-        want.w = exclusive_w;
-        want.h = exclusive_h;
-        if ((SDL_GetClosestDisplayMode(SDL_GetWindowDisplayIndex(window), &want, &got) == NULL) ||
+        if ((!main_display_mode(exclusive_w, exclusive_h, &got)) ||
             (SDL_SetWindowDisplayMode(window, &got) != 0))
         {
             printf("No exclusive fullscreen display mode fits %dx%d (%s); using borderless.\n",
@@ -1781,7 +1811,8 @@ void setvideodisplaymodenext(int mode)
 {
     if ((mode < 0) || (mode >= DISPLAY_COUNT))
         mode = DISPLAY_BORDERLESS;
-    sdl_displaymode_wanted = mode;
+    if (mode != DISPLAY_WINDOWED)  /* Alt+Enter's full-screen style */
+        sdl_displaymode_wanted = mode;
     if (getenv(BUILD_WINDOWED) != NULL)
         mode = DISPLAY_WINDOWED;
     if (sdl_window == NULL)
@@ -1819,7 +1850,18 @@ int getvideovsync(void)
 } /* getvideovsync */
 
 
-/* Alt+Enter: windowed, or the full-screen style set (borderless if none). */
+static void (*sdl_togglehook)(int mode) = NULL;
+
+void setvideotogglehook(void (*hook)(int mode))
+{
+    sdl_togglehook = hook;
+} /* setvideotogglehook */
+
+
+/*
+ * Alt+Enter: windowed, or the full-screen style set (borderless if none);
+ *  through the hook if there is one (the game's mode set), else now.
+ */
 static int attempt_fullscreen_toggle(void)
 {
     int mode = sdl_displaymode_wanted;
@@ -1833,9 +1875,39 @@ static int attempt_fullscreen_toggle(void)
         mode = DISPLAY_WINDOWED;
     else if (mode == DISPLAY_WINDOWED)
         mode = DISPLAY_BORDERLESS;
+    if (sdl_togglehook != NULL)
+    {
+        sdl_togglehook(mode);
+        return(1);
+    } /* if */
     show_display_mode(mode);
     return(sdl_displaymode == mode);
 } /* attempt_fullscreen_toggle */
+
+
+int getvideomodelist(int32_t *w, int32_t *h, int max, int32_t *desktopw, int32_t *desktoph)
+{
+    SDL_DisplayMode mode;
+    int i, n = 0, count;
+
+    *desktopw = *desktoph = 0;
+    if (SDL_GetDesktopDisplayMode(0, &mode) == 0)
+    {
+        *desktopw = mode.w;
+        *desktoph = mode.h;
+    } /* if */
+    count = SDL_GetNumDisplayModes(0);
+    for (i = 0; (i < count) && (n < max); i++)
+    {
+        if (SDL_GetDisplayMode(0, i, &mode) == 0)
+        {
+            w[n] = mode.w;
+            h[n] = mode.h;
+            n++;
+        } /* if */
+    } /* for */
+    return(n);
+} /* getvideomodelist */
 
 
     /*

@@ -418,7 +418,14 @@ Ported from later JFBuild commits, retyped as above:
   alone when they haven't changed (a moved window stays put, also when the
   first GL window replaces it); a new windowed size is given only while
   windowed (in full screen it waits for the return) and centred on the
-  bounds of the display the window was on.
+  bounds of the display the window was on. Exclusive takes the main
+  display's mode exactly the size asked for (the closest only when there's
+  none), and full screen moves a window on another display to the main one
+  first (untested with two displays). `getvideomodelist` gives the main
+  display's modes and desktop size (the VIDEO page's RESOLUTION list).
+  `setvideotogglehook` hands Alt+Enter's display mode to the game (a mode
+  set) instead of changing it at once; `setvideodisplaymodenext` keeps a
+  full-screen style for Alt+Enter, not windowed.
 - `setvideofadeout`/`setvideofadein` (the VIDEO page's fade around a
   change): a darkness applied at every present, in real time, over the
   game's palette and fade without touching them. The SDL renderer's texture

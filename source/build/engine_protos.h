@@ -132,6 +132,8 @@ extern void setvideodisplaymode(int mode);
 extern void setvideodisplaymodenext(int mode);
 extern void setvideodrawfit(int on);
 extern int getvideodisplaymode(void);
+extern void setvideotogglehook(void (*hook)(int mode));
+extern int getvideomodelist(int32_t *w, int32_t *h, int max, int32_t *desktopw, int32_t *desktoph);
 extern void setvideofadeout(void);
 extern void setvideofadein(void);
 extern int getvideofade(void);
