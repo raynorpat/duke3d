@@ -48,8 +48,12 @@ set(ENV{HOME} "${_home}")
 set(ENV{USERPROFILE} "${_home}")
 set(ENV{DUKE3D_SAVE_DIR} "${_home}")
 
+if(DEMOGOD)
+  set(_demo_options -demogod)
+endif()
+
 macro(_demo_run)
-  execute_process(COMMAND "${DUKE3D}" -demoverify ${DEMO}
+  execute_process(COMMAND "${DUKE3D}" -demoverify ${DEMO} ${_demo_options}
     WORKING_DIRECTORY "${_run}"
     TIMEOUT 300
     RESULT_VARIABLE _result

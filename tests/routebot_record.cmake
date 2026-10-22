@@ -12,7 +12,10 @@ set(ENV{SDL_AUDIODRIVER} dummy)
 set(ENV{HOME} "${WORK}/home")
 set(ENV{USERPROFILE} "${WORK}/home")
 set(ENV{DUKE3D_SAVE_DIR} "${WORK}/home")
-execute_process(COMMAND "${DUKE3D}" /v1 /l1 /s3 -routebot check.route -r
+if(DEMOGOD)
+  set(_options -demogod)
+endif()
+execute_process(COMMAND "${DUKE3D}" /v1 /l1 /s3 -routebot check.route -r ${_options}
   WORKING_DIRECTORY "${WORK}/run" TIMEOUT 30 RESULT_VARIABLE _result OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
 if(NOT _result EQUAL 0)
   message(FATAL_ERROR "route recording failed: ${_result}\n${_out}${_err}")
@@ -22,7 +25,7 @@ set(_author "${CMAKE_MATCH_1}")
 if(NOT _state)
   message(FATAL_ERROR "no author state: ${_out}")
 endif()
-execute_process(COMMAND "${DUKE3D}" -demoverify 1
+execute_process(COMMAND "${DUKE3D}" -demoverify 1 ${_options}
   WORKING_DIRECTORY "${WORK}/run" TIMEOUT 30 RESULT_VARIABLE _result OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
 string(REGEX MATCH "DEMOSTATE ([-0-9 ]+)" _state "${_out}")
 set(_play "${CMAKE_MATCH_1}")

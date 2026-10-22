@@ -8946,6 +8946,9 @@ static int authorroute(const char *path)
     ud.multimode=1;
     ud.m_recstat=ud.recstat=1;
     newgame(ud.m_volume_number,ud.m_level_number,ud.m_player_skill);
+#if DUKE3D_GAMEVER < GAMEVER_10
+    ud.god=!!CheckParm("DEMOGOD");
+#endif
     enterlevel(MODE_GAME);
     while((state=routebot_next(p->posx,p->posy,p->ang,&next))>0)
     {
@@ -9758,6 +9761,9 @@ int demoverify(int n, char *dumpname)
         return 2;
     }
     ud.recstat = 2;
+#if DUKE3D_GAMEVER < GAMEVER_10
+    ud.god=!!CheckParm("DEMOGOD");
+#endif
     enterlevel(MODE_DEMO);
 
     i = 0;

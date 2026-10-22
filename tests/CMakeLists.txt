@@ -617,6 +617,11 @@ if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3
           "-DDATA=${_vold_data}" "-DWORK=${CMAKE_BINARY_DIR}/routebot_record"
           -P "${CMAKE_CURRENT_SOURCE_DIR}/routebot_record.cmake")
       set_tests_properties(routebot_record_v099_sw PROPERTIES TIMEOUT 90)
+      add_test(NAME routebot_record_god_v099_sw
+        COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
+          "-DDATA=${_vold_data}" -DDEMOGOD=ON "-DWORK=${CMAKE_BINARY_DIR}/routebot_record_god"
+          -P "${CMAKE_CURRENT_SOURCE_DIR}/routebot_record.cmake")
+      set_tests_properties(routebot_record_god_v099_sw PROPERTIES TIMEOUT 90)
     endif()
     foreach(_mode refuse roundtrip)
       add_test(NAME demo_${_mode}_${_vold_name}

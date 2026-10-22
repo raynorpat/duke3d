@@ -2,7 +2,7 @@
 shareware) that, when a demo ends, writes the game state to STATE.BIN and then
 hangs. Optionally starts the title demo loop at demo N.
 
-usage: mkcapture.py <full|sw|sw11|sw10|sw099> <in.exe> <out.exe> <demo number> [krandlog]
+usage: mkcapture.py <full|sw|sw11|sw10|sw099> <in.exe> <out.exe> <demo number> [krandlog] [demogod]
 
 STATE.BIN = reccnt (4) + randomseed (4) + sprite[4096] (44 each) + ps[0] (0x552, the
 1.3D player_struct layout, see ledger F-007; 0x34e for sw11 and sw10, see
@@ -112,6 +112,12 @@ elif len(sys.argv) > 5 and sys.argv[5] == 'firsttic':
     k = calls[1] if len(calls) > 1 else calls[0]; wr(k + 1, struct.pack('<i', cave - (k + 5))); print(f'diagnostic: call at {k:#x} -> cave')
 else:
     wr(jnz + 2, struct.pack('<i', cave - (jnz + 6)))
+if 'demogod' in sys.argv[5:]:
+    assert sys.argv[1] == 'sw099', 'demogod is a beta reference option'
+    # checkcommandline: xor ah,ah; ...; mov byte [god],ah. No later reset.
+    assert rd(0x293aa, 2) == b'\x30\xe4', 'unexpected beta god initializer'
+    wr(0x293aa, b'\xb4\x01')  # mov ah,1
+    print('demogod: initialize beta god mode at startup')
 wr(ed['which_demo'], bytes([demo]))
 open(sys.argv[3], 'wb').write(exe)
 print(f'jnz at {jnz:#x} (was -> {end:#x}), cave at {cave:#x}, {len(c)} bytes, start demo {demo}')
