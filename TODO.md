@@ -13,7 +13,7 @@ reviewed and judged safe to leave for now. Ledger row IDs refer to the Differenc
 - [ ] **Two `TRAND` calls in one expression** (`source/player.c`, the 1.1 death path and the
   1.3D one below it). C leaves their order unspecified; DOS drew `&1` first. Split each into
   two statements.
-- [ ] **1.3D demo header reader** (`source/game.c`, `opendemoread`): a truncated header still
+- [x] **1.3D demo header reader** (`source/game.c`, `opendemoread`): a truncated header still
   range-checks uninitialized locals. Start them out of range, as the 1.1/1.0 reader now does.
 - [ ] **`checkhitsprite` and `cheatkeys` have 1.1-only copies** (`source/sector.c`). A future
   fix to either function has to be made twice; consider folding the 1.1 copy of

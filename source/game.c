@@ -9510,6 +9510,14 @@ char opendemoread(char which_demo) // 0 = mine
      else
        if ((recfilep = kopen4load(d,loadfromgrouponly)) == -1) return(0);
 
+#if DUKE3D_GAMEVER == GAMEVER_13D
+     if(kfilelength(recfilep) < 24)
+     {
+         printf("%s has a truncated 1.3D demo header; refused.\n",fname);
+         kclose(recfilep);
+         return 0;
+     }
+#endif
      kread32(recfilep,&ud.reccnt);
 #if DUKE3D_GAMEVER < GAMEVER_14
 #if DUKE3D_GAMEVER < GAMEVER_13D
@@ -9551,8 +9559,8 @@ char opendemoread(char which_demo) // 0 = mine
      // "Demo file"). A later demo has its version where the volume goes, so
      // a value no 1.3D game can have refuses it.
      {
-         char vol, lev, skill, coop;
-         short mm, moff;
+         char vol = 127, lev = 127, skill = 127, coop = 0;
+         short mm = 0, moff = 0;
 
          kread8(recfilep,&vol);
          kread8(recfilep,&lev);

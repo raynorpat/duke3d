@@ -3,6 +3,7 @@
 #include "duke3d.h"
 #include "build/cache1d.h"
 static int failures;
+extern int32_t recfilep;
 int main(void)
 {
     int sizes[]={1,RECSYNCBUFSIZ,RECSYNCBUFSIZ+1},n,i;
@@ -23,5 +24,20 @@ int main(void)
         /* Do not call close twice on the broken baseline's dangling stream. */
     }
     remove("demo1.dmo");
+#if DUKE3D_GAMEVER == GAMEVER_13D
+    /* A valid 1.3D prefix must not make an incomplete 24-byte header playable. */
+    for(n=0;n<24;n++) {
+        unsigned char header[24]={0}; FILE *f;
+        header[8]=1; /* one player */
+        f=fopen("demo1.dmo","wb");
+        if(!f || fwrite(header,1,n,f)!=(size_t)n) return 1;
+        fclose(f);
+        if(opendemoread(1)) {
+            printf("FAIL accepted %d-byte truncated header\n",n); failures++;
+            kclose(recfilep);
+        }
+    }
+    remove("demo1.dmo");
+#endif
     puts("demo writer checks reached completion"); return failures!=0;
 }
