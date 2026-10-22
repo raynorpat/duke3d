@@ -7,7 +7,7 @@ if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
 endif()
 
 option(DUKE3D_SHAREWARE "Build the shareware (VOLUMEONE) version: 0.99, 1.0, 1.1 or 1.3D" OFF)
-# Each older release needs its own data; see docs/v13d/reference.md and docs/v099/.
+# Each older release needs its own data; see docs/v13d/, docs/v10-v11/ and docs/v099/.
 set(DUKE3D_VERSION "1.5" CACHE STRING "Game version to build: 0.99, 1.0, 1.1, 1.3D, 1.4 or 1.5")
 set_property(CACHE DUKE3D_VERSION PROPERTY STRINGS 0.99 1.0 1.1 1.3D 1.4 1.5)
 string(CONCAT _version_combinations

@@ -442,7 +442,7 @@ Tests that need game data are only registered when you point CMake at it:
 | `DUKE3D_V099_SW_DATA_DIR` | Beta CON compile, boot, real-renderer camera, demo-format and DOS-save tests. Installed `refdemos/E1L<n>.DMO` files enable per-map sync checks; E1L5 also enables the 60-second episode-ending check; `refsaves/` holds the four DOS save references. No beta network tests; needs Python 3 |
 | `DUKE3D_NET_PEERS` | 1.3D, 1.1 and 1.0 builds: other builds, as `<exe>=<data folder>` entries, to check that multiplayer refuses mismatched versions |
 
-A 1.5 refusal peer (`net_refuse_v10_sw_3`) can't run on the shareware data, so it needs a
+A 1.5 refusal peer can't run on the shareware data, so it needs a
 data folder of its own. Make one in a git-ignored build directory, for example
 `build-v15/netpeer`: a symlink to a 1.5 `DUKE3D.GRP`, plus copies of `testdata/*.con`.
 Then list the 1.5 executable with it in `DUKE3D_NET_PEERS`, for example
