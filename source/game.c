@@ -9654,6 +9654,14 @@ int demoverify(int n, char *dumpname, int draw, int switchevery)
                 char tag[32];
                 sprintf(tag,"DEMOSWITCH tic %d:",(int)tics);
                 video_teststep(tag);
+                while(videofading())  // this tic drawn until the switch is done: one per k tics
+                {
+                    gldrawframe();
+                    displayrooms(screenpeek,65536);
+                    displayrest(65536);
+                    nextpage();
+                    video_applypending();
+                }
             }
         }
     }

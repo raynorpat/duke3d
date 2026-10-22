@@ -452,13 +452,14 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
       set_tests_properties(demo_sync_v13d_${_v13d_edition}_${_demo} PROPERTIES TIMEOUT 400)
     endforeach()
-    # Demo 1 again, drawn, with the renderer switched every 50 tics as the
-    # VIDEO page does (OpenGL fails headless, and stays off): still in sync.
+    # Demo 1 again, drawn, with the renderer and mode switched every 100 tics
+    # as the VIDEO page does, each faded and waited for (OpenGL fails
+    # headless, and stays off): still in sync.
     add_test(NAME demo_switch_v13d_${_v13d_edition}
       COMMAND "${CMAKE_COMMAND}"
               "-DDUKE3D=$<TARGET_FILE:duke3d>"
               "-DDATA=${_v13d_data}" "-DEDITION=${_v13d_edition}"
-              -DDEMO=1 "-DFLAGS=-demoswitch 50"
+              -DDEMO=1 "-DFLAGS=-demoswitch 100"
               "-DREFS=${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_demo_refs.cmake"
               "-DWORK=${CMAKE_BINARY_DIR}/dsw13"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")

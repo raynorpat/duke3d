@@ -1902,12 +1902,21 @@ static int video_switch_check(void)
         win = SDL_GetWindowFromID(id);
     winid = SDL_GetWindowID(win);
 
-    gl_forcefail = 4;
-    r = video_setrenderer(3);
+    gl_forcefail = 4;  /* asked for as the VIDEO page does: faded out, failed, faded back in */
+    video_requestrenderer(3);
+    for (id = SDL_GetTicks(); (videofading()) && (SDL_GetTicks() - id < 3000); )
+    {
+        present8_frame(0);
+        video_applypending();
+    }
     gl_forcefail = 0;
-    printf("renderer 2 -> 3, OpenGL failing: renderer %d, OpenGL greyed %d\n", r, (int) video_glunavailable);
-    if ((r != 2) || (getrendermode() != 2) || (!video_glunavailable))
+    r = getrendermode();
+    printf("renderer 2 -> 3, OpenGL failing: renderer %d, OpenGL greyed %d, faded back in %d\n", r,
+           (int) video_glunavailable, (!videofading()) && (getvideofade() == 0));
+    if ((r != 2) || (!video_glunavailable))
         { fprintf(stderr, "FAIL: OpenGL failing didn't keep renderer 2 and grey OpenGL\n"); ok = 0; }
+    if ((videofading()) || (getvideofade() != 0))
+        { fprintf(stderr, "FAIL: OpenGL failing didn't fade back in\n"); ok = 0; }
     if ((SDL_GetWindowFromID(winid) != win) || (SDL_GetRenderer(win) == NULL))
         { fprintf(stderr, "FAIL: OpenGL failing lost the window or its SDL renderer\n"); return 0; }
     for (id = SDL_GetTicks(); SDL_GetTicks() - id < 300; SDL_Delay(10))
