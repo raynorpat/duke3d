@@ -24,8 +24,9 @@ Each nonblank line is an absolute map coordinate:
 x y
 x y use [crouch]
 x y fire [tics]
-x y jump
-x y crouch
+x y jump [tics]
+x y crouch [tics]
+x y jetpack
 x y wait tics
 x y weapon 1-10
 x y face angle
@@ -37,7 +38,9 @@ The bot moves toward each point and turns to face it. `use` pulses the use key
 while approaching and presses it on arrival; `fire` holds fire; `jump` pulses
 jump once per second and on arrival. `wait` stops at the point for the specified
 positive number of simulation tics (26 per second). `crouch` holds crouch/dive
-while approaching. `use crouch` presses use while crouching for low switches.
+while approaching. Timed `jump`/`crouch` holds the key on arrival for the given
+number of tics, including jetpack ascent/descent. `jetpack` presses the normal
+jetpack toggle on arrival. `use crouch` presses use while crouching for low switches.
 `fire tics` keeps firing for that many tics on arrival.
 `weapon n` selects the normal numbered weapon key (1 is kick, 2 pistol, 3 shotgun).
 `face angle` turns in place after reaching the point, using Build angles0–2047
@@ -53,3 +56,18 @@ For a reference route that repeatedly dies, the plan permits `-demogod` in the
 beta author and `-demoverify` runs. Patch its scratch DOS capture EXE with
 `mkcapture.py sw099 ... 1 krandlog demogod` to initialize exactly the same god
 state. Record this requirement with the demo; the header cannot store it.
+
+Regenerate completed references from the repository root:
+
+```
+tools/v099/mkrefdemos.sh /path/to/d3d_beta build-v099-routebot 1 2
+```
+
+Omit the level numbers to regenerate all six. DOSBox-X must be available, or
+pass `--dosbox /path/to/dosbox-x`. Each route needing god mode has an exact
+`# DEMOGOD` header. The script checks the five original data hashes, authors in
+scratch, requires native playback to match, and then captures the DOS exit.
+It installs a demo in the data folder's `refdemos/` and updates the committed
+numbers only after an exact DOS/native match. Scratch captures and logs remain
+under `/tmp/v099-ref-*` for inspection. The original EXE, GRP and CON files stay
+read-only throughout.

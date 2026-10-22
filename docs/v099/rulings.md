@@ -93,3 +93,14 @@ Each names what was decided, why, and what it costs if it turns out wrong.
   stale upper16 bits. The absent respawn-items settings reset to zero. Cost if
   wrong: a malformed or unusual save that depended on stale decompression bytes
   gets a deterministic respawn setting.
+- **Task 11: use god-mode jetpack fuel for E1L5 height barriers.** Multiple
+  walking attempts reached disconnected initialized ledges; all24 SE31 floor
+  assignments and seven SE2 slope resets match the beta executable. The route
+  uses ordinary jetpack toggle/ascent/descent inputs with the already matched
+  god state, which supplies fuel. Cost if wrong: the reference route bypasses an
+  undiscovered walking path; every resulting input still plays in DOS.
+- **Task 11: diagnostic filenames are not game switches.** The legacy parser
+  treated an absolute `/tmp/...` diagnostic filename as `/t`, enabling monster
+  respawn and causing late replay desyncs. Both command-line parsers now skip
+  arguments belonging to demo/save verification and dumps. Cost if wrong: a
+  diagnostic argument no longer doubles as an unrelated game switch.

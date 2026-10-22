@@ -41,5 +41,12 @@ int main(void)
     CHECK(routebot_load("routebot-test.route"));
     CHECK(routebot_next(724,0,0,&in)==1 && in.fvel==0);
     CHECK(routebot_next(724,0,0,&in)==0);
+    f=fopen("routebot-test.route","w");
+    fputs("0 0 jetpack\n0 0 jump 3\n0 0 crouch 2\n",f); fclose(f);
+    CHECK(routebot_load("routebot-test.route"));
+    CHECK(routebot_next(0,0,0,&in)==1 && in.bits==(1u<<25));
+    for(i=0;i<3;i++) CHECK(routebot_next(0,0,0,&in)==1 && in.bits==1);
+    for(i=0;i<2;i++) CHECK(routebot_next(0,0,0,&in)==1 && in.bits==2);
+    CHECK(routebot_next(0,0,0,&in)==0);
     remove("routebot-test.route"); return failures!=0;
 }

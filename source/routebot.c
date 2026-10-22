@@ -28,6 +28,7 @@ int routebot_load(const char *path)
         else if(n==3 && !strcmp(action,"fire")) points[count].action=2;
         else if(n==3 && !strcmp(action,"jump")) points[count].action=3;
         else if(n==3 && !strcmp(action,"pass")) points[count].action=9;
+        else if(n==3 && !strcmp(action,"jetpack")) points[count].action=10;
         else if(n==3 && !strcmp(action,"crouch")) points[count].action=5;
         else if(n==4 && !strcmp(action,"use") && !strcmp(argument,"crouch")) points[count].action=7;
         else if(n==4 && !strcmp(action,"face")) {
@@ -35,12 +36,12 @@ int routebot_load(const char *path)
             if(*end || value<0 || value>2047) goto bad;
             tics=value; points[count].action=8;
         }
-        else if(n==4 && (!strcmp(action,"wait") || !strcmp(action,"fire") || !strcmp(action,"weapon"))) {
+        else if(n==4 && (!strcmp(action,"wait") || !strcmp(action,"fire") || !strcmp(action,"weapon") || !strcmp(action,"jump") || !strcmp(action,"crouch"))) {
             long value=strtol(argument,&end,10);
             if(*end || value<=0 || value>INT_MAX) goto bad;
             if(!strcmp(action,"weapon") && value>10) goto bad;
             tics=value;
-            points[count].action=!strcmp(action,"wait") ? 4 : !strcmp(action,"fire") ? 2 : 6;
+            points[count].action=!strcmp(action,"wait") ? 4 : !strcmp(action,"fire") ? 2 : !strcmp(action,"jump") ? 3 : !strcmp(action,"crouch") ? 5 : 6;
         }
         else goto bad;
         points[count++].tics=tics;
@@ -61,13 +62,13 @@ int routebot_next(int32_t x,int32_t y,short angle,input *out)
         struct waypoint *p=&points[current];
         int dx=p->x-x,dy=p->y-y,dist=FindDistance2D(dx,dy),turn;
         int radius=p->action==9 ? 384 : 128;
-        if(elapsed++>=26*60 && !((p->action==4 || (p->action==2 && p->tics)) && dist<=radius)) {
+        if(elapsed++>=26*60 && !((p->action==4 || ((p->action==2 || p->action==3 || p->action==5) && p->tics)) && dist<=radius)) {
             fprintf(stderr,"route waypoint %d timed out at %d %d (target %d %d)\n",current+1,x,y,p->x,p->y);
             return -1;
         }
         if((p->action==1 || p->action==7) && (elapsed&1)) out->bits|=1u<<29;
         if(p->action==2) out->bits|=1u<<2;
-        if(p->action==3 && (elapsed%26)==1) out->bits|=1;
+        if(p->action==3 && (p->tics || (elapsed%26)==1)) out->bits|=1;
         if(p->action==5 || p->action==7) out->bits|=2;
         if(p->action==6) out->bits|=(unsigned)p->tics<<8;
         if(dist<=radius)
@@ -80,7 +81,8 @@ int routebot_next(int32_t x,int32_t y,short angle,input *out)
             }
             if(p->action==1 || p->action==7) out->bits|=1u<<29;
             if(p->action==3) out->bits|=1;
-            if((p->action==4 || (p->action==2 && p->tics)) && ++waiting<p->tics) return 1;
+            if(p->action==10) out->bits|=1u<<25;
+            if((p->action==4 || ((p->action==2 || p->action==3 || p->action==5) && p->tics)) && ++waiting<p->tics) return 1;
             printf("ROUTE waypoint %d reached at %d %d\n",current+1,x,y);
             current++; elapsed=waiting=0;
             if(p->action) return 1;
