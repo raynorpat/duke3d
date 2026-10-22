@@ -130,7 +130,11 @@ char *keyw[NUMKEYWORDS] =
     "ifinspace",        // 67
 #if DUKE3D_GAMEVER < GAMEVER_13D
     "ifplayersl",       // 68
+#if DUKE3D_GAMEVER < GAMEVER_10
+    "activate",         // 69
+#else
     "endoflevel",       // 69
+#endif
 #else
     "debug",            // 68
     "endofgame",        // 69
@@ -267,7 +271,11 @@ void getglobalz(short i)
             {
 #if DUKE3D_GAMEVER < GAMEVER_11
                 // 1.0 pushes a player off a big badguy here (C10-005).
-                if( s->statnum == 10 && sprite[lz].xrepeat > 24 && klabs(s->z-sprite[lz].z) < (84<<8) )
+                if( s->statnum == 10 && sprite[lz].xrepeat > 24
+#if DUKE3D_GAMEVER >= GAMEVER_10
+                    && klabs(s->z-sprite[lz].z) < (84<<8)
+#endif
+                  )
                 {
                     j = sprite[lz].ang+1024;
                     ps[s->yvel].posxv += sintable[(j+512)&2047]<<6;
@@ -643,15 +651,19 @@ char parsecommand(void)
             scriptptr -= 2;
             return 0;
         case 14:
-
-            for(j = 0;j < 4;j++)
+#if DUKE3D_GAMEVER < GAMEVER_10
+            k = 3;
+#else
+            k = 4;
+#endif
+            for(j = 0;j < k;j++)
             {
                 if( keyword() == -1 )
                     transnum();
                 else break;
             }
 
-            while(j < 4)
+            while(j < k)
             {
                 *scriptptr = 0;
                 scriptptr++;
@@ -1312,6 +1324,7 @@ char parsecommand(void)
             textptr += 5;
             while( *textptr == ' ' ) textptr++;
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
             designertime[j*11+k] =
                 (((*(textptr+0)-'0')*10+(*(textptr+1)-'0'))*26*60)+
                 (((*(textptr+3)-'0')*10+(*(textptr+4)-'0'))*26);
@@ -1319,6 +1332,7 @@ char parsecommand(void)
             textptr += 5;
             while( *textptr == ' ' ) textptr++;
 
+#endif
             i = 0;
 
             while( *textptr != 0x0a )
@@ -1844,9 +1858,13 @@ short furthestcanseepoint(short i,spritetype *ts,int32_t *dax,int32_t *day)
 
     if( (g_t[0]&63) ) return -1;
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+    angincs = 1024;
+#else
     if(ud.multimode < 2 && ud.player_skill < 3)
         angincs = 2048/2;
     else angincs = 2048/(1+(TRAND&1));
+#endif
 
     for(j=ts->ang;j<(2048+ts->ang);j+=(angincs-(TRAND&511)))
     {
@@ -1884,7 +1902,10 @@ void alterang(short a)
     aang = g_sp->ang;
 
     g_sp->xvel += (*moveptr-g_sp->xvel)/5;
-    if(g_sp->zvel < 648) g_sp->zvel += ((*(moveptr+1)<<4)-g_sp->zvel)/5;
+#if DUKE3D_GAMEVER >= GAMEVER_10
+    if(g_sp->zvel < 648)
+#endif
+        g_sp->zvel += ((*(moveptr+1)<<4)-g_sp->zvel)/5;
 
     if(a&seekplayer)
     {
@@ -1928,7 +1949,11 @@ void alterang(short a)
 
     if(ticselapsed < 1)
     {
+#if DUKE3D_GAMEVER < GAMEVER_10
+        j = 3;
+#else
         j = 2;
+#endif
         if(a&furthestdir)
         {
             goalang = furthestangle(g_i,j);
@@ -2005,12 +2030,15 @@ void move()
     }
 #endif
 
-#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no faceplayersmart (C10-006)
+#if DUKE3D_GAMEVER >= GAMEVER_11 || DUKE3D_GAMEVER < GAMEVER_10 // absent only in 1.0 (C099-025)
     if(a&face_player_smart)
     {
         int32_t newx,newy;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+        newx = ps[g_p].posx+(ps[g_p].posxv>>9);
+        newy = ps[g_p].posy+(ps[g_p].posyv>>9);
+#elif DUKE3D_GAMEVER < GAMEVER_13D
         newx = ps[g_p].posx+(ps[g_p].posxv>>12);
         newy = ps[g_p].posy+(ps[g_p].posyv>>12);
 #else
@@ -2026,12 +2054,16 @@ void move()
 
     if( g_t[1] == 0 || a == 0 )
     {
+#if DUKE3D_GAMEVER < GAMEVER_10
+        setsprite(g_i,g_sp->x,g_sp->y,g_sp->z);
+#else
         if( ( badguy(g_sp) && g_sp->extra <= 0 ) || (hittype[g_i].bposx != g_sp->x) || (hittype[g_i].bposy != g_sp->y) )
         {
             hittype[g_i].bposx = g_sp->x;
             hittype[g_i].bposy = g_sp->y;
             setsprite(g_i,g_sp->x,g_sp->y,g_sp->z);
         }
+#endif
         return;
     }
 
@@ -2045,7 +2077,11 @@ void move()
         dodge(g_sp);
 #if DUKE3D_GAMEVER < GAMEVER_13D
         // 1.1 also turns to the furthest open angle (C11-028).
+#if DUKE3D_GAMEVER < GAMEVER_10
+        j = furthestangle(g_i,4);
+#else
         j = furthestangle(g_i,(ud.multimode < 2 && ud.player_skill < 3) ? 3 : 2);
+#endif
         if( klabs(getincangle(g_sp->ang,j)) > 128 )
             g_sp->ang = j;
 #endif
@@ -2060,7 +2096,11 @@ void move()
 
     if(g_sp->xvel || g_sp->zvel)
     {
+#if DUKE3D_GAMEVER < GAMEVER_10
+        if(a)
+#else
         if(a && g_sp->picnum != ROTATEGUN)
+#endif
         {
 #if DUKE3D_GAMEVER < GAMEVER_13D
             // 1.1 keeps a DRONE between its floor and ceiling (C11-029).
@@ -2112,6 +2152,17 @@ void move()
 #endif
             else if(g_sp->picnum != ORGANTIC)
             {
+#if DUKE3D_GAMEVER < GAMEVER_10
+                if( g_x < 512 && sprite[ps[g_p].i].xrepeat < 32 &&
+                    sprite[ps[g_p].i].extra > 0 && g_sp->xrepeat > 32 )
+                    quickkill(&ps[0]);
+                l = sector[g_sp->sectnum].ceilingz;
+                if( g_sp->zvel < 0 && (g_sp->z-l) < (64<<8) )
+                {
+                    g_sp->z = l+(64<<8);
+                    g_sp->zvel = 0;
+                }
+#else
                 if(g_sp->zvel > 0 && hittype[g_i].floorz < g_sp->z)
                     g_sp->z = hittype[g_i].floorz;
                 if( g_sp->zvel < 0)
@@ -2131,11 +2182,17 @@ void move()
                     }
 #endif
                 }
+#endif
             }
         }
         else if(g_sp->picnum == APLAYER)
+#if DUKE3D_GAMEVER < GAMEVER_10
+            if( (g_sp->z-sector[g_sp->sectnum].ceilingz) < (32<<8) )
+                g_sp->z = sector[g_sp->sectnum].ceilingz+(32<<8);
+#else
             if( (g_sp->z-hittype[g_i].ceilingz) < (32<<8) )
                 g_sp->z = hittype[g_i].ceilingz+(32<<8);
+#endif
 
         daxvel = g_sp->xvel;
         angdif = g_sp->ang;
@@ -2146,13 +2203,25 @@ void move()
         if( a && g_sp->picnum != ROTATEGUN )
 #endif
         {
+#if DUKE3D_GAMEVER < GAMEVER_10
+            if( g_x < 844 && g_sp->xrepeat > 16 )
+#else
             if( g_x < 960 && g_sp->xrepeat > 16 )
+#endif
             {
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+                daxvel = -128;
+#else
                 daxvel = -(1024-g_x);
+#endif
                 angdif = getangle(ps[g_p].posx-g_sp->x,ps[g_p].posy-g_sp->y);
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+                if(g_x < 256)
+#else
                 if(g_x < 512)
+#endif
                 {
                     ps[g_p].posxv = 0;
                     ps[g_p].posyv = 0;
@@ -2175,6 +2244,10 @@ void move()
             else if(g_sp->picnum != DRONE && g_sp->picnum != SHARK && g_sp->picnum != COMMANDER)
 #endif
             {
+#if DUKE3D_GAMEVER < GAMEVER_10
+                if( (g_t[0]&1) || ps[g_p].actorsqu == g_i ) return;
+                daxvel <<= 1;
+#else
                 if( hittype[g_i].bposz != g_sp->z || ( ud.multimode < 2 && ud.player_skill < 2 ) )
                 {
                     if( (g_t[0]&1) || ps[g_p].actorsqu == g_i ) return;
@@ -2185,10 +2258,15 @@ void move()
                     if( (g_t[0]&3) || ps[g_p].actorsqu == g_i ) return;
                     else daxvel <<= 2;
                 }
+#endif
             }
 #if DUKE3D_GAMEVER < GAMEVER_13D
             // After a wall or sprite hit, 1.1 turns at random (C11-029).
-            if( (g_t[0]&15) == 2 && (hittype[g_i].movflag&49152) >= 32768 )
+            if( (g_t[0]&15) == 2 && (hittype[g_i].movflag&49152) >= 32768
+#if DUKE3D_GAMEVER < GAMEVER_10
+                && g_sp->picnum != BOSS1 && g_sp->picnum != BOSS2
+#endif
+              )
                 g_sp->ang = TRAND&2047;
 #endif
         }
@@ -2251,7 +2329,9 @@ char parse(void)
             {
                 short temphit = -1, sclip, angdif; // -1: 1.0's hitscan leaves this unwritten on a miss (DOS read stack garbage)
 
-#if DUKE3D_GAMEVER < GAMEVER_11
+#if DUKE3D_GAMEVER < GAMEVER_10
+                if(0) // beta has no wide probe (C099-016)
+#elif DUKE3D_GAMEVER < GAMEVER_11
                 if( g_sp->picnum == BOSS1 || g_sp->picnum == BOSS2 ) // any size (C10-003)
 #elif DUKE3D_GAMEVER < GAMEVER_13D
                 if( (g_sp->picnum == BOSS1 || g_sp->picnum == BOSS2) && g_sp->xrepeat > 60 )
@@ -2566,12 +2646,18 @@ char parse(void)
                     c = 0;
                 else
                 {
-                    if( ceilingspace(g_sp->sectnum) || sector[g_sp->sectnum].lotag == 2)
+                    if( ceilingspace(g_sp->sectnum)
+#if DUKE3D_GAMEVER >= GAMEVER_10
+                        || sector[g_sp->sectnum].lotag == 2
+#endif
+                      )
                         c = gc/6;
                     else c = gc;
                 }
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+                if( hittype[g_i].cgg == 0 )
+#elif DUKE3D_GAMEVER < GAMEVER_13D
                 if( hittype[g_i].cgg == 0 || (sector[g_sp->sectnum].floorstat&64) )
 #else
                 if( hittype[g_i].cgg <= 0 || (sector[g_sp->sectnum].floorstat&2) )
@@ -2593,7 +2679,17 @@ char parse(void)
                 {
                     g_sp->z = hittype[g_i].floorz - FOURSLEIGHT;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+                    if( g_sp->zvel > 3072 && g_sp->extra <= 0 && badguy(g_sp) )
+                    {
+                        guts(g_sp,JIBS6,10,g_p);
+                        spritesound(THUD,g_i);
+                        spawn(g_i,BLOODPOOL);
+                    }
+                    if(sector[g_sp->sectnum].lotag == 1)
+                        g_sp->z += (24<<8);
+                    else g_sp->zvel = 0;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
                     // 1.1: badguys only, a higher squish speed and no
                     // pushmove (C11-010).
                     if( badguy(g_sp) )
@@ -2748,11 +2844,15 @@ char parse(void)
             break;
         case 69:
             insptr++;
+#if DUKE3D_GAMEVER < GAMEVER_10
+            operateactivators(*insptr,0); // C099-009: single-player global index
+#else
             ps[g_p].timebeforeexit = *insptr;
             ps[g_p].customexitsound = -1;
             // 1.1's endoflevel leaves ud.eog alone (C11-008).
 #if DUKE3D_GAMEVER >= GAMEVER_13D
             ud.eog = 1;
+#endif
 #endif
             insptr++;
             break;
@@ -2815,14 +2915,20 @@ char parse(void)
             {
                 if(*insptr > 0)
                 {
-                    if( ( j - *insptr ) < (max_player_health>>2) &&
-                        j >= (max_player_health>>2) )
+                    if( ( j - *insptr ) < (max_player_health>>2)
+#if DUKE3D_GAMEVER >= GAMEVER_10
+                        && j >= (max_player_health>>2)
+#endif
+                      )
                             spritesound(DUKE_GOTHEALTHATLOW,ps[g_p].i);
 
                     ps[g_p].last_extra = j;
                 }
 
                 sprite[ps[g_p].i].extra = j;
+#if DUKE3D_GAMEVER < GAMEVER_10
+                pus = 1; // C099-013; the port keeps the redraw flag global.
+#endif
             }
 
             insptr++;
@@ -2970,10 +3076,16 @@ char parse(void)
 
             if(ud.multimode < 2)
             {
-                if( lastsavedpos >= 0 && ud.recstat != 2 )
+                if( lastsavedpos >= 0
+#if DUKE3D_GAMEVER >= GAMEVER_10
+                    && ud.recstat != 2
+#endif
+                  )
                 {
                     ps[g_p].gm = MODE_MENU;
+#if DUKE3D_GAMEVER >= GAMEVER_10
                     KB_ClearKeyDown(sc_Space);
+#endif
                     cmenu(15000);
                 }
                 else ps[g_p].gm = MODE_RESTART;
@@ -3098,6 +3210,9 @@ char parse(void)
             break;
         case 48:
             insptr+=2;
+#if DUKE3D_GAMEVER < GAMEVER_10
+            pus = 1;
+#endif
             switch(*(insptr-1))
             {
                 case 0:
@@ -3201,7 +3316,11 @@ char parse(void)
                        j = 1;
                 else if( (l&8192) && ps[g_p].on_ground)
                        j = 1;
-                else if( (l&16384) && sprite[ps[g_p].i].xrepeat > 32 && sprite[ps[g_p].i].extra > 0 && ps[g_p].timebeforeexit == 0 )
+                else if( (l&16384)
+#if DUKE3D_GAMEVER >= GAMEVER_10
+                    && sprite[ps[g_p].i].xrepeat > 32
+#endif
+                    && sprite[ps[g_p].i].extra > 0 && ps[g_p].timebeforeexit == 0 )
                        j = 1;
                 else if( (l&32768) && sprite[ps[g_p].i].extra <= 0)
                        j = 1;
@@ -3250,6 +3369,9 @@ char parse(void)
             return 0;
         case 62:
             insptr++;
+#if DUKE3D_GAMEVER < GAMEVER_10
+            getglobalz(g_i);
+#endif
             parseifelse( (( hittype[g_i].floorz - hittype[g_i].ceilingz ) >> 8 ) < *insptr);
             break;
         case 63:  // "ifhitspace" in confiles.  --ryan.
@@ -3317,6 +3439,9 @@ char parse(void)
             parseifelse( dodge(g_sp) == 1);
             break;
         case 71:
+#if DUKE3D_GAMEVER < GAMEVER_10
+            parseifelse( ud.respawn_monsters == 1 );
+#else
             if( badguy(g_sp) )
                 parseifelse( ud.respawn_monsters );
 #if DUKE3D_GAMEVER >= GAMEVER_13D
@@ -3325,22 +3450,31 @@ char parse(void)
 #endif
             else
                 parseifelse( ud.respawn_items );
+#endif
             break;
         case 72:
             insptr++;
-//            getglobalz(g_i);
+#if DUKE3D_GAMEVER < GAMEVER_10
+            getglobalz(g_i);
+#endif
             parseifelse( (hittype[g_i].floorz - g_sp->z) <= ((*insptr)<<8));
             break;
         case 73:
             insptr++;
-//            getglobalz(g_i);
+#if DUKE3D_GAMEVER < GAMEVER_10
+            getglobalz(g_i);
+#endif
             parseifelse( ( g_sp->z - hittype[g_i].ceilingz ) <= ((*insptr)<<8));
             break;
         case 14:
 
             insptr++;
+#if DUKE3D_GAMEVER < GAMEVER_10
+            ps[g_p].pals_time = totalclock+32;
+#else
             ps[g_p].pals_time = *insptr;
             insptr++;
+#endif
             for(j=0;j<3;j++)
             {
                 ps[g_p].pals[j] = *insptr;
@@ -3410,7 +3544,9 @@ char parse(void)
             }
             break;
         case 90:
-#if DUKE3D_GAMEVER < GAMEVER_11
+#if DUKE3D_GAMEVER < GAMEVER_10
+            insptr++;
+#elif DUKE3D_GAMEVER < GAMEVER_11
             // 1.0's debugprint plays a random sound, by the C library's
             // rand() (C10-002).
             insptr++;
@@ -3579,7 +3715,9 @@ void execute(short i,short p,int32_t x)
             // 1.0's bosses never fall asleep, whatever their size (C10-007).
             if( g_sp->picnum == BOSS1 || g_sp->picnum == BOSS2 ) return;
 #endif
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+            // Beta has no respawn exemptions (C099-023).
+#elif DUKE3D_GAMEVER < GAMEVER_13D
             // 1.1's big-badguy test (picnum both BOSS1 and BOSS2) never
             // holds, and the respawn_items test covers badguys too (C11-030).
             if( badguy(g_sp) && ud.respawn_monsters == 1 && g_sp->extra <= 0 ) return;

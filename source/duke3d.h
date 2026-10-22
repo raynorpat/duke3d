@@ -103,8 +103,13 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 // #define AUSTRALIA
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+#define MAXSLEEPDIST  8192
+#define SLEEPTIME 6*64
+#else
 #define MAXSLEEPDIST  16384
 #define SLEEPTIME 24*64
+#endif
 
 #if DUKE3D_GAMEVER < GAMEVER_10
     // 0.99: no version field in DOS; 9 distinguishes our net handshake.

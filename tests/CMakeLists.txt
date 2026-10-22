@@ -316,6 +316,13 @@ add_executable(game_helpers game_helpers.c "${_game_c}")
 target_link_libraries(game_helpers PRIVATE duke3d_game)
 add_test(NAME game_helpers COMMAND game_helpers)
 
+if(DUKE3D_VERSION STREQUAL "0.99")
+  add_executable(con_runtime_v099 con_runtime_v099.c "${_game_c}")
+  target_link_libraries(con_runtime_v099 PRIVATE duke3d_game)
+  add_test(NAME con_runtime_v099 COMMAND con_runtime_v099)
+  set_tests_properties(con_runtime_v099 PROPERTIES TIMEOUT 30)
+endif()
+
 # Checks the save record codec against the DOS 1.5 byte layout. Needs no
 # game data.
 add_executable(savegame_codec savegame_codec.c "${_game_c}")
@@ -565,7 +572,7 @@ if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3
     set(_vold_name v099_sw)
     set(_vold_data "${DUKE3D_V099_SW_DATA_DIR}")
   endif()
-  if(_vold_data AND NOT _vold_edition STREQUAL "sw099")
+  if(_vold_data)
     add_test(NAME con_compile_${_vold_name}
       COMMAND "${CMAKE_COMMAND}"
               "-DDATA=${_vold_data}" "-DEDITION=${_vold_edition}"
@@ -575,6 +582,8 @@ if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3
               "-DWORK=${CMAKE_BINARY_DIR}/cc_${_vold_name}"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/con_compile_v13d.cmake")
     set_tests_properties(con_compile_${_vold_name} PROPERTIES TIMEOUT 120)
+  endif()
+  if(_vold_data AND NOT _vold_edition STREQUAL "sw099")
     add_test(NAME game_boot_${_vold_name}
       COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
               "-DDATA=${_vold_data}" "-DEDITION=${_vold_edition}"
