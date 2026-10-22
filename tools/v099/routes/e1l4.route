@@ -1,0 +1,580 @@
+# DEMOGOD
+# E1L4 Toxic Dump: intended pump/ferry route, native MODE_EOL verified.
+# Requires god mode after observed no-god death; no flight. Author: 8494 tics.
+29758 27271
+# portal wall2277 sector346->266 width1086 rise0 gap96
+29707 27637
+29429 27915
+# portal wall1822 sector266->122 width2432 rise0 gap192
+27332 28352
+26940 28352
+# portal wall910 sector122->121 width512 rise8 gap280
+26564 32384
+26172 32384
+# portal wall905 sector121->483 width512 rise-8 gap280
+26052 32384
+25660 32384
+25525 33611
+25163 33973
+25013 33973
+24651 33611
+# portal wall3025 sector483->117 width9216 rise0 gap288
+24516 30720
+24124 30720
+24064 34500
+24064 35100 jump
+24064 35700 jump
+# portal wall859 sector114->113 width512 rise0 gap160
+24064 36156
+24064 36548
+24064 36608
+24064 36608 face 1024
+24064 36608 fire 104
+23000 36608
+23136 37376
+23136 37376 face 512
+23136 37376 use
+23136 37376 wait 52
+23100 36608
+24000 36608
+# portal wall848 sector113->114 width512 rise0 gap160
+24064 36548
+24064 36156
+# portal wall861 sector114->117 width512 rise-128 gap176; large drop 128 units; damage/dive
+24064 35524
+24064 35132
+# portal wall874 sector117->483 width9216 rise0 gap288
+24124 30720
+24516 30720
+24651 33611
+25013 33973
+25163 33973
+25525 33611
+# portal wall3028 sector483->121 width512 rise8 gap280
+25660 32384
+26052 32384
+# portal wall907 sector121->122 width512 rise-8 gap280
+26172 32384
+26564 32384
+# portal wall914 sector122->266 width2432 rise0 gap192
+26940 28352
+27332 28352
+# portal wall1825 sector266->346 width1086 rise0 gap96
+29429 27915
+29707 27637
+32266 28170
+32266 28170 wait 1
+32266 28170 face 256
+32266 28170 use
+32266 28170 wait 104
+# portal wall2264 sector346->125 width1086 rise0 gap64
+31221 26123
+31451 25893
+# portal wall927 sector125->124 width1086 rise0 gap0
+31397 25947 use
+# Door delay estimate, adjust from real run
+31397 25947 wait 26
+31579 25765 use
+# portal wall925 sector124->90 width1086 rise0 gap0
+31525 25819 use
+# Door delay estimate, adjust from real run
+31525 25819 wait 26
+31755 25589 use
+# portal wall695 sector90->92 width1086 rise0 gap96
+32245 25099
+32523 24821
+# SE7 tag20 sector92->28; water may require dive/ascend beyond API
+33152 24192
+33152 24192 crouch
+33152 24192 crouch
+# Expected transporter destination; only reachable after transport
+-6016 25984 crouch
+# portal wall255 sector28->27 width1086 rise0 gap44
+-6027 25995 crouch
+-5749 25717 crouch
+# portal wall251 sector27->507 width1086 rise0 gap72
+-5131 25099 crouch
+-4853 24821 crouch
+# portal wall3178 sector507->508 width1448 rise0 gap72
+-5003 24459 crouch
+-4725 24181 crouch
+# portal wall3184 sector508->387 width1086 rise0 gap72
+-4853 23563 crouch
+-5131 23285 crouch
+# portal wall2534 sector387->49 width1086 rise0 gap100
+-5621 22795 crouch
+-5899 22517 crouch
+# portal wall374 sector49->359 width2172 rise16 gap64
+-6901 21003
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-6901 21003 jump
+-7131 20773
+# portal wall2371 sector359->463 width2172 rise-60 gap64
+-7077 20827
+-7307 20597
+# portal wall2909 sector463->390 width1000 rise0 gap132
+-9987 21719
+-10237 21417
+-11264 20224
+-11264 19712
+# portal wall2582 sector390->48 width1493 rise0 gap276
+-10267 17704
+-10469 17368
+# portal wall364 sector48->355 width1810 rise32 gap96
+-10908 16194 crouch
+-10908 16194 jump
+-10908 16194 jump
+-10908 16194 jump
+-10908 16194 jump
+-10908 16194 jump
+-10908 16194 jump
+-10908 16194 jump
+-10908 16194 jump
+-10862 15873
+# portal wall2352 sector355->357 width1792 rise24 gap64
+-10880 16000
+-10880 15676
+# portal wall2362 sector357->354 width1536 rise-24 gap64
+-10752 15812
+-10752 15420
+-11647 15359
+-11647 15359 wait 1
+-11647 15359 face 512
+-11647 15359 crouch
+-11647 15359 crouch
+-11647 15359 crouch
+-11647 15359 use crouch
+-11647 15359 wait 260
+-11647 15359 jump
+-11647 15359 jump
+-11647 15359 jump
+-11647 15359 jump
+-11647 15359 jump
+-11647 15359 jump
+# portal wall2338 sector354->357 width1536 rise24 gap64
+-10752 15420
+-10752 15812
+# portal wall2364 sector357->355 width1792 rise-24 gap64
+-10880 15676
+-10880 16000
+# portal wall2354 sector355->48 width1810 rise-32 gap96
+-10862 15873
+-10908 16194
+-12032 16640
+-12032 16640 jump
+-12032 16640 jump
+-12032 16640 jump
+-12032 16640 jump
+-12032 16640 jump
+-12032 16640 jump
+23552 16896 jump
+# Surface pump raised floors; dock353 then slope1 and jump across basin
+# portal wall350 sector47->388 width1493 rise0 gap200
+25115 17624
+25317 17960
+24320 19968
+# portal wall2543 sector388->353 width1557 rise8 gap152
+23840 22207
+23776 22593
+# portal wall2333 sector353->352 width604 rise-4 gap152
+24570 22888
+24902 22680
+# portal wall2331 sector352->506 width1032 rise4 gap152
+25342 23144
+25730 23192
+27851 23093
+28213 22731
+# portal wall3167 sector506->1 width2977 rise5 gap155
+28849 21652
+28495 21484
+# portal wall16 sector1->0 width1438 rise0 gap157
+26679 21030
+26313 20890
+24600 20000
+21600 19300 jump
+# portal wall2927 sector465->464 width2284 rise0 gap132
+21882 16608
+21958 16224
+22219 15157
+# portal wall2924 sector464->131 width1448 rise0 gap100
+22773 14603
+23051 14325
+23800 13800
+23800 13800 face 1615
+23800 13800 fire 52
+23900 13600
+23900 13600 face 1588
+23900 13600 use
+23900 13600 wait 52
+23200 13600
+23200 13600 face 1450
+23200 13600 fire 26
+23200 13600 jump
+23200 13600 wait 26
+23050 13550
+23050 13550 jump
+23050 13550 wait 26
+23050 13550 jump
+23050 13550 wait 26
+23050 13550 jump
+23050 13550 wait 26
+23050 13550 jump
+23050 13550 wait 26
+23050 13550 jump
+23050 13550 wait 26
+# Return to gate108
+23051 14325 jump
+22773 14603 jump
+22800 14200
+22000 14300 jump
+21900 15400 jump
+21958 16224
+21882 16608
+22252 18815
+22548 19073
+23000 19150
+23000 19150 crouch
+23000 19150 crouch
+23000 19150 crouch
+23000 19150 crouch
+23000 19150 crouch
+23000 19150 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+-12714 18894 crouch
+# portal wall2593 sector390->463 width1000 rise0 gap132
+-10237 21417
+-9987 21719
+-9397 21429
+-7499 19531
+# portal wall2897 sector463->107 width2988 rise0 gap132
+-6543 17990
+-6257 17722
+# portal wall816 sector107->108 width2172 rise8 gap96
+-5771 16779
+-5493 16501
+# portal wall820 sector108->109 width2172 rise-8 gap96
+-5515 16523
+-5237 16245
+# portal wall824 sector109->110 width4136 rise0 gap132
+-5194 13769
+-5558 13623
+# portal wall832 sector110->481 width1086 rise-64 gap116
+-6645 12299
+-6923 12021
+# portal wall3009 sector481->480 width1000 rise32 gap148
+-7299 10839 jump
+-7549 10537 jump
+# portal wall3003 sector480->469 width3443 rise0 gap148
+-8941 11133
+-9233 11395
+# West branch reaches legitimate valve147 before twin gates5/6
+# portal wall2945 sector469->470 width3638 rise0 gap148
+-11240 11516
+-11544 11268
+# portal wall2959 sector470->362 width2611 rise64 gap84
+-12864 11482
+-13248 11558
+# portal wall2392 sector362->366 width2560 rise24 gap60
+-13116 11520
+-13508 11520
+-13508 11520 crouch
+-13508 11520 crouch
+-13508 11520 crouch
+# portal wall2417 sector366->363 width2304 rise-24 gap64
+-13372 11392
+-13764 11392
+-13824 12672
+-13824 12672 face 0
+-13824 12672 crouch
+-13824 12672 crouch
+-13824 12672 crouch
+-13824 12672 use
+-13824 12672 wait 52
+-13824 12672 jump
+-13824 12672 jump
+-13824 12672 jump
+-13824 12672 jump
+-13824 12672 jump
+-13824 12672 jump
+# portal wall2395 sector363->366 width2304 rise24 gap64
+-13764 11392
+-13372 11392
+# portal wall2419 sector366->362 width2560 rise-24 gap60
+-13508 11520
+-13508 11520 crouch
+-13508 11520 crouch
+-13508 11520 crouch
+-13116 11520
+# portal wall2393 sector362->470 width2611 rise-64 gap84
+-13248 11558
+-12864 11482
+# portal wall2957 sector470->469 width3638 rise0 gap148
+-12700 12300
+-11800 12400
+-11240 11516
+-10240 9984
+# portal wall2949 sector469->9 width4096 rise0 gap148
+-10240 9860
+-10240 9468
+# portal wall99 sector9->10 width4096 rise0 gap148
+-10240 9412
+-10240 9020
+# Dive while swimming away from the pursuit, then enter the low passage.
+-9200 9200 crouch
+-9200 9200 jump 8
+-9200 8252
+-10240 7996
+-10240 5316
+-10240 4924
+-10240 3780
+-10240 3388
+-10240 3268
+-10240 2876
+-10240 768
+-10240 768 jump 4
+23040 1792 jump 8
+# portal wall3267 sector524->146 width1536 rise0 gap152
+24124 2816
+24516 2816
+# portal wall1055 sector146->147 width1536 rise0 gap120
+24636 2816
+25028 2816
+# Continuous conveyor carries Duke around the curved upper channel.
+23040 -14000 pass
+# Let the upper channel drop Duke into the pool.
+23040 -16000
+23040 -16000 wait 14
+-10752 -17500 crouch
+# portal wall1210 sector172->169 width4608 rise0 gap132
+-13056 -17980
+-13056 -18372
+# portal wall1185 sector169->502 width4608 rise0 gap132
+-13056 -20540
+-13056 -20932
+-11500 -23000
+-11500 -23000 jump 6
+22292 -23000 jump 8
+22292 -23000 wait 1
+# portal wall3122 sector501->144 width2048 rise8 gap216
+23040 -23612
+23040 -24004
+# portal wall1044 sector144->140 width1536 rise92 gap124
+23552 -24764 jump
+23552 -25088 jump
+# portal wall1016 sector140->141 width1536 rise-24 gap124
+23552 -24960
+23552 -25284
+23000 -25300
+23000 -25300 wait 1
+23000 -25300 face 917
+23000 -25300 use
+23000 -25300 wait 104
+# Return by the shallow pool and climb its left bank.
+23552 -25300
+23552 -25000 jump
+23552 -24400
+23552 -24400 wait 26
+23040 -23400
+19300 -16900
+12600 -15500 jump
+18000 -19456
+18800 -19456
+18800 -19456 weapon 2
+18800 -19456 wait 26
+18800 -19456 face 322
+18800 -19456 fire 1
+# Ride until the ferries approach, then transfer before they reverse.
+18831 -19446 wait 1
+18847 -19446 wait 1
+18879 -19446 wait 1
+18927 -19446 wait 1
+18991 -19446 wait 1
+19071 -19446 wait 1
+19167 -19446 wait 1
+19279 -19446 wait 1
+19407 -19446 wait 1
+19551 -19446 wait 1
+19711 -19446 wait 1
+19887 -19446 wait 1
+20079 -19446 wait 1
+20287 -19446 wait 1
+20511 -19446 wait 1
+20751 -19446 wait 1
+20975 -19446 wait 1
+21183 -19446 wait 1
+21375 -19446 wait 1
+21551 -19446 wait 1
+21711 -19446 wait 1
+21855 -19446 wait 1
+21983 -19446 wait 1
+22095 -19446 wait 1
+24700 -19456 jump
+28000 -19456 jump
+27979 -20299
+28341 -20661
+# portal wall2513 sector381->380 width1493 rise0 gap128
+29211 -21032
+29413 -20696
+# portal wall2498 sector380->378 width1810 rise0 gap128
+29852 -20546
+29796 -20158
+# portal wall2486 sector378->254 width512 rise0 gap64
+30524 -19456
+30848 -19456
+# portal wall1745 sector254->255 width512 rise0 gap64
+30720 -19456
+31044 -19456
+# portal wall1754 sector255->252 width2560 rise-4 gap64
+32512 -18372
+32512 -17980
+# portal wall1735 sector252->251 width1536 rise0 gap32
+33596 -17408 crouch
+33988 -17408 crouch
+# portal wall1732 sector251->213 width1717 rise0 gap32
+35025 -17496 crouch
+35375 -17320 crouch
+# portal wall1551 sector213->212 width1717 rise0 gap32
+36264 -16431 crouch
+36440 -16081 crouch
+# portal wall1547 sector212->205 width1536 rise0 gap32
+36352 -14020 crouch
+36352 -13628 crouch
+# portal wall1499 sector205->412 width3072 rise0 gap128
+36924 -7168
+37316 -7168
+# portal wall2688 sector412->214 width768 rise4 gap80
+37504 -5828
+37504 -5436
+# portal wall1554 sector214->415 width768 rise-4 gap80
+38460 -4480
+38852 -4480
+38852 -4480 weapon 5
+38852 -4480 wait 26
+# portal wall2700 sector415->416 width768 rise0 gap116
+44092 -4480
+44484 -4480
+# portal wall2701 sector416->222 width2560 rise0 gap128
+45568 -4292 fire 26
+45568 -3900
+# portal wall1597 sector222->246 width1536 rise0 gap96
+46652 -3328
+47044 -3328
+# portal wall1703 sector246->245 width1619 rise0 gap96
+47174 -3390
+47546 -3266
+47947 -3253
+48309 -2891
+49077 -2123
+# portal wall1696 sector245->244 width1619 rise0 gap96
+49090 -1722
+49214 -1350
+# portal wall1693 sector244->240 width1536 rise-12 gap64
+49152 -1220
+49152 -828
+# portal wall1671 sector240->239 width1536 rise0 gap76
+49152 -964
+49152 -572
+# portal wall1667 sector239->238 width1536 rise0 gap76
+49152 -708
+49152 -316
+# portal wall1663 sector238->224 width1536 rise0 gap76
+49152 -452
+49152 -60
+# portal wall1607 sector224->225 width1536 rise0 gap76
+49152 -196
+49152 196
+# portal wall1611 sector225->226 width1536 rise0 gap76
+49152 60
+49152 452
+# portal wall1615 sector226->227 width1536 rise0 gap76
+49152 316
+49152 708
+# portal wall1619 sector227->228 width1536 rise0 gap76
+49152 572
+49152 964
+# portal wall1623 sector228->229 width1536 rise0 gap76
+49152 828
+49152 1220
+# portal wall1627 sector229->230 width1536 rise0 gap76
+49152 1084
+49152 1476
+# portal wall1631 sector230->231 width1536 rise0 gap76
+49152 1340
+49152 1732
+# portal wall1635 sector231->232 width1536 rise0 gap76
+49152 1596
+49152 1988
+# portal wall1639 sector232->233 width1536 rise0 gap76
+49152 1852
+49152 2244
+# portal wall1643 sector233->234 width1536 rise0 gap76
+49152 2108
+49152 2500
+# portal wall1647 sector234->235 width1536 rise0 gap76
+49152 2364
+49152 2756
+# portal wall1651 sector235->236 width1536 rise0 gap76
+49152 2620
+49152 3012
+# portal wall1655 sector236->237 width1536 rise0 gap76
+49152 2876
+49152 3268
+# portal wall1659 sector237->393 width1536 rise-4 gap76
+49152 3132
+49152 3524
+# portal wall2612 sector393->394 width1536 rise0 gap80
+49152 5180
+49152 5572
+# portal wall2616 sector394->395 width1536 rise0 gap80
+49152 7228
+49152 7620
+# portal wall2620 sector395->396 width2172 rise0 gap80
+49525 9333
+49803 9611
+# Let the final pipe current carry Duke around its bends.
+43072 42820
+42115 43376
+42115 43376 wait 1
+42115 43376 face 512
+42115 43376 use
+42115 43376 wait 80
