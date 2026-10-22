@@ -343,6 +343,31 @@ add_executable(game_helpers game_helpers.c "${_game_c}")
 target_link_libraries(game_helpers PRIVATE duke3d_game)
 add_test(NAME game_helpers COMMAND game_helpers)
 
+# The small full-screen HUD (screen_size 4) at several 8-bit modes: in
+# widescreen modes health sits at the screen's left edge and ammo and the
+# inventory at its right; 4:3 and tall modes keep their layout (pinned
+# checksums, hex, of the frame without and with an inventory item; empty
+# just prints them). Needs game data.
+add_executable(minihud minihud.c "${_game_c}")
+target_link_libraries(minihud PRIVATE duke3d_game)
+if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
+  foreach(_pin "320x200;f2070c6d;f191ac15" "640x480;3444f9f9;fab217a1"
+               "1280x1024;b324dd41;8b7c4151" "480x640;6b424f6e;b6211dae"
+               "1280x720;d08e6033;f49c6dcd" "1600x900;742b8451;ac001fed")
+    list(GET _pin 0 _size)
+    list(GET _pin 1 _plain)
+    list(GET _pin 2 _inv)
+    string(REPLACE "x" ";" _wh "${_size}")
+    add_test(NAME minihud_${_size}
+      COMMAND minihud "${DUKE3D_GRP}"
+              "${CMAKE_CURRENT_BINARY_DIR}/minihud_${_size}" ${_wh}
+              "${_plain}" "${_inv}")
+    set_tests_properties(minihud_${_size} PROPERTIES
+      ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+      TIMEOUT 30)
+  endforeach()
+endif()
+
 # Checks the save record codec against the DOS 1.5 byte layout. Needs no
 # game data.
 add_executable(savegame_codec savegame_codec.c "${_game_c}")

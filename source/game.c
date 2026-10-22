@@ -1748,18 +1748,30 @@ void coolgaugetext(short snum)
 
     if (ss == 4)   //DRAW MINI STATUS BAR:
     {
-        rotatesprite(5<<16,(200-28)<<16,65536L,0,HEALTHBOX,0,21,10+16,0,0,xdim-1,ydim-1);
+        int32_t hx = 0, ax = 0, ix = 0;
+
+        // Widescreen: health at the screen's left edge, ammo and the
+        // inventory box (left of the ammo) at its right. The 320x200 x of
+        // the left edge is hx (<= 0), the right edge's is 320-hx.
+        if (widescreen)
+        {
+            hx = 160-scale(xdim,120,ydim);
+            ax = (320-hx)-5-tilesizx[AMMOBOX]-37;
+            ix = ax+37-tilesizx[INVENTORYBOX]-(69-37-tilesizx[AMMOBOX])-69;
+        }
+
+        rotatesprite((5+hx)<<16,(200-28)<<16,65536L,0,HEALTHBOX,0,21,10+16,0,0,xdim-1,ydim-1);
         if (p->inven_icon)
-            rotatesprite(69<<16,(200-30)<<16,65536L,0,INVENTORYBOX,0,21,10+16,0,0,xdim-1,ydim-1);
+            rotatesprite((69+ix)<<16,(200-30)<<16,65536L,0,INVENTORYBOX,0,21,10+16,0,0,xdim-1,ydim-1);
 
         if(sprite[p->i].pal == 1 && p->last_extra < 2)
-            digitalnumber(20,200-17,1,-16,10+16);
-        else digitalnumber(20,200-17,p->last_extra,-16,10+16);
+            digitalnumber(20+hx,200-17,1,-16,10+16);
+        else digitalnumber(20+hx,200-17,p->last_extra,-16,10+16);
 
-        rotatesprite(37<<16,(200-28)<<16,65536L,0,AMMOBOX,0,21,10+16,0,0,xdim-1,ydim-1);
+        rotatesprite((37+ax)<<16,(200-28)<<16,65536L,0,AMMOBOX,0,21,10+16,0,0,xdim-1,ydim-1);
 
         if (p->curr_weapon == HANDREMOTE_WEAPON) i = HANDBOMB_WEAPON; else i = p->curr_weapon;
-        digitalnumber(53,200-17,p->ammo_amount[i],-16,10+16);
+        digitalnumber(53+ax,200-17,p->ammo_amount[i],-16,10+16);
 
         o = 158; permbit = 0;
         if (p->inven_icon)
@@ -1780,9 +1792,9 @@ void coolgaugetext(short snum)
 #endif
                 default: i = -1;
             }
-            if (i >= 0) rotatesprite((231-o)<<16,(200-21)<<16,65536L,0,i,0,0,10+16+permbit,0,0,xdim-1,ydim-1);
+            if (i >= 0) rotatesprite((231-o+ix)<<16,(200-21)<<16,65536L,0,i,0,0,10+16+permbit,0,0,xdim-1,ydim-1);
 
-            minitext(292-30-o,190,"%",6,10+16+permbit);
+            minitext(292-30-o+ix,190,"%",6,10+16+permbit);
 
             j = 0x80000000;
             switch(p->inven_icon)
@@ -1800,10 +1812,10 @@ void coolgaugetext(short snum)
                 case 7: i = (p->boot_amount>>1); break;
 #endif
             }
-            invennum(284-30-o,200-6,(char)i,0,10+permbit);
-            if (j > 0) minitext(288-30-o,180,"ON",0,10+16+permbit);
-            else if ((uint32_t)j != 0x80000000) minitext(284-30-o,180,"OFF",2,10+16+permbit);
-            if (p->inven_icon >= 6) minitext(284-35-o,180,"AUTO",2,10+16+permbit);
+            invennum(284-30-o+ix,200-6,(char)i,0,10+permbit);
+            if (j > 0) minitext(288-30-o+ix,180,"ON",0,10+16+permbit);
+            else if ((uint32_t)j != 0x80000000) minitext(284-30-o+ix,180,"OFF",2,10+16+permbit);
+            if (p->inven_icon >= 6) minitext(284-35-o+ix,180,"AUTO",2,10+16+permbit);
         }
         return;
     }
