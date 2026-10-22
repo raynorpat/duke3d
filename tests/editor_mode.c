@@ -19,7 +19,7 @@ void faketimerhandler(void) { }
 
 int main(int argc, char **argv)
 {
-    editormode_t m = { 3, 640, 480, 2, GLPATH_VBO, 320, 200 };
+    editormode_t m = { 3, 640, 480, 2, GLPATH_VBO, 320, 200, 2 /* SS_4K */ };
 #ifdef POLYMOST
     int polymost = 1;
 #else
@@ -48,10 +48,11 @@ int main(int argc, char **argv)
         fprintf(stderr, "FAIL: gltexmiplevel=%d (expected 2)\n", (int) gltexmiplevel);
         return 1;
     }
-    if ((gldrawpathrequest != GLPATH_VBO) || (glinternalwidth != 320) || (glinternalheight != 200))
+    if ((gldrawpathrequest != GLPATH_VBO) || (glinternalwidth != 320) || (glinternalheight != 200) ||
+        (glsupersample != 2))
     {
-        fprintf(stderr, "FAIL: gldrawpathrequest=%d glinternal %dx%d\n", (int) gldrawpathrequest,
-                (int) glinternalwidth, (int) glinternalheight);
+        fprintf(stderr, "FAIL: gldrawpathrequest=%d glinternal %dx%d supersampling %d\n", (int) gldrawpathrequest,
+                (int) glinternalwidth, (int) glinternalheight, (int) glsupersample);
         return 1;
     }
 

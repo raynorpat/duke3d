@@ -174,6 +174,7 @@ static int lastframe_w, lastframe_h;  /* its texture size */
 static int gl_draw_w, gl_draw_h;  /* the drawable */
 static int gl_scaled = 0;  /* the shader path draws at its internal size (xres, yres)... */
 static int32_t gl_showrect[4];  /* ...shown here in the drawable (gl_fitrect) */
+static int gl_ss = 0;  /* ...or supersampled (glsupersample), shown scaled down */
 #endif
 
 SDL_Surface *surface = NULL; /* This isn't static so that we can use it elsewhere AH */
@@ -998,6 +999,8 @@ static void gl_alloc_lastframe(void)
     lastframe_set = 0;
     swapped = 0;
 
+    if (gl_ss)  /* the shader path keeps its own frame; one this big isn't wasted */
+        return;
     lastframe_w = xres;
     lastframe_h = yres;
     if (!glinfo.texnpot)
@@ -1162,14 +1165,84 @@ void _glpalettefade(void)
 } /* _glpalettefade */
 
 
+/* The largest frame the shader path can draw: GL's texture, renderbuffer
+ *  and viewport limits, the engine's MAXXDIM, and gl_maxfbtest's. */
+static int gl_maxfb(void)
+{
+    GLint t = 0, vp[2] = { 0, 0 };
+    int m = MAXXDIM;
+
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &t);
+    if ((t > 0) && (t < m)) m = t;
+    if (glinfo.fbo)
+    {
+        t = 0;
+        glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE, &t);
+        if ((t > 0) && (t < m)) m = t;
+    } /* if */
+    glGetIntegerv(GL_MAX_VIEWPORT_DIMS, vp);
+    if ((vp[0] > 0) && (vp[0] < m)) m = vp[0];
+    if ((vp[1] > 0) && (vp[1] < m)) m = vp[1];
+    if ((gl_maxfbtest > 0) && (gl_maxfbtest < m)) m = gl_maxfbtest;
+    return(m);
+} /* gl_maxfb */
+
+
+/*
+ * Supersampling's size for the drawable (gl_draw_w by gl_draw_h), or 0 when
+ *  it isn't used: off, off the shader path, with an internal size
+ *  (internal), or not larger than the window. say: tell why, and when it's
+ *  clamped to the largest frame.
+ */
+static int gl_sssize(int internal, int say, int *w, int *h)
+{
+    int maxfb, fw, fh;
+    const char *name = videoopts_ssname(glsupersample);
+
+    if (glsupersample <= SS_OFF)
+        return(0);
+    if (gldrawpath != GLPATH_SHADER)
+    {
+        if (say)
+            printf("Supersampling %s needs draw path shader; drawing at the window's size.\n", name);
+        return(0);
+    } /* if */
+    if (internal)
+    {
+        if (say)
+            printf("Supersampling %s is off: the GL internal size is used instead.\n", name);
+        return(0);
+    } /* if */
+    maxfb = gl_maxfb();
+    videoopts_sssize(glsupersample, gl_draw_w, gl_draw_h, 0, &fw, &fh);
+    videoopts_sssize(glsupersample, gl_draw_w, gl_draw_h, maxfb, w, h);
+    if ((say) && ((*w != fw) || (*h != fh)))
+    {
+        printf("Supersampling %s at %dx%d is over the largest frame, %d; drawing at %dx%d.\n",
+               name, fw, fh, maxfb, *w, *h);
+        gl_ssclamps++;
+    } /* if */
+    if (!videoopts_ssavailable(glsupersample, gl_draw_w, gl_draw_h, maxfb, 1, 0))
+    {
+        if (say)
+            printf("Supersampling %s at %dx%d isn't larger than the window (%dx%d); drawing at its size.\n",
+                   name, *w, *h, gl_draw_w, gl_draw_h);
+        return(0);
+    } /* if */
+    return(1);
+} /* gl_sssize */
+
+
 /*
  * xdim/ydim are the drawable size, clamped to what the engine's arrays hold,
  *  or on the shader path its internal size (glinternalwidth/height), which
- *  the present scales up to the drawable. say: tell why a setting isn't used.
+ *  the present scales up to the drawable, or its supersampled size
+ *  (glsupersample), which it scales down. say: tell why a setting isn't
+ *  used.
  */
 static void init_gl_res_vars(int say)
 {
-    int w, h, why;
+    int w, h, why, internal, sw, sh;
     int32_t iw, ih;
 
     SDL_GL_GetDrawableSize(sdl_window, &gl_draw_w, &gl_draw_h);
@@ -1183,6 +1256,7 @@ static void init_gl_res_vars(int say)
     else if ((say) && (why == 2))
         printf("GL internal size %dx%d is under 320x200; drawing at %dx%d.\n",
                (int) glinternalwidth, (int) glinternalheight, (int) iw, (int) ih);
+    internal = (iw != 0);
     if ((iw != 0) && (gldrawpath != GLPATH_SHADER))
     {
         if (say)
@@ -1195,6 +1269,12 @@ static void init_gl_res_vars(int say)
     {
         w = iw;
         h = ih;
+    } /* if */
+    gl_ss = gl_sssize(internal, say, &sw, &sh);
+    if (gl_ss)
+    {
+        w = sw;
+        h = sh;
     } /* if */
     gl_fitrect(w, h, gl_draw_w, gl_draw_h, gl_showrect);
 
@@ -1218,14 +1298,11 @@ static void init_gl_res_vars(int say)
  *  last frame is shown again, stretched to the new size, and kept as the
  *  new last frame, so the screen and its fades don't go black.
  */
+static void gl_remake(int say);
+
 static void gl_resize(void)
 {
     int w, h;
-    palette_t pal[256], fadergb;
-    unsigned char fadedelta, base[768];
-    GLuint old, shframe;
-    float oldu = 0, oldv = 0;
-    int drawn;
 
     SDL_GL_GetDrawableSize(sdl_window, &w, &h);
     if ((w == gl_draw_w) && (h == gl_draw_h))
@@ -1243,6 +1320,22 @@ static void gl_resize(void)
         } /* if */
         return;
     } /* if */
+    gl_remake(0);
+} /* gl_resize */
+
+
+/*
+ * The frame made again at the size init_gl_res_vars gives now (the
+ *  drawable's, or supersampling's): the palette, the fade and the frame
+ *  drawn or shown are kept, as in a resize. say: as init_gl_res_vars's.
+ */
+static void gl_remake(int say)
+{
+    palette_t pal[256], fadergb;
+    unsigned char fadedelta, base[768];
+    GLuint old, shframe;
+    float oldu = 0, oldv = 0;
+    int drawn;
 
     /* init_res_lookups sets the base palette and drops the fade: keep both. */
     memcpy(pal, curpalette, sizeof (pal));
@@ -1259,7 +1352,13 @@ static void gl_resize(void)
     } /* if */
     shframe = polymost_takeframe_shader();  /* the GL 2.1 tier's, drawn or being drawn */
     polymost_glreset();
-    init_gl_res_vars(0);
+    init_gl_res_vars(say);
+    if (gl_ss)  /* a framebuffer that big failing: the window's size, on the vbo path */
+    {
+        polymost_prepare_shader();
+        if (gldrawpath != GLPATH_SHADER)
+            init_gl_res_vars(say);
+    } /* if */
     memcpy(curpalette, pal, sizeof (pal));
     memcpy(getbasepalette(), base, sizeof (base));
     palfadergb = fadergb;
@@ -1279,8 +1378,42 @@ static void gl_resize(void)
         glDeleteTextures(1, &old);
         gl_swap();  /* framedrawn: it becomes lastframe, faded and shown. */
     } /* if */
-} /* gl_resize */
+} /* gl_remake */
 #endif
+
+
+int setvideosupersample(int level)
+{
+#ifdef USE_OPENGL
+    if (level == glsupersample)
+        return(gl_ss);
+    glsupersample = level;
+    if ((gl_drawing) && (gldrawpath == GLPATH_SHADER) && (!gl_scaled))
+        gl_remake(1);
+    return(gl_ss);
+#else
+    (void) level;
+    return(0);
+#endif
+} /* setvideosupersample */
+
+
+int videosupersampleavailable(int level)
+{
+#ifdef USE_OPENGL
+    int32_t iw, ih;
+
+    if (level <= SS_OFF)
+        return(1);
+    if (!gl_drawing)
+        return(0);
+    gl_internalsize(glinternalwidth, glinternalheight, &iw, &ih);
+    return(videoopts_ssavailable(level, gl_draw_w, gl_draw_h, gl_maxfb(),
+                                 gldrawpath == GLPATH_SHADER, iw != 0));
+#else
+    return(level <= 0);
+#endif
+} /* videosupersampleavailable */
 
 
 int setgamemode_gl(char davidoption)
@@ -1379,7 +1512,7 @@ int setgamemode_gl(char davidoption)
     init_gl_res_vars(1);
     setrendermode(3);
     polymost_glreset();
-    if (gl_scaled)  /* the shader path failing now draws at the window's size. */
+    if ((gl_scaled) || (gl_ss))  /* the shader path failing now draws at the window's size. */
     {
         polymost_prepare_shader();
         if (gldrawpath != GLPATH_SHADER)
@@ -2342,6 +2475,48 @@ int setvesa(int32_t x, int32_t y)
 
 #ifdef USE_OPENGL
 /*
+ * A top-down RGB frame (sw by sh, malloc'd, freed here) scaled down to dw
+ *  by dh as the shader path's present does: each pixel the mean of the
+ *  texels it covers, each weighted by how much of it is covered. NULL if
+ *  there's no memory.
+ */
+static unsigned char *gl_boxdown(unsigned char *src, int sw, int sh, int dw, int dh)
+{
+    unsigned char *out = (unsigned char *) malloc((size_t) dw * dh * 3);
+    double sx = (double) sw / dw, sy = (double) sh / dh, a, b, c, d, wy, wx, sum[3];
+    const unsigned char *p;
+    int ox, oy, x, y, i;
+
+    for (oy = 0; (out != NULL) && (oy < dh); oy++)
+    {
+        a = oy * sy;
+        b = a + sy;
+        for (ox = 0; ox < dw; ox++)
+        {
+            c = ox * sx;
+            d = c + sx;
+            sum[0] = sum[1] = sum[2] = 0;
+            for (y = (int) a; (y < b) && (y < sh); y++)
+            {
+                wy = (((y + 1) < b) ? (y + 1) : b) - ((y > a) ? y : a);
+                for (x = (int) c; (x < d) && (x < sw); x++)
+                {
+                    wx = (((x + 1) < d) ? (x + 1) : d) - ((x > c) ? x : c);
+                    p = &src[((size_t) y * sw + x) * 3];
+                    for (i = 0; i < 3; i++)
+                        sum[i] += wx * wy * p[i];
+                } /* for */
+            } /* for */
+            for (i = 0; i < 3; i++)
+                out[((size_t) oy * dw + ox) * 3 + i] = (unsigned char) (sum[i] / (sx * sy) + 0.5);
+        } /* for */
+    } /* for */
+    free(src);
+    return(out);
+} /* gl_boxdown */
+
+
+/*
  * RGB of the frame (JFBuild's GL branch), top row first, in a malloc'd
  *  buffer, or NULL. It's read from the back buffer: a frame being drawn is
  *  there; otherwise the last swapped frame is drawn there again first, as
@@ -2349,7 +2524,8 @@ int setvesa(int32_t x, int32_t y)
  *  The fade the swap puts over it is applied here the same way, so it's
  *  the picture on screen, as in 8-bit. With no last-frame texture (over
  *  GL_MAX_TEXTURE_SIZE) it reads the front buffer, fade and all. The size
- *  is the drawable's.
+ *  is the drawable's; supersampled, the frame is scaled down to it as the
+ *  present does (gl_boxdown).
  */
 static unsigned char *gl_screencapture(int *w, int *h)
 {
@@ -2360,6 +2536,12 @@ static unsigned char *gl_screencapture(int *w, int *h)
     *w = xdim;
     *h = ydim;
     rgb = polymost_capture_shader();  /* the GL 2.1 tier's frame, as shown */
+    if ((rgb != NULL) && (gl_ss))  /* supersampled: at the window's size, as shown */
+    {
+        *w = gl_showrect[2];
+        *h = gl_showrect[3];
+        return(gl_boxdown(rgb, xres, yres, *w, *h));
+    } /* if */
     if (rgb != NULL)
         return(rgb);
     if (!framedrawn)

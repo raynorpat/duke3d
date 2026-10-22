@@ -46,6 +46,16 @@ extern int32_t glinternalwidth, glinternalheight;
 	 * either is 0, otherwise at least 320x200. 0: as set, 1: one of them was
 	 * 0, 2: made bigger. */
 int gl_internalsize(int32_t w, int32_t h, int32_t *ow, int32_t *oh);
+	/* The shader path's supersampling level (videoopts.h SS_*, 0: off): it
+	 * draws videoopts_sssize's size (videoopts_ssheight high at the
+	 * drawable's aspect, clamped to the largest frame buffer) and shows it
+	 * box-filtered down to the window. Not with an internal size, or when
+	 * that size isn't larger than the window (then the window's size). */
+extern int32_t glsupersample;
+	/* Test hooks: the largest frame buffer, if less than GL's (0: GL's); and
+	 * the times supersampling was clamped to it, with a message. */
+extern int32_t gl_maxfbtest;
+extern uint32_t gl_ssclamps;
 	/* The shader path's contrast and saturation, applied to the palette it
 	 * shows after the fade (EDuke32's: 1.0 each leaves it as it is). */
 #define GL_CONTRAST_MIN 0.5

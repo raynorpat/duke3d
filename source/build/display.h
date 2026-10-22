@@ -191,6 +191,15 @@ void setvideofadein(void);
 int getvideofade(void);
 int videofading(void);
 int videofade_at(uint32_t ms);
+/*
+ * Renderer 3's supersampling (glext.h glsupersample) set to level now, the
+ *  frame made again at its size, keeping the palette and fade as a resize
+ *  does; 1 if it's in use. videosupersampleavailable: whether level can be
+ *  used now (off always; the others on the shader path without an internal
+ *  size, at a size larger than the window's: videoopts_ssavailable).
+ */
+int setvideosupersample(int level);
+int videosupersampleavailable(int level);
 void setvideovsync(int on);  /* 1: present on vsync (the default) */
 int getvideovsync(void);
 /* Renderer 3: draws the last frame shown, unfaded, as the new frame's start. */

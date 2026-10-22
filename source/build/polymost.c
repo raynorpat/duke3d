@@ -215,6 +215,7 @@ static int32_t gltexcacind[GLTEXMAX], gltexcacnext[GLTEXMAX], gltexcacnum = -1;
 	//   itself. Showing it (polymost_present_shader) draws that into the window
 	//   through the palette, faded as classic fades the 8-bit palette.
 static GLuint glshprog = 0, glshtprog = 0, glshresolve = 0; //the index, translucent index and resolve programs
+static GLuint glshdown = 0; //the resolve of a supersampled frame
 static GLuint glshfbo = 0, glshfbotex = 0, glshdepth = 0; //the framebuffer: an index in red, and depth
 static int32_t glshfbox = 0, glshfboy = 0; //its size
 static GLuint glshlookup = 0, glshpal = 0; //the palookups (a row per pal and shade) and the palette
@@ -483,6 +484,34 @@ static const char glshresfrag[] =
 	"    float i = texture2D(frame,gl_TexCoord[0].st).r;\n"
 	"    gl_FragColor = vec4(texture2D(pal,vec2((i*255.0+0.5)/256.0,0.5)).rgb,1.0);\n"
 	"}\n";
+	//The present of a supersampled frame (larger than the window): each pixel the
+	//   mean of the texels it covers through the palette, each weighted by how
+	//   much of it is covered (scale: texels per pixel, origin: where it shows)
+static const char glshdownfrag[] =
+	"#version 120\n"
+	"uniform sampler2D frame, pal;\n"
+	"uniform vec2 scale, origin, invsize;\n"
+	"void main()\n"
+	"{\n"
+	"    vec2 a = (gl_FragCoord.xy-origin-0.5)*scale, b = a+scale;\n"
+	"    vec3 sum = vec3(0.0);\n"
+	"    float x, y = floor(a.y), wy, i;\n"
+	"    for(int j=0;j<64;j++)\n"
+	"    {\n"
+	"        if (y >= b.y) break;\n"
+	"        wy = min(y+1.0,b.y)-max(y,a.y);\n"
+	"        x = floor(a.x);\n"
+	"        for(int k=0;k<64;k++)\n"
+	"        {\n"
+	"            if (x >= b.x) break;\n"
+	"            i = texture2D(frame,(vec2(x,y)+0.5)*invsize).r;\n"
+	"            sum += (min(x+1.0,b.x)-max(x,a.x))*wy*texture2D(pal,vec2((i*255.0+0.5)/256.0,0.5)).rgb;\n"
+	"            x += 1.0;\n"
+	"        }\n"
+	"        y += 1.0;\n"
+	"    }\n"
+	"    gl_FragColor = vec4(sum/(scale.x*scale.y),1.0);\n"
+	"}\n";
 static const char glshbroken[] = "#version 120\nvoid main() { broken }\n"; //gl_forcefail 2
 
 static GLuint polymost_shcompile (GLenum type, const char *src)
@@ -542,10 +571,11 @@ static void polymost_shaderfree ()
 	glsub_flush();
 	if (glshbound) { bglBindFramebuffer(GL_FRAMEBUFFER,0); glshbound = 0; }
 	glscene = glshprogon = glffcleared = 0;
-	if ((glshprog) || (glshtprog) || (glshresolve)) bglUseProgram(0);
+	if ((glshprog) || (glshtprog) || (glshresolve) || (glshdown)) bglUseProgram(0);
 	if (glshprog) { bglDeleteProgram(glshprog); glshprog = 0; }
 	if (glshtprog) { bglDeleteProgram(glshtprog); glshtprog = 0; }
 	if (glshresolve) { bglDeleteProgram(glshresolve); glshresolve = 0; }
+	if (glshdown) { bglDeleteProgram(glshdown); glshdown = 0; }
 	if (glshfbo) { bglDeleteFramebuffers(1,&glshfbo); glshfbo = 0; }
 	if (glshdepth) { bglDeleteRenderbuffers(1,&glshdepth); glshdepth = 0; }
 	if (glshfbotex) { glDeleteTextures(1,&glshfbotex); glshfbotex = 0; }
@@ -620,7 +650,8 @@ static int32_t polymost_shaderready ()
 		glshprog = polymost_shlink(glshidxvert,(gl_forcefail == 2)?glshbroken:glshidxfrag,"tile","lookup");
 		glshtprog = polymost_shlink(glshidxvert,glshtransfrag,"tile","lookup");
 		glshresolve = polymost_shlink(glshresvert,glshresfrag,"frame","pal");
-		if ((!glshprog) || (!glshtprog) || (!glshresolve)) { polymost_shaderfail("its shaders don't compile or link"); return(0); }
+		glshdown = polymost_shlink(glshresvert,glshdownfrag,"frame","pal");
+		if ((!glshprog) || (!glshtprog) || (!glshresolve) || (!glshdown)) { polymost_shaderfail("its shaders don't compile or link"); return(0); }
 		bglUseProgram(glshtprog);
 		bglUniform1i(bglGetUniformLocation(glshtprog,"trans"),2);
 		bglUniform1i(bglGetUniformLocation(glshtprog,"dest"),3);
@@ -850,7 +881,8 @@ static void polymost_shownpalette (palette_t *pal)
 }
 
 	//Shows the frame on the GL 2.1 tier: draws the framebuffer's indices into the
-	//   window (dw by dh) through polymost_shownpalette, darkened by dark/256
+	//   window (dw by dh) through polymost_shownpalette (a frame larger than r,
+	//   supersampled, box-filtered down: glshdownfrag), darkened by dark/256
 	//   (the VIDEO page's fade), for the
 	//   swap, at r (x, y, width, height: gl_fitrect's), black around it. The
 	//   framebuffer keeps them. 0: not on that tier (or nothing drawn yet).
@@ -896,7 +928,14 @@ int32_t polymost_present_shader (const int32_t *r, int32_t dw, int32_t dh, int32
 		glClear(GL_COLOR_BUFFER_BIT);
 	}
 	glViewport(r[0],r[1],r[2],r[3]);
-	bglUseProgram(glshresolve);
+	if ((xres > r[2]) || (yres > r[3])) //supersampled: scaled down
+	{
+		bglUseProgram(glshdown);
+		bglUniform2f(bglGetUniformLocation(glshdown,"scale"),(float)xres/(float)r[2],(float)yres/(float)r[3]);
+		bglUniform2f(bglGetUniformLocation(glshdown,"origin"),(float)r[0],(float)r[1]);
+		bglUniform2f(bglGetUniformLocation(glshdown,"invsize"),1.f/(float)xres,1.f/(float)yres);
+	}
+	else bglUseProgram(glshresolve);
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D,glshfbotex);
 	polymost_shaderquad();

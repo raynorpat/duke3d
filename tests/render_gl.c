@@ -110,6 +110,7 @@
 #include "SDL_opengl.h"
 #include "glext.h"
 #include "glsubmit.h"
+#include "videoopts.h"
 
 /* The game is linked in (for render_gl_game.c), so it provides the
  * engine's callbacks. */
@@ -123,7 +124,11 @@ void video_requestmode(int displaymode, int w, int h);  /* game.c */
 void video_getmode(int32_t *w, int32_t *h);  /* game.c */
 void video_applypending(void);  /* game.c */
 void video_flushpending(void);  /* game.c */
+int video_setsupersample(int level);  /* game.c */
+void video_requestsupersample(int level);  /* game.c */
 extern int32_t GLDrawPath;  /* config.c */
+extern int32_t GLInternalWidth, GLInternalHeight;  /* config.c */
+extern double GLContrast, GLSaturation;  /* config.c */
 extern int32_t video_glunavailable;  /* game.c */
 extern SDL_Surface *surface;  /* sdl_driver.c: the 8-bit frame */
 
@@ -2132,6 +2137,345 @@ static int video_mode_check(void)
     return ok;
 }
 
+/* gl_fitrect's part r of the window's frame (bottom-up, dw wide), top-down. */
+static unsigned char *shown_part(const unsigned char *shown, int dw, const int32_t *r)
+{
+    unsigned char *out = malloc((size_t) r[2] * r[3] * 3);
+    int y;
+
+    for (y = 0; y < r[3]; y++)
+        memcpy(out + (size_t) y * r[2] * 3, shown + ((size_t) (r[1] + r[3] - 1 - y) * dw + r[0]) * 3,
+               (size_t) r[2] * 3);
+    return out;
+}
+
+/* A top-down RGB frame (w by h) scaled down to ow by oh: each pixel the mean
+ *  of the texels it covers, each weighted by how much of it is covered. */
+static unsigned char *box_down(const unsigned char *src, int w, int h, int ow, int oh)
+{
+    unsigned char *out = malloc((size_t) ow * oh * 3);
+    double sx = (double) w / ow, sy = (double) h / oh, a, b, c, d, wy, wx, sum[3];
+    int ox, oy, x, y, i;
+
+    for (oy = 0; oy < oh; oy++)
+    {
+        a = oy * sy; b = a + sy;
+        for (ox = 0; ox < ow; ox++)
+        {
+            c = ox * sx; d = c + sx;
+            sum[0] = sum[1] = sum[2] = 0;
+            for (y = (int) floor(a); (y < b) && (y < h); y++)
+            {
+                wy = fmin(y + 1.0, b) - fmax((double) y, a);
+                for (x = (int) floor(c); (x < d) && (x < w); x++)
+                {
+                    wx = fmin(x + 1.0, d) - fmax((double) x, c);
+                    for (i = 0; i < 3; i++)
+                        sum[i] += wx * wy * src[((size_t) y * w + x) * 3 + i];
+                }
+            }
+            for (i = 0; i < 3; i++)
+                out[((size_t) oy * ow + ox) * 3 + i] = (unsigned char) (sum[i] / (sx * sy) + 0.5);
+        }
+    }
+    return out;
+}
+
+/* The largest |a - b| in a channel of two RGB frames of n pixels; *mean the mean. */
+static int max_diff(const unsigned char *a, const unsigned char *b, long n, double *mean)
+{
+    long i, sum = 0;
+    int d, most = 0;
+
+    for (i = 0; i < n * 3; i++)
+    {
+        d = abs((int) a[i] - (int) b[i]);
+        sum += d;
+        if (d > most) most = d;
+    }
+    *mean = (double) sum / ((double) n * 3);
+    return most;
+}
+
+/* Hard steps: neighbouring pixels (right and below) of a top-down RGB frame
+ *  differing by more than 48 in a channel, per thousand pairs. */
+static double hard_steps(const unsigned char *p, int w, int h)
+{
+    long n = 0, hard = 0;
+    int x, y, i, dx, dy;
+    const unsigned char *q;
+
+    for (y = 0; y < h - 1; y++)
+        for (x = 0; x < w - 1; x++)
+        {
+            q = &p[((size_t) y * w + x) * 3];
+            for (dx = 0, dy = 0, i = 0; i < 3; i++)
+            {
+                dx = max(dx, abs((int) q[i] - (int) q[3 + i]));
+                dy = max(dy, abs((int) q[i] - (int) q[(size_t) w * 3 + i]));
+            }
+            hard += (dx > 48) + (dy > 48);
+            n += 2;
+        }
+    return 1000.0 * hard / n;
+}
+
+/* The supersampling frame, shown: a view with the HUD's gun and the status
+ *  bar (hud), or the view alone. */
+static void ss_frame(int hud)
+{
+    int k;
+
+    for (k = 0; k < 2; k++)
+    {
+        cmp_draw(0);
+        if (hud)
+        {
+            rotatesprite(160<<16, 130<<16, 65536, 0, FIRSTGUN, 0, 0, 2, 0, 0, xdim-1, ydim-1);
+            rotatesprite(0, (200 - tilesizy[BOTTOMSTATUSBAR])<<16, 65536, 0, BOTTOMSTATUSBAR, 4, 0,
+                         2+8+16+64, 0, 0, xdim-1, ydim-1);
+        }
+        nextpage();
+    }
+}
+
+/* Sets the window to w by h (points) and waits for the drawable to change. */
+static void ss_resize(int w, int h)
+{
+    int dw, dh, oldw, oldh;
+    Uint32 t0;
+
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &oldw, &oldh);
+    SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), w, h);
+    for (t0 = SDL_GetTicks(), dw = oldw, dh = oldh; (dw == oldw) && (dh == oldh) && (SDL_GetTicks() - t0 < 3000);
+         SDL_Delay(10))
+    {
+        _handle_events();
+        SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    }
+    _handle_events();
+}
+
+/*
+ * The frame shown as it is now (what: its name): the window's part of it is
+ *  the frame drawn (polymost_capture_shader, xdim by ydim) scaled down by
+ *  box_down, within 1, and a screenshot is the same, at the window's part's
+ *  size. *steps (if steps): hard_steps of the frame shown; *keep (if keep):
+ *  the frame shown. 1: pass.
+ */
+static int ss_shown(const char *dir, const char *what, int hud, double *steps, unsigned char **keep)
+{
+    unsigned char *cap, *shown, *part, *want, *rows;
+    int dw, dh, most, smost = 999, ok = 1, sw = 0, sh = 0;
+    int32_t r[4];
+    double mean, smean = 0, st;
+    char path[1024];
+    SDL_Surface *s, *s24 = NULL;
+    long i;
+
+    ss_frame(hud);
+    shown = read_shown(&dw, &dh);
+    gl_fitrect(xdim, ydim, dw, dh, r);
+    part = shown_part(shown, dw, r);
+    cap = polymost_capture_shader();
+    want = box_down(cap, xdim, ydim, r[2], r[3]);
+    most = max_diff(part, want, (long) r[2] * r[3], &mean);
+    st = hard_steps(part, r[2], r[3]);
+    if (steps) *steps = st;
+    snprintf(path, sizeof (path), "%s/ss_%s0000.bmp", dir, what);
+    remove(path);
+    snprintf(path, sizeof (path), "%s/ss_%sxxxx.bmp", dir, what);
+    i = screencapture(path, 0);
+    snprintf(path, sizeof (path), "%s/ss_%s0000.bmp", dir, what);
+    s = (i == 0) ? SDL_LoadBMP(path) : NULL;
+    if (s) { s24 = SDL_ConvertSurfaceFormat(s, SDL_PIXELFORMAT_RGB24, 0); sw = s->w; sh = s->h; }
+    if ((s24) && (s24->w == r[2]) && (s24->h == r[3]))
+    {
+        rows = malloc((size_t) r[2] * r[3] * 3);
+        for (i = 0; i < r[3]; i++)
+            memcpy(rows + (size_t) i * r[2] * 3, (unsigned char *) s24->pixels + (size_t) i * s24->pitch,
+                   (size_t) r[2] * 3);
+        smost = max_diff(rows, want, (long) r[2] * r[3], &smean);
+        free(rows);
+    }
+    printf("%s: drawn at %dx%d, shown at %d,%d %dx%d of %dx%d: |shown - box(frame)| most %d mean %.3f; "
+           "screenshot %dx%d, most %d mean %.3f; hard steps %.1f per 1000\n", what, (int) xdim, (int) ydim,
+           (int) r[0], (int) r[1], (int) r[2], (int) r[3], dw, dh, most, mean, sw, sh, smost, smean, st);
+    if (most > 1) { fprintf(stderr, "FAIL: %s: the frame shown isn't the frame drawn scaled down\n", what); ok = 0; }
+    if (smost > 1) { fprintf(stderr, "FAIL: %s: the screenshot isn't the frame shown\n", what); ok = 0; }
+    SDL_FreeSurface(s24);
+    SDL_FreeSurface(s);
+    free(cap);
+    free(want);
+    free(shown);
+    if (keep) *keep = part;
+    else free(part);
+    return ok;
+}
+
+/* Sets supersampling level now (game.c video_setsupersample); 1 if it then
+ *  draws at the size want (0: the drawable's) and is offered (offered). */
+static int ss_set(int level, int wantw, int wanth, int offered, const char *what)
+{
+    int dw, dh, ok;
+
+    video_setsupersample(level);
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    if (!wantw) { wantw = min(dw, MAXXDIM); wanth = min(dh, MAXYDIM); }
+    ok = (xdim == wantw) && (ydim == wanth) && (videosupersampleavailable(level) == offered);
+    printf("supersampling %s, %s: drawn at %dx%d (drawable %dx%d), offered %d, path %s\n", videoopts_ssname(level),
+           what, (int) xdim, (int) ydim, dw, dh, videosupersampleavailable(level), gl_pathname(gldrawpath));
+    if (!ok) fprintf(stderr, "FAIL: supersampling %s, %s: not drawn at %dx%d or offered %d\n",
+                     videoopts_ssname(level), what, wantw, wanth, offered);
+    return ok;
+}
+
+/* Sets the mode again (windowed 640x400), as a VIDEO change does; 1 if it
+ *  then draws at the drawable's size, and supersampling isn't offered. */
+static int ss_mode(const char *what)
+{
+    int dw, dh, ok;
+
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    ok = (xdim == min(dw, MAXXDIM)) && (ydim == min(dh, MAXYDIM)) && (!videosupersampleavailable(SS_4K));
+    printf("supersampling 4k, %s: path %s, drawn at %dx%d (drawable %dx%d), offered %d\n", what,
+           gl_pathname(gldrawpath), (int) xdim, (int) ydim, dw, dh, videosupersampleavailable(SS_4K));
+    if (!ok) fprintf(stderr, "FAIL: supersampling with %s\n", what);
+    return ok;
+}
+
+/*
+ * Supersampling (renderer 3's shader path; game.c video_setsupersample,
+ *  video_requestsupersample) in a 640x400 window. 4k, asked for as the VIDEO
+ *  page asks, is drawn 2160 high at the drawable's aspect, and the frame
+ *  shown is that frame box-filtered down (ss_shown), with fewer hard steps
+ *  than off; a resize works out the size and whether it is offered again;
+ *  off again shows what it showed before, byte for byte. Over the largest
+ *  frame buffer (gl_maxfbtest) it's clamped with a message (gl_ssclamps);
+ *  when that isn't larger than the window it isn't offered and draws at the
+ *  window's size. An internal size
+ *  wins; the vbo path, and the shader path when its framebuffer fails, draw
+ *  at the window's size. 1: pass, 0: fail, 77: no shader path.
+ */
+static int ss_check(const char *dir)
+{
+    unsigned char *off, *again;
+    int dw, dh, ok = 1, w, h, maxfb, most, bw, bh, i, avail;
+    double offsteps, sssteps, mean;
+    uint32_t clamps;
+    Uint32 t0;
+    GLenum err;
+
+    videoswitch_setup();
+    GLContrast = GLSaturation = 1.0;  /* duke3d.cfg's defaults: the palette as it is */
+    if (video_setmode(DISPLAY_WINDOWED, 640, 400) != 0) { fprintf(stderr, "FAIL: video_setmode(640x400)\n"); return 0; }
+    if ((video_setrenderer(3) != 3) || (gldrawpath != GLPATH_SHADER))
+    {
+        printf("SKIP: no shader path (%s)\n", SDL_GetError());
+        return 77;
+    }
+    setbrightness(0, palette);
+    polymosttexfullbright = 240;
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    ok &= ss_set(SS_OFF, 0, 0, 1, "at the start");
+    ok &= ss_shown(dir, "off", 1, NULL, &off);
+    ok &= ss_shown(dir, "off_view", 0, &offsteps, NULL);
+
+    video_requestsupersample(SS_4K);  /* faded out, made, faded back in */
+    for (t0 = SDL_GetTicks(); (videofading()) && (SDL_GetTicks() - t0 < 3000); )
+    {
+        fade_frame();
+        video_applypending();
+    }
+    videoopts_sssize(SS_4K, dw, dh, 0, &w, &h);
+    printf("4k asked for: drawn at %dx%d (want %dx%d), fading %d, darkness %d\n", (int) xdim, (int) ydim, w, h,
+           videofading(), getvideofade());
+    if ((xdim != w) || (ydim != h) || (h != 2160) || (videofading()) || (getvideofade() != 0))
+        { fprintf(stderr, "FAIL: supersampling 4k asked for isn't drawn at %dx%d\n", w, h); ok = 0; }
+    ok &= ss_shown(dir, "4k", 1, NULL, NULL);
+    ok &= ss_shown(dir, "4k_view", 0, &sssteps, NULL);
+    printf("hard steps in the view: off %.1f, 4k %.1f per 1000\n", offsteps, sssteps);
+    if (sssteps > offsteps * 0.75) { fprintf(stderr, "FAIL: 4k's edges aren't smoother than off's\n"); ok = 0; }
+
+    ss_resize(800, 450);  /* recomputed at the new drawable's aspect */
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    videoopts_sssize(SS_4K, dw, dh, 0, &w, &h);
+    printf("4k after a resize to %dx%d: drawn at %dx%d (want %dx%d)\n", dw, dh, (int) xdim, (int) ydim, w, h);
+    if ((xdim != w) || (ydim != h)) { fprintf(stderr, "FAIL: a resize at 4k\n"); ok = 0; }
+    ok &= ss_shown(dir, "4k_resized", 1, NULL, NULL);
+    videoopts_sssize(SS_2K, dw, dh, 0, &w, &h);
+    ok &= ss_set(SS_2K, w, h, 1, "after the resize");
+    ok &= ss_shown(dir, "2k", 1, NULL, NULL);
+
+    ss_resize(640, 400);  /* off again: as before */
+    ok &= ss_set(SS_OFF, 0, 0, 1, "again");
+    ok &= ss_shown(dir, "off_again", 1, NULL, &again);
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    most = max_diff(off, again, (long) dw * dh, &mean);
+    printf("off again: most |shown - shown before| %d\n", most);
+    if (most != 0) { fprintf(stderr, "FAIL: off after supersampling isn't the frame before\n"); ok = 0; }
+    free(off);
+    free(again);
+
+    /* a resize turns it off and back on: the largest frame between the two drawables' widths */
+    ss_resize(800, 450);
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &bw, &bh);
+    ss_resize(640, 400);
+    gl_maxfbtest = (dw + bw) / 2;
+    for (i = 0; i < 3; i++)
+    {
+        if (i == 1) ss_resize(800, 450);
+        if (i == 2) ss_resize(640, 400);
+        SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &w, &h);
+        avail = videoopts_ssavailable(SS_4K, w, h, gl_maxfbtest, 1, 0);
+        if (avail) videoopts_sssize(SS_4K, w, h, gl_maxfbtest, &w, &h);
+        if (i == 0) ok &= ss_set(SS_4K, w, h, avail, "largest frame between the windows");
+        printf("4k, largest frame %d, drawable %dx%d: drawn at %dx%d, offered %d (want %dx%d, %d)\n",
+               (int) gl_maxfbtest, (i == 1) ? bw : dw, (i == 1) ? bh : dh, (int) xdim, (int) ydim,
+               videosupersampleavailable(SS_4K), w, h, avail);
+        if ((xdim != w) || (ydim != h) || (videosupersampleavailable(SS_4K) != avail) || (avail != (i != 1)))
+            { fprintf(stderr, "FAIL: a resize didn't turn supersampling %s\n", (i == 1) ? "off" : "on"); ok = 0; }
+    }
+    gl_maxfbtest = 0;
+
+    maxfb = dw * 3 / 2;  /* clamped, still larger than the window */
+    gl_maxfbtest = maxfb;
+    clamps = gl_ssclamps;
+    videoopts_sssize(SS_8K, dw, dh, maxfb, &w, &h);
+    ok &= ss_set(SS_8K, w, h, 1, "over the largest frame buffer");
+    printf("clamp messages: %u\n", (unsigned) (gl_ssclamps - clamps));
+    if ((gl_ssclamps != clamps + 1) || (max(w, h) != maxfb)) { fprintf(stderr, "FAIL: 8k wasn't clamped with a message\n"); ok = 0; }
+    ok &= ss_shown(dir, "8k_clamped", 1, NULL, NULL);
+    gl_maxfbtest = dw;  /* clamped to the window's size: not offered */
+    ok &= ss_set(SS_4K, 0, 0, 0, "clamped to the window");
+    gl_maxfbtest = 0;
+
+    ok &= ss_set(SS_OFF, 0, 0, 1, "before the other settings");
+    video_setsupersample(SS_4K);
+    GLInternalWidth = 320; GLInternalHeight = 200;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    printf("supersampling 4k, internal size 320x200: drawn at %dx%d, offered %d\n", (int) xdim, (int) ydim,
+           videosupersampleavailable(SS_4K));
+    if ((xdim != 320) || (ydim != 200) || (videosupersampleavailable(SS_4K)))
+        { fprintf(stderr, "FAIL: an internal size doesn't win over supersampling\n"); ok = 0; }
+    GLInternalWidth = GLInternalHeight = 0;
+    GLDrawPath = GLPATH_VBO;
+    ok &= ss_mode("vbo");
+    GLDrawPath = GLPATH_AUTO;
+    gl_forcefail = 3;
+    ok &= ss_mode("an incomplete framebuffer");
+    gl_forcefail = 0;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    videoopts_sssize(SS_4K, dw, dh, 0, &w, &h);
+    printf("supersampling 4k, shader path again: drawn at %dx%d\n", (int) xdim, (int) ydim);
+    if ((xdim != w) || (ydim != h)) { fprintf(stderr, "FAIL: supersampling not back on the shader path\n"); ok = 0; }
+    ok &= ss_set(SS_OFF, 0, 0, 1, "at the end");
+    if ((err = glGetError()) != GL_NO_ERROR) { fprintf(stderr, "FAIL: GL error 0x%x\n", (unsigned) err); ok = 0; }
+    polymosttexfullbright = 256;
+    return ok;
+}
+
 int main(int argc, char **argv)
 {
     int32_t posx, posy, posz;
@@ -2185,7 +2529,7 @@ int main(int argc, char **argv)
 
     if (argc < 3)
     {
-        fprintf(stderr, "usage: %s <DUKE3D.GRP> <dir>\n", argv[0]);
+        fprintf(stderr, "usage: %s <DUKE3D.GRP> <dir> [video|supersample]\n", argv[0]);
         return 2;
     }
 
@@ -2209,6 +2553,11 @@ int main(int argc, char **argv)
     {
         i = video_switch_check();
         if (i == 1) i = video_mode_check();
+        return (i == 1) ? 0 : (i == 77) ? 77 : 1;
+    }
+    if ((argc > 3) && (strcmp(argv[3], "supersample") == 0))
+    {
+        i = ss_check(argv[2]);
         return (i == 1) ? 0 : (i == 77) ? 77 : 1;
     }
     i = present8_check();

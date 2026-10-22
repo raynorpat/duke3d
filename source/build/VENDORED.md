@@ -451,7 +451,22 @@ Ported from later JFBuild commits, retyped as above:
   game lays out as classic does at it; `polymost_present_shader` draws the
   frame into `gl_fitrect`'s rectangle of the drawable (the largest scale
   that fits, square pixels, centred, nearest texel) with black bars around
-  it; screenshots are the internal-size frame.
+  it; screenshots are the internal-size frame. `glsupersample` (the
+  game's `Supersampling` through `setvideosupersample`, the editor's
+  `supersampling`) is the shader path's supersampling level: without an
+  internal size, `init_gl_res_vars` makes `xdim`/`ydim` `videoopts_sssize`'s
+  size for the drawable (1440/2160/4320 high at its aspect), clamped to
+  the largest frame (GL's texture, renderbuffer and viewport limits and
+  `MAXXDIM`; `gl_maxfbtest` and `gl_ssclamps` are test hooks) with a
+  message, or the drawable's size when that isn't larger than it.
+  `polymost_present_shader` then draws with `glshdownfrag`: each pixel the
+  mean of the texels it covers through the shown palette (fade, contrast,
+  saturation and the VIDEO fade included), weighted by coverage.
+  Screenshots are scaled down the same way on the CPU (`gl_boxdown`), at
+  the window's size. A resize, or `setvideosupersample` (`gl_remake`, the
+  resize's rebuild), works the size out again; if the framebuffer fails at
+  it, the vbo path draws at the window's size. No `lastframe` texture is
+  made at a supersampled size.
 - `glsubmit.c`/`glsubmit.h` (ours): renderer 3's vertex submission.
   `polymost.c`'s and `engine.c`'s `glBegin`/`glTexCoord`/`glColor`/
   `glVertex`/`glEnd` (drawpoly, `drawtrap`/`tessectrap`, the tile picker,

@@ -64,6 +64,7 @@ int editorsetgamemode(const editormode_t *m)
     gldrawpathrequest = m->gldrawpath;  /* setgamemode_gl picks what the driver has */
     glinternalwidth = m->glinternalwidth;
     glinternalheight = m->glinternalheight;
+    glsupersample = m->supersampling;
 #endif
     if (editorrendermode == 3 && editorglfailed)
         editorrendermode = 0;

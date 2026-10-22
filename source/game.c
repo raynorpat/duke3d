@@ -2304,6 +2304,23 @@ int video_setmode(int displaymode, int w, int h)
     return 0;
 }
 
+// Sets renderer 3's supersampling level (SS_*) now, the frame made again at
+// its size and the view laid out for it; in renderers 0-2 it's kept for
+// renderer 3. GLSupersampling, what duke3d.cfg keeps, is left alone.
+// Returns 1 if supersampling is in use (videosupersampleavailable: whether
+// a level can be).
+int video_setsupersample(int level)
+{
+    int on = setvideosupersample(level);
+
+    if (getrendermode() == 3)
+    {
+        flushperms();
+        vscrn();
+    }
+    return on;
+}
+
 // The run's resolution, as last set (the display mode: getvideodisplaymode).
 void video_getmode(int32_t *w, int32_t *h)
 {
@@ -2316,7 +2333,7 @@ void video_getmode(int32_t *w, int32_t *h)
 // and fade, which stay as they are), they are made together after a black
 // frame is shown, and it fades back in, also when a change failed. Play
 // goes on underneath.
-static int32_t video_pendingrenderer = -1;
+static int32_t video_pendingrenderer = -1, video_pendingss = -1;
 static int32_t video_pendingmode = -1, video_pendingw, video_pendingh;
 static char video_testtag[32];  // video_teststep's, printed when made
 static int32_t video_testfrom, video_testmode;
@@ -2324,6 +2341,12 @@ static int32_t video_testfrom, video_testmode;
 void video_requestrenderer(int r)
 {
     video_pendingrenderer = r;
+    setvideofadeout();
+}
+
+void video_requestsupersample(int level)
+{
+    video_pendingss = level;
     setvideofadeout();
 }
 
@@ -2340,11 +2363,13 @@ static void video_testprint(void);
 // Makes the changes asked for, and fades back in (also when one failed).
 static void video_makepending(void)
 {
+    if (video_pendingss >= 0)
+        video_setsupersample(video_pendingss);
     if (video_pendingmode >= 0)
         video_setmode(video_pendingmode,video_pendingw,video_pendingh);
     if (video_pendingrenderer >= 0)
         video_setrenderer(video_pendingrenderer);
-    video_pendingmode = video_pendingrenderer = -1;
+    video_pendingmode = video_pendingrenderer = video_pendingss = -1;
     setvideofadein();
     if (video_testtag[0])
         video_testprint();
@@ -2355,7 +2380,7 @@ static void video_makepending(void)
 // coming here), the fade out starts again.
 void video_applypending(void)
 {
-    if ((video_pendingmode < 0) && (video_pendingrenderer < 0))
+    if ((video_pendingmode < 0) && (video_pendingrenderer < 0) && (video_pendingss < 0))
         return;
     if (getvideofade() == 256)
         video_makepending();
@@ -2369,7 +2394,7 @@ void video_applypending(void)
 // which then draw the whole screen again.
 void video_flushpending(void)
 {
-    if ((video_pendingmode >= 0) || (video_pendingrenderer >= 0))
+    if ((video_pendingmode >= 0) || (video_pendingrenderer >= 0) || (video_pendingss >= 0))
         video_makepending();
 }
 
@@ -9054,6 +9079,7 @@ int main(int argc,char **argv)
     gamerenderer = clamprenderer(i ? ((i+1 < _argc) ? atoi(_argv[i+1]) : 0) : RendererSetting);
     setvideodisplaymode(DisplayMode);  // the VIDEO menu changes them as it goes
     setvideovsync(VSync);
+    setvideosupersample(GLSupersampling);  // renderer 3's, this run's from here on
     setvideodrawfit(1);  // the VIDEO page's draw sizes (the editor keeps its own)
     gamewidth = ScreenWidth;
     gameheight = ScreenHeight;

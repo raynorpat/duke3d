@@ -270,6 +270,14 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
       ENVIRONMENT "BUILD_WINDOWED=1"
       SKIP_RETURN_CODE 77
       TIMEOUT 60)
+    # Supersampling on the shader path: the frame shown is the large one
+    # box-filtered down, its sizes, clamp and the settings that turn it off.
+    add_test(NAME render_gl_supersample
+      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" supersample)
+    set_tests_properties(render_gl_supersample PROPERTIES
+      ENVIRONMENT "BUILD_WINDOWED=1"
+      SKIP_RETURN_CODE 77
+      TIMEOUT 60)
   endif()
 
   # Boots the real game to its title loop and into E1L1, headless. It uses
