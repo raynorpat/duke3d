@@ -109,6 +109,7 @@ int main(void)
     p=setup(); p->newowner=1; p->horizoff=12; p->ang=512;
     sector[0].floorstat=2; sector[0].floorheinum=1024;
     { int a=insertsprite(0,0);
+      short tx=tilesizx[0],ty=tilesizy[0];
       memset(&sprite[a],0,sizeof(sprite[a])); sprite[a].sectnum=0; sprite[a].statnum=0;
       sprite[a].x=sprite[a].y=16384; sprite[a].z=32768;
       sprite[a].cstat=289; sprite[a].xrepeat=sprite[a].yrepeat=64;
@@ -116,7 +117,12 @@ int main(void)
       processinput(0);
       check("bridge supplies collision floor",hittype[p->i].floorz,32768);
       check("slope lookahead uses sector floor above bridge",p->horizoff,5);
+      tilesizx[0]=tx; tilesizy[0]=ty;
     }
+    p=setup(); p->newowner=1; p->horizoff=12; p->ang=512;
+    sector[0].floorstat=2; sector[0].floorheinum=1024;
+    sector[1]=sector[0]; numsectors=2;
+    processinput(0); check("overlapping slope probe uses global search",p->horizoff,12);
     p=setup(); p->newowner=1; p->horizoff=12; p->ang=512; p->posy=32760;
     sector[0].floorstat=2; sector[0].floorheinum=1024;
     processinput(0); check("probe outside sector retains offset",p->horizoff,12);

@@ -3419,8 +3419,8 @@ void processinput(short snum)
     {
         x = p->posx+(sintable[(p->ang+512)&2047]>>10);
         y = p->posy+(sintable[p->ang&2047]>>10);
-        // G099-086: seed the probe instead of reading the beta's uninitialized stack word.
-        tempsect = psect;
+        // G099-086: global search matches measured DOS stale-hint fallbacks.
+        tempsect = -1;
         updatesector(x,y,&tempsect);
         if(tempsect == psect)
         {
