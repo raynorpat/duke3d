@@ -14,6 +14,9 @@ writer, and closes `demo1.dmo` when the route finishes or the level ends. A deat
 or a waypoint that cannot be reached in 60 seconds returns exit 2 and preserves
 the partial recording for diagnosis. `ROUTESTATE` reports the final player sprite
 state in the same order as `DEMOSTATE`, followed by whether the level ended.
+`-demodump file` writes the same diagnostic prefix as playback (remaining count,
+RNG seed, native sprite array and native ps[0]), then the native sector and wall
+arrays. The appended geometry helps inspect initialized doors and moving floors.
 
 Each nonblank line is an absolute map coordinate:
 
@@ -26,6 +29,7 @@ x y crouch
 x y wait tics
 x y weapon 1-10
 x y face angle
+x y pass
 ```
 
 Comments start with `#`. Coordinates within 128 map units count as reached.
@@ -37,7 +41,9 @@ while approaching. `use crouch` presses use while crouching for low switches.
 `fire tics` keeps firing for that many tics on arrival.
 `weapon n` selects the normal numbered weapon key (1 is kick, 2 pistol, 3 shotgun).
 `face angle` turns in place after reaching the point, using Build angles0–2047
-(0 east,512 south,1024 west,1536 north), within8 angle units. Use points on both sides of
+(0 east,512 south,1024 west,1536 north), within8 angle units.
+`pass` uses a384-unit arrival radius for flow checkpoints on conveyors/currents,
+where external movement can prevent precise positioning. Use points on both sides of
 a doorway to guide movement through it. A route may contain at most 4096 points.
 
 The bot authors input. Its result is not reference evidence: play the resulting

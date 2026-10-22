@@ -7755,9 +7755,12 @@ void checkcommandline(int argc,char **argv)
     while(i < argc)
     {
         c = argv[i];
+        if(!stricmp(c,"-demoverify") || !stricmp(c,"-demodump") ||
+           !stricmp(c,"-loadverify") || !stricmp(c,"-saveverify")
 #ifdef DUKE3D_ROUTEBOT
-        if(!stricmp(c,"-routebot")) { i+=2; continue; }
+           || !stricmp(c,"-routebot")
 #endif
+          ) { i+=2; continue; }
 
         if(*c == '-')
         {
@@ -7960,6 +7963,10 @@ void checkcommandline(int argc,char **argv)
         while(i < argc)
         {
             c = argv[i];
+
+            if(!stricmp(c,"-demoverify") || !stricmp(c,"-demodump") ||
+               !stricmp(c,"-loadverify") || !stricmp(c,"-saveverify"))
+            { i+=2; continue; }
 
             if (stricmp(c, "-net") == 0)
             {
@@ -8936,8 +8943,26 @@ static int load_duke3d_groupfile(void)
 }
 
 
+/* Author dumps append geometry to the existing demo diagnostic prefix. */
+static int writedemostate(const char *name,int geometry)
+{
+    FILE *f=fopen(name,"wb");
+    int32_t v;
+    if(!f) return 1;
+    v=BUILDSWAP_INTEL32(ud.reccnt); fwrite(&v,4,1,f);
+    v=BUILDSWAP_INTEL32(randomseed); fwrite(&v,4,1,f);
+    fwrite(sprite,sizeof(spritetype),MAXSPRITES,f);
+    fwrite(&ps[0],sizeof(ps[0]),1,f);
+    if(geometry) {
+        fwrite(sector,sizeof(sectortype),MAXSECTORS,f);
+        fwrite(wall,sizeof(walltype),MAXWALLS,f);
+    }
+    fclose(f);
+    return 0;
+}
+
 #ifdef DUKE3D_ROUTEBOT
-static int authorroute(const char *path)
+static int authorroute(const char *path,const char *dumpname)
 {
     int state,tics=0;
     input next;
@@ -8964,6 +8989,7 @@ static int authorroute(const char *path)
     printf("ROUTESTATE %d %d %d %d %d %d %d EOL %d\n",tics,
         sprite[p->i].x,sprite[p->i].y,sprite[p->i].z,sprite[p->i].ang,
         sprite[p->i].extra,randomseed,!!(p->gm&MODE_EOL));
+    if(dumpname && writedemostate(dumpname,1)) return 1;
     return state<0 ? 2 : 0;
 }
 #endif
@@ -9209,7 +9235,8 @@ int main(int argc,char **argv)
     {
         if(i+1>=_argc || !CheckParm("R"))
         { fputs("-routebot requires a route file and -r\n",stderr); exit(2); }
-        exit(authorroute(_argv[i+1]));
+        j=CheckParm("DEMODUMP");
+        exit(authorroute(_argv[i+1],(j && j+1<_argc) ? _argv[j+1] : NULL));
     }
 #endif
 
@@ -9812,19 +9839,7 @@ int demoverify(int n, char *dumpname)
     printf("DEMOSTATE %d %d %d %d %d %d %u\n",tics,sprite[k].x,sprite[k].y,
         sprite[k].z,sprite[k].ang,sprite[k].extra,(unsigned)randomseed);
 
-    if(dumpname)
-    {
-        FILE *f = fopen(dumpname,"wb");
-        int32_t v;
-
-        if(f == NULL)
-            return 1;
-        v = BUILDSWAP_INTEL32(ud.reccnt); fwrite(&v,4,1,f);
-        v = BUILDSWAP_INTEL32(randomseed); fwrite(&v,4,1,f);
-        fwrite(sprite,sizeof(spritetype),MAXSPRITES,f);
-        fwrite(&ps[0],sizeof(ps[0]),1,f); // in this build's own layout
-        fclose(f);
-    }
+    if(dumpname) return writedemostate(dumpname,0);
     return 0;
 }
 

@@ -49,6 +49,13 @@ int main(void)
         check("beta headache skill",ud.player_skill,4);
     }
     {
+        char *args[] = { "duke3d", "-demodump", "/tmp/map-state.bin",
+            "-loadverify", "/tmp/save.sav", "-saveverify", "/tmp/out.sav" };
+        boardfilename[0]=0; checkcommandline(7,args);
+        check("diagnostic paths do not enable respawn",ud.m_respawn_monsters,0);
+        check("diagnostic paths do not select a map",boardfilename[0],0);
+    }
+    {
         char *args[] = { "duke3d", "oddmapname" };
         ud.warp_on=0; boardfilename[0]=0; checkcommandline(2,args);
         check("beta map substring",strcmp(boardfilename,"oddmapname"),0);

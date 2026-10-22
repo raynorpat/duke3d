@@ -115,6 +115,14 @@ int main(void)
         ud.multimode = 1;
     }
 
+    {
+        char *args[] = { "duke3d", "-demodump", "/tmp/map-state.bin",
+            "-loadverify", "/tmp/save.sav", "-saveverify", "/tmp/out.sav" };
+        boardfilename[0]=0; checkcommandline(7,args);
+        check("diagnostic paths don't enable respawn",ud.m_respawn_monsters,0);
+        check("diagnostic paths don't select a map",boardfilename[0],0);
+    }
+
     /* The GRP check: a known release GRP that isn't this build's release
        gets a warning; this build's own GRP, a modded one and an unknown one
        don't. CRC-32 is the standard (zlib) one. */

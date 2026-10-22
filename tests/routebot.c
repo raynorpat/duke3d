@@ -37,5 +37,9 @@ int main(void)
     CHECK(routebot_next(0,0,512,&in)==1 && in.avel<0);
     CHECK(routebot_next(0,0,0,&in)==1 && in.avel==0);
     CHECK(routebot_next(0,0,0,&in)==0);
+    f=fopen("routebot-test.route","w"); fputs("1024 0 pass\n",f); fclose(f);
+    CHECK(routebot_load("routebot-test.route"));
+    CHECK(routebot_next(724,0,0,&in)==1 && in.fvel==0);
+    CHECK(routebot_next(724,0,0,&in)==0);
     remove("routebot-test.route"); return failures!=0;
 }
