@@ -675,13 +675,13 @@ if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3
   endif()
   # Each DOS reference save of this release must load with the state its
   # status bar showed, and survive our own save and reload.
-  if(_vold_data AND NOT _vold_edition STREQUAL "sw099")
+  if(_vold_data)
     include("${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_save_refs.cmake")
     get_cmake_property(_vars VARIABLES)
     foreach(_var IN LISTS _vars)
       if(_var MATCHES "^V13D_SAVE_(.+)_EDITION$" AND "${${_var}}" STREQUAL _vold_edition)
         set(_ref "${CMAKE_MATCH_1}")
-        string(REGEX REPLACE "^sw1[01]_" "" _name "${_ref}")
+        string(REGEX REPLACE "^sw(099|1[01])_" "" _name "${_ref}")
         add_test(NAME dos_save_${_vold_name}_${_name}
           COMMAND "${CMAKE_COMMAND}" -DMODE=load "-DNAME=${_ref}"
                   "-DDUKE3D=$<TARGET_FILE:duke3d>"
@@ -697,14 +697,14 @@ if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3
     # The other release's and the 1.3D shareware saves, when their folders are
     # set, and a 1.5 one must be refused (rulings.md: 1.1's BYTEVERSION 12
     # collides with neither; 1.0 has none and goes by its layout).
-    if(_vold_edition STREQUAL "sw11")
+    if(_vold_edition STREQUAL "sw11" OR _vold_edition STREQUAL "sw099")
       set(_vold_other_dir "${DUKE3D_V10_SW_DATA_DIR}")
     else()
       set(_vold_other_dir "${DUKE3D_V11_SW_DATA_DIR}")
     endif()
     set(_vold_others "")
-    foreach(_other "${_vold_other_dir}" "${DUKE3D_V13D_SW_DATA_DIR}")
-      if(_other AND EXISTS "${_other}/refsaves/e1l1start.SAV")
+    foreach(_other "${_vold_other_dir}" "${DUKE3D_V13D_SW_DATA_DIR}" "${DUKE3D_V099_SW_DATA_DIR}")
+      if(_other AND NOT _other STREQUAL _vold_data AND EXISTS "${_other}/refsaves/e1l1start.SAV")
         if(_vold_others)
           string(APPEND _vold_others "$<SEMICOLON>")
         endif()

@@ -202,12 +202,15 @@ def calls_10(bl):
     for size, count in ((2, 1025), (2, 4096), (2, 4096),
                         (2, 1025), (2, 4096), (2, 4096), (2, 1), (12, 256)):
         call('', size, count)
-    call('ps', PLAYER_SIZE_11, 8)
+    beta = len(bl[i]) == 8 * 0x33f
+    call('ps', 0x33f if beta else PLAYER_SIZE_11, 8)
     call('po', 16, 8)
     call('hittype', 71, 2048)
     for size, count in ((2, 1), (3072, 1), (4, 2048), (4, 2048),
-                        (2, 1), (2, 64), (2, 1), (2, 64), (2, 64), (1, 128)):
+                        (2, 1), (2, 64), (2, 1), (2, 64), (2, 64)):
         call('', size, count)
+    if not beta:
+        call('', 1, 128)
     call('script bitmap', 1, 10240)
     call('script', 4, 10240)
     call('actorscrptr', 4, 4096)
@@ -217,18 +220,23 @@ def calls_10(bl):
     call('animatecnt', 4, 1)
     call('', 2, 64)
     call('animateptr', 4, 64)
-    for size, count in ((4, 64), (4, 64), (1, 1), (2, 1), (4, 1), (4, 1)):
+    for size, count in ((4, 64), (4, 64), (1, 1), (2, 1)):
+        call('', size, count)
+    for size, count in (((2, 1),) if beta else ((4, 1), (4, 1))):
         call('', size, count)
     return out
 
 
 def layout_10(bl):
     c = {name: (first, n) for name, first, n in calls_10(bl) if name}
+    beta = len(bl[c['ps'][0]]) == 8 * 0x33f
     return dict(allowed={c['script bitmap'][0]: 'script bitmap',
                          c['lockclock'][0]: 'lockclock'},
                 animatecnt=c['animatecnt'][0], animateptr=c['animateptr'][0],
                 ps=tuple(range(c['ps'][0], c['ps'][0] + c['ps'][1])),
-                psize=PLAYER_SIZE_11, palette=0x33a, gm=0x30c, gmmask=0)
+                psize=0x33f if beta else PLAYER_SIZE_11,
+                palette=0x308 if beta else 0x33a, gm=0x2dc if beta else 0x30c, gmmask=0,
+                redraw=(0x322, 0x326) if beta else None)
 
 
 def chunks(path):
@@ -333,6 +341,11 @@ def compare(dos, ours):
         for p in range(0, len(ps), size):
             ps[p + L['palette']:p + L['palette'] + 4] = bytes(4)
             ps[p + L['gm']] &= L['gmmask']
+        # Native loadplayer/vscrn request a redraw for the active player.
+        # Inactive players' saved display flags must still match exactly.
+        if L.get('redraw'):
+            first, last = L['redraw']
+            ps[first:last] = bytes(last - first)
         o = 0
         for k in L['ps']:
             x[k], o = bytes(ps[o:o + len(x[k])]), o + len(x[k])

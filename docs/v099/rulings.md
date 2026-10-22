@@ -77,3 +77,19 @@ Each names what was decided, why, and what it costs if it turns out wrong.
   use while crouching to
   the optional bot; these remain ordinary recorded input. Cost if wrong: route
   authoring changes, while DOS playback remains the reference.
+- **Task 11: use a wider arrival radius on conveyor waypoints.** Optional `pass`
+  nodes accept384 units because conveyor drift can prevent the ordinary128-unit
+  arrival. Other nodes retain128. Cost if wrong: an authored path changes; the
+  DOS playback comparison still decides acceptance.
+- **Task 14: translate beta display fields to native globals.** Only the selected
+  player's saved `pus`, `pub` and help flag update the native globals; inactive
+  players write the observed1/1/0 defaults. Loading requests a redraw, so save
+  comparison ignores only the active player's two redraw shorts (0x322–0x325).
+  Inactive flags and every simulation field still compare. Native-only fields
+  absent from the beta record are initialized, with actor/audio sentinels -1.
+  Cost if wrong: a redraw differs after loading, without changing simulation.
+- **Task 14: zero-extend the two-byte respawn tail.** As specified during Task2,
+  read the saved low16 bits rather than reproducing DOS loadplayer's accidental
+  stale upper16 bits. The absent respawn-items settings reset to zero. Cost if
+  wrong: a malformed or unusual save that depended on stale decompression bytes
+  gets a deterministic respawn setting.

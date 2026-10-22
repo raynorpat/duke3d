@@ -374,7 +374,8 @@ Trailing scalars: `earthquaketime` (1, `0x10aef1`, which domovethings counts dow
   `animatevel[0]` as stored.
 - loadplayer then copies the value into `m_respawn_monsters` (`0xf0d18`).
 
-A loader that matches the EXE must reproduce this, or the ruling must say why it doesn't.
+The native beta loader zero-extends the saved two bytes; see the Task14 ruling for
+this deliberate departure from the stale-buffer bug.
 
 After reading, loadplayer sets `gm = MODE_GAME`, zeroes `lockclock`, `totalclock`,
 `ud.recstat` and the FIFO counters, and closes the file. loadpheader (`0x34ec0`) reads
@@ -404,7 +405,9 @@ it as the immediate `0xe1018`, which DOS/4GW relocates.
   (`0x20515c`).
 
 A 0.99 loader takes the base from the save itself (the empty `actorscrptr[]` entries) and
-translates the `hittype` pointers, as for 1.0. This hasn't been checked on a real save yet.
+translates the `hittype` pointers, as for 1.0. All four DOS reference saves confirm
+the relocated base `0x2be018`; the writer uses that base for compatible raw pointers.
+Each reference loads, writes back with matching simulation records, and reloads.
 
 ### Network packets
 

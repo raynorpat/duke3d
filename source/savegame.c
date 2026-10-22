@@ -82,15 +82,25 @@ int32_t sg_sprite(unsigned char *b, void *rec, int write)
  * 1.1-only fields sit between ours. on_sector_effector, no_autoaim and
  * select_dir aren't carried: written as zeros, ignored on reading.
  * The 1.0 one ("player_struct (1.0)") is the same size: it has a byte at
- * 0x322 and a per-player auto_run, and no no_autoaim or aim_mode.
+ * 0x322 and a per-player auto_run, and no no_autoaim or aim_mode. The beta
+ * has 0x33f bytes (docs/v099/notes/0.99-player.md): the byte group precedes
+ * inventory shorts, several later fields are absent, and display flags
+ * are per-player. Only the active player maps to the native globals.
  */
 int32_t sg_player(unsigned char *b, void *rec, int write)
 {
     struct player_struct *p = (struct player_struct *)rec;
     int32_t o = 0, k;
+#if DUKE3D_GAMEVER < GAMEVER_10
+    int32_t display;
+#endif
 
     if (!write)
     {
+#if DUKE3D_GAMEVER < GAMEVER_10
+        memset(p,0,sizeof(*p));
+        p->wackedbyactor = p->scream_voice = -1;
+#endif
         p->bobposx = p->bobposy = 0;
         p->subweapon = 0; p->wantweaponfire = 0;
         p->weapreccnt = 0;
@@ -103,16 +113,24 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
     F32(p->posx); F32(p->posy); F32(p->posz); F32(p->horiz); F32(p->ohoriz);
     F32(p->ohorizoff); F32(p->invdisptime);
     F32(p->oposx); F32(p->oposy); F32(p->oposz);
-    F32(p->pyoff); F32(p->opyoff);
+    F32(p->pyoff);
+#if DUKE3D_GAMEVER >= GAMEVER_10
+    F32(p->opyoff);
+#endif
     F32(p->posxv); F32(p->posyv); F32(p->poszv); F32(p->last_pissed_time);
+#if DUKE3D_GAMEVER >= GAMEVER_10
     F32(p->truefz); F32(p->truecz);
+#endif
     F32(p->player_par); F32(p->visibility);
     F32(p->bobcounter); F32(p->weapon_sway);
     F32(p->pals_time); F32(p->burn_time); F32(p->randomflamex); F32(p->crack_time);
 
     F16(p->ang); F16(p->oang); F16(p->angvel); F16(p->cursectnum); F16(p->look_ang);
     F16(p->last_extra);
-    A16(p->ammo_amount,10); F16(p->wackedbyactor);
+    A16(p->ammo_amount,10);
+#if DUKE3D_GAMEVER >= GAMEVER_10
+    F16(p->wackedbyactor);
+#endif
     F16(p->curr_weapon); F16(p->last_weapon); F16(p->tipincs); F16(p->horizoff);
     F16(p->holoduke_amount); F16(p->newowner); F16(p->hurt_delay); F16(p->hbomb_hold_delay);
     F16(p->jumping_counter); F16(p->airleft); F16(p->knee_incs); F16(p->access_incs);
@@ -124,6 +142,7 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
     F16(p->one_eighty_count); F16(p->cheat_phase);
     F16(p->dummyplayersprite); F16(p->extra_extra8); F16(p->quick_kick);
     F16(p->heat_amount); F16(p->actorsqu); F16(p->timebeforeexit); F16(p->customexitsound);
+#if DUKE3D_GAMEVER >= GAMEVER_10
     F16(p->rotscrnang); F16(p->dead_flag); F16(p->show_empty_weapon);
     F16(p->scuba_amount); F16(p->jetpack_amount); F16(p->steroids_amount); F16(p->shield_amount);
     F16(p->spacesuit_amount);
@@ -132,6 +151,7 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
 
     F32(p->scream_voice);
 
+#endif
     F8(p->gm); F8(p->on_warping_sector); F8(p->footprintcount);
     F8(p->hbomb_on); F8(p->jumping_toggle);
     if (write) b[o] = 0;    /* on_sector_effector */
@@ -149,7 +169,10 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
 #endif
     F8(p->spacesuit_on); F8(p->scuba_on); F8(p->spacesuit_used);
     F8(p->footprintpal); F8(p->heat_on);
-    F8(p->holster_weapon); F8(p->falling_counter); F8(p->frag_ps);
+    F8(p->holster_weapon);
+#if DUKE3D_GAMEVER >= GAMEVER_10
+    F8(p->falling_counter); F8(p->frag_ps);
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_11
     F8(p->aim_mode);
 #endif
@@ -157,11 +180,27 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
     /* palette: a 32-bit DOS pointer. Written as zeros, never read back. */
     if (write) b[o] = b[o+1] = b[o+2] = b[o+3] = 0;
     o += 4;
+#if DUKE3D_GAMEVER < GAMEVER_10
+    F16(p->rotscrnang); F16(p->dead_flag); F16(p->show_empty_weapon);
+    F16(p->scuba_amount); F16(p->jetpack_amount); F16(p->steroids_amount); F16(p->shield_amount);
+    F16(p->spacesuit_amount);
+    F16(p->holoduke_on); F16(p->pycount); F16(p->weapon_pos);
+    display = p == &ps[myconnectindex] ? pus : 1; F16(display);
+    if (!write && p == &ps[myconnectindex]) pus = display;
+    display = p == &ps[myconnectindex] ? pub : 1; F16(display);
+    if (!write && p == &ps[myconnectindex]) pub = display;
+    F16(p->transporter_hold); F16(p->last_full_weapon); F16(p->footprintshade); F16(p->boot_amount);
+
+#endif
     F8(p->toggle_key_flag); F8(p->knuckle_incs);
     if (write) b[o] = 0;    /* select_dir */
     o++;
     F8(p->walking_snd_toggle); F8(p->interface_toggle_flag); F8(p->palookup); F8(p->hard_landing);
     F8(p->max_secret_rooms); F8(p->secret_rooms); A8(p->pals,3);
+#if DUKE3D_GAMEVER < GAMEVER_10
+    display = p == &ps[myconnectindex] ? ud.show_help : 0; F8(display);
+    if (!write && p == &ps[myconnectindex]) ud.show_help = display;
+#endif
     F8(p->max_actors_killed); F8(p->actors_killed);
 #if DUKE3D_GAMEVER < GAMEVER_11
     F8(p->auto_run);
@@ -465,14 +504,22 @@ int32_t sg_check10(int32_t fil)
     static const int32_t mid[][2] =
     {
         {2,1}, {SG_ANIMWALL_SIZE*MAXANIMWALLS,1}, {4,2048}, {4,2048},
-        {2,1}, {2,64}, {2,1}, {2,64}, {2,64}, {1,MAXSECTORS>>3},
+        {2,1}, {2,64}, {2,1}, {2,64}, {2,64},
+#if DUKE3D_GAMEVER >= GAMEVER_10
+        {1,MAXSECTORS>>3},
+#endif
         {1,SG_DOS_MAXSCRIPT}, {4,SG_DOS_MAXSCRIPT}
     };
     static const int32_t tail[][2] =
     {
         {4,1}, {2,1}, {2,MAXPSKYTILES},
         {4,1}, {2,MAXANIMATES}, {4,MAXANIMATES}, {4,MAXANIMATES}, {4,MAXANIMATES},
-        {1,1}, {2,1}, {4,1}, {4,1}
+        {1,1}, {2,1},
+#if DUKE3D_GAMEVER < GAMEVER_10
+        {2,1}
+#else
+        {4,1}, {4,1}
+#endif
     };
     static short picnum[SG_DOS_MAXHITTYPES];
     static unsigned char actors[SG_DOS_MAXTILES*4];
@@ -491,9 +538,9 @@ int32_t sg_check10(int32_t fil)
     if (!sg_calls10(fil,lists,10)) goto done;
     /* hittype[] comes raw, straight after po[] */
     if (!sg_call10(fil,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES,sgbuf)) goto done;
-    if (!sg_calls10(fil,mid,12)) goto done;
+    if (!sg_calls10(fil,mid,sizeof(mid)/sizeof(mid[0]))) goto done;
     if (!sg_call10(fil,4,SG_DOS_MAXTILES,actors)) goto done;
-    if (!sg_calls10(fil,tail,12)) goto done;
+    if (!sg_calls10(fil,tail,sizeof(tail)/sizeof(tail[0]))) goto done;
     if (klseek(fil,0,SEEK_CUR) != kfilelength(fil)) goto done;
 
     /* actorscrptr[]: every entry is stored minus script's address, so the

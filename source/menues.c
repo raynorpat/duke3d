@@ -271,7 +271,11 @@ int loadplayerfile(char *fnptr, signed char spot)
      bv = sg_check10(fil);
      if(bv < 0)
      {
+#if DUKE3D_GAMEVER < GAMEVER_10
+        printf("%s is not a DOS 0.99 save.\n",fnptr);
+#else
         printf("%s is not a DOS 1.0 save.\n",fnptr);
+#endif
         FTA(114,&ps[myconnectindex]);
         kclose(fil);
         ototalclock = totalclock;
@@ -407,7 +411,11 @@ int loadplayerfile(char *fnptr, signed char spot)
      mirrorcnt = clampcount(sg_read16(fil),64);
      sg_read16s(fil,mirrorwall,2,64);
      sg_read16s(fil,mirrorsector,2,64);
+#if DUKE3D_GAMEVER >= GAMEVER_10
      kdfread(&show2dsector[0],sizeof(char),MAXSECTORS>>3,fil);
+#else
+     memset(show2dsector,0,sizeof(show2dsector));
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D saves no actortype, boardfilename or clouds
      clearbufbyte(actortype,MAXTILES,0L);
      kdfread(&actortype[0],sizeof(char),SG_DOS_MAXTILES,fil);
@@ -458,7 +466,11 @@ int loadplayerfile(char *fnptr, signed char spot)
 
      earthquaketime = sg_read8(fil);
      ud.from_bonus = sg_read16(fil);
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+     ud.respawn_monsters = (uint16_t)sg_read16(fil);
+     ud.m_respawn_monsters = ud.respawn_monsters;
+     ud.respawn_items = ud.m_respawn_items = 0;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
      // 1.1 ends with 7 scalars; auto_run and crosshair are bytes. 1.0 ends
      // with the first 4.
      ud.respawn_monsters = sg_read32(fil);
@@ -743,7 +755,9 @@ int saveplayerfile(char *fnptr, signed char spot)
      sg_write16(fil,mirrorcnt);
      sg_write16s(fil,mirrorwall,2,64);
      sg_write16s(fil,mirrorsector,2,64);
+#if DUKE3D_GAMEVER >= GAMEVER_10
      dfwrite(&show2dsector[0],sizeof(char),MAXSECTORS>>3,fil);
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D saves no actortype, boardfilename or clouds
      dfwrite(&actortype[0],sizeof(char),SG_DOS_MAXTILES,fil);
      dfwrite(&boardfilename[0],sizeof(boardfilename),1,fil);
@@ -794,7 +808,9 @@ int saveplayerfile(char *fnptr, signed char spot)
 
      sg_write8(fil,earthquaketime);
      sg_write16(fil,ud.from_bonus);
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+     sg_write16(fil,ud.respawn_monsters);
+#elif DUKE3D_GAMEVER < GAMEVER_13D
      sg_write32(fil,ud.respawn_monsters);
      sg_write32(fil,ud.respawn_items);
 #if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 ends here

@@ -75,7 +75,53 @@ static void test_sprite(void)
     CHECK(memcmp(&s, &back, sizeof(s)) == 0);
 }
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+/* Independently measured DOS beta record offsets (0.99-player.md). */
+static void test_player(void)
+{
+    static struct player_struct p, back;
+    unsigned char b[2048];
+
+    memset(&p, 0, sizeof(p)); memset(&back, 0x55, sizeof(back)); memset(b, 0xee, sizeof(b));
+    p.posx = -5; p.posxv = 0x12345678; p.pals_time = 999; p.ang = 0x0605;
+    p.ammo_amount[9] = 27; p.curr_weapon = 7; p.i = 0x0a0b; p.customexitsound = 15;
+    p.gm = 0x11; p.name[0] = 'D'; p.unnamed_322 = 29; p.gotweapon[9] = 1;
+    p.refresh_inventory = 28; p.rotscrnang = 16; p.shield_amount = 100;
+    p.transporter_hold = 19; p.boot_amount = 20; p.toggle_key_flag = 34;
+    p.pals[2] = 39; p.actors_killed = 40; p.auto_run = 1; p.return_to_center = 51;
+    CHECK(SG_PLAYER_SIZE == 0x33f);
+    CHECK(sg_player(b, &p, 1) == 0x33f);
+    CHECK(le32(b + 0x214) == -5 && le32(b + 0x240) == 0x12345678);
+    CHECK(le32(b + 0x260) == 999 && le16(b + 0x270) == 0x0605);
+    CHECK(le16(b + 0x28e) == 27 && le16(b + 0x290) == 7);
+    CHECK(le16(b + 0x2bc) == 0x0a0b && le16(b + 0x2da) == 15);
+    CHECK(b[0x2dc] == 0x11 && b[0x2e4] == 'D' && b[0x2f2] == 29);
+    CHECK(b[0x306] == 1 && b[0x307] == 28 && le32(b + 0x308) == 0);
+    CHECK(le16(b + 0x30c) == 16 && le16(b + 0x318) == 100);
+    CHECK(le16(b + 0x326) == 19 && le16(b + 0x32c) == 20);
+    CHECK(b[0x32e] == 34 && b[0x339] == 39 && b[0x33c] == 40);
+    CHECK(b[0x33d] == 1 && b[0x33e] == 51 && b[0x33f] == 0xee);
+    b[0x308] = 0x99; /* Never restore a DOS palette pointer. */
+    CHECK(sg_player(b, &back, 0) == 0x33f);
+    CHECK(back.posx == -5 && back.shield_amount == 100 && back.actors_killed == 40);
+    CHECK(back.palette == NULL && back.name[13] == 0 && back.weaprecs[0] == 0);
+    CHECK(back.opyoff == 0 && back.truefz == 0 && back.truecz == 0);
+    CHECK(back.wackedbyactor == -1 && back.scream_voice == -1);
+    CHECK(back.falling_counter == 0 && back.frag_ps == 0 && back.aim_mode == 0);
+    CHECK(back.ammo_amount[10] == 0 && back.gotweapon[11] == 0);
+
+    myconnectindex = 0; pus = 3; pub = 4; ud.show_help = 2;
+    CHECK(sg_player(b, &ps[0], 1) == 0x33f);
+    CHECK(le16(b + 0x322) == 3 && le16(b + 0x324) == 4 && b[0x33a] == 2);
+    pus = pub = ud.show_help = 0;
+    sg_player(b, &ps[0], 0);
+    CHECK(pus == 3 && pub == 4 && ud.show_help == 2);
+    sg_player(b, &ps[7], 1);
+    CHECK(le16(b + 0x322) == 1 && le16(b + 0x324) == 1 && b[0x33a] == 0);
+    sg_player(b, &ps[7], 0);
+    CHECK(pus == 3 && pub == 4 && ud.show_help == 2);
+}
+#elif DUKE3D_GAMEVER < GAMEVER_13D
 /* The DOS 1.1 player_struct (docs/v10-v11/reference.md, "player_struct (1.1)"),
    or in 1.0 builds the 1.0 one ("player_struct (1.0)"): the same up to 0x321. */
 static void test_player(void)
