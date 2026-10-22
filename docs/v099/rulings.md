@@ -28,9 +28,13 @@ Each names what was decided, why, and what it costs if it turns out wrong.
   statnum.
 - **G099-086: the slope look-ahead `updatesector` seed is fixed.** processinput passes an
   uninitialized stack word as the start sector (`0x40434`). In DOS it is stale stack data;
-  in our build it is undefined. We seed it with `cursectnum`. The result differs only where
-  sectors overlap at the probe point. Cost if wrong: on an overlapping slope a demo's
-  `horizoff` (and so aim) differs from DOS.
+  in our build it is undefined. We seed it with `-1`, selecting the engine's global
+  search. The final E1L3 DOS capture logged 64 actual hints: 35 were outside the
+  501-sector range, and 29 were sector 0 with neither it nor its neighbors containing
+  the probe point. All took the global fallback. This policy also reproduces every
+  tic of the earlier 7894-tic E1L3 DOS trace; seeding with `cursectnum` changed aim on
+  overlapping slopes and later desynchronized RNG. Cost if wrong: another stale DOS
+  value could select a different overlapping sector, changing `horizoff` and aim.
 - **G099-023: `warp##` digits outside the level tables are ignored.** The beta has no
   range check, so `0` or a high digit indexes the level tables out of bounds. A cheat never
   runs in a demo, so this departs from no reference run. Cost if wrong: typing a bad warp
@@ -104,7 +108,7 @@ Each names what was decided, why, and what it costs if it turns out wrong.
   respawn and causing late replay desyncs. Both command-line parsers now skip
   arguments belonging to demo/save verification and dumps. Cost if wrong: a
   diagnostic argument no longer doubles as an unrelated game switch.
-- **G099-125: render from the measured beta camera fields.** The beta has no
+- **G099-128: render from the measured beta camera fields.** The beta has no
   `opyoff`, `truefz` or `truecz`; its camera uses current bob and a hittype floor
   cap. The guarded renderer follows those calculations and the measured camera
   branches. The existing native representation still lacks the display-only
@@ -117,6 +121,49 @@ Each names what was decided, why, and what it costs if it turns out wrong.
   blocking. Version 1.0 (`0x4d953`) and beta stained glass (`0x48ecb`) use
   the wall-array base correctly. Preserve the beta outcome when the sum is
   below MAXWALLS; skip a store beyond that array rather than corrupt memory.
-  E1L3 first diverged at tic95 because wall1773 was incorrectly cleared by
-  the port when shooting wall2331; beta instead clears unused wall4104.
-  The corrected native replay matches the DOS1875-tic player/RNG trace.
+  E1L3 first diverged at tic 95 because wall 1773 was incorrectly cleared by
+  the port when shooting wall 2331; beta instead clears unused wall 4104.
+  The corrected native replay matches the DOS 1875-tic player/RNG trace.
+
+- **G099-127: correct shared early forcefield texture orientation.** Beta,
+  1.0 and 1.1 all OR 85 into forcefield wall flags;1.3D adds vertical texture
+  flip 256. The inherited port forced the later flip in every version. Apply
+  the measured OR 85 below GAMEVER_13D under the spec's shared-port-bug policy,
+  preserving any flip already stored in the map. Cost if wrong: old-version
+  forcefield textures have a different vertical orientation; collision flags
+  and simulation remain unchanged.
+
+- **C099-005/006: keep native compiler error interaction.** ESC abort and
+  the beta's reload prompts only affect interactive/error paths; they do not
+  change compilation of the unmodified beta CONs or demo playback. Mark those
+  differences n/a. Cost if wrong: prompts differ when compiling broken or
+  modified scripts.
+- **G099-078: correct the shared unaimed shrinker multiplier.** Both beta
+  and 1.0 multiply the firing z velocity by 100;1.1 uses 97. Apply 100 below
+  GAMEVER_11 under the spec's shared-port-bug policy. Cost if wrong: unaimed
+  shrinker trajectories differ in the affected early versions; the measured
+  executable instructions and focused regression establish the intended value.
+- **Task11: bound death/restart comparisons before DOS batching.** Native
+  headless replay handles MODE_RESTART immediately after its tic; the beta
+  finishes the frame's input batch first, so post-death restart timing depends
+  on rendering speed. Full-route references use god mode, and the no-god death
+  scenario stops at the first death before a restart is requested. Cost if
+  wrong: a demo spanning death/restart can diverge at the frame boundary;
+  ordinary living playback and the first-death comparison remain checked.
+
+- **G099-129: beta quit does not wait for absent later-version ads.** The
+  beta exits through gameexit 0x20930, Shutdown 0x1ca50, then a DOS text-mode
+  DUKE3D.BIN display with no key waits. Native beta previously inherited 1.0's
+  two graphical-ad waits, but tiles 3290/3291 are empty in beta data. Exclude
+  beta from that call; keep its normal shutdown and existing native text-mode
+  policy. Cost if wrong: native quit omits the DOS-only text advertisement.
+
+- **Task13: observe gameplay ending after replay, without changing attract behavior.**
+  Beta attract playback intentionally returns to the title at EOL. The private
+  native test and scratch DOS observer hand the accepted boss replay’s EOL state
+  to the real main ending path. DOS remains alive through 60.04 seconds of the
+  victory path; its eventual INT21 exit is deliberately diagnostic. No inferred
+  post-boss crash patch is applied. The native test additionally checks score,
+  ordering, title return and normal shutdown. Cost if wrong: this diagnostic
+  handoff would not model a live gameplay exit; the original ending routines
+  and accepted boss state remain the code and input under observation.

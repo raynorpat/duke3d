@@ -1,15 +1,25 @@
 # 0.99 Beta Reference Material
 
 This file records the reference material for the 0.99 pre-release beta build variant
-(spec `docs/superpowers/specs/2026-10-21-v099-variant-design.md`). None of the beta files
-are in this repository. Only their location, checksums and the values measured from them
-are.
+([design](../superpowers/specs/2026-10-21-v099-variant-design.md),
+[plan and ledger](../superpowers/plans/2026-10-21-v099-variant.md),
+[rulings](rulings.md), [module notes](notes/)). None of the beta files are in this
+repository. Only their location, checksums and the values measured from them are.
 
 ## Data location
 
 `~/Downloads/d3d_beta/`, unpacked from `~/Downloads/d3d_beta.7z`. Tests read it through
-`DUKE3D_V099_SW_DATA_DIR`. Nothing is run inside it except writing the `refdemos/` and
-`refsaves/` folders. Runs use scratch copies or symlinks.
+`DUKE3D_V099_SW_DATA_DIR`. Game and DOS sessions use scratch copies or symlinks;
+only generated references are written to its `refdemos/` and `refsaves/` folders.
+The archive contains its files directly, so it can be unpacked with:
+
+```
+7zz x d3d_beta.7z -o/path/to/d3d_beta
+```
+
+Configure the native beta as `DUKE3D_VERSION=0.99` with `DUKE3D_SHAREWARE=ON`.
+The [README](../../README.md#playing-the-099-beta) has build and data-test examples.
+The beta has no verified multiplayer support; this variant targets single player.
 
 `README.TXT` (Jan 5 1996) is a note to the publisher: "This version is really stable for
 single player. We are working the next week on net/modem and then we should be ready to
@@ -190,10 +200,11 @@ sequence. 1.0 also calls `pan3dsound` (`0x51ed0`) every other tic, and the beta 
 | Code cave | `0x99b20`, `0x4e0` bytes | `0xa2aa0`, `0x560` bytes | zero slack after the end of the code object (`0x99b1f`), to the end of its last file-backed page (`0x9a000`) |
 | Log slack | `0x2471a0`, `0xe60` bytes | `0x2abaf0` | end of object 2, up to the page end `0x248000`. Room for 256 krandlog entries (`12 + 4 × 256` bytes). Task 7 exercised the krand logger here |
 
-### player_struct (partial)
+### player_struct
 
-`ps[]` is 8 × `0x33f` bytes at `0xf0f38`. Only the fields this task needed were read. A
-full map is left to later tasks.
+`ps[]` is 8 × `0x33f` bytes at `0xf0f38`. The selected offsets below identify the
+capture fields; the [full field map](notes/0.99-player.md#player_struct-099-0x33f-bytes)
+also documents the layout differences from 1.0 and the changed field order.
 
 | Offset | Size | Field | 1.0 | Evidence |
 |---|---|---|---|---|
@@ -203,6 +214,12 @@ full map is left to later tasks.
 | `0x2bc` | 2 | `i` (player sprite) | `0x2ca` | used to index `sprite[]` in movedummyplayers and the cheats |
 | `0x2cc` | 2 | `cheat_phase` | `0x2da` | cheats |
 | `0x2dc` | 1 | `gm` | `0x30c` | tested for MODE_MENU (1), MODE_EOL (8), MODE_TYPE (16), MODE_RESTART (32) and MODE_END (128) |
+
+The native save codec translates per-player redraw/help fields to the port globals;
+see the [save rulings](rulings.md). The renderer uses current `pyoff` and the measured
+beta camera clamps, without reading absent `opyoff`, `truefz` or `truecz` fields.
+The display-only per-player `on_sector_effector` interpolation flag still has no
+native representation, so smoothing on some moving sectors can differ from DOS.
 
 ### BYTEVERSION
 
@@ -214,22 +231,24 @@ full map is left to later tasks.
 - The "You cannot play Duke with different versions" string is not in the EXE.
 
 `9` collides with nothing in `source/duke3d.h` (10, 12, 14, 103, 116, 27, 117). It only
-matters for our own packets and our own save header, because neither DOS format carries
-it. A DOS 0.99 save is told apart from a DOS 1.0 one by its layout (see "Save file"), as
-`sg_check10` does for 1.0.
+matters for our own network handshake. Neither DOS nor native beta saves write a
+version field. A beta save is told apart from a 1.0 save by its whole-file layout
+(see [Save file](#save-file)); the build-specific `sg_check10` walk validates it
+before world/player state is loaded.
 
 ### Capture-patch notes
 
 - **Demo-end pattern.** The `found demo` flag sits at `[esp+8]`, not `[esp+4]`. So the
   pattern is `cmp [reccnt],0 / jg / cmp byte [esp+8],0 / jnz END`. It matches exactly once,
-  at `0x2a718`, with the `jnz` at `0x2a726`. `tools/v13d/mkcapture.py`'s regular
-  expression needs that byte changed for 0.99.
+  at `0x2a718`, with the `jnz` at `0x2a726`. `tools/v13d/mkcapture.py` uses its
+  dedicated `sw099` pattern for this stack offset. It also redirects beta's MODE_EOL
+  return to the capture cave, so an exit is captured before playback returns.
 - **The STATE.BIN dump** is `8 + 4096 × 44 + 0x33f` = 181,063 bytes. The 213-byte patch
-  fits in the `0x4e0`-byte cave, and so would the 319-byte `krandlog` version.
+  fits in the `0x4e0`-byte cave, as does the 319-byte `krandlog` version.
 - **krandlog's call-site scan** walks the flat image up to `0xa0000`, an offset that
   reaches address `0xb0000`. In the beta, data starts at `0xa0000`, so the scan must stop
-  at the end of the code object (`0x9a000`). Otherwise it could patch data bytes that look
-  like `call krand`.
+  at the end of the code object (`0x9a000`), as the `sw099` table now specifies.
+  Otherwise it could patch data bytes that look like `call krand`.
 - **mksave.** saveplayer (`0x35560`) has no `recstat` or `gm` check. It opens
   `game<n>.sav`, writes and closes it, and sets `ps[myconnectindex]+0x322 = 1`. So it can
   be called from a playback hook, as `tools/v13d/mksave.py` does for 1.0. The thumbnail
@@ -263,15 +282,17 @@ its 541 records, and the block chain ends exactly at the end of the file (543 by
 
 - opendemoread calls `newgame(volume, level, skill)` straight after the header.
 - opendemowrite writes a zero `reccnt` placeholder.
-- record buffers up to 2520 records (`cmp 0x9d7`) and flushes them with
+- record buffers up to 2520 records (`cmp ebx,0x9d8`, flush at `reccnt >= 2520`) with
   `dfwrite(buf, multimode * 10, reccnt / multimode)`. The total goes in its own counter,
   `0xb0500`.
 - closedemowrite flushes the rest, seeks to 0 and writes `0xb0500` as the record count.
-- playback reads `min(reccnt, 2520) / multimode` groups per `kdfread` call and runs one
-  domovethings per 4 `totalclock` ticks.
+- playback reads `min(reccnt, 2520) / multimode` groups per `kdfread` call. Its tic loop
+  tests `totalclock > lockclock`; domovethings advances lockclock by 4 ticks.
 
-All of this is as in 1.0. The body is the same `kdfread` block chain, and the delta coding
-restarts for every 2520-record call.
+The header, record layout and 2520-record grouping are the same as 1.0. The body is
+the same `kdfread` block chain, and delta coding restarts for each call. The beta
+playback timing and restart/end rules differ as described in the
+[game notes](notes/0.99-game.md#3-playback-0x2a560-the-demo-loop).
 
 ### Input record
 
@@ -326,14 +347,17 @@ each, `bits` as 4), as in 1.0. In the recorded demo, `fvel` stays within 0 to 12
   and playing on. Unlike 1.0, the beta's processinput does not close the demo when the
   single player dies (1.0 `0x441e0` calls closedemowrite there).
 
-So there are six playthrough demos, one per map, each started with `/l<n> /r`. A demo
-that has to reach a map's exit can't be produced by the unmodified beta: the session would
-have to be ended before the exit, or the scratch recording EXE patched to close the demo
-at MODE_EOL. That choice is left to the recording task.
+Reference routes are authored by the optional native route bot, one file per map;
+they do not use the unmodified DOS recorder. The native main loop closes recording
+cleanly at MODE_EOL. Original DOS playback remains the authority for accepting each
+reference; see [Regenerating reference demos](#regenerating-reference-demos). This avoids
+the DOS recorder's level-change truncation bug without using a native result as its
+own reference.
 
 ### Save file
 
-**Every field is its own `dfwrite` LZW block, as in 1.0.** In write order (saveplayer
+**Each field group is its own `dfwrite` call, as in 1.0; large calls span several LZW
+blocks.** In write order (saveplayer
 `0x35560`, loadplayer `0x34fb0` reads the same order):
 
 | # | Field | 0.99 | 1.0 |
@@ -375,7 +399,8 @@ Trailing scalars: `earthquaketime` (1, `0x10aef1`, which domovethings counts dow
 - loadplayer then copies the value into `m_respawn_monsters` (`0xf0d18`).
 
 The native beta loader zero-extends the saved two bytes; see the Task14 ruling for
-this deliberate departure from the stale-buffer bug.
+this deliberate departure from the stale-buffer bug. All four reference saves have
+zero upper halves in animatevel[0], so those references alone do not exercise the bug.
 
 After reading, loadplayer sets `gm = MODE_GAME`, zeroes `lockclock`, `totalclock`,
 `ud.recstat` and the FIFO counters, and closes the file. loadpheader (`0x34ec0`) reads
@@ -408,6 +433,10 @@ A 0.99 loader takes the base from the save itself (the empty `actorscrptr[]` ent
 translates the `hittype` pointers, as for 1.0. All four DOS reference saves confirm
 the relocated base `0x2be018`; the writer uses that base for compatible raw pointers.
 Each reference loads, writes back with matching simulation records, and reloads.
+The originals each have 44 dfwrite calls and 68 LZW blocks. Active redraw flags may
+change after loading; comparison masks only that player's two redraw shorts, plus the
+documented palette/mode/clock and pointer-bitmap normalization. Inactive display flags
+and simulation fields still compare.
 
 ### Network packets
 
@@ -542,3 +571,76 @@ at tic120 so it exercises a live combat state. No cheats were used.
 | e1l1fight | `b9f87d0adb5b372a2a0aedd7672606a9` |
 | e1l2door | `28980abe1d58e1d7ed7720ba645200b9` |
 | e1inv | `4915806be9daf7dc5a64e4c425af78e3` |
+
+## Regenerating reference demos
+
+`tools/v099/mkrefdemos.sh` drives the native optional route bot, native replay and an
+original-DOS capture. It requires Python 3, DOSBox-X and a separate beta build with
+`DUKE3D_ROUTEBOT=ON`; normal builds omit the authoring code. From the repository root:
+
+```
+cmake -S . -B build-v099-routebot -DDUKE3D_VERSION=0.99 \
+    -DDUKE3D_SHAREWARE=ON -DDUKE3D_ROUTEBOT=ON
+cmake --build build-v099-routebot
+sh tools/v099/mkrefdemos.sh /path/to/d3d_beta build-v099-routebot 1
+```
+
+The positional arguments are the original data directory, the build directory, then
+optional E1 level numbers 1–6. Omit the level numbers to process all six; supply
+`--dosbox /path/to/dosbox-x` when it is not on PATH. The author starts each selected map
+with `/v1 /l<n> /s3` (normal skill), `-routebot <route file> -r`. It takes routes from
+`tools/v099/routes/e1l<n>.route`.
+
+A route marked `# DEMOGOD` enables `-demogod` in native author/replay and the matching
+`demogod` patch in the scratch DOS executable. The demo header does not encode god
+mode. Manual replay of such a reference must therefore also use `-demogod`; ordinary
+D/N cheats cannot set the state during demo recording/playback. The E1L5 route's two
+jetpack segments use ordinary recorded controls and god-mode inventory fuel, as
+recorded in [rulings.md](rulings.md). Route comments identify those segments.
+
+The tool keeps runs in a unique `/tmp/v099-ref-*` directory, checks the five original
+EXE/GRP/CON hashes, and creates its own flattened EXE for the capture patcher. It writes
+`refdemos/E1L<n>.DMO` in the data directory and updates that map's
+`V13D_DEMO_SW099_E1L<n>_*` values in `tests/data/v13d_demo_refs.cmake` only after native
+authoring, native replay and original DOS playback agree on tic count, player sprite
+position/angle/health and RNG seed, with MODE_EOL reached. A mismatch stops the run;
+completed earlier maps may already have been installed. Original EXE, GRP and CON files
+are never patched in place. No generated beta DMO, EXE, GRP or save belongs in the repository.
+
+With `DUKE3D_V099_SW_DATA_DIR` configured, each installed reference enables
+`demo_sync_v099_sw_e1l<n>`. The DEMOGOD value alongside the DOS state controls replay.
+The same data option enables beta CON, boot, renderer-camera, demo-format and DOS-save
+checks; route-writer checks additionally require `DUKE3D_ROUTEBOT=ON`. Registered tests
+and reference values describe their specific inputs, not complete E1 feature coverage.
+
+All six accepted routes use the documented god initializer after ordinary attempts
+died. These are measured DOS end states, also reproduced by native authoring and
+playback; each consumed all input and reached MODE_EOL:
+
+| Map | Tics | Sprite X | Y | Z | Angle | Health | RNG seed |
+|---|---|---|---|---|---|---|---|
+| E1L1 | 3798 | 21851 | 60926 | -51712 | 0 | 100 | 1995976010 |
+| E1L2 | 5293 | -21612 | 36864 | -65568 | 1932 | 100 | 1761277566 |
+| E1L3 | 7894 | -17499 | 3537 | 103330 | 1020 | 100 | 2831408770 |
+| E1L4 | 8494 | 42063 | 43370 | 19221 | 507 | 100 | 3728242256 |
+| E1L5 | 10659 | -32142 | 37881 | 706487 | 43 | 100 | 2239398522 |
+| E1L6 | 7689 | 60981 | -6007 | 192299 | 1532 | 100 | 1041529079 |
+
+## Episode ending
+
+The accepted E1L5 boss recording reaches MODE_EOL with level_number 5. Ordinary
+beta attract playback returns to the title at EOL; it does not show the gameplay
+ending. A scratch observation copy handed that EOL state into the original main
+ending path, leaving its CONs, bonus renderer and input functions intact. The
+original victory path remained responsive for 60.04 wall seconds, its timer
+advanced to 6985, and no crash was observed. The observer then deliberately exited
+through DOS INT21/4c00; this is a diagnostic termination, not original shutdown.
+
+`episode_end_v099_sw` uses a private native game copy to hand the same replay
+state into the real main loop. It holds the rendered victory sequence for 60
+seconds, acknowledges the score and four ordering panels, returns to the title,
+then uses the actual quit confirmation and requires normal shutdown and exit 0.
+Frame captures and ordered progress markers remain in the test work directory.
+The automation hooks are compiled out of ordinary builds. The beta’s own exit
+uses a DOS text screen without graphical ads or extra key waits; native beta
+therefore skips the later-version ad waits, as recorded in [rulings.md](rulings.md).

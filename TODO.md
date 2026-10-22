@@ -73,3 +73,10 @@ reviewed and judged safe to leave for now. Ledger row IDs refer to the Differenc
 - [ ] **`CMakeLists.txt`** comment above `DUKE3D_VERSION` points only at `docs/v13d/`.
 - [ ] **Shareware-only configure error** (`CMakeLists.txt`) repeats itself ("only supported as
   shareware: 1.1 and 1.0 only exist as shareware builds").
+
+## 0.99 beta
+
+- [ ] **Moving-sector view interpolation** (`source/game.c`, G099-128): the beta's
+  per-player `on_sector_effector` display flag has no native representation. The
+  camera calculations match measured beta paths, but smoothing on moving sectors
+  can differ. Add the flag and verify the actual renderer on a moving-sector case.

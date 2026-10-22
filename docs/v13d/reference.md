@@ -6,7 +6,9 @@ themselves are in this repository. Only their locations, checksums and the value
 measured from them are.
 
 The 1.1 and 1.0 shareware variants have their own reference, rulings and notes in
-`docs/v10-v11/` (`reference.md`, `rulings.md`, `notes/`).
+[docs/v10-v11/](../v10-v11/reference.md) (`reference.md`, `rulings.md`, `notes/`).
+The 0.99 pre-release beta has a separate [reference](../v099/reference.md),
+[rulings](../v099/rulings.md) and [module notes](../v099/notes/).
 
 ## Data locations
 
@@ -313,7 +315,7 @@ addresses given. Each module's 1.3D (full EXE) address range:
 `tests/data/v13d_demo_refs.cmake` holds the final state of the five original demos.
 The values are captured without the debugger. A scratch copy of `DUKE3D.EXE` is patched
 so that when demo playback ends, it writes `STATE.BIN` (`reccnt`, `randomseed`,
-`sprite[4096]`) and hangs:
+`sprite[4096]`, then `ps[0]`) and hangs:
 
 1. `python3 -I tools/v13d/le_flatten.py <DUKE3D.EXE> 37c3c <edition>13.bin 352a4` makes
    the flattened image that the patcher searches.
@@ -330,7 +332,8 @@ so that when demo playback ends, it writes `STATE.BIN` (`reccnt`, `randomseed`,
    `SDL_VIDEODRIVER=dummy dosbox-x -conf <conf> -fastlaunch -nomenu`, with `cycles=max`,
    `[mixer] nosound=true`, `sbtype=sb16`, and an autoexec that runs `DUKE3D.EXE`. Without
    an emulated Sound Blaster the game stalls after "Could not detect FM chip".
-4. Wait for `STATE.BIN` (180232 bytes), kill DOSBox-X, and run
+4. Wait for `STATE.BIN` (181594 bytes, including the `0x552`-byte player record),
+   kill DOSBox-X, and run
    `python3 -I tools/v13d/statebin.py STATE.BIN <id>`. It refuses captures where `reccnt`
    isn't 0, because that would mean playback ran more than one tic in the final frame.
 
@@ -339,8 +342,9 @@ The captures are deterministic: two runs of shareware demo 3 produced byte-ident
 
 To find where a desync starts, cut a copy of the demo to N tics (the first long of the
 file) and capture both sides at tic N: the DOS executable as above, and ours with
-`duke3d -demoverify <n> -demodump <file>` (a relative file name: arguments starting with
-`/` are taken as switches), which writes the same layout with `ps[0]` in our own layout.
+`duke3d -demoverify <n> -demodump <file>`, which writes the same prefix with `ps[0]`
+in our own layout. Diagnostic filenames may be relative or absolute; the command-line
+parser skips the filename after `-demodump` rather than treating it as a game switch.
 Bisect on N. Compare sprites ignoring free slots (statnum 1024) and the unused byte at
 offset 19, which DOS leaves as it was. To see which code drew random numbers in tic N,
 add `krandlog` to `mkcapture.py`: every `call krand` then goes through a logger that
