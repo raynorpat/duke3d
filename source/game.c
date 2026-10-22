@@ -40,6 +40,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "sndcards.h"
 
 #include "duke3d.h"
+#ifdef DUKE3D_ROUTEBOT
+#include "routebot.h"
+#endif
 #include "glext.h"
 
 #include <sys/types.h>
@@ -7752,6 +7755,9 @@ void checkcommandline(int argc,char **argv)
     while(i < argc)
     {
         c = argv[i];
+#ifdef DUKE3D_ROUTEBOT
+        if(!stricmp(c,"-routebot")) { i+=2; continue; }
+#endif
 
         if(*c == '-')
         {
@@ -8930,6 +8936,35 @@ static int load_duke3d_groupfile(void)
 }
 
 
+#ifdef DUKE3D_ROUTEBOT
+static int authorroute(const char *path)
+{
+    int state,tics=0;
+    input next;
+    struct player_struct *p=&ps[myconnectindex];
+    if(!routebot_load(path)) return 2;
+    ud.multimode=1;
+    ud.m_recstat=ud.recstat=1;
+    newgame(ud.m_volume_number,ud.m_level_number,ud.m_player_skill);
+    enterlevel(MODE_GAME);
+    while((state=routebot_next(p->posx,p->posy,p->ang,&next))>0)
+    {
+        inputfifo[movefifoend[myconnectindex]&(MOVEFIFOSIZ-1)][myconnectindex]=next;
+        movefifoend[myconnectindex]++;
+        domovethings();
+        tics++;
+        if(p->gm&MODE_EOL) break;
+        if(sprite[p->i].extra<=0 || (p->gm&(MODE_RESTART|MODE_MENU)))
+        { fprintf(stderr,"route stopped on death at tic %d\n",tics); state=-1; break; }
+    }
+    closedemowrite();
+    printf("ROUTESTATE %d %d %d %d %d %d %d EOL %d\n",tics,
+        sprite[p->i].x,sprite[p->i].y,sprite[p->i].z,sprite[p->i].ang,
+        sprite[p->i].extra,randomseed,!!(p->gm&MODE_EOL));
+    return state<0 ? 2 : 0;
+}
+#endif
+
 int main(int argc,char **argv)
 {
     int32_t i, j, k, l;
@@ -9164,6 +9199,16 @@ int main(int argc,char **argv)
 
     FX_StopAllSounds();
     clearsoundlocks();
+
+#ifdef DUKE3D_ROUTEBOT
+    i=CheckParm("ROUTEBOT");
+    if(i)
+    {
+        if(i+1>=_argc || !CheckParm("R"))
+        { fputs("-routebot requires a route file and -r\n",stderr); exit(2); }
+        exit(authorroute(_argv[i+1]));
+    }
+#endif
 
     i = CheckParm("DEMOVERIFY");
     if(i && i+1 < _argc)

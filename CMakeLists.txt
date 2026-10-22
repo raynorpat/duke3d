@@ -22,6 +22,7 @@ if((DUKE3D_SHAREWARE AND NOT DUKE3D_VERSION MATCHES "^(0\\.99|1\\.0|1\\.1|1\\.3D
     "Unsupported DUKE3D_VERSION ${DUKE3D_VERSION} with DUKE3D_SHAREWARE=${DUKE3D_SHAREWARE}. "
     "${_version_combinations}")
 endif()
+option(DUKE3D_ROUTEBOT "Build the optional demo-authoring route bot" OFF)
 option(DUKE3D_CONTROLS_MENU "Enable the in-game controls config menu" ON)
 option(DUKE3D_POLYMOST "Build Ken Silverman's Polymost renderers (needs OpenGL)" ON)
 set(DUKE3D_FETCH_SDL "AUTO" CACHE STRING
