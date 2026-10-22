@@ -4,8 +4,8 @@
    normal attract playback intentionally returns to title instead. Score uses
    queued key skips, not its 10360-tick timeout. Color PPMs are render evidence,
    not DOS pixel goldens; the original-executable comparison is a separate audit.
-   The inherited quit waits reference absent beta art, so their captures retain
-   the quit confirmation; queued keys acknowledge them before normal shutdown. */
+   Beta quit skips later-version ad waits because their art is absent; entering
+   either wait fails this test before normal shutdown. */
 #define SDL_MAIN_HANDLED
 #include <stdint.h>
 #include <SDL.h>
