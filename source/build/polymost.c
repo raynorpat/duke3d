@@ -215,7 +215,9 @@ static int32_t gltexcacind[GLTEXMAX], gltexcacnext[GLTEXMAX], gltexcacnum = -1;
 	//   itself. Showing it (polymost_present_shader) draws that into the window
 	//   through the palette, faded as classic fades the 8-bit palette.
 static GLuint glshprog = 0, glshtprog = 0, glshresolve = 0; //the index, translucent index and resolve programs
-static GLuint glshdown = 0; //the resolve of a supersampled frame
+static GLuint glshdown = 0; //the resolve of a supersampled frame (linked on its own)
+static int32_t glshdownfailed = 0; //it didn't compile or link: no supersampling this run
+int32_t glshsupersampled = 0; //sdl_driver.c: the frame is supersampled, shown with glshdown
 static GLuint glshfbo = 0, glshfbotex = 0, glshdepth = 0; //the framebuffer: an index in red, and depth
 static int32_t glshfbox = 0, glshfboy = 0; //its size
 static GLuint glshlookup = 0, glshpal = 0; //the palookups (a row per pal and shade) and the palette
@@ -489,6 +491,7 @@ static const char glshresfrag[] =
 	//   much of it is covered (scale: texels per pixel, origin: where it shows)
 static const char glshdownfrag[] =
 	"#version 120\n"
+	"#define GLSHDOWNTAPS 16\n" //texels per axis: a scale of at most GLSHDOWNMAXSCALE
 	"uniform sampler2D frame, pal;\n"
 	"uniform vec2 scale, origin, invsize;\n"
 	"void main()\n"
@@ -496,12 +499,12 @@ static const char glshdownfrag[] =
 	"    vec2 a = (gl_FragCoord.xy-origin-0.5)*scale, b = a+scale;\n"
 	"    vec3 sum = vec3(0.0);\n"
 	"    float x, y = floor(a.y), wy, i;\n"
-	"    for(int j=0;j<64;j++)\n"
+	"    for(int j=0;j<GLSHDOWNTAPS;j++)\n"
 	"    {\n"
 	"        if (y >= b.y) break;\n"
 	"        wy = min(y+1.0,b.y)-max(y,a.y);\n"
 	"        x = floor(a.x);\n"
-	"        for(int k=0;k<64;k++)\n"
+	"        for(int k=0;k<GLSHDOWNTAPS;k++)\n"
 	"        {\n"
 	"            if (x >= b.x) break;\n"
 	"            i = texture2D(frame,(vec2(x,y)+0.5)*invsize).r;\n"
@@ -588,6 +591,34 @@ static void polymost_shaderfree ()
 	glshlookupdirty = 1;
 }
 
+	//The supersampled present's program, linked on its own when first wanted (a
+	//   driver that can't link its loops loses supersampling, not the tier).
+	//   1: it's ready. gl_forcefail 5 (a test hook) breaks it, without
+	//   making the failure stick.
+int32_t polymost_supersample_ready ()
+{
+	if ((!glinfo.glsl) || (glshdownfailed)) return(0);
+	if ((glshdown) && (gl_forcefail != 5)) return(1);
+	glsub_flush();
+	if (gl_forcefail == 5)
+	{
+		GLuint p = polymost_shlink(glshresvert,glshbroken,"frame","pal");
+		if (p) bglDeleteProgram(p);
+		printf("OpenGL supersampling is unavailable: its shader doesn't compile or link.\n");
+		glshprogon = 0;
+		return(0);
+	}
+	glshdown = polymost_shlink(glshresvert,glshdownfrag,"frame","pal");
+	glshprogon = 0; //polymost_shlink leaves no program in use
+	if (!glshdown)
+	{
+		glshdownfailed = 1;
+		printf("OpenGL supersampling is unavailable: its shader doesn't compile or link.\n");
+		return(0);
+	}
+	return(1);
+}
+
 	//The GL 2.1 tier can't draw: says why and draws on the vbo path from now on
 static void polymost_shaderfail (const char *why)
 {
@@ -650,8 +681,7 @@ static int32_t polymost_shaderready ()
 		glshprog = polymost_shlink(glshidxvert,(gl_forcefail == 2)?glshbroken:glshidxfrag,"tile","lookup");
 		glshtprog = polymost_shlink(glshidxvert,glshtransfrag,"tile","lookup");
 		glshresolve = polymost_shlink(glshresvert,glshresfrag,"frame","pal");
-		glshdown = polymost_shlink(glshresvert,glshdownfrag,"frame","pal");
-		if ((!glshprog) || (!glshtprog) || (!glshresolve) || (!glshdown)) { polymost_shaderfail("its shaders don't compile or link"); return(0); }
+		if ((!glshprog) || (!glshtprog) || (!glshresolve)) { polymost_shaderfail("its shaders don't compile or link"); return(0); }
 		bglUseProgram(glshtprog);
 		bglUniform1i(bglGetUniformLocation(glshtprog,"trans"),2);
 		bglUniform1i(bglGetUniformLocation(glshtprog,"dest"),3);
@@ -928,7 +958,7 @@ int32_t polymost_present_shader (const int32_t *r, int32_t dw, int32_t dh, int32
 		glClear(GL_COLOR_BUFFER_BIT);
 	}
 	glViewport(r[0],r[1],r[2],r[3]);
-	if ((xres > r[2]) || (yres > r[3])) //supersampled: scaled down
+	if ((glshsupersampled) && (polymost_supersample_ready())) //scaled down
 	{
 		bglUseProgram(glshdown);
 		bglUniform2f(bglGetUniformLocation(glshdown,"scale"),(float)xres/(float)r[2],(float)yres/(float)r[3]);

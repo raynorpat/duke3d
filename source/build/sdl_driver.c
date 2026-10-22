@@ -149,6 +149,8 @@ extern void polymost_glreset(void);
 extern int32_t polymost_present_shader(const int32_t *r, int32_t dw, int32_t dh, int32_t dark);
 extern void polymost_prepare_shader(void);
 extern unsigned char *polymost_capture_shader(void);
+extern int32_t polymost_supersample_ready(void);
+extern int32_t glshsupersampled;
 extern GLuint polymost_takeframe_shader(void);
 extern void polymost_putframe_shader(GLuint tex);
 extern void polymost_unbind_shader(void);
@@ -1188,6 +1190,18 @@ static int gl_maxfb(void)
 } /* gl_maxfb */
 
 
+/* The largest supersampled frame for the drawable: gl_maxfb, and at most
+ *  GLSHDOWNMAXSCALE texels to a pixel (its larger side is the one clamped). */
+static int gl_ssmaxfb(void)
+{
+    int m = gl_maxfb(), d = (gl_draw_w > gl_draw_h) ? gl_draw_w : gl_draw_h;
+
+    if ((d > 0) && (d * GLSHDOWNMAXSCALE < m))
+        m = d * GLSHDOWNMAXSCALE;
+    return(m);
+} /* gl_ssmaxfb */
+
+
 /*
  * Supersampling's size for the drawable (gl_draw_w by gl_draw_h), or 0 when
  *  it isn't used: off, off the shader path, with an internal size
@@ -1213,7 +1227,9 @@ static int gl_sssize(int internal, int say, int *w, int *h)
             printf("Supersampling %s is off: the GL internal size is used instead.\n", name);
         return(0);
     } /* if */
-    maxfb = gl_maxfb();
+    if (!polymost_supersample_ready())
+        return(0);
+    maxfb = gl_ssmaxfb();
     videoopts_sssize(glsupersample, gl_draw_w, gl_draw_h, 0, &fw, &fh);
     videoopts_sssize(glsupersample, gl_draw_w, gl_draw_h, maxfb, w, h);
     if ((say) && ((*w != fw) || (*h != fh)))
@@ -1271,6 +1287,7 @@ static void init_gl_res_vars(int say)
         h = ih;
     } /* if */
     gl_ss = gl_sssize(internal, say, &sw, &sh);
+    glshsupersampled = gl_ss;
     if (gl_ss)
     {
         w = sw;
@@ -1408,7 +1425,9 @@ int videosupersampleavailable(int level)
     if (!gl_drawing)
         return(0);
     gl_internalsize(glinternalwidth, glinternalheight, &iw, &ih);
-    return(videoopts_ssavailable(level, gl_draw_w, gl_draw_h, gl_maxfb(),
+    if ((gldrawpath == GLPATH_SHADER) && (!polymost_supersample_ready()))
+        return(0);
+    return(videoopts_ssavailable(level, gl_draw_w, gl_draw_h, gl_ssmaxfb(),
                                  gldrawpath == GLPATH_SHADER, iw != 0));
 #else
     return(level <= 0);
@@ -2536,6 +2555,8 @@ static unsigned char *gl_screencapture(int *w, int *h)
     *w = xdim;
     *h = ydim;
     rgb = polymost_capture_shader();  /* the GL 2.1 tier's frame, as shown */
+    if ((rgb == NULL) && (gl_ss))  /* the back buffer isn't the frame's size */
+        return(NULL);
     if ((rgb != NULL) && (gl_ss))  /* supersampled: at the window's size, as shown */
     {
         *w = gl_showrect[2];

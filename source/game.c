@@ -2363,7 +2363,13 @@ static void video_testprint(void);
 // Makes the changes asked for, and fades back in (also when one failed).
 static void video_makepending(void)
 {
-    if (video_pendingss >= 0)
+    if (video_pendingss >= 0 && video_pendingmode >= 0)
+    {
+#ifdef USE_OPENGL
+        glsupersample = video_pendingss;  // the mode set makes it
+#endif
+    }
+    else if (video_pendingss >= 0)
         video_setsupersample(video_pendingss);
     if (video_pendingmode >= 0)
         video_setmode(video_pendingmode,video_pendingw,video_pendingh);

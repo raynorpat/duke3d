@@ -2470,6 +2470,29 @@ static int ss_check(const char *dir)
     videoopts_sssize(SS_4K, dw, dh, 0, &w, &h);
     printf("supersampling 4k, shader path again: drawn at %dx%d\n", (int) xdim, (int) ydim);
     if ((xdim != w) || (ydim != h)) { fprintf(stderr, "FAIL: supersampling not back on the shader path\n"); ok = 0; }
+
+    gl_forcefail = 5;  /* supersampling's shader doesn't compile: the shader path stays, without it */
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    printf("supersampling 4k, its shader failing: path %s, drawn at %dx%d, offered %d\n", gl_pathname(gldrawpath),
+           (int) xdim, (int) ydim, videosupersampleavailable(SS_4K));
+    if ((gldrawpath != GLPATH_SHADER) || (xdim != dw) || (ydim != dh) || (videosupersampleavailable(SS_4K)) ||
+        (!videosupersampleavailable(SS_OFF)))
+        { fprintf(stderr, "FAIL: supersampling's shader failing didn't keep the shader path and grey it\n"); ok = 0; }
+    ok &= ss_shown(dir, "4k_noshader", 1, NULL, NULL);
+    gl_forcefail = 0;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    if ((xdim != w) || (ydim != h)) { fprintf(stderr, "FAIL: supersampling not back after its shader\n"); ok = 0; }
+
+    /* a small window: at most GLSHDOWNMAXSCALE texels to a pixel */
+    ok &= ss_set(SS_OFF, 0, 0, 1, "before a small window");
+    ss_resize(200, 120);
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &bw, &bh);
+    videoopts_sssize(SS_8K, bw, bh, GLSHDOWNMAXSCALE * max(bw, bh), &w, &h);
+    ok &= ss_set(SS_8K, w, h, 1, "a small window");
+    if ((w > GLSHDOWNMAXSCALE * bw) || (h > GLSHDOWNMAXSCALE * bh) || (h >= 4320))
+        { fprintf(stderr, "FAIL: 8k in a small window isn't held to %d texels a pixel\n", GLSHDOWNMAXSCALE); ok = 0; }
+    ok &= ss_shown(dir, "8k_small", 1, NULL, NULL);
+    ss_resize(640, 400);
     ok &= ss_set(SS_OFF, 0, 0, 1, "at the end");
     if ((err = glGetError()) != GL_NO_ERROR) { fprintf(stderr, "FAIL: GL error 0x%x\n", (unsigned) err); ok = 0; }
     polymosttexfullbright = 256;

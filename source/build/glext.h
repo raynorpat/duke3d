@@ -56,6 +56,10 @@ extern int32_t glsupersample;
 	 * the times supersampling was clamped to it, with a message. */
 extern int32_t gl_maxfbtest;
 extern uint32_t gl_ssclamps;
+	/* The supersampled present draws at most this many texels to a pixel
+	 * per axis (polymost.c's GLSHDOWNTAPS, less one for a part texel at
+	 * each end): larger sizes are clamped to it. */
+#define GLSHDOWNMAXSCALE 14
 	/* The shader path's contrast and saturation, applied to the palette it
 	 * shows after the fade (EDuke32's: 1.0 each leaves it as it is). */
 #define GL_CONTRAST_MIN 0.5
@@ -72,7 +76,8 @@ void gl_colorcorrect(unsigned char *c, double contrast, double saturation);
 void gl_fitrect(int32_t w, int32_t h, int32_t dw, int32_t dh, int32_t *r);
 	/* Test hook: 1 makes GLSL and FBOs unavailable, as if they failed; 2 makes
 	 * the shader path's shader not compile, 3 its framebuffer incomplete; 4
-	 * makes the run's first GL context fail, as on a machine without GL. */
+	 * makes the run's first GL context fail, as on a machine without GL; 5
+	 * makes supersampling's shader not compile. */
 extern int32_t gl_forcefail;
 	/* Test hooks (polymost.c): RGB tile textures made, and times they were all
 	 * made dirty (gltexinvalidateall); the shader path makes none. */

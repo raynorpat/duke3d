@@ -461,7 +461,13 @@ Ported from later JFBuild commits, retyped as above:
   message, or the drawable's size when that isn't larger than it.
   `polymost_present_shader` then draws with `glshdownfrag`: each pixel the
   mean of the texels it covers through the shown palette (fade, contrast,
-  saturation and the VIDEO fade included), weighted by coverage.
+  saturation and the VIDEO fade included), weighted by coverage. That
+  program is linked on its own when first wanted
+  (`polymost_supersample_ready`): if it doesn't link, supersampling isn't
+  offered and the shader path stays (`gl_forcefail` 5 tests it). Its loop
+  takes at most 16 texels a side, so the size is also held to
+  `GLSHDOWNMAXSCALE` (14) texels to a pixel. An internal size larger than
+  the window still shows through `glshresolve`, nearest.
   Screenshots are scaled down the same way on the CPU (`gl_boxdown`), at
   the window's size. A resize, or `setvideosupersample` (`gl_remake`, the
   resize's rebuild), works the size out again; if the framebuffer fails at
