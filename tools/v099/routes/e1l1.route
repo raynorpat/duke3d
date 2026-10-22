@@ -1,0 +1,283 @@
+# E1L1: DOS-verified normal-skill route to the level exit
+# DEMOGOD
+# start sector 282 x/y/z/angle {'x': -31259, 'y': 7191, 'z': -172608, 'ang': 256, 'sector': 282}
+-31259 7191 wait 26 # allow spawn/fall/start lift to settle
+# key sprite 210 sector 189 palette 21 tag 0
+-30400 7552 # sector 282, portal wall 1717 to 308
+-30016 7552 # sector 308, width 1280, rise 0, clear 128
+-27392 11328 # sector 308, portal wall 1905 to 304
+-27392 11712 # sector 304, width 10752, rise 0, clear 128
+-23424 12096 fire # sector 304, portal wall 1879 to 305
+-23424 12480 fire # sector 305, width 1024, rise -712, clear 192
+-23424 12736 # transporter 85 tag 252 sector 305 to 289
+9216 41664 wait 26 # transporter destination 625
+9085 41930 # sector 289, portal wall 1750 to 290
+8984 42233 # sector 290, width 1214, rise 0, clear 172
+8620 41558 # sector 290, portal wall 1755 to 292
+8276 41386 # sector 292, width 1145, rise 0, clear 172
+13576 43370 # sector 292, portal wall 1772 to 199
+13816 43670 # sector 199, width 1639, rise 0, clear 1847
+13632 60000
+13224 61000
+13224 62000 # pass west of hydrant457
+13632 63296 # sector 199, portal wall 1130 to 170
+14016 63296 # sector 170, width 1408, rise 0, clear 1788
+16000 63296
+16000 59000
+16384 58944 # sector 170, portal wall 960 to 7
+16384 58624 # sector 7, width 1024, rise 0, clear 128
+16384 58720 use # sector 7, portal wall 36 to 133
+16384 58432 use # sector 133, width 1024, rise 0, clear 64
+16384 58240 # sector 133, portal wall 618 to 132
+16384 57856 # sector 132, width 1024, rise 0, clear 64
+16384 57984 # sector 132, portal wall 616 to 131
+16384 57728 # sector 131, width 1024, rise 0, clear 64
+16384 57760 # sector 131, portal wall 612 to 8
+16384 57536 # sector 8, width 1024, rise 0, clear 64
+16704 57216 # sector 8, portal wall 39 to 9
+17088 57216 # sector 9, width 1024, rise 8, clear 88
+16960 57216 # sector 9, portal wall 44 to 11
+17344 57216 # sector 11, width 1024, rise 8, clear 80
+17216 57216 # sector 11, portal wall 52 to 10
+17600 57216 # sector 10, width 1024, rise 8, clear 72
+17472 57216 # sector 10, portal wall 50 to 128
+17856 57216 # sector 128, width 1024, rise 8, clear 64
+17728 57216 # sector 128, portal wall 596 to 129
+18112 57216 # sector 129, width 1024, rise 0, clear 64
+17984 57216 # sector 129, portal wall 600 to 130
+18368 57216 # sector 130, width 1024, rise 0, clear 64
+18496 57216 use # sector 130, portal wall 608 to 153
+18880 57216 use # sector 153, width 1024, rise 0, clear 64
+23733 55221
+23733 54475
+20990 53982
+19968 53504
+19968 51008 # sector 153, portal wall 804 to 18
+19968 50624 # sector 18, width 1024, rise 12, clear 80
+19832 50184 # sector 18, portal wall 83 to 107
+20104 49912 # sector 107, width 1448, rise 12, clear 68
+20288 50048 # sector 107, portal wall 511 to 108
+20672 50048 # sector 108, width 1024, rise 0, clear 68
+20710 49933 # sector 108, portal wall 515 to 15
+21018 50163 # sector 15, width 1280, rise 0, clear 68
+21546 49900 # sector 15, portal wall 73 to 17
+21718 49556 # sector 17, width 859, rise 0, clear 68
+22016 49728 # sector 17, portal wall 79 to 5
+22016 49344 # sector 5, width 1536, rise 0, clear 68
+22016 49344 # sector 5, portal wall 28 to 100
+22016 48960 # sector 100, width 1536, rise 0, clear 68
+22016 48064 # sector 100, portal wall 470 to 99
+22016 47680 # sector 99, width 1536, rise 0, clear 96
+22016 46784 # sector 99, portal wall 464 to 80
+22016 46400 # sector 80, width 1536, rise 0, clear 124
+22356 46166 # sector 80, portal wall 380 to 325
+22700 45994 # sector 325, width 1145, rise 0, clear 124
+23681 45971 # sector 325, portal wall 2002 to 324
+24063 45933 # sector 324, width 1286, rise 0, clear 124
+25408 45568 # sector 324, portal wall 1995 to 101
+25792 45568 # sector 101, width 1024, rise 0, clear 64
+26176 45568 # sector 101, portal wall 474 to 102
+26560 45568 # sector 102, width 1024, rise 0, clear 64
+26880 45888 # sector 102, portal wall 490 to 140
+26880 46272 # sector 140, width 1024, rise 0, clear 104
+26880 46208 # sector 140, portal wall 659 to 143
+26880 46592 # sector 143, width 1018, rise 0, clear 104
+27198 46864 # sector 143, portal wall 681 to 144
+27200 47150 # follow slope across thin sector144
+27200 47450
+26881 47873 # sector 141, width 1018, rise -4, clear 100
+26880 49216 # sector 141, portal wall 669 to 37
+26880 49600 # sector 37, width 1024, rise 8, clear 96
+26905 49475 # sector 37, portal wall 172 to 36
+26759 49829 # sector 36, width 1024, rise 8, clear 88
+26829 49724 # sector 36, portal wall 170 to 35
+26557 49996 # sector 35, width 1024, rise 8, clear 88
+26662 49926 # sector 35, portal wall 166 to 34
+26308 50072 # sector 34, width 1024, rise 8, clear 88
+26432 50048 # sector 34, portal wall 162 to 33
+26048 50048 # sector 33, width 1024, rise 8, clear 88
+26173 50072 # sector 33, portal wall 158 to 32
+25819 49926 # sector 32, width 1024, rise 8, clear 88
+25924 49996 # sector 32, portal wall 154 to 31
+25652 49724 # sector 31, width 1024, rise 8, clear 88
+25722 49829 # sector 31, portal wall 150 to 30
+25576 49475 # sector 30, width 1024, rise 8, clear 88
+25600 49600 # sector 30, portal wall 146 to 55
+25600 49280 # sector 55, width 1024, rise 8, clear 88
+25600 49376 # sector 55, portal wall 247 to 54
+25600 49088 # sector 54, width 1024, rise 0, clear 96
+25575 49213 # sector 54, portal wall 240 to 53
+25721 48859 # sector 53, width 1024, rise 8, clear 88
+25643 48955 # sector 53, portal wall 238 to 52
+25914 48683 # sector 52, width 1049, rise 8, clear 88
+25818 48762 # sector 52, portal wall 234 to 51
+26172 48616 # sector 51, width 1024, rise 8, clear 88
+26048 48640 # sector 51, portal wall 230 to 50
+26432 48640 # sector 50, width 1024, rise 8, clear 88
+26307 48616 # sector 50, portal wall 226 to 49
+26661 48762 # sector 49, width 1024, rise 8, clear 88
+26556 48692 # sector 49, portal wall 222 to 48
+26828 48964 # sector 48, width 1024, rise 8, clear 88
+26758 48859 # sector 48, portal wall 218 to 47
+26904 49213 # sector 47, width 1024, rise 8, clear 88
+26880 49088 # sector 47, portal wall 214 to 46
+26880 49408 # sector 46, width 1024, rise 8, clear 88
+26882 49310 # sector 46, portal wall 211 to 45
+26882 49630 # sector 45, width 1024, rise 0, clear 96
+26907 49505 # sector 45, portal wall 204 to 44
+26761 49859 # sector 44, width 1024, rise 8, clear 88
+26831 49754 # sector 44, portal wall 202 to 43
+26559 50026 # sector 43, width 1024, rise 8, clear 88
+26664 49956 # sector 43, portal wall 198 to 42
+26310 50102 # sector 42, width 1024, rise 8, clear 88
+26434 50078 # sector 42, portal wall 194 to 41
+26050 50078 # sector 41, width 1024, rise 8, clear 88
+26175 50102 # sector 41, portal wall 190 to 40
+25821 49956 # sector 40, width 1024, rise 8, clear 88
+25926 50026 # sector 40, portal wall 186 to 39
+25654 49754 # sector 39, width 1024, rise 8, clear 88
+25724 49859 # sector 39, portal wall 182 to 38
+25578 49505 # sector 38, width 1024, rise 8, clear 88
+25602 49630 # sector 38, portal wall 178 to 56
+25602 49246 # sector 56, width 1024, rise 8, clear 88
+25024 48896 # sector 56, portal wall 253 to 151
+24640 48896 # sector 151, width 1024, rise 0, clear 112
+23488 48640 # sector 151, portal wall 775 to 193
+23104 48640 # sector 193, width 1536, rise 0, clear 112
+22016 47232 jump # sector 193, portal wall 1081 to 189
+22016 46848 jump # sector 189, width 1920, rise 24, clear 192
+21568 46848 # collect key palette 21; may be picked up from adjacent sector
+# switch sprite 163 sector 245 palette 21 tag 204
+22016 46848 # sector 189, portal wall 1054 to 193
+22016 47232 # sector 193, width 1920, rise -24, clear 192
+23104 48640 # sector 193, portal wall 1084 to 151
+23488 48640 # sector 151, width 1536, rise 0, clear 112
+24640 48896 # sector 151, portal wall 773 to 56
+25024 48896 # sector 56, width 1024, rise 0, clear 112
+25602 49246 # sector 56, portal wall 251 to 38
+25602 49630 # sector 38, width 1024, rise -8, clear 88
+25578 49505 # sector 38, portal wall 176 to 39
+25724 49859 # sector 39, width 1024, rise -8, clear 88
+25654 49754 # sector 39, portal wall 180 to 40
+25926 50026 # sector 40, width 1024, rise -8, clear 88
+25821 49956 # sector 40, portal wall 184 to 41
+26175 50102 # sector 41, width 1024, rise -8, clear 88
+26050 50078 # sector 41, portal wall 188 to 42
+26434 50078 # sector 42, width 1024, rise -8, clear 88
+26310 50102 # sector 42, portal wall 192 to 43
+26664 49956 # sector 43, width 1024, rise -8, clear 88
+26559 50026 # sector 43, portal wall 196 to 44
+26831 49754 # sector 44, width 1024, rise -8, clear 88
+26761 49859 # sector 44, portal wall 200 to 45
+26907 49505 # sector 45, width 1024, rise -8, clear 88
+26882 49630 # sector 45, portal wall 206 to 46
+26882 49310 # sector 46, width 1024, rise 0, clear 96
+26880 49408 # sector 46, portal wall 209 to 47
+26880 49088 # sector 47, width 1024, rise -8, clear 88
+26904 49213 # sector 47, portal wall 212 to 48
+26758 48859 # sector 48, width 1024, rise -8, clear 88
+26828 48964 # sector 48, portal wall 216 to 49
+26556 48692 # sector 49, width 1024, rise -8, clear 88
+26661 48762 # sector 49, portal wall 220 to 50
+26307 48616 # sector 50, width 1024, rise -8, clear 88
+26432 48640 # sector 50, portal wall 224 to 51
+26048 48640 # sector 51, width 1024, rise -8, clear 88
+26172 48616 # sector 51, portal wall 228 to 52
+25818 48762 # sector 52, width 1024, rise -8, clear 88
+25914 48683 # sector 52, portal wall 232 to 53
+25643 48955 # sector 53, width 1049, rise -8, clear 88
+25721 48859 # sector 53, portal wall 236 to 54
+25575 49213 # sector 54, width 1024, rise -8, clear 88
+25600 49088 # sector 54, portal wall 242 to 55
+25600 49376 # sector 55, width 1024, rise 0, clear 96
+25600 49280 # sector 55, portal wall 245 to 30
+25600 49600 # sector 30, width 1024, rise -8, clear 88
+25576 49475 # sector 30, portal wall 144 to 31
+25722 49829 # sector 31, width 1024, rise -8, clear 88
+25652 49724 # sector 31, portal wall 148 to 32
+25924 49996 # sector 32, width 1024, rise -8, clear 88
+25819 49926 # sector 32, portal wall 152 to 33
+26173 50072 # sector 33, width 1024, rise -8, clear 88
+26048 50048 # sector 33, portal wall 156 to 34
+26432 50048 # sector 34, width 1024, rise -8, clear 88
+26308 50072 # sector 34, portal wall 160 to 35
+26662 49926 # sector 35, width 1024, rise -8, clear 88
+26557 49996 # sector 35, portal wall 164 to 36
+26829 49724 # sector 36, width 1024, rise -8, clear 88
+26759 49829 # sector 36, portal wall 168 to 37
+26905 49475 # sector 37, width 1024, rise -8, clear 88
+26880 49600 # sector 37, portal wall 174 to 141
+26880 49216 # sector 141, width 1024, rise -8, clear 96
+26881 47873 # sector 141, portal wall 665 to 142
+26881 47489 # sector 142, width 1018, rise 4, clear 100
+27200 47450 # return across the slope
+27200 47150
+27198 46864
+26880 46592 # sector 143, portal wall 680 to 140
+26880 46208 # sector 140, width 1018, rise 0, clear 104
+26880 46272 # sector 140, portal wall 662 to 102
+26880 45888 # sector 102, width 1024, rise 0, clear 104
+26560 45568 # sector 102, portal wall 491 to 101
+26176 45568 # sector 101, width 1024, rise 0, clear 64
+25792 45568 # sector 101, portal wall 481 to 324
+25408 45568 # sector 324, width 1024, rise 0, clear 64
+24406 44844 # sector 324, portal wall 1993 to 268
+24234 44500 # sector 268, width 2862, rise 0, clear 124
+20796 43686 # sector 268, portal wall 1629 to 234
+20420 43610 # sector 234, width 3916, rise 0, clear 252
+19163 48677 # sector 234, portal wall 1353 to 126
+18936 48904 # sector 126, width 1086, rise 0, clear 64
+19016 48824 use # call the raised lift
+19016 48824 wait 156
+18835 49005 # sector 121, width 1086, rise 0, clear 64
+18861 48979 jump # sector 121, portal wall 570 to 59
+18680 49160 jump # sector 59, width 1086, rise 124, clear -60
+18432 49408 # stand on lift before triggering
+18432 49408 use # one pulse triggers lift
+18432 49408 wait 156 # allow lift to reach upper landing
+18184 49656 # sector 59, portal wall 266 to 77
+17957 49883 # sector 77, width 1086, rise 0, clear 64
+18043 49797 # sector 77, portal wall 367 to 244
+17816 50024 # sector 244, width 1086, rise 0, clear 64
+18165 50848 # sector 244, portal wall 1424 to 245
+18379 51168 # sector 245, width 1154, rise 0, clear 128
+17024 55424 # face sprite 163
+17024 55616 # reach usable side before pulsing
+17024 55616 use # switch; stand192 away from wall sprite
+17024 55616 wait 78 # allow access animation/door motion
+# Start after red access panel204, near17024,55616 in sector245.
+# Use the intended upper path; TOUCHPLATE297 automatically detonates/open247/248.
+17504 55104 # position north of left door leaf; floor69 initializes to same -92 as245
+17504 55616 # face south toward sector240 before pulsing use
+17504 55616 use # unlocked sliding door240, paired with241 (SE15 hitag299)
+17504 55616 wait 78
+17504 56320 # through open left leaf into120
+17792 56960 # sector120; floor-92
+17472 56960 # face west toward raised sector253
+17056 57152 jump # up56 into253; avoid the small inner sector97 hole
+17056 57152 wait 104 # land/on_ground triggers TOUCHPLATE526/tag297; let blast finish
+15680 57024 # stay north of sector97; approach upper blast sector248
+15200 57024 # cross reopened248 (8-unit rise), into250
+14880 58080 # enter249 on upper floor-148
+14880 60224
+14880 60672 # sector184, west side of second sliding door
+15168 60672 # face east toward leaf237
+15168 60672 use # second sliding door237/236, SE15 hitag0
+15168 60672 wait 78
+15808 60672 # cross238->237->239 into upper220; floor falls52 to-96
+15808 60928
+16384 60928 jump # up52 onto floor-sprite bridge420, z=-37888
+17920 60928 # floor-sprite bridge421
+19100 60928 # exit ledge154 at floor-148; continue existing exit-corridor waypoints
+
+19520 60928 # sector 154, portal wall 833 to 122
+19904 60928 # sector 122, width 1024, rise 0, clear 168
+21056 60928 # sector 122, portal wall 574 to 123
+21440 60928 # sector 123, width 1024, rise 0, clear 64
+21568 60928 # sector 123, portal wall 577 to 125
+21856 60928 # sector 125, width 1024, rise 0, clear 64
+21760 60928 fire # sector 125, portal wall 586 to 124
+21984 60928 fire # sector 124, width 768, rise 16, clear 40
+21824 60928 crouch
+21824 60928 use crouch # nuke faces west; press from corridor125
+21824 60928 wait 260 # wait for fist/level exit

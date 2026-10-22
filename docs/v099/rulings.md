@@ -73,6 +73,7 @@ Each names what was decided, why, and what it costs if it turns out wrong.
   recording changes its header and state.
 - **Task 11: extend optional route input for required map actions.** The original
   maps contain underwater transitions and combat that the initial use/fire/jump/wait
-  format cannot author. Added crouch/dive, timed fire and weapon-key selection to
+  format cannot author. Added crouch/dive, timed fire, weapon-key selection, stationary facing and
+  use while crouching to
   the optional bot; these remain ordinary recorded input. Cost if wrong: route
   authoring changes, while DOS playback remains the reference.

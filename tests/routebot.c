@@ -24,13 +24,18 @@ int main(void)
     for(i=0;i<26*60;i++) CHECK(routebot_next(0,0,0,&in)==1);
     CHECK(routebot_next(0,0,0,&in)==-1);
     f=fopen("routebot-test.route","w");
-    fputs("0 0 crouch\n0 0 fire 3\n0 0 weapon 3\n",f); fclose(f);
+    fputs("0 0 crouch\n0 0 fire 3\n0 0 weapon 3\n0 0 use crouch\n0 0 face 512\n0 0 face 0\n",f); fclose(f);
     CHECK(routebot_load("routebot-test.route"));
     CHECK(routebot_next(0,0,0,&in)==1 && (in.bits&2));
     CHECK(routebot_next(0,0,0,&in)==1 && (in.bits&4));
     CHECK(routebot_next(0,0,0,&in)==1 && (in.bits&4));
     CHECK(routebot_next(0,0,0,&in)==1 && (in.bits&4));
     CHECK(routebot_next(0,0,0,&in)==1 && ((in.bits>>8)&15)==3);
+    CHECK(routebot_next(0,0,0,&in)==1 && (in.bits&2) && (in.bits&(1u<<29)));
+    CHECK(routebot_next(0,0,0,&in)==1 && in.avel>0 && in.fvel==0);
+    CHECK(routebot_next(0,0,512,&in)==1 && in.avel==0);
+    CHECK(routebot_next(0,0,512,&in)==1 && in.avel<0);
+    CHECK(routebot_next(0,0,0,&in)==1 && in.avel==0);
     CHECK(routebot_next(0,0,0,&in)==0);
     remove("routebot-test.route"); return failures!=0;
 }

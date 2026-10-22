@@ -19,12 +19,13 @@ Each nonblank line is an absolute map coordinate:
 
 ```
 x y
-x y use
+x y use [crouch]
 x y fire [tics]
 x y jump
 x y crouch
 x y wait tics
 x y weapon 1-10
+x y face angle
 ```
 
 Comments start with `#`. Coordinates within 128 map units count as reached.
@@ -32,8 +33,11 @@ The bot moves toward each point and turns to face it. `use` pulses the use key
 while approaching and presses it on arrival; `fire` holds fire; `jump` pulses
 jump once per second and on arrival. `wait` stops at the point for the specified
 positive number of simulation tics (26 per second). `crouch` holds crouch/dive
-while approaching. `fire tics` keeps firing for that many tics on arrival.
-`weapon n` selects the normal numbered weapon key (1 is kick, 2 pistol, 3 shotgun). Use points on both sides of
+while approaching. `use crouch` presses use while crouching for low switches.
+`fire tics` keeps firing for that many tics on arrival.
+`weapon n` selects the normal numbered weapon key (1 is kick, 2 pistol, 3 shotgun).
+`face angle` turns in place after reaching the point, using Build angles0–2047
+(0 east,512 south,1024 west,1536 north), within8 angle units. Use points on both sides of
 a doorway to guide movement through it. A route may contain at most 4096 points.
 
 The bot authors input. Its result is not reference evidence: play the resulting

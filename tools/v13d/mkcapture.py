@@ -112,6 +112,10 @@ elif len(sys.argv) > 5 and sys.argv[5] == 'firsttic':
     k = calls[1] if len(calls) > 1 else calls[0]; wr(k + 1, struct.pack('<i', cave - (k + 5))); print(f'diagnostic: call at {k:#x} -> cave')
 else:
     wr(jnz + 2, struct.pack('<i', cave - (jnz + 6)))
+if sys.argv[1] == 'sw099':
+    # Playback returns on MODE_EOL before reaching the normal record-end branch.
+    assert rd(0x2a8ab, 13) == bytes.fromhex('240825ff0000000f85fd000000')
+    wr(0x2a8b4, struct.pack('<i', cave - 0x2a8b8))
 if 'demogod' in sys.argv[5:]:
     assert sys.argv[1] == 'sw099', 'demogod is a beta reference option'
     # checkcommandline: xor ah,ah; ...; mov byte [god],ah. No later reset.

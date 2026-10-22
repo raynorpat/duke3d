@@ -611,6 +611,20 @@ if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3
     set_tests_properties(game_boot_${_vold_name} PROPERTIES TIMEOUT 240)
   endif()
   if(_vold_data AND _vold_edition STREQUAL "sw099")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_demo_refs.cmake")
+    foreach(_level RANGE 1 6)
+      if(EXISTS "${_vold_data}/refdemos/E1L${_level}.DMO")
+        add_test(NAME demo_sync_v099_sw_e1l${_level}
+          COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
+            "-DDATA=${_vold_data}" -DEDITION=sw099 -DDEMO=1 "-DREFNAME=E1L${_level}"
+            "-DDEMOFILE=${_vold_data}/refdemos/E1L${_level}.DMO"
+            "-DDEMOGOD=${V13D_DEMO_SW099_E1L${_level}_DEMOGOD}"
+            "-DREFS=${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_demo_refs.cmake"
+            "-DWORK=${CMAKE_BINARY_DIR}/ds_v099_e1l${_level}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
+        set_tests_properties(demo_sync_v099_sw_e1l${_level} PROPERTIES TIMEOUT 400)
+      endif()
+    endforeach()
     if(DUKE3D_ROUTEBOT)
       add_test(NAME routebot_record_v099_sw
         COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"

@@ -28,6 +28,12 @@ int routebot_load(const char *path)
         else if(n==3 && !strcmp(action,"fire")) points[count].action=2;
         else if(n==3 && !strcmp(action,"jump")) points[count].action=3;
         else if(n==3 && !strcmp(action,"crouch")) points[count].action=5;
+        else if(n==4 && !strcmp(action,"use") && !strcmp(argument,"crouch")) points[count].action=7;
+        else if(n==4 && !strcmp(action,"face")) {
+            long value=strtol(argument,&end,10);
+            if(*end || value<0 || value>2047) goto bad;
+            tics=value; points[count].action=8;
+        }
         else if(n==4 && (!strcmp(action,"wait") || !strcmp(action,"fire") || !strcmp(action,"weapon"))) {
             long value=strtol(argument,&end,10);
             if(*end || value<=0 || value>INT_MAX) goto bad;
@@ -57,14 +63,20 @@ int routebot_next(int32_t x,int32_t y,short angle,input *out)
             fprintf(stderr,"route waypoint %d timed out at %d %d (target %d %d)\n",current+1,x,y,p->x,p->y);
             return -1;
         }
-        if(p->action==1 && (elapsed&1)) out->bits|=1u<<29;
+        if((p->action==1 || p->action==7) && (elapsed&1)) out->bits|=1u<<29;
         if(p->action==2) out->bits|=1u<<2;
         if(p->action==3 && (elapsed%26)==1) out->bits|=1;
-        if(p->action==5) out->bits|=2;
+        if(p->action==5 || p->action==7) out->bits|=2;
         if(p->action==6) out->bits|=(unsigned)p->tics<<8;
         if(dist<=128)
         {
-            if(p->action==1) out->bits|=1u<<29;
+            if(p->action==8) {
+                turn=((p->tics+1024-angle)&2047)-1024;
+                out->avel=min(max(turn/8,-64),64);
+                if(klabs(turn)>=8) return 1;
+                out->avel=0;
+            }
+            if(p->action==1 || p->action==7) out->bits|=1u<<29;
             if(p->action==3) out->bits|=1;
             if((p->action==4 || (p->action==2 && p->tics)) && ++waiting<p->tics) return 1;
             printf("ROUTE waypoint %d reached at %d %d\n",current+1,x,y);
