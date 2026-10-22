@@ -1001,7 +1001,11 @@ void prelevel(char g)
             case W_FORCEFIELD+2:
                 if(wal->shade > 31)
                     wal->cstat = 0;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                else wal->cstat |= 85;
+#else
                 else wal->cstat |= 85+256;
+#endif
 
 
                 if(wal->lotag && wal->nextwall >= 0)

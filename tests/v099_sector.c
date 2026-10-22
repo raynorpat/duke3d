@@ -119,6 +119,12 @@ int main(void)
     check("lockout first picture",wall[0].picnum,VIEWSCREENBROKE);
     check("lockout second picture",wall[1].picnum,VIEWSCREENBROKE);
     check("lockout third picture",wall[2].picnum,VIEWSCREENBROKE);
+    setup(); wall[0].overpicnum=wall[1].overpicnum=wall[2].overpicnum=W_FORCEFIELD+1;
+    wall[1].cstat=256; wall[2].cstat=341; wall[2].shade=32;
+    prelevel(MODE_GAME);
+    check("forcefield keeps original texture orientation",wall[0].cstat,85);
+    check("forcefield preserves mapped flip",wall[1].cstat,341);
+    check("disabled forcefield clears all flags",wall[2].cstat,0);
     setup(); wall[0].overpicnum=MIRROR; wall[0].cstat=16;
     checkhitwall(projectile,0,0,512,0,HYDRENT);
     check("hydrant does not break mirror",wall[0].overpicnum,MIRROR);
