@@ -297,7 +297,26 @@ int main(void)
         fclose(f);
         text[n] = 0;
         check("page pending writes Supersampling 4k", strstr(text, "Supersampling = \"4k\"") != NULL, 1);
+
+        /* The page opened again during that fade keeps the change to save. */
+        video_pagebegin();
+        video_requestsupersample(SS_2K);
+        video_pagetouch(VROW_SUPERSAMPLING);
+        video_pagebegin();
+        video_flushpending();
+        check("page reopened while pending: saved", GLSupersampling, SS_2K);
 #endif
+
+        /* DISPLAY saves the choice, not the mode in effect (a fallback from
+           fullscreen, or BUILD_WINDOWED): here no window, so borderless. */
+        DisplayMode = DISPLAY_WINDOWED;
+        video_pagebegin();
+        video_pagesetdisplay(DISPLAY_EXCLUSIVE);
+        check("page DISPLAY in effect differs", getvideodisplaymode() != DISPLAY_EXCLUSIVE, 1);
+        check("page DISPLAY saves the choice", DisplayMode, DISPLAY_EXCLUSIVE);
+        check("page DISPLAY steps from the choice", video_pagegetdisplay(), DISPLAY_EXCLUSIVE);
+        video_pagebegin();
+        check("page DISPLAY reopened: in effect", video_pagegetdisplay(), getvideodisplaymode());
         remove(cfg);
         while ((slash = strrchr(cfg, '/')) != NULL) {
             *slash = 0;

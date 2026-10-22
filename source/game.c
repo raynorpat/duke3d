@@ -2470,6 +2470,7 @@ static void video_toggle(int mode)
 // the file's at once (as F11).
 static videoopts_t video_page;
 static int32_t video_pagecopy;
+static int32_t video_pagedisplay = -1;  // DISPLAY's choice, saved even when not in effect
 
 static void video_configvals(videovals_t *v)
 {
@@ -2497,7 +2498,8 @@ static void video_pagesettle(int now)
     {
         video_configvals(&inuse);
         inuse.renderer = gamerenderer;
-        inuse.displaymode = getvideodisplaymode();
+        // the choice, not a fallback from fullscreen or BUILD_WINDOWED's window
+        inuse.displaymode = (video_pagedisplay >= 0) ? video_pagedisplay : getvideodisplaymode();
         inuse.width = gamewidth;
         inuse.height = gameheight;
         inuse.vsync = getvideovsync();
@@ -2520,13 +2522,31 @@ static void video_pagesettle(int now)
     }
 }
 
-// Opening the page.
+// Opening the page. While a change is still to be saved (opened again
+// during its fade), what's kept so far stays, so the save isn't lost.
 void video_pagebegin(void)
 {
     videovals_t saved;
 
+    if (video_pagecopy)
+        return;
     video_configvals(&saved);
     videoopts_begin(&video_page,&saved);
+    video_pagedisplay = -1;
+}
+
+// DISPLAY chosen (DISPLAY_*), after asking for it: saved as chosen.
+void video_pagesetdisplay(int mode)
+{
+    video_pagedisplay = mode;
+    video_pagetouch(VROW_DISPLAYMODE);
+}
+
+// The display mode DISPLAY steps from: the one chosen on the page, else the
+// one in effect.
+int video_pagegetdisplay(void)
+{
+    return (video_pagedisplay >= 0) ? video_pagedisplay : getvideodisplaymode();
 }
 
 // The player changed row (VROW_*), after asking for the change: saved.
@@ -9230,8 +9250,8 @@ int main(int argc,char **argv)
     {
         printf("\nVESA driver for ( %d * %d ) not found/supported!\n",xdim,ydim);
         ScreenMode = 2;
-        gamewidth = ScreenWidth = 320;
-        gameheight = ScreenHeight = 200;
+        gamewidth = 320;  // for this run: duke3d.cfg keeps its size
+        gameheight = 200;
         setgamemoderenderer(0);
     }
 // CTW END - MODIFICATION

@@ -284,6 +284,8 @@ extern void video_flushpending(void);
 extern int video_pending(void);
 extern void video_pagebegin(void);
 extern void video_pagetouch(int row);
+extern void video_pagesetdisplay(int mode);
+extern int video_pagegetdisplay(void);
 extern short EGS(short whatsect, int32_t s_x, int32_t s_y, int32_t s_z, short s_pn, signed char s_s, signed char s_xr, signed char s_yr, short s_a, short s_ve, int32_t s_zv, short s_ow, signed char s_ss);
 extern char wallswitchcheck(short i);
 extern short spawn(short j, short pn);

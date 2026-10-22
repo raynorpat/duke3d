@@ -3215,7 +3215,7 @@ void menus(void)
                 filtergrey = !(filteravail[TEXFILTER_BILINEAR] || filteravail[TEXFILTER_TRILINEAR]);
                 video_getmode(&gw,&gh);
                 nres = videopage_reslist(display,gw,gh,res);
-                c = 32;  // labels; values from vx
+                c = 46;  // labels (the cursor all on screen at 4:3); values from vx
                 vx = c+144;
 
                 rotatesprite(320<<15,10<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
@@ -3275,14 +3275,16 @@ void menus(void)
                             }
                             break;
                         case 1:
-                            i = videopage_next(display,dir,DISPLAY_COUNT,displayavail);
-                            if(i != display)
+                            // from the last choice, which a fallback (from
+                            // fullscreen, or BUILD_WINDOWED) doesn't change
+                            i = videopage_next(video_pagegetdisplay(),dir,DISPLAY_COUNT,displayavail);
+                            if(i != video_pagegetdisplay())
                             {
                                 int32 w = gw, h = gh;
 
                                 videopage_modesize(i,&w,&h);
                                 video_requestmode(i,w,h);
-                                video_pagetouch(VROW_DISPLAYMODE);
+                                video_pagesetdisplay(i);
                                 if(w != gw || h != gh)
                                     video_pagetouch(VROW_RESOLUTION);
                             }
