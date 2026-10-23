@@ -9330,23 +9330,6 @@ static const struct { int32_t size; uint32_t crc; int build; const char *name; }
 #define OWNGRP GRP_15
 #endif
 
-uint32_t grpcrc32(uint32_t crc, const unsigned char *buf, size_t n)
-{
-    static uint32_t table[256];
-    uint32_t c;
-    int i, j;
-
-    if (table[1] == 0)
-        for (i = 0; i < 256; i++)
-        {
-            for (c = i, j = 0; j < 8; j++) c = (c & 1) ? 0xEDB88320 ^ (c >> 1) : c >> 1;
-            table[i] = c;
-        }
-    crc = ~crc;
-    while (n--) crc = table[(crc ^ *buf++) & 255] ^ (crc >> 8);
-    return ~crc;
-}
-
 // A renderer number from duke3d.cfg or -renderer, limited to 0 (classic)
 // through 3 (Polymost OpenGL).
 int clamprenderer(int32_t r)

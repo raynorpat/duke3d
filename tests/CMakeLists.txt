@@ -1070,3 +1070,10 @@ add_test(NAME input_render COMMAND input_render)
 set_tests_properties(input_render PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
   TIMEOUT 30)
+
+add_executable(game_profile game_profile.c)
+target_link_libraries(game_profile PRIVATE duke3d_profile)
+add_test(NAME game_profile COMMAND game_profile "${CMAKE_CURRENT_BINARY_DIR}/profile-test.grp")
+add_executable(game_version_args game_version_args.c)
+target_link_libraries(game_version_args PRIVATE duke3d_profile)
+add_test(NAME game_version_args COMMAND game_version_args)

@@ -37,6 +37,10 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(Dependencies)
 include(CompileOptions)
 
+add_library(duke3d_profile STATIC source/gameprofile.c source/gameversion.c)
+target_include_directories(duke3d_profile PUBLIC "${PROJECT_SOURCE_DIR}/source")
+target_compile_features(duke3d_profile PUBLIC c_std_99)
+
 enable_testing()
 
 add_subdirectory(source/build)
