@@ -102,6 +102,56 @@ static void camera(const char *name,int x,int z,int angle,int horizon)
     check(name,globalhoriz,horizon);
 }
 
+/* Carry the player through a real SE0 quarter turn before rendering half a
+   tic later. DOS 0x15b73 sets the flag; 0x21cee/0x21f70 selects the current
+   camera (0,2048,9216; angle 512, horizon 126), while the walls still interpolate. */
+static void movingsector(void)
+{
+    struct player_struct *p=reset();
+    int i,pivot=insertsprite(0,3);
+    uint32_t actual,reference;
+
+    memset(&sprite[pivot],0,sizeof(sprite[pivot]));
+    memset(&hittype[pivot],0,sizeof(hittype[pivot]));
+    sprite[pivot].sectnum=0; sprite[pivot].statnum=3;
+    sprite[pivot].picnum=SECTOREFFECTOR; sprite[pivot].lotag=1;
+    sprite[pivot].owner=pivot; sprite[pivot].cstat=32768;
+    hittype[pivot].temp_data[0]=1;
+    changespritestat(other,3);
+    sprite[other].picnum=SECTOREFFECTOR; sprite[other].lotag=0;
+    sprite[other].x=sprite[other].y=0; sprite[other].owner=pivot;
+    memset(&hittype[other],0,sizeof(hittype[other]));
+    sector[0].floorstat=64; sector[0].extra=4096;
+    p->posx=p->oposx=2048; p->on_ground=1;
+    p->oposz=4096; p->horiz=120; p->ohoriz=80;
+    p->horizoff=6; p->ohorizoff=2;
+    for(i=0;i<4;i++)
+    {
+        msx[i]=wall[i].x; msy[i]=wall[i].y;
+        setinterpolation(&wall[i].x); setinterpolation(&wall[i].y);
+    }
+    moveeffectors();
+    check("rotating sector carries x",p->posx,0);
+    check("rotating sector carries y",p->posy,2048);
+    check("rotating sector retains previous x",p->oposx,2048);
+    check("rotating sector marks player",p->on_sector_effector,1);
+    check("rotating sector moves walls",wall[0].x,8192);
+    clearallviews(0); displayrooms(0,32768);
+    check("moving-sector camera current x",globalposx,0);
+    check("moving-sector camera current y",globalposy,2048);
+    check("moving-sector camera current angle",globalang,512);
+    check("moving-sector camera current z",globalposz,9216);
+    check("moving-sector camera current horizon",globalhoriz,126);
+    actual=frame();
+    clearallviews(0); dointerpolations(32768);
+    drawrooms(0,2048,9216,512,126,0); drawmasks();
+    restoreinterpolations(); reference=frame();
+    check("moving-sector rendered frame matches DOS camera",actual==reference,1);
+    numinterpolations=0;
+    changespritestat(other,0); deletesprite(pivot);
+    sector[0].floorstat=0; sector[0].extra=0;
+}
+
 int main(int argc,char **argv)
 {
     struct player_struct *p;
@@ -134,8 +184,10 @@ int main(int argc,char **argv)
     p=reset(); sprite[player].pal=1;
     camera("no later shrink palette offset",0,9216,0,100);
 
-    p=reset(); p->over_shoulder_on=1;
-    camera("third person height",-2048,5120,0,100);
+    movingsector();
+
+    p=reset(); p->on_sector_effector=1; p->over_shoulder_on=1;
+    camera("moving-sector third person height",-2048,5120,0,100);
     p=reset(); p->over_shoulder_on=1; p->posz=p->oposz=-16000;
     camera("third person ceiling clearance",-2048,-11264,0,100);
     p=reset(); p->over_shoulder_on=1; p->posz=p->oposz=19000;

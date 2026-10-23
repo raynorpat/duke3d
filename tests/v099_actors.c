@@ -61,9 +61,42 @@ static int transporter(int floor)
     hittype[dest].temp_data[0]=100;
     return src;
 }
+static void movingsectorflags(void)
+{
+    int i,j,pivot;
+
+    setup(); i=actor(SECTOREFFECTOR,3); sprite[i].lotag=0;
+    pivot=actor(SECTOREFFECTOR,3); sprite[pivot].lotag=1; sprite[pivot].owner=pivot;
+    hittype[pivot].temp_data[0]=1; sprite[i].owner=pivot;
+    sector[0].floorstat=64; sector[0].extra=4096;
+    ps[0].on_ground=1; ps[0].posx=1024;
+    for(j=0;j<4;j++) { msx[j]=wall[j].x-512; msy[j]=wall[j].y-512; }
+    moveeffectors();
+    check("SE0 marks carried player",ps[0].on_sector_effector,1);
+    ps[0].on_sector_effector=0; ps[0].on_ground=0; moveeffectors();
+    check("SE0 ignores airborne player",ps[0].on_sector_effector,0);
+
+    setup(); i=actor(SECTOREFFECTOR,3); sprite[i].lotag=14; sprite[i].xvel=32;
+    j=actor(LOCATORS,7); sprite[j].x=16384; sprite[i].owner=j;
+    for(j=0;j<4;j++) { msx[j]=wall[j].x-512; msy[j]=wall[j].y-512; }
+    moveeffectors();
+    check("SE14 marks carried player",ps[0].on_sector_effector,1);
+    ps[0].on_sector_effector=0; sprite[i].extra=0; moveeffectors();
+    check("SE14 extra zero does not carry",ps[0].on_sector_effector,0);
+
+    setup(); i=actor(SECTOREFFECTOR,3); sprite[i].lotag=30; sprite[i].xvel=16;
+    j=actor(LOCATORS,7); sprite[j].x=16384; sprite[i].owner=j;
+    for(j=0;j<4;j++) { msx[j]=wall[j].x-512; msy[j]=wall[j].y-512; }
+    moveeffectors();
+    check("SE30 marks carried player",ps[0].on_sector_effector,1);
+    ps[0].on_sector_effector=0; sprite[i].xvel=0; moveeffectors();
+    check("stationary SE30 does not carry",ps[0].on_sector_effector,0);
+}
+
 int main(void)
 {
     int i, j, k;
+    movingsectorflags();
     setup(); ps[0].curr_weapon=RPG_WEAPON;
     ps[0].gotweapon[DEVISTATOR_WEAPON]=1; ps[0].ammo_amount[DEVISTATOR_WEAPON]=10;
     checkavailweapon(&ps[0]); check("registered shoot scan",ps[0].curr_weapon,DEVISTATOR_WEAPON);

@@ -7163,7 +7163,9 @@ void moveeffectors(void)   //STATNUM 3
                     {
                         if( ps[p].cursectnum == s->sectnum && ps[p].on_ground == 1)
                         {
-
+#if DUKE3D_GAMEVER < GAMEVER_10
+                            ps[p].on_sector_effector = 1; // Beta 0x15b73.
+#endif
                             ps[p].ang += (l*q);
                             ps[p].ang &= 2047;
 
@@ -7403,7 +7405,9 @@ void moveeffectors(void)   //STATNUM 3
                         if(s->sectnum == sprite[ps[p].i].sectnum && s->extra != 0)
                     {
                         rotatepoint(s->x,s->y,ps[p].posx,ps[p].posy,q,&ps[p].posx,&ps[p].posy);
-
+#if DUKE3D_GAMEVER < GAMEVER_10
+                        ps[p].on_sector_effector = 1; // Beta 0x16816.
+#endif
                         ps[p].posx += m;
                         ps[p].posy += x;
 
@@ -7645,6 +7649,9 @@ void moveeffectors(void)   //STATNUM 3
                     for(p = connecthead;p >= 0;p = connectpoint2[p])
                         if( ps[p].cursectnum == s->sectnum )
                     {
+#if DUKE3D_GAMEVER < GAMEVER_10
+                        ps[p].on_sector_effector = 1; // Beta 0x187a7.
+#endif
                         ps[p].posx += l;
                         ps[p].posy += x;
 

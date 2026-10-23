@@ -218,8 +218,11 @@ also documents the layout differences from 1.0 and the changed field order.
 The native save codec translates per-player redraw/help fields to the port globals;
 see the [save rulings](rulings.md). The renderer uses current `pyoff` and the measured
 beta camera clamps, without reading absent `opyoff`, `truefz` or `truecz` fields.
-The display-only per-player `on_sector_effector` interpolation flag still has no
-native representation, so smoothing on some moving sectors can differ from DOS.
+The beta-only per-player `on_sector_effector` byte (DOS offset `0x2e1`) preserves
+moving-sector camera timing: SE0, SE14/6 and SE30 set it when carrying a player,
+processinput clears it, and displayrooms selects current camera coordinates when
+it is set outside third-person view. The save codec round-trips the byte; a real
+SE0 quarter turn is checked against the raw renderer at the measured camera.
 
 ### BYTEVERSION
 

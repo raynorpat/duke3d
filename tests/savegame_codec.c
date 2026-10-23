@@ -85,7 +85,7 @@ static void test_player(void)
     memset(&p, 0, sizeof(p)); memset(&back, 0x55, sizeof(back)); memset(b, 0xee, sizeof(b));
     p.posx = -5; p.posxv = 0x12345678; p.pals_time = 999; p.ang = 0x0605;
     p.ammo_amount[9] = 27; p.curr_weapon = 7; p.i = 0x0a0b; p.customexitsound = 15;
-    p.gm = 0x11; p.name[0] = 'D'; p.unnamed_322 = 29; p.gotweapon[9] = 1;
+    p.gm = 0x11; p.on_sector_effector = 1; p.name[0] = 'D'; p.unnamed_322 = 29; p.gotweapon[9] = 1;
     p.refresh_inventory = 28; p.rotscrnang = 16; p.shield_amount = 100;
     p.transporter_hold = 19; p.boot_amount = 20; p.toggle_key_flag = 34;
     p.pals[2] = 39; p.actors_killed = 40; p.auto_run = 1; p.return_to_center = 51;
@@ -95,6 +95,7 @@ static void test_player(void)
     CHECK(le32(b + 0x260) == 999 && le16(b + 0x270) == 0x0605);
     CHECK(le16(b + 0x28e) == 27 && le16(b + 0x290) == 7);
     CHECK(le16(b + 0x2bc) == 0x0a0b && le16(b + 0x2da) == 15);
+    CHECK(b[0x2e1] == 1);
     CHECK(b[0x2dc] == 0x11 && b[0x2e4] == 'D' && b[0x2f2] == 29);
     CHECK(b[0x306] == 1 && b[0x307] == 28 && le32(b + 0x308) == 0);
     CHECK(le16(b + 0x30c) == 16 && le16(b + 0x318) == 100);
@@ -104,6 +105,7 @@ static void test_player(void)
     b[0x308] = 0x99; /* Never restore a DOS palette pointer. */
     CHECK(sg_player(b, &back, 0) == 0x33f);
     CHECK(back.posx == -5 && back.shield_amount == 100 && back.actors_killed == 40);
+    CHECK(back.on_sector_effector == 1);
     CHECK(back.palette == NULL && back.name[13] == 0 && back.weaprecs[0] == 0);
     CHECK(back.opyoff == 0 && back.truefz == 0 && back.truecz == 0);
     CHECK(back.wackedbyactor == -1 && back.scream_voice == -1);

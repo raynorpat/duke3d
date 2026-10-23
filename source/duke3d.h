@@ -490,6 +490,9 @@ struct player_struct
 
     char gm,on_warping_sector,footprintcount;
     char hbomb_on,jumping_toggle,rapid_fire_hold,on_ground;
+#if DUKE3D_GAMEVER < GAMEVER_10
+    char on_sector_effector; // beta displayrooms uses the current moving-sector view
+#endif
     char name[32],inven_icon,buttonpalette;
 
     char jetpack_on,spritebridge,lastrandomspot;

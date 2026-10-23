@@ -111,9 +111,15 @@ Each names what was decided, why, and what it costs if it turns out wrong.
 - **G099-128: render from the measured beta camera fields.** The beta has no
   `opyoff`, `truefz` or `truecz`; its camera uses current bob and a hittype floor
   cap. The guarded renderer follows those calculations and the measured camera
-  branches. The existing native representation still lacks the display-only
-  per-player on-sector-effector interpolation flag. Cost if wrong: smoothing
-  on some moving sectors differs; simulation and save layout are unchanged.
+  branches. The beta-only `on_sector_effector` byte is set when SE0, SE14/6
+  or SE30 carries a player (`0x15b73`, `0x16816`, `0x187a7`) and cleared by
+  processinput (`0x40586`). With that flag and no third-person view, displayrooms
+  uses current player coordinates/angle/horizon and a full sprite interpolation
+  ratio (`0x21cee`, `0x21f70`); the sector walls retain their interpolated geometry.
+  The save codec preserves the byte at DOS player offset `0x2e1`. A real SE0
+  quarter-turn frame is compared with the raw renderer at the measured camera.
+  Cost if wrong: moving-sector camera timing differs; simulation positions and
+  the DOS save layout are unchanged.
 
 - **G099-126: preserve the beta glass-wall target within the wall array.**
   Beta `checkhitwall` at `0x48e0b` addresses `wal + nextwall*32`,

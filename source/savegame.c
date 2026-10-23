@@ -85,7 +85,8 @@ int32_t sg_sprite(unsigned char *b, void *rec, int write)
  * 0x322 and a per-player auto_run, and no no_autoaim or aim_mode. The beta
  * has 0x33f bytes (docs/v099/notes/0.99-player.md): the byte group precedes
  * inventory shorts, several later fields are absent, and display flags
- * are per-player. Only the active player maps to the native globals.
+ * are per-player. Only the active player's redraw/help fields map to the
+ * native globals; on_sector_effector is carried as a per-player byte.
  */
 int32_t sg_player(unsigned char *b, void *rec, int write)
 {
@@ -154,8 +155,12 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
 #endif
     F8(p->gm); F8(p->on_warping_sector); F8(p->footprintcount);
     F8(p->hbomb_on); F8(p->jumping_toggle);
+#if DUKE3D_GAMEVER < GAMEVER_10
+    F8(p->on_sector_effector);
+#else
     if (write) b[o] = 0;    /* on_sector_effector */
     o++;
+#endif
     F8(p->rapid_fire_hold); F8(p->on_ground);
     A8(p->name,13); F8(p->inven_icon);
 #if DUKE3D_GAMEVER < GAMEVER_11
