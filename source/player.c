@@ -338,6 +338,8 @@ short aim(spritetype *s,short aang)
 
     smax = 0x7fffffff;
 
+    /* Build the two cone-edge vectors and the forward vector from the
+     * 14-bit sine table; Build angles wrap at 2048. */
     dx1 = sintable[(a+512-aang)&2047];
     dy1 = sintable[(a-aang)&2047];
     dx2 = sintable[(a+512+aang)&2047];
@@ -346,6 +348,8 @@ short aim(spritetype *s,short aang)
     dx3 = sintable[(a+512)&2047];
     dy3 = sintable[a&2047];
 
+    /* Search status classes in priority order; a target in an earlier class
+     * wins over closer targets in later classes. */
     for(k=0;k<4;k++)
     {
         if( j >= 0 )
@@ -357,6 +361,8 @@ short aim(spritetype *s,short aang)
                 xv = (SX-s->x);
                 yv = (SY-s->y);
 
+                /* Cross products test the cone edges without calculating an angle.
+                 * The dot product below ranks accepted targets by forward distance. */
                 if( (dy1*xv) <= (dx1*yv) )
                     if( ( dy2*xv ) >= (dx2*yv) )
                 {
@@ -410,6 +416,8 @@ short aim(spritetype *s,short aang)
 
     smax = 0x7fffffff;
 
+    /* Build the two cone-edge vectors and the forward vector from the
+     * 14-bit sine table; Build angles wrap at 2048. */
     dx1 = sintable[(a+512-aang)&2047];
     dy1 = sintable[(a-aang)&2047];
     dx2 = sintable[(a+512+aang)&2047];
@@ -418,6 +426,8 @@ short aim(spritetype *s,short aang)
     dx3 = sintable[(a+512)&2047];
     dy3 = sintable[a&2047];
 
+    /* Search status classes in priority order; a target in an earlier class
+     * wins over closer targets in later classes. */
     for(k=0;k<4;k++)
     {
         if( j >= 0 )
@@ -467,6 +477,8 @@ short aim(spritetype *s,short aang)
                 xv = (SX-s->x);
                 yv = (SY-s->y);
 
+                /* Cross products test the cone edges without calculating an angle.
+                 * The dot product below ranks accepted targets by forward distance. */
                 if( (dy1*xv) <= (dx1*yv) )
                     if( ( dy2*xv ) >= (dx2*yv) )
                 {
@@ -728,6 +740,8 @@ void shoot(short i,short atwith)
                 sa += 32-(TRAND&63);
             }
 
+            /* Temporarily remove the shooter's blocking bits so the trace can leave
+             * its own sprite. The code below re-enables both bits afterward. */
             s->cstat &= ~257;
             hitscan(sx,sy,sz,sect,
                 sintable[(sa+512)&2047],
@@ -987,6 +1001,8 @@ void shoot(short i,short atwith)
                 sz-(1<<8),atwith,0,18,18,sa,vel,zvel,i,4);
 
             sprite[j].extra += (TRAND&7);
+            /* For this projectile, yvel carries the selected target index rather
+             * than a Y velocity. The update pass interprets the payload. */
             sprite[j].yvel = l;
 
             if(p == -1)
@@ -1050,6 +1066,8 @@ void shoot(short i,short atwith)
             x += 4096;
 #endif
 
+            /* Choose the lob from horizontal distance rather than solving an intercept.
+             * Velocities below -4096 reset to -2048 instead of clamping. */
             zvel = -x>>1;
 
             if(zvel < -4096)
@@ -1406,6 +1424,8 @@ void shoot(short i,short atwith)
                 }
             }
 
+            /* Temporarily remove the shooter's blocking bits so the trace can leave
+             * its own sprite. The code below re-enables both bits afterward. */
             s->cstat &= ~257;
             hitscan(sx,sy,sz,sect,
                 sintable[(sa+512)&2047],
@@ -1715,6 +1735,8 @@ void shoot(short i,short atwith)
 
             sprite[j].extra += (TRAND&7);
             if(atwith != FREEZEBLAST)
+                /* For this projectile, yvel carries the selected target index rather
+                 * than a Y velocity. The update pass interprets the payload. */
                 sprite[j].yvel = l;
             else
             {
@@ -1849,6 +1871,8 @@ void shoot(short i,short atwith)
             j = ps[findplayer(s,&x)].i;
             x = ldist(&sprite[j],s);
 
+            /* Choose the lob from horizontal distance rather than solving an intercept.
+             * Velocities below -4096 reset to -2048 instead of clamping. */
             zvel = -x>>1;
 
             if(zvel < -4096)
@@ -1909,6 +1933,8 @@ void shoot(short i,short atwith)
 
 //            RESHOOTGROW:
 
+            /* Temporarily remove the shooter's blocking bits so the trace can leave
+             * its own sprite. The code below re-enables both bits afterward. */
             s->cstat &= ~257;
             hitscan(sx,sy,sz,sect,
                 sintable[(sa+512)&2047],
@@ -3549,6 +3575,8 @@ void processinput(short snum)
     pi = p->i;
     s = &sprite[pi];
 
+    /* kickback_pic is the weapon simulation phase, shared with HUD drawing;
+     * its numbered steps trigger shots, sounds, ejection and recovery. */
     kb = &p->kickback_pic;
 
     /* Read synchronized action bits, not live device state, so demos and peers simulate the same input. */
@@ -5268,6 +5296,8 @@ void processinput(short snum)
 
     if( doincrements(p) ) return;
 
+    /* Negative positions lower the old weapon to -9; positive positions
+     * raise the selected weapon back to its ready position at zero. */
     if(p->weapon_pos != 0)
     {
         if(p->weapon_pos == -9)
@@ -5295,6 +5325,8 @@ void processinput(short snum)
 #endif
         p->random_club_frame += 64; // Glowing
 
+    /* The held pipebomb pauses at its hold frame until fire is released;
+     * other weapon phases must not advance while that latch is set. */
     if(p->rapid_fire_hold == 1)
     {
         if( sb_snum&(1<<2) ) return;
@@ -5342,6 +5374,8 @@ void processinput(short snum)
 #endif
             }
         }
+        /* Starting an attack and advancing it are separate passes. Ammunition
+         * is charged at the weapon-specific start or firing phase below. */
         else switch(p->curr_weapon)
         {
             case HANDBOMB_WEAPON:
@@ -5405,6 +5439,8 @@ void processinput(short snum)
                         j = nextspritesect[j];
                     }
 
+                    /* Begin placement only on a nearby unmasked wall, with room away from
+                     * existing tripbombs and an allowed sector on either side. */
                     if(j == -1 && hw >= 0 && (wall[hw].cstat&16) == 0 )
                         if( ( wall[hw].nextsector >= 0 && sector[wall[hw].nextsector].lotag <= 2 ) || ( wall[hw].nextsector == -1 && sector[sect].lotag <= 2 ) )
                             if( ( (sx-p->posx)*(sx-p->posx) + (sy-p->posy)*(sy-p->posy) ) < (290*290) )
@@ -5475,6 +5511,8 @@ void processinput(short snum)
         {
             case HANDBOMB_WEAPON:
 
+                /* Pause the throw while fire is held. The accumulated hold delay feeds
+                 * the bomb's horizontal launch speed. */
                 if( (*kb) == 6 && (sb_snum&(1<<2)) )
                 {
                     p->rapid_fire_hold = 1;
@@ -5572,6 +5610,8 @@ void processinput(short snum)
 
                 if((*kb) >= 5)
                 {
+                    /* Clip timing is derived from the ammunition remainder; there is no
+                     * separate magazine counter. */
                     if( p->ammo_amount[PISTOL_WEAPON] <= 0 || (p->ammo_amount[PISTOL_WEAPON]%12) )
                     {
                         (*kb)=0;
@@ -5603,6 +5643,8 @@ void processinput(short snum)
 
                 (*kb)++;
 
+                /* One shotgun shell produces seven independent pellet traces,
+                 * each consuming its own spread random numbers. */
                 if(*kb == 4)
                 {
                     shoot(pi,SHOTGUN);
@@ -5841,6 +5883,8 @@ void processinput(short snum)
                 }
 
 #if DUKE3D_GAMEVER >= GAMEVER_14
+                /* Honor a queued weapon change during the knee cycle instead of
+                 * waiting for an ammunition-driven fallback. */
                 if(p->wantweaponfire >= 0)
                     checkavailweapon(p);
 #endif
@@ -5866,6 +5910,14 @@ void processinput(short snum)
 
 
 //UPDATE THIS FILE OVER THE OLD GETSPRITESCORE/COMPUTERGETINPUT FUNCTIONS
+/*
+================
+getspritescore
+
+Score a pickup for the bot using its tile and current supplies.
+A positive value makes it eligible for the opportunistic pickup search.
+================
+*/
 static int getspritescore(int32_t snum, int32_t dapicnum)
 {
     switch(dapicnum)
@@ -5927,6 +5979,14 @@ static int32_t goalsect[MAXPLAYERS], goalwall[MAXPLAYERS], goalsprite[MAXPLAYERS
 static int32_t goalplayer[MAXPLAYERS], clipmovecount[MAXPLAYERS];
 short searchsect[MAXSECTORS], searchparent[MAXSECTORS];
 char dashow2dsector[(MAXSECTORS+7)>>3];
+/*
+================
+computergetinput
+
+Build a bot command from combat spacing, projectile avoidance and sector routing.
+Write the same synchronized input fields used by human players.
+================
+*/
 void computergetinput(int32_t snum, input *syn)
 {
     int32_t i, j, k, l, x1, y1, z1, x2, y2, z2, x3, y3, z3, dx, dy;
@@ -5949,6 +6009,8 @@ void computergetinput(int32_t snum, input *syn)
     z1 = sprite[p->i].z;
     damyang = sprite[p->i].ang;
     damysect = sprite[p->i].sectnum;
+    /* The local bot steers from predicted position and angle in multiplayer;
+     * remote bots use their current sprite state. */
     if ((numplayers >= 2) && (snum == myconnectindex))
         { x1 = myx; y1 = myy; z1 = myz+PHEIGHT; damyang = myang; damysect = mycursectnum; }
 
@@ -5958,6 +6020,8 @@ void computergetinput(int32_t snum, input *syn)
             goalplayer[snum] = snum;
     }
 
+    /* Acquire an opponent by XY distance, doubling the cost of candidates
+     * that fail the visibility test. */
     if ((goalplayer[snum] == snum) || (ps[goalplayer[snum]].dead_flag != 0))
     {
         j = 0x7fffffff;
@@ -5999,6 +6063,8 @@ void computergetinput(int32_t snum, input *syn)
             x3 = sprite[j].x;
             y3 = sprite[j].y;
             z3 = sprite[j].z;
+            /* Probe several future projectile positions and its hitscan endpoint.
+             * The cross product chooses which side to evade toward. */
             for(l=0;l<=8;l++)
             {
                 if (tmulscale11(x3-x1,x3-x1,y3-y1,y3-y1,(z3-z1)>>4,(z3-z1)>>4) < 3072)
@@ -6048,6 +6114,8 @@ void computergetinput(int32_t snum, input *syn)
         }
 
 
+        /* Use both weapons to choose the desired combat separation; height
+         * and shrunken or frozen targets modify it below. */
         fightdist = fdmatrix[p->curr_weapon][ps[goalplayer[snum]].curr_weapon];
         if (fightdist < 128) fightdist = 128;
         dist = ksqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1)); if (dist == 0) dist = 1;
@@ -6062,6 +6130,8 @@ void computergetinput(int32_t snum, input *syn)
 
         if (dist < 256) syn->bits |= (1<<22);
 
+        /* Aim movement at a point on the target-to-bot ray at fightdist.
+         * Normalizing by dist makes this both approach and retreat steering. */
         x3 = x2+((x1-x2)*fightdist/dist);
         y3 = y2+((y1-y2)*fightdist/dist);
         syn->fvel += (x3-x1)*2047/dist;
@@ -6070,6 +6140,8 @@ void computergetinput(int32_t snum, input *syn)
             //Strafe attack
         if (fightdist)
         {
+            /* Mix several sine periods for lateral motion, with a different phase
+             * for each bot instead of a shared left/right rhythm. */
             j = totalclock+snum*13468;
             i = sintable[(j<<6)&2047];
             i += sintable[((j+4245)<<5)&2047];
@@ -6082,6 +6154,8 @@ void computergetinput(int32_t snum, input *syn)
             syn->svel += ((sintable[(daang+512)&2047]*i)>>17);
         }
 
+        /* Wrap the angle error into -1024..1023 before damping and clamping it
+         * to the command's turn range. */
         syn->avel = min(max((((daang+1024-damyang)&2047)-1024)>>1,-127),127);
         syn->horz = min(max((zang-p->horiz)>>1,-MAXHORIZ),MAXHORIZ);
         syn->bits |= (1<<23);
@@ -6096,6 +6170,8 @@ void computergetinput(int32_t snum, input *syn)
         endsect = sprite[ps[goalplayer[snum]].i].sectnum;
 
         clearbufbyte(dashow2dsector,(MAXSECTORS+7)>>3,0L);
+        /* Breadth-first search uses parallel sector and parent-index arrays.
+         * The bitmap prevents visiting a sector twice. */
         searchsect[0] = startsect;
         searchparent[0] = -1;
         dashow2dsector[startsect>>3] |= (1<<(startsect&7));
@@ -6125,6 +6201,8 @@ void computergetinput(int32_t snum, input *syn)
                         for(k=send-1;k>=0;k=searchparent[k])
                             dashow2dsector[searchsect[k]>>3] |= (1<<(searchsect[k]&7));
 
+                        /* Walk parent indices back to the first sector beyond the start.
+                         * Its connecting wall becomes the next steering goal. */
                         for(k=send-1;k>=0;k=searchparent[k])
                             if (!searchparent[k]) break;
 
@@ -6168,6 +6246,7 @@ void computergetinput(int32_t snum, input *syn)
                 }
             }
 
+            /* Transporters contribute extra sector links to the route search. */
             for(i=headspritesect[searchsect[splc]];i>=0;i=nextspritesect[i])
                 if (sprite[i].lotag == 7)
                 {
@@ -6216,6 +6295,8 @@ void computergetinput(int32_t snum, input *syn)
     {
         if (goalsprite[snum] < 0)
         {
+            /* With no route, sample four random sectors for a visible useful pickup;
+             * this is an opportunistic search rather than a global best-score scan. */
             for(k=0;k<4;k++)
             {
                 i = (rand()%numsectors);
@@ -6239,6 +6320,8 @@ void computergetinput(int32_t snum, input *syn)
     else
         goalsprite[snum] = -1;
 
+    /* Trial movement uses local copies so collision probing does not move
+     * the real player. A second probe tests a lower body position. */
     x3 = p->posx; y3 = p->posy; z3 = p->posz; dasect = p->cursectnum;
     i = clipmove(&x3,&y3,&z3,&dasect,p->posxv,p->posyv,164L,4L<<8,4L<<8,CLIPMASK0);
     if (!i)
@@ -6265,6 +6348,8 @@ void computergetinput(int32_t snum, input *syn)
         daang = getangle(x2-x1,y2-y1);
         if ((i&0xc000) == 32768)
             daang = getangle(wall[wall[i&(MAXWALLS-1)].point2].x-wall[i&(MAXWALLS-1)].x,wall[wall[i&(MAXWALLS-1)].point2].y-wall[i&(MAXWALLS-1)].y);
+        /* Mix several sine periods for lateral motion, with a different phase
+         * for each bot instead of a shared left/right rhythm. */
         j = totalclock+snum*13468;
         i = sintable[(j<<6)&2047];
         i += sintable[((j+4245)<<5)&2047];
@@ -6275,6 +6360,7 @@ void computergetinput(int32_t snum, input *syn)
 
         if ((clipmovecount[snum]&31) == 2) syn->bits |= (1<<29);
         if ((clipmovecount[snum]&31) == 17) syn->bits |= (1<<22);
+        /* Persistent blockage abandons the route goal so navigation can retry. */
         if (clipmovecount[snum] > 32) { goalsect[snum] = -1; goalwall[snum] = -1; clipmovecount[snum] = 0; }
 
         goalsprite[snum] = -1;

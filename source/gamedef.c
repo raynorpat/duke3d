@@ -233,6 +233,13 @@ short getincangle(short a,short na)
     }
 }
 
+/*
+================
+ispecial
+
+Recognize the legacy label separators, incrementing line_number for a newline.
+================
+*/
 char ispecial(char c)
 {
     if(c == 0x0a)
@@ -247,6 +254,14 @@ char ispecial(char c)
     return 0;
 }
 
+/*
+================
+isaltok
+
+Recognize characters that may belong to a CON token,
+including punctuation used by braces, comments and signed numbers.
+================
+*/
 char isaltok(char c)
 {
     return ( isalnum(c) || c == '{' || c == '}' || c == '/' || c == '*' || c == '-' || c == '_' || c == '.');
@@ -437,6 +452,8 @@ int32_t keyword(void)
     int32_t i;
     char *temptextptr;
 
+    /* Look ahead without consuming the source; callers use a keyword
+     * to distinguish the next command from optional numeric operands. */
     temptextptr = textptr;
 
     while( isaltok(*temptextptr) == 0 )
@@ -493,6 +510,7 @@ int32_t transword(void) //Returns its code #
     {
         if( strcmp( tempbuf,keyw[i]) == 0 )
         {
+            /* Emit the keyword index directly as the interpreter opcode. */
             *scriptptr = i;
             textptr += l;
             scriptptr++;
@@ -556,6 +574,8 @@ void transnum(void)
     }
 
 
+    /* Defined symbols share the operand path with numbers; their values
+     * may be constants or byte offsets into the compiled script. */
     for(i=0;i<labelcnt;i++)
     {
         if( strcmp(tempbuf,label+(i<<6)) == 0 )
@@ -599,6 +619,8 @@ char parsecommand(void)
 
     if( error > 12 || ( *textptr == '\0' ) || ( *(textptr+1) == '\0' ) ) return 1;
 
+    /* Recognized keywords emit an opcode first. Compile-time definitions
+     * and comments rewind scriptptr to remove words that are not executable. */
     tw = transword();
 
     switch(tw)
@@ -627,6 +649,8 @@ char parsecommand(void)
             while( *textptr != '*' || *(textptr+1) != '/' );
             textptr+=2;
             return 0;
+        /* Outside an actor or state this defines a state label; inside one
+         * it emits a call to an already defined state. */
         case 17:
             if( parsing_actor == 0 && parsing_state == 0 )
             {
@@ -883,6 +907,8 @@ char parsecommand(void)
 
             printf("Including: '%s'.\n",tempbuf);
 
+            /* Compile the include into the same script stream while temporarily
+             * replacing the source cursor, line number and pending-else count. */
             temp_line_number = line_number;
             line_number = 1;
             temp_ifelse_check = checking_ifelse;
@@ -1161,6 +1187,8 @@ char parsecommand(void)
         case 10:
             if( checking_ifelse )
             {
+                /* An else starts with a jump over its body; its target is patched once
+                 * the nested command or block has been compiled. */
                 checking_ifelse--;
                 tempscrptr = scriptptr;
                 scriptptr++; //Leave a spot for the fail location
@@ -1234,6 +1262,7 @@ char parsecommand(void)
         case 91:
         case 109:
 
+            /* ifp combines its named player-state tests into one operand mask. */
             if(tw == 51)
             {
                 j = 0;
@@ -1248,6 +1277,8 @@ char parsecommand(void)
                 scriptptr++;
             }
 
+            /* Reserve the false-branch target before compiling the conditional body.
+             * Backpatch it with the byte offset immediately after that body. */
             tempscrptr = scriptptr;
             scriptptr++; //Leave a spot for the fail location
 
@@ -1264,6 +1295,8 @@ char parsecommand(void)
 
             checking_ifelse++;
             return 0;
+        /* Compile a braced block recursively; its closing brace returns from
+         * this loop without ending the surrounding source file. */
         case 29:
             num_squigilly_brackets++;
             do
@@ -1483,6 +1516,8 @@ char parsecommand(void)
                     break;
                 }
             }
+            /* Sound declarations populate the game tables at compile time;
+             * transnum is used as scratch space, so each operand is rewound. */
             sounds[k][i] = '\0';
 
             transnum();
@@ -1673,6 +1708,14 @@ char parsecommand(void)
 }
 
 
+/*
+================
+passone
+
+Compile commands until the parser reports completion,
+then report an excessive diagnostic count.
+================
+*/
 void passone(void)
 {
 
@@ -1690,6 +1733,14 @@ char *defaultcons[3] =
      "DEFS.CON"
 };
 
+/*
+================
+copydefaultcons
+
+Copy the three default CON files from the group archive
+into the working directory for editing.
+================
+*/
 void copydefaultcons(void)
 {
     int32_t i, fs, fpi;
@@ -1795,6 +1846,7 @@ void loadefs(char *filenam,char *mptr)
     clearbufbyte(actortype,MAXSPRITES,0L);
 
     labelcnt = 0;
+    /* Reserve word zero for the compiled byte size, including that header. */
     scriptptr = script+1;
     warning = 0;
     error = 0;
@@ -2158,6 +2210,8 @@ void move()
 #endif
 
 #if DUKE3D_GAMEVER >= GAMEVER_11 || DUKE3D_GAMEVER < GAMEVER_10 // absent only in 1.0 (C099-025)
+    /* Lead the facing direction with the player's velocity; each revision
+     * keeps its original scale for that prediction. */
     if(a&face_player_smart)
     {
         int32_t newx,newy;
@@ -2321,6 +2375,8 @@ void move()
                 g_sp->z = hittype[g_i].ceilingz+(32<<8);
 #endif
 
+        /* Keep scripted velocity separate from the displacement used this tick;
+         * close-range repulsion and batched movement can override the latter. */
         daxvel = g_sp->xvel;
         angdif = g_sp->ang;
 
@@ -2382,6 +2438,8 @@ void move()
                 }
                 else
                 {
+                    /* Some actors move only every fourth script tick. Scale the accepted
+                     * displacement to make up for the skipped movement calls. */
                     if( (g_t[0]&3) || ps[g_p].actorsqu == g_i ) return;
                     else daxvel <<= 2;
                 }
@@ -2467,6 +2525,8 @@ char parse(void)
             insptr++;
             parseifelse( rnd(*insptr));
             break;
+        /* ifcanshoottarget probes ahead and to either side of the facing angle.
+         * The wider probes help large actors reject nearby obstructions. */
         case 45:
 
             if(g_x > 1024)
@@ -2544,6 +2604,8 @@ char parse(void)
             spritetype *s;
             short sect;
 
+            /* Try the hologram first when visible; otherwise test the real player.
+             * A later search may retain a visible approach point in lastvx/lastvy. */
             if(ps[g_p].holoduke_on >= 0)
             {
                 s = &sprite[ps[g_p].holoduke_on];
@@ -2600,6 +2662,8 @@ char parse(void)
             break;
         case 24:
             insptr++;
+            /* An ai record supplies action, move and movement flags as three
+             * script words. Reset the counters when installing the new record. */
             g_t[5] = *insptr;
             g_t[4] = *SCRIPT_PTR(g_t[5]);       // Action
             g_t[1] = *SCRIPT_PTR(g_t[5]+4);       // move
@@ -2959,6 +3023,8 @@ char parse(void)
             break;
         case 22:
             insptr++;
+            /* Defer sprite deletion to execute so the interpreter stops using its
+             * current actor context before the status-list entry is removed. */
             killit_flag = 1;
             break;
         case 23:
@@ -3081,6 +3147,8 @@ char parse(void)
             {
                 int32_t *tempscrptr;
 
+                /* Save the return address on the C stack while executing a state body.
+                 * Script references themselves remain byte offsets, not native pointers. */
                 tempscrptr = insptr+2;
 
                 insptr = SCRIPT_PTR(*(insptr+1));
@@ -3088,6 +3156,7 @@ char parse(void)
                 insptr = tempscrptr;
             }
             break;
+        /* Run the braced body until an end opcode returns to this interpreter level. */
         case 29:
             insptr++;
             while(1) if(parse()) break;
@@ -3788,6 +3857,8 @@ char parse(void)
             parseifelse( j == NUM_SOUNDS );
             break;
         default:
+            /* Defer sprite deletion to execute so the interpreter stops using its
+             * current actor context before the status-list entry is removed. */
             killit_flag = 1;
             break;
     }
@@ -3815,6 +3886,7 @@ void execute(short i,short p,int32_t x)
 
     if( actorscrptr[g_sp->picnum] == 0 ) return;
 
+    /* Skip the actor header: strength, action, move and movement flags. */
     insptr = 4 + SCRIPT_PTR(actorscrptr[g_sp->picnum]);
 
     killit_flag = 0;
@@ -3835,6 +3907,8 @@ void execute(short i,short p,int32_t x)
     }
 #endif
 
+    /* Advance the action frame using its delay and signed frame increment.
+     * Animation counters persist in the actor's temporary script state. */
     if(g_t[4])
     {
         g_sp->lotag += TICSPERFRAME;
@@ -3852,6 +3926,8 @@ void execute(short i,short p,int32_t x)
         done = parse();
     while( done == 0 );
 
+    /* Flag 1 takes the deletion path. Flag 2 also ends parsing, but skips
+     * this deletion and continues through the movement path. */
     if(killit_flag == 1)
     {
         if(ps[g_p].actorsqu == g_i)

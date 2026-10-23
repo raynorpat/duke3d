@@ -107,6 +107,14 @@ void TENtext(void)
 */
 // CTW END - REMOVED
 
+/*
+================
+cmenu
+
+Switch menu pages and restore the cursor row remembered for major pages.
+Save confirmation pages keep the current row.
+================
+*/
 void cmenu(short cm)
 {
     current_menu = cm;
@@ -127,6 +135,13 @@ void cmenu(short cm)
 }
 
 
+/*
+================
+savetemp
+
+Write the supplied memory block to a temporary file for later menu use.
+================
+*/
 void savetemp(char *fn,intptr_t daptr,int32_t dasiz)
 {
     int fp;
@@ -138,6 +153,13 @@ void savetemp(char *fn,intptr_t daptr,int32_t dasiz)
     close(fp);
 }
 
+/*
+================
+getangplayers
+
+Draw the other connected players as direction markers around this player.
+================
+*/
 void getangplayers(short snum)
 {
     short i,a;
@@ -156,6 +178,14 @@ void getangplayers(short snum)
     }
 }
 
+/*
+================
+loadpheader
+
+Read a save slot's description, level settings and preview tile
+without restoring the game world.
+================
+*/
 static int loadpheader(char spot,int32 *vn,int32 *ln,int32 *psk,int32 *nump)
 {
 
@@ -199,6 +229,8 @@ static int loadpheader(char spot,int32 *vn,int32 *ln,int32 *psk,int32 *nump)
      *psk = sg_read32(fil);
 
      if (waloff[MAXTILES-3] == 0) allocache(&waloff[MAXTILES-3],160*100,&walock[MAXTILES-3]);
+     /* The saved 160 by 100 preview is exposed as a transposed Build tile
+      * for the menu's rotated draw. */
      tilesizx[MAXTILES-3] = 100; tilesizy[MAXTILES-3] = 160;
      kdfread((char *)waloff[MAXTILES-3],160,100,fil);
 
@@ -208,6 +240,14 @@ static int loadpheader(char spot,int32 *vn,int32 *ln,int32 *psk,int32 *nump)
 }
 
 
+/*
+================
+loadplayer
+
+Resolve a save slot filename and load it, or queue a network load request
+when the selected version supports that protocol.
+================
+*/
 int loadplayer(signed char spot)
 {
      char fn[] = "game0.sav";
@@ -257,6 +297,14 @@ static int32_t clampcount(int32_t v, int32_t hi)
      return v < 0 ? 0 : (v > hi ? hi : v);
 }
 
+/*
+================
+loadplayerfile
+
+Restore the version-specific save layout and rebuild live script, animation
+and interpolation references before restarting play.
+================
+*/
 int loadplayerfile(char *fnptr, signed char spot)
 {
      short k,music_changed;
@@ -637,6 +685,8 @@ int loadplayerfile(char *fnptr, signed char spot)
 
      clearbufbyte(playerquitflag,MAXPLAYERS,0x01010101);
 
+     /* Seed local prediction from the restored player before clearing input
+      * history and synchronizing the restart. */
      resetmys();
 
      ready2send = 1;
@@ -650,6 +700,14 @@ int loadplayerfile(char *fnptr, signed char spot)
      return(0);
 }
 
+/*
+================
+saveplayer
+
+Resolve the save slot and multiplayer filename, coordinating with peers
+where this game version requires it.
+================
+*/
 int saveplayer(signed char spot)
 {
      char fn[] = "game0.sav";
@@ -696,6 +754,14 @@ int saveplayer(signed char spot)
      return saveplayerfile(fullname,spot);
 }
 
+/*
+================
+saveplayerfile
+
+Write the game state and menu preview using the selected version's DOS layout.
+Store serialized references rather than native pointer values.
+================
+*/
 int saveplayerfile(char *fnptr, signed char spot)
 {
      int32_t i, j, animoffs[MAXANIMATES];
@@ -935,6 +1001,15 @@ ControlInfo minfo;
 
 int32_t mi;
 
+/*
+================
+probe_with_delete
+
+Move and draw the menu cursor, then report selection or cancellation.
+Return row >= 0 for activation or slider adjustment, -1 for cancel,
+or -row-2 while browsing.
+================
+*/
 static int probe_with_delete(int x,int y,int i,int n,int *hitdelete)
 {
     short centre, s;
@@ -944,6 +1019,8 @@ static int probe_with_delete(int x,int y,int i,int n,int *hitdelete)
     if( ControllerType == 1 && CONTROL_MousePresent )
     {
         CONTROL_GetInput( &minfo );
+        /* Accumulate mouse movement until it crosses a menu-row threshold;
+         * small motion must not select a new row every frame. */
         mi += minfo.dz;
     }
 
@@ -995,6 +1072,8 @@ static int probe_with_delete(int x,int y,int i,int n,int *hitdelete)
     else
         rotatesprite((x-tilesizx[BIGFNTCURSOR]-4)<<16,(y+(probey*i)-4)<<16,65536L,0,SPINNINGNUKEICON+(((totalclock>>3))%7),sh,0,10,0,0,xdim-1,ydim-1);
 
+    /* Binding pages need deletion to return the selected row through the
+     * same path as activation, with a separate flag identifying the action. */
     if (hitdelete != NULL)
     {
         *hitdelete = ((KB_KeyPressed(sc_Delete)) ||
@@ -1029,6 +1108,7 @@ static int probe_with_delete(int x,int y,int i,int n,int *hitdelete)
     }
     else
     {
+        /* Keep -1 reserved for cancellation; encode an idle row below it. */
         if(onbar == 0) return(-probey-2);
         if ( KB_KeyPressed( sc_LeftArrow ) || KB_KeyPressed( sc_kpad_4 ) || ((buttonstat&1) && minfo.dyaw < -128 ) )
             return(probey);
@@ -1038,11 +1118,26 @@ static int probe_with_delete(int x,int y,int i,int n,int *hitdelete)
     }
 }
 
+/*
+================
+probe
+
+Run the standard menu cursor without the optional delete-binding action.
+================
+*/
 int probe(int x,int y,int i,int n)
 {
     return probe_with_delete(x,y,i,n,NULL);
 }
 
+/*
+================
+menutext
+
+Draw the large menu font in logical screen coordinates and return the end X.
+An X of 160 requests centering by the measured glyph widths.
+================
+*/
 int menutext(int x,int y,short s,short p,char *t)
 {
     short i, ac, centre;
@@ -1051,6 +1146,7 @@ int menutext(int x,int y,short s,short p,char *t)
 
     i = centre = 0;
 
+    /* Measure the glyphs first; menu text uses variable tile widths. */
     if( x == (320>>1) )
     {
         while( *(t+i) )
@@ -1159,6 +1255,13 @@ int menutext(int x,int y,short s,short p,char *t)
 }
 
 
+/*
+================
+menutextc
+
+Draw the alternate large-font text centered on X and return the end X.
+================
+*/
 int menutextc(int x,int y,short s,short p,char *t)
 {
     short i, ac, centre;
@@ -1262,11 +1365,21 @@ int menutextc(int x,int y,short s,short p,char *t)
 }
 
 
+/*
+================
+bar
+
+Draw a menu slider and optionally change its value from directional input.
+A negative step reverses both the control direction and knob placement.
+================
+*/
 void bar(int x,int y,short *p,short dainc,char damodify,short s, short pa)
 {
     short xloc;
     char rev;
 
+    /* Reversed sliders still store a positive value; only input and drawing
+     * run in the opposite direction. */
     if(dainc < 0) { dainc = -dainc; rev = 1; }
     else rev = 0;
     y-=2;
@@ -1427,6 +1540,13 @@ static void videopage_modesize(int display, int32_t *w, int32_t *h)
 int32 volnum,levnum,plrskl,numplr;
 short lastsavedpos = -1;
 
+/*
+================
+dispnames
+
+Draw the ten save-slot names inside the load/save menu frame.
+================
+*/
 void dispnames(void)
 {
     short x, c = 160;
@@ -1565,6 +1685,14 @@ int getfilenames(char kind[6])
 #endif
 
 
+/*
+================
+sortfilenames
+
+Sort the menu filename records in bytewise name order,
+keeping each record's file/directory marker with its name.
+================
+*/
 void sortfilenames()
 {
         char sortbuffer[17];
@@ -1609,6 +1737,13 @@ typedef struct
     int32 which;
 } KeyBinds;
 
+/*
+================
+keybindtext
+
+Draw one control action and the current name of its keyboard mapping.
+================
+*/
 static void keybindtext(int pos, char *name, int32 which)
 {
     char *binding = (char *) CONTROL_GetMappingName(which);
@@ -1624,6 +1759,14 @@ static KeyBinds *currentbind = NULL;
 static int prevbindmenu = 0;
 static int keybindprobey = 0;
 
+/*
+================
+DoKeybindMenu
+
+Browse a binding group, clear a selected mapping, or enter key capture.
+Remember the previous page and cursor row for the return trip.
+================
+*/
 static void DoKeybindMenu(char *name, KeyBinds *keybinds, int cnt, int prevmenu)
 {
     int i;
@@ -1675,6 +1818,13 @@ static void DoKeybindMenu(char *name, KeyBinds *keybinds, int cnt, int prevmenu)
 }
 #endif
 
+/*
+================
+non3dr_menus
+
+Dispatch the port-added control configuration pages and key capture state.
+================
+*/
 static void non3dr_menus(void)
 {
     short c = (320>>1);
@@ -2190,6 +2340,14 @@ static const struct { short page, y; const char *text; } credits13[] =
 #define GAME_MENU_TOP 67
 #endif
 
+/*
+================
+menus
+
+Service menu input and packets, then draw and operate the current page.
+The page number also carries confirmation and save-name entry states.
+================
+*/
 void menus(void)
 {
     int count;
@@ -2216,6 +2374,7 @@ void menus(void)
     }
     else buttonstat = 0;
 
+    /* Release the save-preview cache lock when the menu is no longer active. */
     if( (ps[myconnectindex].gm&MODE_MENU) == 0 )
     {
         walock[MAXTILES-3] = 1;
@@ -2227,12 +2386,14 @@ void menus(void)
 
     x = 0;
 
+    /* Pulse the highlighted row from the Build clock, independently of input. */
     sh = 4-(sintable[(totalclock<<4)&2047]>>11);
 
     if(!(current_menu >= 1000 && current_menu <= 2999 && current_menu >= 300 && current_menu <= 369))
         vscrn();
 
     // icculus.org-added menus?
+    /* Port-added configuration pages occupy a separate range of page numbers. */
     if (current_menu >= 30000)
         non3dr_menus();
     else switch(current_menu)
@@ -3461,6 +3622,8 @@ void menus(void)
                         videopage_bh = res[i].h;
                         videopage_browse = 1;
                     }
+                    /* Resolution arrows only browse; commit the pending size on activation
+                     * when no video transition is busy. */
                     if(enter && videopage_browse && !busy)
                     {
                         if(videopage_bw != gw || videopage_bh != gh)
@@ -3740,6 +3903,7 @@ void menus(void)
 
             break;
 
+        /* Capture the game view once before entering the save-slot browser. */
         case 350:
             cmenu(351);
             screencapt = 1;
@@ -3769,6 +3933,7 @@ void menus(void)
             if(current_menu == 300) menutext(c,24,0,0,"LOAD GAME");
             else menutext(c,24,0,0,"SAVE GAME");
 
+            /* These page numbers encode the slot whose save name is being edited. */
             if(current_menu >= 360 && current_menu <= 369 )
             {
 #if DUKE3D_GAMEVER >= GAMEVER_10
@@ -4498,6 +4663,14 @@ static int32_t glgamebrightness;
 
 /* The player palette on screen: in a game or demo the viewed player's
    (screenpeek), elsewhere myconnectindex's (see glsetgamepalette). */
+/*
+================
+gameviewpalette
+
+Choose the viewed player's palette during play or demos, except at level end.
+Use the local player's palette for the surrounding screens.
+================
+*/
 char *gameviewpalette(void)
 {
     return ps[((ps[myconnectindex].gm&(MODE_GAME|MODE_DEMO)) &&
@@ -4553,11 +4726,21 @@ void glsetgamepalette(void)
 #endif
 }
 
+/*
+================
+palto
+
+Blend toward a six-bit RGB colour using the low seven bits of e as strength.
+The high bit bypasses rate limiting; renderer 3 applies a fade overlay.
+================
+*/
 void palto(char r,char g,char b,int32_t e)
 {
     int i;
     char temparray[768];
 
+    /* Palette channels are six-bit values. A blend strength of 64 reaches
+     * the target colour through the integer divide by 64. */
     for(i=0;i<768;i+=3)
     {
         temparray[i  ] =
@@ -4587,6 +4770,14 @@ void palto(char r,char g,char b,int32_t e)
 }
 
 
+/*
+================
+drawoverheadmap
+
+Project discovered map geometry, selected sprites and player markers
+into the rotated and zoomed overhead view.
+================
+*/
 void drawoverheadmap(int32_t cposx, int32_t cposy, int32_t czoom, short cang)
 {
         int32_t i=0l, j=0l, k=0l, l=0l, x1=0l, y1=0l, x2=0l, y2=0l, x3=0l;
@@ -4599,6 +4790,8 @@ void drawoverheadmap(int32_t cposx, int32_t cposy, int32_t czoom, short cang)
         walltype *wal, *wal2;
         spritetype *spr;
 
+        /* Fold rotation and zoom into the basis vectors; the second pair also
+         * corrects the screen aspect before coordinates reach drawline256. */
         xvect = sintable[(-cang)&2047] * czoom;
         yvect = sintable[(1536-cang)&2047] * czoom;
         xvect2 = mulscale16(xvect,yxaspect);
@@ -5017,6 +5210,14 @@ void endanimvol43(int32_t fr)
 #if DUKE3D_GAMEVER >= GAMEVER_15
 int32_t lastanimhack=0;
 #endif
+/*
+================
+playanm
+
+Play cached ANM frames with the clip's timing and sound cues,
+servicing input and packets until the clip ends or is skipped.
+================
+*/
 void playanm(char *fn,char t)
 {
         char *animbuf, *palptr;

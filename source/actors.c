@@ -502,6 +502,8 @@ void checkavailweapon( struct player_struct *p )
 
     for(i=0;i<10;i++)
     {
+        /* The preference list uses menu numbering: zero means weapon slot 9,
+         * while other values are one greater than the simulation slot. */
         weap = ud.wchoice[snum][i];
 #ifdef VOLUMEONE
         if(weap > 6) continue;
@@ -1500,6 +1502,8 @@ void movefta(void)
             if( x < 30000 )
             {
                 hittype[i].timetosleep++;
+                /* Distance also spaces the wake-up visibility checks; nearby dormant
+                 * actors are tested sooner than distant ones. */
                 if( hittype[i].timetosleep >= (x>>8) )
                 {
                     if(badguy(s))
@@ -4916,6 +4920,8 @@ void moveactors(void)
     i = headspritestat[1];
     while(i >= 0)
     {
+        /* Cache the link before built-in behavior or CON code can delete this
+         * actor or move it to another status list. */
         nexti = nextspritestat[i];
 
         s = &sprite[i];
