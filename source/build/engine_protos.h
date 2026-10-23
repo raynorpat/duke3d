@@ -86,12 +86,13 @@ extern void faketimerhandler(void);
 extern void waitforeverybody(void);
 #endif
 
-/* cache1d.c */
+/* cache.c */
 extern void initcache(intptr_t dacachestart, int32_t dacachesize);
 extern void allocache(intptr_t *newhandle, int32_t newbytes, unsigned char *newlockptr);
 extern void suckcache(int32_t *suckptr);
 extern void agecache(void);
 extern void reportandexit(char *errormessage);
+/* filesystem.c */
 extern int32_t initgroupfile(const char *filename);
 extern void uninitgroupfile(void);
 extern int32_t kopen4load(const char *filename, char searchfirst);

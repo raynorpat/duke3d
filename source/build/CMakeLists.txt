@@ -2,7 +2,8 @@
 
 add_library(buildengine STATIC
   draw.c
-  cache1d.c
+  cache.c
+  filesystem.c
   engine.c
   glext.c
   glsubmit.c
