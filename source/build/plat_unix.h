@@ -14,8 +14,8 @@
  * This file IS NOT A PART OF Ken Silverman's original release
  */
 
-#ifndef _INCLUDE_UNIX_COMPAT_H_
-#define _INCLUDE_UNIX_COMPAT_H_
+#ifndef _INCLUDE_PLAT_UNIX_H_
+#define _INCLUDE_PLAT_UNIX_H_
 
 #if (!defined PLATFORM_UNIX)
 #error PLATFORM_UNIX is not defined.
@@ -57,7 +57,7 @@ int stricmp(const char *x, const char *y);
 #define printext16 printext256
 #define printext16_noupdate printext256_noupdate
 
-/* Other DOSisms. See unix_compat.c for implementation. */
+/* Other DOSisms. See plat_unix.c for implementation. */
 int32_t filelength(int fhandle);
 
 /* !!! need an implementation of findfirst()/findnext()! */
@@ -84,6 +84,6 @@ int32_t filelength(int fhandle);
 
 #endif
 
-/* end of unix_compat.h ... */
+/* end of plat_unix.h ... */
 
 

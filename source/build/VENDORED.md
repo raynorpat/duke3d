@@ -28,6 +28,7 @@ and public header names:
 | `pragmas.c` | `math.c`, together with the math/table helpers extracted from `engine.c` |
 | `engine.c` | `engine.c` (world/renderer core), `display.c` (views, pixels/text and palette operations), `tiles.c` (tile/voxel resources and sprite bookkeeping), plus the helpers in `math.c` |
 | `sdl_driver.c` | `sdl_main.c` (startup/events), `sdl_input.c` (devices/scancodes), `sdl_window.c` (video/presentation), `sdl_sys.c` (timing/diagnostics) |
+| `unix_compat.c/.h`, `win32_compat.c/.h` | `plat_unix.c/.h`, `plat_win32.c/.h`, selected by `platform.h` |
 
 `engine_internal.h` supplies only the declarations needed between these
 modules. `engine.c` still owns the `ENGINE` definitions from `build.h`, includes

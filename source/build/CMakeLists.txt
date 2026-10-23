@@ -18,9 +18,9 @@ add_library(buildengine STATIC
   ../videoopts.c)
 
 if(WIN32)
-  target_sources(buildengine PRIVATE win32_compat.c)
+  target_sources(buildengine PRIVATE plat_win32.c)
 else()
-  target_sources(buildengine PRIVATE unix_compat.c)
+  target_sources(buildengine PRIVATE plat_unix.c)
 endif()
 
 target_include_directories(buildengine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

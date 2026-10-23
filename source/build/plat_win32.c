@@ -1,5 +1,5 @@
 /*
- * Win32 compatibility code: the pieces win32_compat.h declares but that
+ * Win32 compatibility code: the pieces plat_win32.h declares but that
  *  only unix_compat.c defined upstream. Not part of icculus's release;
  *  see VENDORED.md.
  */
@@ -16,7 +16,7 @@
 #endif
 
 #include <stdio.h>
-#include "win32_compat.h"
+#include "plat_win32.h"
 
 /*
   256 byte table to assist in performing an
@@ -46,4 +46,4 @@ const int hbits[64] =
 
 
 
-/* end of win32_compat.c ... */
+/* end of plat_win32.c ... */

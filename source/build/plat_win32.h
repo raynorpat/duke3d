@@ -15,8 +15,8 @@
  * This file IS NOT A PART OF Ken Silverman's original release
  */
   
-#ifndef _INCLUDE_WIN32_COMPAT_H_
-#define _INCLUDE_WIN32_COMPAT_H_
+#ifndef _INCLUDE_PLAT_WIN32_H_
+#define _INCLUDE_PLAT_WIN32_H_
 
 #if (!defined PLATFORM_WIN32)
 #error PLATFORM_WIN32 is not defined.
@@ -102,7 +102,7 @@ extern const int hbits[];   /* !!! what is this, and why is it here? */
 #endif
 #endif
 
-/* end of win32_compat.h ... */
+/* end of plat_win32.h ... */
 
 
 

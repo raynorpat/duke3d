@@ -24,7 +24,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <ctype.h>
-#include "unix_compat.h"
+#include "plat_unix.h"
 
 /*
   256 byte table to assist in performing an
@@ -85,5 +85,5 @@ int32_t filelength(int fhandle)
 
 
 
-/* end of unix_compat.c ... */
+/* end of plat_unix.c ... */
 

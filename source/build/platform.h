@@ -2,15 +2,15 @@
 #define _INCLUDE_PLATFORM_H_
 
 #if (defined PLATFORM_WIN32)
-#include "win32_compat.h"
+#include "plat_win32.h"
 #elif (defined PLATFORM_MACOSX)
-#include "unix_compat.h"
+#include "plat_unix.h"
 #include <machine/endian.h>
 #elif (defined PLATFORM_FREEBSD)
-#include "unix_compat.h"
+#include "plat_unix.h"
 #include <sys/endian.h>
 #elif (defined PLATFORM_UNIX)
-#include "unix_compat.h"
+#include "plat_unix.h"
 #if !defined(__SUNPRO_C)
 #include <endian.h>
 #endif

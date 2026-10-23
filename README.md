@@ -641,6 +641,7 @@ The engine files in `source/build/` are grouped by responsibility:
 | `sdl_input.c` | SDL keyboard, mouse and joystick input |
 | `sdl_window.c` | SDL windows, video modes, palettes, presentation and screenshots |
 | `sdl_sys.c` | SDL timers, idle processing and diagnostic output |
+| `platform.h`, `plat_unix.c/.h`, `plat_win32.c/.h` | Platform selection and native compatibility helpers |
 
 `polymost.c` remains included by `engine.c` and includes its two backend
 implementations, with the OpenGL file guarded by `USE_OPENGL`. All three are
