@@ -96,6 +96,14 @@ static inline void dtol (double d, int32_t *a)
 	*a = (int32_t)lrint(d);
 }
 
+/*
+================
+imod
+
+Wrap a signed texture coordinate into 0..b-1, with b positive.
+C's remainder alone leaves negative coordinates below zero.
+================
+*/
 static inline int32_t imod (int32_t a, int32_t b)
 {
 	if (a >= 0) return(a%b);
@@ -164,6 +172,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 	}
 	walptr = (char *)waloff[globalpicnum];
 
+	/* Rotate depth and texture numerators together to preserve perspective. */
 	j = 0; dorot = ((gchang != 1.0) || (gctang != 1.0));
 	if (dorot)
 	{
@@ -196,6 +205,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 			if ((!j) || (px[j] != px[j-1]) || (py[j] != py[j-1])) j++;
 		}
 	}
+	/* Without pitch/roll, each backend evaluates the original mapping planes. */
 	else
 	{
 		for(i=0;i<n;i++)
@@ -306,6 +316,14 @@ void initmosts (double *px, double *py, int32_t n)
 	vsp[VSPMAX-1].n = vcnt; vsp[vcnt].p = VSPMAX-1;
 }
 
+/*
+================
+vsdel
+
+Unlink a visibility strip and return its node to the free list.
+VSPMAX-1 is the free-list sentinel; zero anchors the active list.
+================
+*/
 void vsdel (int32_t i)
 {
 	int32_t pi, ni;
@@ -322,6 +340,14 @@ void vsdel (int32_t i)
 	vsp[VSPMAX-1].n = i;
 }
 
+/*
+================
+vsinsaft
+
+Copy strip i into a free node and link the copy immediately after it.
+The caller supplies the new edge coordinates when it splits the strip.
+================
+*/
 int32_t vsinsaft (int32_t i)
 {
 	int32_t r;
@@ -339,6 +365,14 @@ int32_t vsinsaft (int32_t i)
 	return(r);
 }
 
+/*
+================
+testvisiblemost
+
+Test whether any open visibility strip overlaps the screen x interval.
+Portal traversal can stop when earlier geometry has covered that interval.
+================
+*/
 int32_t testvisiblemost (float x0, float x1)
 {
 	int32_t i, newi;
@@ -352,6 +386,14 @@ int32_t testvisiblemost (float x0, float x1)
 }
 
 static int32_t domostlayers = METH_LAYERS; //0 while drawing the parallaxed sky: it has no glow pass
+/*
+================
+domost
+
+Draw the exposed polygon between an edge and the current visibility strips.
+Then move the ceiling or floor boundary inward to hide it from later draws.
+================
+*/
 void domost (float x0, float y0, float x1, float y1)
 {
 	double dpx[4], dpy[4];
@@ -458,6 +500,8 @@ void domost (float x0, float y0, float x1, float y1)
 				//
 				//     ny0 ?         ny1 ?
 
+			/* Both ends have three positions: above, inside or below the aperture.
+			 * A base-three index selects the corresponding clipping case below. */
 			k = 1+3;
 			if ((vsp[i].tag == 0) || (ny0 <= vsp[i].cy[0]+.01)) k--;
 			if ((vsp[i].tag == 1) || (ny0 >= vsp[i].fy[0]-.01)) k++;
@@ -542,6 +586,14 @@ void domost (float x0, float y0, float x1, float y1)
 
 static void polymost_scansector (int32_t sectnum);
 
+/*
+================
+polymost_drawalls
+
+Draw a wall bunch and its exposed ceiling/floor polygons through domost.
+Visit the sector beyond a portal only while its screen interval is visible.
+================
+*/
 static void polymost_drawalls (int32_t bunch)
 {
 	sectortype *sec, *nextsec;
@@ -1086,6 +1138,14 @@ static void polymost_drawalls (int32_t bunch)
 	}
 }
 
+/*
+================
+polymost_bunchfront
+
+Compare wall bunches only where their projected x intervals overlap.
+Return -1 for no overlap; otherwise use the classic wall-front test.
+================
+*/
 static int32_t polymost_bunchfront (int32_t b1, int32_t b2)
 {
 	double x1b1, x1b2, x2b1, x2b2;
@@ -1103,6 +1163,14 @@ static int32_t polymost_bunchfront (int32_t b1, int32_t b2)
 	return(wallfront(i,b2f));
 }
 
+/*
+================
+polymost_scansector
+
+Project facing walls into linked bunches and collect the sector's sprites.
+Portals close to the eye are queued before projection can discard their walls.
+================
+*/
 static void polymost_scansector (int32_t sectnum)
 {
 	double d, xp1, yp1, xp2, yp2;
@@ -1153,6 +1221,7 @@ static void polymost_scansector (int32_t sectnum)
 			if ((nextsectnum >= 0) && (!(wal->cstat&32)) && (!(gotsector[nextsectnum>>3]&pow2char[nextsectnum&7])))
 			{
 				d = (double)x1*(double)y2 - (double)x2*(double)y1; xp1 = (double)(x2-x1); yp1 = (double)(y2-y1);
+				/* Squared distance to the wall line: no square root or projection divide. */
 				if (d*d <= (xp1*xp1 + yp1*yp1)*(SCISDIST*SCISDIST*260.0))
 					sectorborder[sectorbordercnt++] = nextsectnum;
 			}
@@ -1196,6 +1265,14 @@ static void polymost_scansector (int32_t sectnum)
 	} while (sectorbordercnt > 0);
 }
 
+/*
+================
+polymost_drawrooms
+
+Set up the camera and draw the opaque world in front-to-back bunch order.
+Visibility strips retain the portions of the viewport that are still open.
+================
+*/
 void polymost_drawrooms ()
 {
 	int32_t i, j, k, n, n2, closest;
@@ -1391,6 +1468,14 @@ void polymost_drawrooms ()
 	enddrawing();
 }
 
+/*
+================
+polymost_drawmaskwall
+
+Project a portal's masked wall within the opening of its two sectors.
+Clip the resulting polygon before handing it to the shared texture mapper.
+================
+*/
 void polymost_drawmaskwall (int32_t damaskwallcnt)
 {
 	double dpx[8], dpy[8], dpx2[8], dpy2[8];
@@ -1638,6 +1723,14 @@ static float polymost_spritenear (spritetype *tspr, float yp, float xl, float xr
 	return(max(nearest,max(yp*.25f,8.f)));
 }
 
+/*
+================
+polymost_drawsprite
+
+Project face, wall and floor sprites through the shared polygon mapper.
+Orientation and cstat choose the geometry, clipping and blend method.
+================
+*/
 void polymost_drawsprite (int32_t snum)
 {
 	double px[6], py[6];
@@ -1952,6 +2045,14 @@ void polymost_drawsprite (int32_t snum)
 	//dastat&128  1:draw all pages (permanent)
 	//dastat&256  1:one-to-one pixel aspect (when dastat&2)
 	//cx1,...     clip window (actual screen coords)
+/*
+================
+polymost_dorotatesprite
+
+Draw a screen-space tile with the shared polygon mapper.
+Save and restore the world camera state so HUD draws do not alter the 3D view.
+================
+*/
 void polymost_dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short picnum,
 	signed char dashade, unsigned char dapalnum, unsigned short dastat, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2)
 {

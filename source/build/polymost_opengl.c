@@ -118,6 +118,14 @@ static GLuint glidxmip[MAXTILES][2]; //a tile's mip levels for trilinear (0: non
 static int32_t glidxsize[MAXTILES][2][4]; //its index texture's size, and its mip levels' texture's (0: none made)
 
 void gloadtile(int32_t,int32_t,int32_t,int32_t,int32_t);
+/*
+================
+gltexcache
+
+Find the RGBA texture for a tile, palette and repeat/clamp combination.
+The key's high bit marks a slot for reload without changing its GL handle.
+================
+*/
 static int32_t gltexcache (int32_t dapicnum, int32_t dapalnum, int32_t dameth)
 {
 	int32_t i, j, k;
@@ -1518,6 +1526,14 @@ void resizeglcheck ()
 	}
 }
 
+/*
+================
+fixtransparency
+
+Give transparent texels neighbouring RGB colours while keeping alpha zero.
+Filtering then avoids dark fringes around masked texture edges.
+================
+*/
 void fixtransparency (coltype *dapic, int32_t daxsiz, int32_t daysiz, int32_t daxsiz2, int32_t daysiz2, int32_t dameth)
 {
 	coltype *wpptr;
@@ -1554,6 +1570,14 @@ void fixtransparency (coltype *dapic, int32_t daxsiz, int32_t daysiz, int32_t da
 	}
 }
 
+/*
+================
+uploadtexture
+
+Build and upload RGBA mip levels, reusing pic as scratch storage.
+Top levels may be dropped to meet the texture-size limit or user setting.
+================
+*/
 static void uploadtexture(int32_t doalloc, int32_t xsiz, int32_t ysiz, int32_t intexfmt, int32_t texfmt, coltype *pic, int32_t tsizx, int32_t tsizy, int32_t dameth)
 {
 	coltype *wpptr, *rpptr;
@@ -1585,6 +1609,7 @@ static void uploadtexture(int32_t doalloc, int32_t xsiz, int32_t ysiz, int32_t i
 #if 0
 	gluBuild2DMipmaps(GL_TEXTURE_2D,GL_RGBA8,xsiz,ysiz,texfmt,GL_UNSIGNED_BYTE,pic); //Needs C++ to link?
 #elif 1
+	/* Each smaller mip occupies the front of the same image buffer. */
 	x2 = xsiz; y2 = ysiz;
 	for(j=1;(x2 > 1) || (y2 > 1);j++)
 	{
@@ -1603,6 +1628,7 @@ static void uploadtexture(int32_t doalloc, int32_t xsiz, int32_t ysiz, int32_t i
 					if ((rpptr[x2].a)                  ) { r += (int32_t)rpptr[x2  ].r; g += (int32_t)rpptr[x2  ].g; b += (int32_t)rpptr[x2  ].b; a += (int32_t)rpptr[x2  ].a; k++; }
 					if ((x+x+1 < x2) && (rpptr[x2+1].a)) { r += (int32_t)rpptr[x2+1].r; g += (int32_t)rpptr[x2+1].g; b += (int32_t)rpptr[x2+1].b; a += (int32_t)rpptr[x2+1].a; k++; }
 				}
+				/* Average only contributing texels; transparent RGB must not darken edges. */
 				switch(k)
 				{
 					case 0:
@@ -1627,6 +1653,14 @@ static void uploadtexture(int32_t doalloc, int32_t xsiz, int32_t ysiz, int32_t i
 #endif
 }
 
+/*
+================
+gloadtile
+
+Convert column-major ART indices into a row-major RGBA cache texture.
+Build padded edges and an optional fullbright layer before uploading.
+================
+*/
 void gloadtile (int32_t dapic, int32_t dapal, int32_t dameth, int32_t gltexind, int32_t doalloc)
 {
 	coltype *pic, *wpptr, *fbpic;
@@ -1774,6 +1808,14 @@ static void polymost_glowend (GLuint basetex, float *pc, int32_t method)
 	glBindTexture(GL_TEXTURE_2D,basetex);
 }
 
+/*
+================
+polymost_gl_drawpoly
+
+Submit a projected polygon using the selected texture and GL drawing path.
+Reconstruct texture coordinates and eye-space vertices from the mapping planes.
+================
+*/
 static void polymost_gl_drawpoly(const polymost_polygon *poly)
 {
 	double ngdx, ngdy, ngdo, ngux, nguy, nguo, ngvx, ngvy, ngvo, dp, up, vp, du0, du1, dui, duj;
@@ -1857,6 +1899,8 @@ static void polymost_gl_drawpoly(const polymost_polygon *poly)
 		}
 
 			//Hack for walls&masked walls which use textures that are not a power of 2
+		/* Split at ART-width boundaries so GL never repeats the padding added
+		 * to a non-power-of-two wall texture on older hardware. */
 		if ((pow2xsplit) && (tsizx != xx))
 		{
 			if (!dorot)
@@ -2397,6 +2441,14 @@ static void polymost_gl_endsky(void)
 			}
 }
 
+/*
+================
+polymost_gl_beginrooms
+
+Start the opaque world pass, letting visibility strips decide coverage.
+Record depth for the masked walls and sprites that will be drawn afterward.
+================
+*/
 static void polymost_gl_beginrooms(void)
 {
 	if (rendmode == 3)
@@ -2414,6 +2466,7 @@ static void polymost_gl_beginrooms(void)
 		glDepthFunc(GL_ALWAYS); //NEVER,LESS,(,L)EQUAL,GREATER,(NOT,G)EQUAL,ALWAYS
 
 		//glPolygonOffset(1,1); //Supposed to make sprites pasted on walls or floors not disappear
+		/* Leave opaque surfaces just behind the later masked/sprite depth range. */
 		glDepthRange(0.00001,1.0); //<- this is more widely supported than glPolygonOffset
 
 		 //Enable this for OpenGL red-blue glasses mode :)
@@ -2440,6 +2493,14 @@ static void polymost_gl_beginrooms(void)
 	}
 }
 
+/*
+================
+polymost_gl_endrooms
+
+Switch from span-ordered opaque geometry to depth-tested late draws.
+The depth-range bias keeps coplanar sprites in front of their walls.
+================
+*/
 static void polymost_gl_endrooms(void)
 {
 	if (rendmode == 3)
@@ -2463,6 +2524,14 @@ static void polymost_gl_beginmasked(int32_t sectnum)
 	}
 }
 
+/*
+================
+polymost_gl_nearer_begin
+
+Scale fog for a face sprite moved toward the eye and suppress GL depth writes.
+Return the saved fog scale for the paired restore after the sprite draw.
+================
+*/
 static float polymost_gl_nearer_begin(float scale)
 {
 				float fogshades = glfogshades; glfogshades *= scale;

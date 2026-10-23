@@ -21,7 +21,7 @@
 //    keeps A.ASM's one-pixel shortcut, so the picture matches A.ASM's exactly;
 //  - the routines JFBuild's a-c.c doesn't have, because its engine stopped
 //    calling them, are at the end: the four-column vline routines built on
-//    the one-column ones, tvlineasm2, and the parallax-sky rhline family.
+//    the one-column ones, tvlineasm2, and the rotated-sprite rhline family.
 
 #include <stdint.h>
 #include "platform.h"
@@ -55,6 +55,14 @@ void sethlinesizes(int32_t logx, int32_t logy, intptr_t bufplc)
 	{ hlogx = logx; hlogy = logy; hbuf = (unsigned char *)bufplc; }
 void setpalookupaddress(char *paladdr) { hpal = (unsigned char *)paladdr; }
 void setuphlineasm4(int32_t bxinc, int32_t byinc) { hbxinc = bxinc; hbyinc = byinc; }
+/*
+================
+hlineasm4
+
+Draw cnt+1 opaque floor/ceiling pixels from right to left.
+Texture phases wrap in 32 bits; paloffs selects the shade row.
+================
+*/
 void hlineasm4(int32_t cnt, int32_t skiploadincs, int32_t paloffs, uint32_t by, uint32_t bx, intptr_t p)
 {
 	unsigned char *palptr, *pp;
@@ -81,6 +89,14 @@ static unsigned char slopemach_ah1;
 static unsigned char slopemach_ah2;
 static float asm2_f;
 typedef union { unsigned int i; float f; } bitwisef2i;
+/*
+================
+setupslopevlin
+
+Unpack the texture-size shifts and latch the floating depth step.
+These values replace constants patched into the original slope instructions.
+================
+*/
 void setupslopevlin(int32_t i1, intptr_t i2, int32_t i3)
 {
     bitwisef2i c;
@@ -99,6 +115,14 @@ extern int32_t globalx3, globaly3;
 extern int32_t fpuasm;
 #define low32(a) ((a&0xffffffff))
 
+/*
+================
+slopevlin
+
+Draw a sloped-plane column, correcting perspective every eight pixels.
+The palette-pointer array supplies a separate shade lookup for each pixel.
+================
+*/
 void slopevlin(intptr_t i1, int32_t _i2, intptr_t *i3, int32_t i4, int32_t i5, int32_t i6)
 {
     uint32_t i2 = (uint32_t)_i2;
@@ -110,6 +134,7 @@ void slopevlin(intptr_t i1, int32_t _i2, intptr_t *i3, int32_t i4, int32_t i5, i
     esi = i5 + (uint32_t)low32((__int64)globalx3 * (__int64)(i2<<3));
     edi = i6 + (uint32_t)low32((__int64)globaly3 * (__int64)(i2<<3));
     ebx = i4;
+    /* Reconstruct perspective at block ends, then step between corrections. */
     do {
 	    // -------------
 	    // All this is calculating a fixed point approx. of 1/a
@@ -163,6 +188,14 @@ void slopevlin(intptr_t i1, int32_t _i2, intptr_t *i3, int32_t i4, int32_t i5, i
 	//Wall,face sprite/wall sprite vertical line functions
 static int32_t vlogy, mvlogy, tvlogy;
 void setupvlineasm(int32_t neglogy) { vlogy = neglogy&31; }
+/*
+================
+vlineasm1
+
+Draw cnt+1 opaque column pixels and return the advanced texture phase.
+The four-column caller uses that return value to continue the next span.
+================
+*/
 int32_t vlineasm1(int32_t vinc, intptr_t paloffs, int32_t cnt, int32_t vplc, intptr_t bufplc, intptr_t p)
 {
 	unsigned char *pp = (unsigned char *)p, *pbuf = (unsigned char *)bufplc, *ppal = (unsigned char *)paloffs;
@@ -178,6 +211,14 @@ int32_t vlineasm1(int32_t vinc, intptr_t paloffs, int32_t cnt, int32_t vplc, int
 }
 
 void setupmvlineasm(int32_t neglogy) { mvlogy = neglogy&31; }
+/*
+================
+mvlineasm1
+
+Draw cnt+1 masked column pixels, leaving texel 255 untouched.
+Advance and return the texture phase even when a pixel is transparent.
+================
+*/
 int32_t mvlineasm1(int32_t vinc, intptr_t paloffs, int32_t cnt, int32_t vplc, intptr_t bufplc, intptr_t p)
 {
 	unsigned char ch, *pp = (unsigned char *)p, *pbuf = (unsigned char *)bufplc, *ppal = (unsigned char *)paloffs;
@@ -193,11 +234,20 @@ int32_t mvlineasm1(int32_t vinc, intptr_t paloffs, int32_t cnt, int32_t vplc, in
 }
 
 void setuptvlineasm(int32_t neglogy) { tvlogy = neglogy&31; }
+/*
+================
+tvlineasm1
+
+Draw cnt+1 translucent column pixels through the palette blend table.
+transmode exchanges the foreground/background order of the lookup.
+================
+*/
 int32_t tvlineasm1(int32_t vinc, intptr_t paloffs, int32_t cnt, int32_t vplc, intptr_t bufplc, intptr_t p)
 {
 	unsigned char ch, *pp = (unsigned char *)p, *pbuf = (unsigned char *)bufplc, *ppal = (unsigned char *)paloffs;
 	uint32_t uvplc = (uint32_t)vplc;
 
+	/* A blend is a 16-bit table index, not arithmetic on RGB colours. */
 	if (transmode)
 	{
 		for(;cnt>=0;cnt--)
@@ -225,6 +275,14 @@ int32_t tvlineasm1(int32_t vinc, intptr_t paloffs, int32_t cnt, int32_t vplc, in
 	//Fix: A.ASM draws (cntup16>>16)+1 pixels ("sub ecx,65536 / jnc"); JFBuild's ">0" dropped the last one of every span.
 static int32_t mlogx, mlogy, tlogx, tlogy;
 void msethlineshift(int32_t logx, int32_t logy) { mlogx = logx; mlogy = logy; }
+/*
+================
+mhline
+
+Draw a masked floor-sprite span, including its last pixel.
+The high word of cntup16 is a last-pixel offset, not a pixel count.
+================
+*/
 void mhline(intptr_t bufplc, uint32_t bx, int32_t cntup16, int32_t junk, uint32_t by, intptr_t p)
 {
 	unsigned char ch, *pp = (unsigned char *)p, *pbuf = (unsigned char *)bufplc, *ppal = (unsigned char *)asm3;
@@ -241,6 +299,14 @@ void mhline(intptr_t bufplc, uint32_t bx, int32_t cntup16, int32_t junk, uint32_
 }
 
 void tsethlineshift(int32_t logx, int32_t logy) { tlogx = logx; tlogy = logy; }
+/*
+================
+thline
+
+Draw an inclusive floor-sprite span through the translucency table.
+Texel 255 leaves the destination unchanged in either blend order.
+================
+*/
 void thline(intptr_t bufplc, uint32_t bx, int32_t cntup16, int32_t junk, uint32_t by, intptr_t p)
 {
 	unsigned char ch, *pp = (unsigned char *)p, *pbuf = (unsigned char *)bufplc, *ppal = (unsigned char *)asm3;
@@ -281,6 +347,14 @@ void setupspritevline(intptr_t paloffs, int32_t bxinc, int32_t byinc, int32_t ys
 	sbyinc = byinc;
 	sysiz = ysiz;
 }
+/*
+================
+spritevline
+
+Draw a rotated sprite column using 16.16 texture coordinates.
+This interface emits cnt-1 pixels, unlike the wall-column routines.
+================
+*/
 void spritevline(int32_t bx, int32_t by, int32_t cnt, intptr_t bufplc, intptr_t p)
 {
 	unsigned char *pp = (unsigned char *)p, *pbuf = (unsigned char *)bufplc;
@@ -301,6 +375,14 @@ void msetupspritevline(intptr_t paloffs, int32_t bxinc, int32_t byinc, int32_t y
 	msbyinc = byinc;
 	msysiz = ysiz;
 }
+/*
+================
+mspritevline
+
+Draw a masked rotated-sprite column; texel 255 is transparent.
+The sprite-column count stops at one, emitting cnt-1 pixels.
+================
+*/
 void mspritevline(int32_t bx, int32_t by, int32_t cnt, intptr_t bufplc, intptr_t p)
 {
 	unsigned char ch, *pp = (unsigned char *)p, *pbuf = (unsigned char *)bufplc;
@@ -322,6 +404,14 @@ void tsetupspritevline(intptr_t paloffs, int32_t bxinc, int32_t byinc, int32_t y
 	tsbyinc = byinc;
 	tsysiz = ysiz;
 }
+/*
+================
+tspritevline
+
+Draw a translucent rotated-sprite column through the blend table.
+The sprite-column count stops at one, emitting cnt-1 pixels.
+================
+*/
 void tspritevline(int32_t bx, int32_t by, int32_t cnt, intptr_t bufplc, intptr_t p)
 {
 	unsigned char ch, *pp = (unsigned char *)p, *pbuf = (unsigned char *)bufplc;
@@ -355,6 +445,14 @@ static unsigned char *slabpal;
 void setupdrawslab (int32_t dabpl, intptr_t pal)
 	{ slabbpl = dabpl; slabpal = (unsigned char *)pal; }
 
+/*
+================
+drawslab
+
+Expand one sampled texel across each row of a rectangular slab.
+The 16.16 v step selects the source texel for the next row.
+================
+*/
 void drawslab (int32_t dx, int32_t v, int32_t dy, int32_t vi, intptr_t vptr, intptr_t p)
 {
 	int32_t x;
@@ -368,6 +466,14 @@ void drawslab (int32_t dx, int32_t v, int32_t dy, int32_t vi, intptr_t vptr, int
 	}
 }
 
+/*
+================
+stretchhline
+
+Stretch a source row right to left into cnt*4 destination bytes.
+The old interface counts four-byte groups; u and uinc are 16.16.
+================
+*/
 void stretchhline (intptr_t p0, int32_t u, int32_t cnt, int32_t uinc, intptr_t rptr, intptr_t p)
 {
 	unsigned char *np;
@@ -410,6 +516,14 @@ void vlineasm4(int32_t cnt, intptr_t p)
 		vplce[i] = vlineasm1(vince[i],palookupoffse[i],cnt-1,vplce[i],bufplce[i],p+i);
 }
 
+/*
+================
+mvlineasm4
+
+Draw four adjacent masked columns and save their final texture phases.
+Each single-column call takes a last-pixel offset, hence cnt-1.
+================
+*/
 void mvlineasm4(int32_t cnt, intptr_t p)
 {
 	int32_t i;
@@ -428,6 +542,14 @@ void setuptvlineasm2(int32_t i1, intptr_t i2, intptr_t i3)
 	tran2pal_ecx = i3;
 } /* */
 
+/*
+================
+tvlineasm2
+
+Draw two adjacent translucent columns using separate texture phases.
+The destination is addressed backward from the column end in asm2.
+================
+*/
 void tvlineasm2(uint32_t i1, uint32_t i2, uintptr_t i3, uintptr_t i4, uint32_t i5, uintptr_t i6)
 {
 	uint32_t ebp = i1;
@@ -482,12 +604,13 @@ void tvlineasm2(uint32_t i1, uint32_t i2, uintptr_t i3, uintptr_t i4, uint32_t i
 		}
 		i6off += bpl;
 	} while (i6off > i6off - bpl);
+	/* Preserve the register-style return convention for the next pair of spans. */
 	asm1 = i5;
 	asm2 = ebp;
 } /* tvlineasm2 */
 
 
-	//The parallax sky's line routines, kept from the icculus port.
+	//The rotated-sprite horizontal line routines, kept from the icculus port.
 static int32_t rmach_eax;
 static int32_t rmach_ebx;
 static int32_t rmach_ecx;
@@ -502,6 +625,14 @@ void setuprhlineasm4(int32_t i1, int32_t i2, int32_t i3, intptr_t i4, int32_t i5
     rmach_esi = i5;
 } /* setuprhlineasm4 */
 
+/*
+================
+rhlineasm4
+
+Draw a right-to-left rotated-sprite span with fractional texture stepping.
+Unsigned wrap tests carry the u/v fractions into source-address changes.
+================
+*/
 void rhlineasm4(int32_t i1, intptr_t i2, int32_t i3, uint32_t i4, uint32_t i5, intptr_t i6)
 {
     uint32_t ebp;
@@ -509,6 +640,7 @@ void rhlineasm4(int32_t i1, intptr_t i2, int32_t i3, uint32_t i4, uint32_t i5, i
 
     if (i1 <= 0) return;
 
+    /* Texture fractions run backward; a borrow steps one extra source texel. */
     i6 = i1;
     do {
 	    i3 = ((i3&0xffffff00)|(*((unsigned char *)i2)));
@@ -539,6 +671,14 @@ void setuprmhlineasm4(int32_t i1, int32_t i2, int32_t i3, intptr_t i4, int32_t i
     rmmach_esi = i5;
 } /* setuprmhlineasm4 */
 
+/*
+================
+rmhlineasm4
+
+Draw a masked rotated-sprite span with fractional carry stepping.
+Texel 255 advances the source and destination without writing.
+================
+*/
 void rmhlineasm4(int32_t i1, intptr_t i2, int32_t i3, int32_t i4, int32_t i5, intptr_t i6)
 {
     uint32_t ebp;

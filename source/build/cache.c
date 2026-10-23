@@ -55,6 +55,14 @@ typedef struct { intptr_t *hand; int32_t leng; unsigned char *lock; } cactype;
 cactype cac[MAXCACHEOBJECTS];
 static int32_t lockrecip[200];
 
+/*
+================
+initcache
+
+Start a cache arena as one empty block.
+lockrecip makes eviction more expensive as a lock approaches 200.
+================
+*/
 void initcache(intptr_t dacachestart, int32_t dacachesize)
 {
 	int32_t i;
@@ -69,10 +77,19 @@ void initcache(intptr_t dacachestart, int32_t dacachesize)
 	cacnum = 1;
 }
 
+/*
+================
+allocache
+
+Allocate from the cheapest contiguous run of evictable cache blocks.
+Eviction clears each owner's handle so it will reload the data on demand.
+================
+*/
 void allocache (intptr_t *newhandle, int32_t newbytes, unsigned char *newlockptr)
 {
 	int32_t i, z, zz, bestz=0, daval, bestval, besto=0, o1, o2, sucklen, suckz;
 
+	/* All blocks use the same 16-byte size quantum, including leftover space. */
 	newbytes = ((newbytes+15)&0xfffffff0);
 
 	if ((unsigned)newbytes > (unsigned)cachesize)
@@ -98,7 +115,9 @@ void allocache (intptr_t *newhandle, int32_t newbytes, unsigned char *newlockptr
 		for(i=o1,zz=z;i<o2;i+=cac[zz++].leng)
 		{
 			if (*cac[zz].lock == 0) continue;
+			/* A pinned block makes the entire candidate run unavailable. */
 			if (*cac[zz].lock >= 200) { daval = 0x7fffffff; break; }
+			/* Charge for both size and lock strength; free blocks cost nothing. */
 			daval += (int32_t) mulscale32(cac[zz].leng+65536,lockrecip[*cac[zz].lock]);
 			if (daval >= bestval) break;
 		}
@@ -149,6 +168,14 @@ void allocache (intptr_t *newhandle, int32_t newbytes, unsigned char *newlockptr
 	cac[bestz].lock = &zerochar;
 }
 
+/*
+================
+suckcache
+
+Release a cached buffer by its data address and join adjacent free space.
+The owner's handle is cleared when its live block is removed.
+================
+*/
 void suckcache (int32_t *suckptr)
 {
 	int32_t i;
@@ -175,6 +202,14 @@ void suckcache (int32_t *suckptr)
 		}
 }
 
+/*
+================
+agecache
+
+Age a fraction of the cache each call so older data gets cheaper to evict.
+Locks 2..199 decay toward 1; 0 is free and 200..255 stay pinned.
+================
+*/
 void agecache(void)
 {
 	int32_t cnt;
@@ -186,6 +221,7 @@ void agecache(void)
 	for(cnt=(cacnum>>4);cnt>=0;cnt--)
 	{
 		ch = (*cac[agecount].lock);
+		/* Treat the char as an unsigned lock byte, even on signed-char hosts. */
 		if (((ch-2)&255) < 198)
 			(*cac[agecount].lock) = (unsigned char) (ch-1);
 

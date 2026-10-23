@@ -37,22 +37,62 @@ static __inline __int64 mul32_64(int i1,int i2)
 {
 	return (__int64)i1*i2;
 }
+/*
+================
+scale
+
+Compute a*b/c with a full 64-bit product.
+Division truncates toward zero, including for negative results.
+================
+*/
 static __inline int scale (int input1, int input2, int input3)
 {
 	return (int)(mul32_64(input1,input2)/input3);
 }
+/*
+================
+mulscale
+
+Multiply in 64 bits, then take the shifted 32-bit result.
+The arithmetic shift rounds negative products down, unlike division.
+================
+*/
 static __inline int mulscale (int input1, int input2, int input3)
 {
 	return (int)(mul32_64(input1,input2)>>input3);
 }
+/*
+================
+dmulscale
+
+Add two full products before shifting the fixed-point result.
+Shifting each term first would lose the carry from their fractional bits.
+================
+*/
 static __inline int dmulscale  (int input1, int input2, int input3,int input4,int input5)
 {
 	return (int)((mul32_64(input1,input2) + mul32_64(input3,input4))>>input5);
 }
+/*
+================
+tmulscale
+
+Add three full products before shifting, for fixed-point dot products.
+Keep the low bits until all terms have been accumulated.
+================
+*/
 static __inline int tmulscale(int i1, int i2, int i3, int i4, int i5, int i6,int shift)
 {
 	return (int)((mul32_64(i1,i2) + mul32_64(i3,i4) + mul32_64(i5,i6))>>shift);
 }
+/*
+================
+divscale
+
+Shift the numerator in 64 bits before dividing.
+The caller must supply a nonzero divisor and a representable quotient.
+================
+*/
 static __inline int divscale(int i1, int i2, int i3)
 {
 	return (int)(((__int64)i1<<i3)/i2);

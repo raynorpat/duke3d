@@ -13,6 +13,14 @@ int32_t *zbufmem = 0, zbufysiz = 0, zbufbpl = 0;
 #endif
 static int32_t zbufwrite = 1; //0: renderer 2's spans don't write the z-buffer
 
+/*
+================
+drawline2d
+
+Clip a debug line to the view and draw it in the indexed framebuffer.
+Step the dominant axis in whole pixels and the other axis in 16.16.
+================
+*/
 void drawline2d (float x0, float y0, float x1, float y1, char col)
 {
 	float f, dx, dy, fxres, fyres;
@@ -30,6 +38,7 @@ void drawline2d (float x0, float y0, float x1, float y1, char col)
 		  if (y1 >= fyres) {                          x1 += (fyres-y1)*dx/dy; y1 = fyres; }
 	else if (y1 <      0) {                          x1 += (    0-y1)*dx/dy; y1 =     0; }
 
+	/* The unsigned range test below rejects negative and off-screen positions. */
 	if (fabs(dx) > fabs(dy))
 	{
 		if (x0 > x1) { f = x0; x0 = x1; x1 = f; f = y0; y0 = y1; y1 = f; }
@@ -52,6 +61,14 @@ void drawline2d (float x0, float y0, float x1, float y1, char col)
 	}
 }
 
+/*
+================
+polymost_soft_drawpoly
+
+Fill a projected convex polygon in the software framebuffer.
+Mode 1 uses a flat debug colour and outline; mode 2 maps paletted ART.
+================
+*/
 static void polymost_soft_drawpoly(const polymost_polygon *poly)
 {
 	double ngdx, ngdy, ngdo, ngux, nguy, nguo, ngvx, ngvy, ngvo, dp, up, vp, rdp;
@@ -73,6 +90,7 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 		{
 			zbufbpl = bytesperline;
 			zbufysiz = ydim;
+			/* One depth value per framebuffer byte, including the row padding. */
 			zbufmem = (int32_t *)realloc(zbufmem,zbufbpl*zbufysiz*4);
 		}
 #endif
@@ -102,6 +120,7 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 				//px[0]*gvx + py[0]*gvy + 1*gvo = vv[0]*dd[0] (vv[i] premultiplied by dd[i] above)
 				//px[1]*gvx + py[1]*gvy + 1*gvo = vv[1]*dd[1]
 				//px[2]*gvx + py[2]*gvy + 1*gvo = vv[2]*dd[2]
+			/* Solve the screen-space planes for 1/z, u/z and v/z from three vertices. */
 			ox = py[1]-py[2]; oy = py[2]-py[0]; oz = py[0]-py[1];
 			r = 1.0 / (ox*px[0] + oy*px[1] + oz*px[2]);
 			ngdx = (ox*dd[0] + oy*dd[1] + oz*dd[2])*r;
@@ -118,6 +137,7 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 		}
 		palptr = &palookup[globalpal][min(max(globalshade,0),numpalookups-1)<<8]; //<-need to make shade not static!
 
+		/* Power-of-two dimensions wrap with masks; other widths need imod. */
 		tsizxm1 = tsizx-1; xmodnice = (!(tsizxm1&tsizx));
 		tsizym1 = tsizy-1; ymulnice = (!(tsizym1&tsizy));
 		if ((method&4) && (!xmodnice)) //Sprites don't need a mod on texture coordinates
@@ -146,6 +166,7 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 	ngux2 = ngux*(1<<LINTERPSIZ);
 	ngvx2 = ngvx*(1<<LINTERPSIZ);
 
+	/* Record one edge in lastx, then walk the other to emit horizontal spans. */
 	mini = (py[0] >= py[1]); maxi = 1-mini;
 	for(z=2;z<n;z++)
 	{
@@ -194,6 +215,8 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 						dtol(vp*rdp,&v0); vp += ngvx2;
 						rdp = 65536.0/dp;
 
+						/* Divide at block ends, then interpolate depth/u/v in 16.16 within
+						 * each block. LINTERPSIZ trades perspective error for fewer divides. */
 						switch (method&3)
 						{
 							case 0:

@@ -32,6 +32,14 @@ uint32_t getkensmessagecrc(intptr_t param) {
     return(0x56c764d4);
 }
 
+/*
+================
+msqrtasm
+
+Approximate an integer square root two input bits at a time.
+This supplies the values used to make the rendering lookup table.
+================
+*/
 int32_t msqrtasm(int i1)
 {
     int retval = 0x40000000;
@@ -55,11 +63,26 @@ int32_t msqrtasm(int i1)
 }
 
 
+/*
+================
+clearbuf
+
+Fill size 32-bit words. The count is words, unlike clearbufbyte.
+================
+*/
 void clearbuf(void *buffer, int size, int32_t fill_value) {
   int i;
   for (i = 0; i < size; i++) ((int32_t*)buffer)[i] = fill_value;
 }
 
+/*
+================
+clearbufbyte
+
+Fill a byte-sized region using the legacy 32-bit fill pattern.
+Small counts and unaligned ends take separate paths.
+================
+*/
 void clearbufbyte(void *vpbuffer, int size, int32_t fill_value) {
   unsigned char *buffer = (unsigned char *) vpbuffer;
   int lsize;
@@ -69,6 +92,7 @@ void clearbufbyte(void *vpbuffer, int size, int32_t fill_value) {
   case 2: *((unsigned short*)buffer) = fill_value; return;
   case 3: { buffer[2]=buffer[1]=buffer[0] = fill_value;} return;
   default:
+	/* Peel bytes and halfwords until the remaining word stores are aligned. */
 	if ((intptr_t)buffer&1) {
 		*buffer = fill_value; size--;
         buffer++;
@@ -94,6 +118,13 @@ void clearbufbyte(void *vpbuffer, int size, int32_t fill_value) {
   }
 }
 
+/*
+================
+copybuf
+
+Copy size 32-bit words; the count follows the old rep movsd interface.
+================
+*/
 void copybuf(void *source, void *dest, int size) {
   int i;
   for (i = 0; i < size; i++) ((int32_t*)dest)[i] = ((int32_t*)source)[i];
@@ -103,6 +134,14 @@ void copybufbyte(void *source, void *dest, int size) {
   memcpy(dest,source,size);
 }
 
+/*
+================
+copybufreverse
+
+Copy bytes forward in dest while walking source backward.
+Source points at the last byte to copy; size must be positive.
+================
+*/
 void copybufreverse(void *source, void *dest, int size) {
   unsigned char *s=source,*d=dest;
   do {
@@ -110,6 +149,14 @@ void copybufreverse(void *source, void *dest, int size) {
   } while(--size);
 }
 
+/*
+================
+qinterpolatedown16
+
+Store the integer parts of a 16.16 ramp.
+The legacy size == 0 case still writes one sample.
+================
+*/
 void qinterpolatedown16 (int32_t *source, int size, int linum, int linum_inc) {
 	if (size == 0)
 	{
@@ -126,10 +173,19 @@ void qinterpolatedown16 (int32_t *source, int size, int linum, int linum_inc) {
 	}
 }
 
+/*
+================
+qinterpolatedown16short
+
+Store a 16.16 ramp as 16-bit samples, two per word store.
+Unlike the 32-bit version, a zero count writes nothing.
+================
+*/
 void qinterpolatedown16short (int32_t *source, int size, int linum, int linum_inc)
 {
 	if (size == 0) return;
 
+	/* The destination may start on a halfword; align before packing pairs. */
 	if ((intptr_t)source & 0x2)
 	{
         unsigned short *src = (unsigned short *) source;
@@ -150,6 +206,8 @@ void qinterpolatedown16short (int32_t *source, int size, int linum, int linum_in
 
 	while (size >= 0)
 	{
+		/* The endian paths target opposite word halves. Signed intermediates
+		 * affect negative-ramp results and are part of the legacy packing. */
 		// DDOI - this fix is from the Amiga port guys
 		// http://www.neoscientists.org/~dante/
 #ifdef PLATFORM_BIGENDIAN
@@ -192,6 +250,14 @@ int32_t reciptable[2048], fpuasm;
 
 
 
+/*
+================
+nsqrtasm
+
+Reduce the input to a square-root table index, then rescale the result.
+shlookup packs the input and output shifts into one word.
+================
+*/
         int32_t nsqrtasm(uint32_t param)
 	{
 	    unsigned short *shlookup_a = (unsigned short*)shlookup;
@@ -203,6 +269,7 @@ int32_t reciptable[2048], fpuasm;
 	    else
 		    cx = shlookup_a[param>>12];
 
+	    /* Low byte normalizes the argument; high byte rescales the root. */
 	    param = param >> (cx&0xff);
 	    param = ((param&0xffff0000)|sqrtable_a[param]);
 	    param = param >> ((cx&0xff00)>>8);
@@ -212,6 +279,14 @@ int32_t reciptable[2048], fpuasm;
 
 
 
+/*
+================
+krecipasm
+
+Approximate a fixed-point reciprocal from a float exponent and mantissa.
+The negative path complements the table result instead of negating it.
+================
+*/
         static int32_t krecipasm(int32_t param)
         {
 		unsigned int xormask;
@@ -230,6 +305,7 @@ int32_t reciptable[2048], fpuasm;
 
 		xormask = (param < 0) ? 0xffffffff : 0;
 
+		/* Keep 11 mantissa bits for the table; the exponent supplies the scale. */
 		mantissa = (fi.i & 0x007ff000) >> 12;
 		exponent = (fi.i - 0x3f800000) >> 23;
 
@@ -268,6 +344,14 @@ int32_t reciptable[2048], fpuasm;
 
 
 
+/*
+================
+getclipmask
+
+Pack four clipping tests and their complements into paired nibbles.
+Polygon rejection combines these masks without testing each edge again.
+================
+*/
         int32_t getclipmask(int i1, int i2, int i3, int i4)
         {
 	    uint32_t eax;
@@ -338,6 +422,14 @@ static int32_t ksqrtasm(int32_t num)
 #define LOGICSQRT(x) nsqrtasm(x)
 #endif
 
+/*
+================
+initksqrt
+
+Build the rendering square-root table and its normalization shifts.
+An input shift of two bits changes the root scale by one bit.
+================
+*/
 static void initksqrt(void)
 {
 	int32_t i, j, k;
@@ -353,6 +445,14 @@ static void initksqrt(void)
 }
 
 
+/*
+================
+engine_loadtables
+
+Build the arithmetic lookup tables once and load the shared angle/font data.
+Early game revisions also need their separate gameplay square-root table.
+================
+*/
 void engine_loadtables(void)
 {
 	int32_t i, fil;
@@ -385,6 +485,14 @@ void engine_loadtables(void)
 }
 
 
+/*
+================
+getangle
+
+Convert a vector to a Build angle: 2048 units make a full turn.
+Use the smaller/larger component ratio to stay in the arctangent table.
+================
+*/
 int getangle(int32_t xvect, int32_t yvect)
 {
 	if ((xvect|yvect) == 0) return(0);
@@ -392,16 +500,33 @@ int getangle(int32_t xvect, int32_t yvect)
 	if (yvect == 0) return(((xvect<0)<<10));
 	if (xvect == yvect) return(256+((xvect<0)<<10));
 	if (xvect == -yvect) return(768+((xvect>0)<<10));
+	/* Fold into a shallow octant, then restore the quadrant and wrap. */
 	if (klabs(xvect) > klabs(yvect))
 		return(((radarang[640+scale(160,yvect,xvect)]>>6)+((xvect<0)<<10))&2047);
 	return(((radarang[640-scale(160,xvect,yvect)]>>6)+512+((yvect<0)<<10))&2047);
 }
 
+/*
+================
+ksqrt
+
+Use the game revision's square-root approximation.
+Early gameplay and rendering deliberately use different lookup tables.
+================
+*/
 int ksqrt(int32_t num)
 {
 	return(LOGICSQRT(num));
 }
 
+/*
+================
+rotatepoint
+
+Rotate a world point about a pivot using the 14-bit sine table.
+Shift only after adding the two products to keep the fractional carry.
+================
+*/
 void rotatepoint(int32_t xpivot, int32_t ypivot, int32_t x, int32_t y, short daang, int32_t *x2, int32_t *y2)
 {
 	int32_t dacos, dasin;
@@ -414,6 +539,14 @@ void rotatepoint(int32_t xpivot, int32_t ypivot, int32_t x, int32_t y, short daa
 	*y2 = dmulscale14(y,dacos,x,dasin) + ypivot;
 }
 
+/*
+================
+krand
+
+Advance the gameplay random stream and return its upper 16 bits.
+Every call changes the state used by subsequent demo simulation.
+================
+*/
 int krand(void)
 {
 	randomseed = (randomseed*27584621)+1;
