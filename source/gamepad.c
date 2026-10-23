@@ -19,6 +19,14 @@ static const int actions[] = {
     };
 static unsigned trigger_held;
 
+/*
+================
+stick
+
+Remove the controller deadzone and rescale each remaining signed range
+to the game's normalized stick magnitude.
+================
+*/
 static int stick(int value)
 {
     const int deadzone = 8000;
@@ -29,6 +37,13 @@ static int stick(int value)
     return 0;
 }
 
+/*
+================
+open_controller
+
+Open the first recognized controller matching the optional device name.
+================
+*/
 static void open_controller(void)
 {
     const char *wanted = getenv("BUILD_SDLJOYSTICK");
@@ -44,6 +59,14 @@ static void open_controller(void)
     }
 }
 
+/*
+================
+GAMEPAD_Init
+
+Initialize controller support unless disabled by the device preference.
+Repeated initialization leaves the current subsystem and device intact.
+================
+*/
 void GAMEPAD_Init(void)
 {
     const char *wanted = getenv("BUILD_SDLJOYSTICK");
@@ -55,6 +78,13 @@ void GAMEPAD_Init(void)
     }
 }
 
+/*
+================
+GAMEPAD_Shutdown
+
+Close the controller and clear its held, menu and repeat state.
+================
+*/
 void GAMEPAD_Shutdown(void)
 {
     if (controller != NULL)
@@ -76,6 +106,13 @@ int GAMEPAD_Connected(void)
     return controller != NULL;
 }
 
+/*
+================
+GAMEPAD_ClearButton
+
+Suppress a controller action until it is released and clear its published bit.
+================
+*/
 void GAMEPAD_ClearButton(int action)
 {
     suppressed |= UINT64_C(1) << action;
@@ -85,6 +122,14 @@ void GAMEPAD_ClearButton(int action)
         GAMEPAD_ButtonState2 &= ~(UINT32_C(1) << (action - 32));
 }
 
+/*
+================
+GAMEPAD_EventAction
+
+Translate a controller press edge into a game action for the event latch.
+Trigger axes emit actions when they cross into the held range.
+================
+*/
 int GAMEPAD_EventAction(const SDL_Event *event)
 {
     int action = -1;
@@ -111,6 +156,14 @@ int GAMEPAD_EventAction(const SDL_Event *event)
     return action;
 }
 
+/*
+================
+GAMEPAD_Poll
+
+Refresh the attached controller, reconnect when needed and publish held actions.
+Menu navigation produces keyboard-style presses with directional repeat.
+================
+*/
 void GAMEPAD_Poll(void)
 {
     static const int keys[] = {
@@ -162,6 +215,8 @@ void GAMEPAD_Poll(void)
         if (buttons & (1u << SDL_CONTROLLER_BUTTON_B)) menu_keys |= 32u;
     }
     if (buttons & (1u << SDL_CONTROLLER_BUTTON_START)) menu_keys |= 32u;
+    /* A menu transition must not turn an already-held menu button into
+     * a gameplay action when the menu closes. */
     if (was_menu >= 0 && menu != was_menu) {
         suppressed |= held;
         previous_keys = menu_keys;
@@ -187,6 +242,8 @@ void GAMEPAD_Poll(void)
         }
         if (!(previous_keys & bit)) {
             KB_QueueGamepadKey(keys[i]);
+            /* Only directions repeat: wait 350 ms after the initial edge, then
+             * repeat every 100 ms. Confirm and cancel remain edge-triggered. */
             if (i < 4) repeat_at[i] = now + 350;
         } else if (i < 4 && (Sint32)(now - repeat_at[i]) >= 0) {
             KB_QueueGamepadKey(keys[i]);
@@ -196,6 +253,14 @@ void GAMEPAD_Poll(void)
     previous_keys = menu_keys;
 }
 
+/*
+================
+GAMEPAD_ResetInput
+
+Discard controller input and suppress actions still held across the reset.
+Seed trigger edge state from the device to avoid a fresh press on resume.
+================
+*/
 void GAMEPAD_ResetInput(void)
 {
     suppressed = UINT64_MAX;
@@ -211,12 +276,26 @@ void GAMEPAD_ResetInput(void)
     memset((void *)KB_GamepadKeyDown, 0, sizeof(KB_GamepadKeyDown));
 }
 
+/*
+================
+GAMEPAD_GetLook
+
+Return right-stick look in Q16 command units per simulation tick.
+================
+*/
 void GAMEPAD_GetLook(int32_t *turn, int32_t *look)
 {
     *turn = (int32_t)((int64_t)axes[2] * 45 * 65536 / 32767);
     *look = (int32_t)(-(int64_t)axes[3] * 32 * 65536 / 32767);
 }
 
+/*
+================
+GAMEPAD_AddInput
+
+Add held-stick movement and, outside immediate-look mode, command-space look.
+================
+*/
 void GAMEPAD_AddInput(int running, int32_t *forward, int32_t *strafe,
                      int32_t *turn, int32_t *look)
 {

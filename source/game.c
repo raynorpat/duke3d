@@ -3791,6 +3791,8 @@ void displayrooms(short snum,int32_t smoothratio)
                   }
                   if (snum == myconnectindex && CONTROL_ImmediateLook()) {
                       int32 yaw, pitch;
+                      /* Overlay unacknowledged local look on the current player or predicted
+                       * base orientation, retaining fractions at the renderer boundary. */
                       CONTROL_GetView(&yaw, &pitch);
                       yaw += (numplayers > 1 ? myang : p->ang) * 65536;
                       pitch += (numplayers > 1 ? myhoriz : p->horiz) * 65536;

@@ -3086,6 +3086,8 @@ void getinput(short snum)
         vel += -keymove;
 
     GAMEPAD_AddInput(running, &vel, &svel, &angvel, &horiz);
+    /* Combine immediate look with the other command inputs here; the control
+     * layer retains motion that the bounded synchronized command cannot carry. */
     if (CONTROL_ImmediateLook()) {
         CONTROL_ConsumeLook(&angvel, &horiz, MAXANGVEL, MAXHORIZ);
     }

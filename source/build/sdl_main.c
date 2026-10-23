@@ -94,6 +94,8 @@ static void handle_events(void)
     SDL_Event event;
 
     /* NULL lets the game clear old context before fresh events arrive. */
+    /* Prepare context before fresh events, latch each event, then sample held
+     * devices once after the queue has been drained. */
     if (sdl_input_focused && sdl_input_event != NULL) sdl_input_event(NULL);
     while (SDL_PollEvent(&event)) {
         root_sdl_event_filter(&event);

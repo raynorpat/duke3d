@@ -105,6 +105,13 @@ static int32_t turn_rate, pitch_rate;
 
 int CONTROL_ImmediateLook(void) { return immediate_look; }
 
+/*
+================
+turnscale
+
+Return the release's nominal command-to-angle scale used for look rates.
+================
+*/
 static int turnscale(void)
 {
 #if DUKE3D_GAMEVER < GAMEVER_11
@@ -116,6 +123,14 @@ static int turnscale(void)
 #endif
 }
 
+/*
+================
+turn_delta
+
+Evaluate this release's actual turn transform, including underwater scaling.
+Quantization must use the same result as player simulation.
+================
+*/
 static int turn_delta(int turn)
 {
 #if DUKE3D_GAMEVER < GAMEVER_11
@@ -131,12 +146,27 @@ static int turn_delta(int turn)
 #endif
 }
 
+/*
+================
+CONTROL_GetView
+
+Return the combined Q16 look held locally and awaiting FIFO acknowledgement.
+================
+*/
 void CONTROL_GetView(int32 *yaw, int32 *horizon)
 {
     *yaw = (int32)(local_aim.yaw + submitted_aim.yaw);
     *horizon = (int32)(local_aim.horizon + submitted_aim.horizon);
 }
 
+/*
+================
+CONTROL_ConsumeLook
+
+Fit accumulated look into the available command range alongside other input.
+Retain the unrepresented remainder and track the submitted FIFO contribution.
+================
+*/
 void CONTROL_ConsumeLook(int32 *turn, int32 *look, int maxturn, int maxlook)
 {
     int slot = movefifoend[myconnectindex] & (MOVEFIFOSIZ - 1);
@@ -154,6 +184,8 @@ void CONTROL_ConsumeLook(int32 *turn, int32 *look, int maxturn, int maxlook)
         *turn += step;
     }
     *look = min(max(base_look + h, -maxlook), maxlook);
+    /* The serialized horizon command represents pairs of input units.
+     * Return any clipped or odd remainder to the Q16 accumulator. */
     *look -= (*look - base_look) % 2;
     local_aim.horizon += (int64_t)(h - (*look - base_look)) * 32768;
     delta = turn_delta(*turn) - turn_delta(base_turn);
@@ -163,11 +195,21 @@ void CONTROL_ConsumeLook(int32 *turn, int32 *look, int maxturn, int maxlook)
     look_fifo[slot].sequence = movefifoend[myconnectindex];
     look_fifo[slot].delta.yaw = (int64_t)delta * 65536;
     look_fifo[slot].delta.horizon = (int64_t)(*look - base_look) * 32768;
+    /* Move represented motion into the outstanding-command total so it stays
+     * visible until the corresponding FIFO entry has been acknowledged. */
     submitted_aim.yaw += look_fifo[slot].delta.yaw;
     submitted_aim.horizon += look_fifo[slot].delta.horizon;
 }
 
 /* Record the actual averaged/copied FIFO entry, rather than raw getinput. */
+/*
+================
+CONTROL_QueueInput
+
+Reconcile local look with the command actually copied or averaged into the FIFO.
+Refund motion lost to packet quantization instead of dropping its remainder.
+================
+*/
 void CONTROL_QueueInput(int32 sequence, int turn, int look)
 {
     int slot = sequence & (MOVEFIFOSIZ - 1);
@@ -192,6 +234,8 @@ void CONTROL_QueueInput(int32 sequence, int turn, int look)
     represented.yaw = (int64_t)(turn_delta(turn) - turn_delta(look_fifo[slot].base_turn)) * 65536;
     represented.horizon = (int64_t)((look >> 1) - (look_fifo[slot].base_look >> 1)) * 65536;
     if (!(sequence & (movesperpacket - 1))) {
+        /* One averaged packet stands for movesperpacket ticks. Preserve the
+         * difference between accumulated look and that repeated representation. */
         refund.yaw = packet_look.yaw - represented.yaw * movesperpacket;
         refund.horizon = packet_look.horizon - represented.horizon * movesperpacket;
         local_aim.yaw += refund.yaw; local_aim.horizon += refund.horizon;
@@ -203,6 +247,14 @@ void CONTROL_QueueInput(int32 sequence, int turn, int look)
     look_fifo[slot].delta = represented;
 }
 
+/*
+================
+CONTROL_AcknowledgeInput
+
+Retire the look contribution for this exact FIFO sequence after consumption.
+Ignore stale or already acknowledged ring slots.
+================
+*/
 void CONTROL_AcknowledgeInput(int32 sequence)
 {
     int slot = sequence & (MOVEFIFOSIZ - 1);
@@ -222,11 +274,21 @@ static uint64_t actionbit(int action)
     return action >= 0 && action < MAXGAMEBUTTONS ? UINT64_C(1) << action : 0;
 }
 
+/*
+================
+publish_buttons
+
+Combine device-held actions with latched presses, excluding suppressed actions.
+Keep suppression only while an action remains physically held.
+================
+*/
 static void publish_buttons(void)
 {
     uint64_t held = keyboard_buttons | mouse_buttons_held | joy_buttons |
         GAMEPAD_ButtonState1 | ((uint64_t)GAMEPAD_ButtonState2 << 32);
     suppressed_buttons &= held;
+    /* Keep down/up taps visible until a command consumes them, even when
+     * no device is still held at the end of the frame. */
     pressed_buttons |= held & ~previous_buttons & ~suppressed_buttons;
     previous_buttons = held;
     held = (held | pressed_buttons) & ~suppressed_buttons;
@@ -234,6 +296,13 @@ static void publish_buttons(void)
     CONTROL_ButtonState2 = (uint32_t)(held >> 32);
 }
 
+/*
+================
+CONTROL_UpdateKeyboardState
+
+Rebuild held keyboard actions from the key map after a scancode transition.
+================
+*/
 void CONTROL_UpdateKeyboardState(int key, int pressed)
 {
     int i;
@@ -248,12 +317,27 @@ void CONTROL_UpdateKeyboardState(int key, int pressed)
     publish_buttons();
 }
 
+/*
+================
+CONTROL_EndInput
+
+Retire latched presses at the end of command consumption and republish held state.
+================
+*/
 void CONTROL_EndInput(void)
 {
     pressed_buttons = 0;
     publish_buttons();
 }
 
+/*
+================
+CONTROL_ResetInput
+
+Clear pending device motion, fractional look, FIFO accounting and button state.
+Reset the poll clock so resumed input does not integrate the paused interval.
+================
+*/
 void CONTROL_ResetInput(void)
 {
     int i;
@@ -279,6 +363,14 @@ void CONTROL_ResetInput(void)
     publish_buttons();
 }
 
+/*
+================
+CONTROL_GetWheelDirection
+
+Consume one ordered wheel step and map weapon cycling to -1 or +1.
+Other mapped actions are latched as presses and return zero.
+================
+*/
 int CONTROL_GetWheelDirection(void)
 {
     int direction = readmousewheel();
@@ -358,6 +450,13 @@ boolean CONTROL_FlagActive( int32 which )
 	return false;
 }
 
+/*
+================
+CONTROL_ClearAssignments
+
+Clear device mappings and discard pending input associated with the old map.
+================
+*/
 void CONTROL_ClearAssignments( void )
 {
     memset(KeyMapping, 0, sizeof(KeyMapping));
@@ -373,6 +472,14 @@ void CONTROL_GetUserInput( UserInput *info )
 	STUBBED("CONTROL_GetUserInput");
 }
 
+/*
+================
+prepare_input
+
+Select immediate-look eligibility and reset accumulated input on context
+or aiming-mode transitions before accepting fresh events.
+================
+*/
 static int prepare_input(void)
 {
     int active;
@@ -388,6 +495,14 @@ static int prepare_input(void)
     return active;
 }
 
+/*
+================
+control_event
+
+Latch short device presses that may begin and end between simulation ticks.
+A NULL event prepares the input context before the SDL queue is drained.
+================
+*/
 static void control_event(const SDL_Event *event)
 {
     int action = -1, button, j;
@@ -412,6 +527,14 @@ static void control_event(const SDL_Event *event)
     publish_buttons();
 }
 
+/*
+================
+CONTROL_PollDevices
+
+Accumulate mouse deltas and sample controller/joystick state at frame cadence.
+Integrate the prior look rate over elapsed time before installing the new sample.
+================
+*/
 void CONTROL_PollDevices(void)
 {
     ControlInfo sample, *info = &sample;
@@ -423,6 +546,8 @@ void CONTROL_PollDevices(void)
     Uint64 now = SDL_GetPerformanceCounter();
     int64_t elapsed;
     active = prepare_input();
+    /* The first poll after a reset has zero elapsed time; later intervals
+     * are measured by SDL's performance counter in microseconds. */
     elapsed = last_poll ? (now - last_poll) * 1000000 / SDL_GetPerformanceFrequency() : 0;
     last_poll = now;
     basehorizon = (numplayers > 1 ? myhoriz : ps[myconnectindex].horiz) +
@@ -469,6 +594,8 @@ void CONTROL_PollDevices(void)
                break;
        }
 
+    /* Immediate camera motion takes the mouse look components out of the
+     * legacy pending sample so tick consumption cannot apply them twice. */
     if (active) {
         int64_t yaw = 0, pitch = 0;
         if (!BUTTON(gamefunc_Strafe)) {
@@ -594,6 +721,14 @@ void CONTROL_PollDevices(void)
     publish_buttons();
 }
 
+/*
+================
+CONTROL_GetInput
+
+Consume pending mouse motion together with the latest joystick sample.
+Sampling remains separate so multiple simulation ticks do not poll devices again.
+================
+*/
 void CONTROL_GetInput(ControlInfo *info)
 {
     *info = joystick_sample;
@@ -604,6 +739,14 @@ void CONTROL_GetInput(ControlInfo *info)
 }
 
 
+/*
+================
+CONTROL_ClearButton
+
+Suppress an action until release and remove its pending press.
+A held device must not immediately reassert a consumed one-shot action.
+================
+*/
 void CONTROL_ClearButton( int32 whichbutton )
 {
     uint64_t bit = actionbit(whichbutton);
@@ -729,6 +872,14 @@ void CONTROL_SetAnalogAxisDeadzone
     }
 }
 
+/*
+================
+CONTROL_FilterDeadzone
+
+Return zero strictly inside the symmetric deadzone.
+Values outside it retain their original magnitude.
+================
+*/
 int32 CONTROL_FilterDeadzone
    (
    int32 axisvalue,
@@ -743,6 +894,13 @@ int32 CONTROL_FilterDeadzone
     return axisvalue;
 }
 
+/*
+================
+CONTROL_GetFilteredAxisValue
+
+Apply the configured deadzone and scale to one legacy joystick axis.
+================
+*/
 int32 CONTROL_GetFilteredAxisValue(int32 axis)
 {
 return (int32)((float)CONTROL_FilterDeadzone
@@ -782,6 +940,13 @@ void    MOUSE_HideCursor( void )
 
 
 
+/*
+================
+updateMouse
+
+Collect full-width Build mouse deltas and retain wheel pulses for button readers.
+================
+*/
 static void updateMouse(void)
 {
     // this is in buildengine.
@@ -796,6 +961,13 @@ static void updateMouse(void)
     mousePositionY += y;
 }
 
+/*
+================
+MOUSE_GetButtons
+
+Return the current mouse buttons and consume the legacy wheel direction bits.
+================
+*/
 int32   MOUSE_GetButtons( void )
 {
     int32 buttons;
@@ -812,6 +984,13 @@ void    MOUSE_GetPosition( int32*x, int32*y  )
     if (y) *y = mousePositionY;
 }
 
+/*
+================
+MOUSE_GetDelta
+
+Collect and consume both accumulated relative mouse axes.
+================
+*/
 void    MOUSE_GetDelta( int32*x, int32*y  )
 {
     updateMouse();

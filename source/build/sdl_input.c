@@ -39,12 +39,27 @@ struct mousewheel { int count; struct mousewheel *next; };
 static struct mousewheel *wheel_head, *wheel_tail;
 static double wheel_fraction;
 
+/*
+================
+setinputcallback
+
+Install the game's frame-poll, context-reset and event-latch callbacks.
+================
+*/
 void setinputcallback(void (*poll)(void), void (*reset)(void),
                       void (*event)(const SDL_Event *))
 {
     sdl_input_poll = poll; sdl_input_reset = reset; sdl_input_event = event;
 }
 
+/*
+================
+readmousewheel
+
+Consume one signed step from the oldest queued wheel event.
+Retain the remaining count so repeated and reversed steps keep their order.
+================
+*/
 int readmousewheel(void)
 {
     struct mousewheel *w = wheel_head;
@@ -60,6 +75,13 @@ int readmousewheel(void)
     return direction;
 }
 
+/*
+================
+clearmouseinput
+
+Clear motion, legacy button bits and precise/queued wheel state together.
+================
+*/
 void clearmouseinput(void)
 {
     mouse_relative_x = mouse_relative_y = mouse_buttons = 0;
@@ -72,6 +94,13 @@ void clearmouseinput(void)
     wheel_tail = NULL;
 }
 
+/*
+================
+readmousexy32
+
+Consume both relative mouse axes at Build's fourfold scale using full-width outputs.
+================
+*/
 void readmousexy32(int32_t *x, int32_t *y)
 {
     if (x) *x = mouse_relative_x * 4;
@@ -79,6 +108,13 @@ void readmousexy32(int32_t *x, int32_t *y)
     mouse_relative_x = mouse_relative_y = 0;
 }
 
+/*
+================
+_joystick_instance
+
+Return the active SDL joystick instance ID, or -1 when no device is open.
+================
+*/
 int _joystick_instance(void)
 {
     return joystick != NULL ? SDL_JoystickInstanceID(joystick) : -1;
@@ -591,7 +627,7 @@ int setupmouse(void)
 readmousexy
 
 Consume accumulated relative motion in Build's four-units-per-pixel interface.
-Clear both accumulators after returning the motion so each event is counted once.
+Consume both axes through readmousexy32, then clamp to the legacy short range.
 ================
 */
 void readmousexy(short *x, short *y)

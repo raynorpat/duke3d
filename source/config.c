@@ -107,6 +107,13 @@ static void CONFIG_GetDecimal( char * entryname, double * v, double lo, double h
    *v = (d < lo) ? lo : (d > hi) ? hi : d;
 }
 
+/*
+================
+CONFIG_PutDecimal
+
+Store a fractional screen setting as quoted text for the legacy script parser.
+================
+*/
 static void CONFIG_PutDecimal( char * entryname, double v )
 {
    char temp[32];
@@ -118,6 +125,8 @@ static void CONFIG_PutDecimal( char * entryname, double v )
 ===================
 =
 = CONFIG_GetSetupFilename
+=
+= Select the configuration filename used by subsequent setup reads and writes.
 =
 ===================
 */
@@ -316,6 +325,8 @@ int32 CONFIG_AnalogNameToNum( char * func )
 =
 = CONFIG_SetDefaults
 =
+= Seed game, input, audio and video defaults before applying saved settings.
+=
 ===================
 */
 
@@ -368,6 +379,8 @@ void CONFIG_SetDefaults( void )
 =
 = CONFIG_ReadKeys
 =
+= Read each action's paired key names and install the recognized mappings.
+=
 ===================
 */
 
@@ -417,6 +430,9 @@ void CONFIG_ReadKeys( void )
 ===================
 =
 = CONFIG_SetupMouse
+=
+= Read configured mouse actions, axis choices and sensitivity through the
+= legacy control mapping interface.
 =
 ===================
 */
@@ -485,6 +501,9 @@ void CONFIG_SetupMouse( int32 scripthandle )
 =
 = CONFIG_SetupGamePad
 =
+= Read the legacy gamepad mapping section through the control API.
+= SDL's named controller path has its own fixed action map.
+=
 ===================
 */
 
@@ -535,6 +554,8 @@ void CONFIG_SetupGamePad( int32 scripthandle )
 ===================
 =
 = CONFIG_SetupJoystick
+=
+= Install configured legacy joystick button, hat and analog-axis mappings.
 =
 ===================
 */
@@ -646,6 +667,9 @@ void readsavenames(void)
 ===================
 =
 = CONFIG_ReadSetup
+=
+= Start from defaults, load or create the setup script, then apply stored values
+= and supported command-line overrides.
 =
 ===================
 */
@@ -890,6 +914,14 @@ void CONFIG_WriteSetup( void )
    SCRIPT_Free (scripthandle);
    }
 
+/*
+================
+CONFIG_SaveSetup
+
+Write current settings back through the loaded setup script.
+Do nothing until setup has been read successfully.
+================
+*/
 void CONFIG_SaveSetup( void )
    {
    int32 dummy;

@@ -56,6 +56,14 @@ FUNCTIONS
 =============================================================================
 */
 
+/*
+================
+keyhandler
+
+Translate the synchronous Build scancode stream into key and action state.
+Remember an extended prefix until its following scancode arrives.
+================
+*/
 void keyhandler(void)
 {
     static boolean gotextended = false;
@@ -110,12 +118,26 @@ void KB_KeyEvent( int scancode, boolean keypressed )
 	STUBBED("KB_KeyEvent");
 }
 
+/*
+================
+KB_KeyWaiting
+
+Pump pending SDL events before reporting whether a key press is waiting.
+================
+*/
 boolean KB_KeyWaiting( void )
 {
     _handle_events();
     return keyIsWaiting;
 }
 
+/*
+================
+KB_QueueGamepadKey
+
+Publish a controller-generated menu key without altering physical key state.
+================
+*/
 void KB_QueueGamepadKey(int scan)
 {
     KB_GamepadKeyDown[scan] = true;
@@ -149,6 +171,13 @@ void KB_FlushKeyboardQueue( void )
 	keyIsWaiting = false;
 }
 
+/*
+================
+KB_ClearKeysDown
+
+Clear physical and controller-generated key-down arrays.
+================
+*/
 void KB_ClearKeysDown( void )
 {
     memset((void *) KB_KeyDown, '\0', sizeof (KB_KeyDown));
