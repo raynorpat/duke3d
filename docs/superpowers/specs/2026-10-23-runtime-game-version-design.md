@@ -1,7 +1,7 @@
 # Runtime Duke release selection
 
 Date: 2026-10-23
-Status: Draft for approval
+Status: Approved by the user, 2026-10-23
 
 ## Intent and decisions
 
