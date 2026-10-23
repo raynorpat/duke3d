@@ -36,6 +36,7 @@ extern int stricmp(const char *x, const char *y);
 #include <ctype.h>
 #include <time.h>
 #include "duke3d.h"
+#include "savegame.h"
 #include "scriplib.h"
 #include "glext.h"
 #include "displaymode.h"
@@ -640,26 +641,28 @@ void CONFIG_SetupJoystick( int32 scripthandle )
 
 void readsavenames(void)
 {
-    int32_t dummy;
+    int32_t fil;
     short i;
     char filename[] = "game_.sav";
     char fullname[MAX_PATH];
-    FILE *fil;
 
     for (i=0;i<10;i++)
     {
         filename[4] = i+'0';
         GetPathFromEnvironment(fullname, sizeof(fullname), filename);
-
-        if ((fil = fopen(fullname,"rb")) == NULL ) continue;
-        dfread32(&dummy,1,fil);
-
-        if(dummy != BYTEVERSION) { fclose(fil); continue; }
-#if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D saves have no player count
-        dfread32(&dummy,1,fil);
-#endif
-        dfread(&ud.savegame[i][0],19,1,fil);
-        fclose(fil);
+        if ((fil = kopen4load(fullname,0)) < 0) continue;
+        if (game_profile->gamever < GAMEVER_11)
+        {
+            if (sg_check10(fil) < 0) { kclose(fil); continue; }
+        }
+        else if (sg_read32(fil) != game_profile->byteversion)
+        {
+            kclose(fil);
+            continue;
+        }
+        if (game_profile->gamever >= GAMEVER_14) sg_read32(fil);
+        kdfread(&ud.savegame[i][0],19,1,fil);
+        kclose(fil);
     }
 }
 

@@ -189,7 +189,7 @@ def main():
     for name, (data, want) in cases.items():
         (work / 'check.sav').write_bytes(data)
         command = ([str(Path(a.duke3d).resolve()), '-loadverify', 'check.sav'] if a.duke3d
-                   else [str(Path(a.codec).resolve()), 'check.sav'])
+                   else [str(Path(a.codec).resolve()), '-test-gameversion', a.version.lower(), 'check.sav'])
         r = subprocess.run(command, cwd=work, env=env,
                            capture_output=True, text=True, timeout=30)
         if r.returncode != want:

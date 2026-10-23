@@ -1113,3 +1113,7 @@ foreach(_case v099_actors v099_player v099_sector con_runtime_v099)
   add_test(NAME ${_case}_runtime COMMAND ${_case} -test-gameversion 0.99)
   set_tests_properties(${_case}_runtime PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 30)
 endforeach()
+
+foreach(_profile 0.99 1.0 1.1 1.3d-shareware 1.3d 1.4 1.5)
+  add_test(NAME savegame_codec_${_profile} COMMAND savegame_codec -test-gameversion ${_profile})
+endforeach()

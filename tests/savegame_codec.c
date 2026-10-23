@@ -77,9 +77,8 @@ static void test_sprite(void)
     CHECK(memcmp(&s, &back, sizeof(s)) == 0);
 }
 
-#if DUKE3D_GAMEVER < GAMEVER_10
 /* Independently measured DOS beta record offsets (0.99-player.md). */
-static void test_player(void)
+static void test_player_0(void)
 {
     static struct player_struct p, back;
     unsigned char b[2048];
@@ -125,10 +124,9 @@ static void test_player(void)
     sg_player(b, &ps[7], 0);
     CHECK(pus == 3 && pub == 4 && ud.show_help == 2);
 }
-#elif DUKE3D_GAMEVER < GAMEVER_13D
 /* The DOS 1.1 player_struct (docs/v10-v11/reference.md, "player_struct (1.1)"),
    or in 1.0 builds the 1.0 one ("player_struct (1.0)"): the same up to 0x321. */
-static void test_player(void)
+static void test_player_1(void)
 {
     static struct player_struct p, back;
     static unsigned char b[2048];
@@ -143,11 +141,11 @@ static void test_player(void)
     p.scream_voice = 0x0c0d0e0f; p.gm = 0x11; p.jumping_toggle = 0x15; p.rapid_fire_hold = 0x16;
     p.name[0] = 'D'; p.inven_icon = 0x17; p.lastrandomspot = 0x18; p.spacesuit_on = 1;
     p.scuba_on = 0x19; p.spacesuit_used = 1; p.footprintpal = 0x1a; p.falling_counter = 0x1b;
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
     p.frag_ps = 3; p.unnamed_322 = 0x1d; p.auto_run = 1; p.gotweapon[0] = 1; p.gotweapon[9] = 1;
-#else
+} else {
     p.frag_ps = 3; p.aim_mode = 1; p.gotweapon[0] = 1; p.gotweapon[9] = 1;
-#endif
+}
     p.refresh_inventory = 0x1c; p.palette = (char *)b; p.toggle_key_flag = 0x22;
     p.knuckle_incs = 0x23; p.walking_snd_toggle = 0x24; p.interface_toggle_flag = 0x25;
     p.palookup = 0x26; p.pals[2] = 0x27; p.actors_killed = 0x28; p.return_to_center = 0x33;
@@ -181,20 +179,20 @@ static void test_player(void)
     CHECK(b[0x312] == 0x16);
     CHECK(b[0x314] == 'D');
     CHECK(b[0x321] == 0x17);
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
     CHECK(b[0x322] == 0x1d);
     CHECK(b[0x326] == 0x18);
-#else
+} else {
     CHECK(b[0x325] == 0x18);
     CHECK(b[0x326] == 0);       /* no_autoaim: never set */
-#endif
+}
     CHECK(b[0x327] == 1);
     CHECK(b[0x328] == 0x19);
     CHECK(b[0x329] == 1);
     CHECK(b[0x32a] == 0x1a);
     CHECK(b[0x32d] == 0x1b);
     CHECK(b[0x32e] == 3);
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
     /* No aim_mode: gotweapon and everything after it sit one byte lower, up
        to the 1.0-only auto_run at 0x34c. */
     CHECK(b[0x32f] == 1 && b[0x338] == 1);
@@ -212,7 +210,7 @@ static void test_player(void)
     CHECK(b[0x34d] == 0x33);
     CHECK(b[0x34e] == 0xee);
     b[0x33a] = 0x99;   /* a DOS pointer: must not be restored */
-#else
+} else {
     CHECK(b[0x32f] == 1);
     CHECK(b[0x330] == 1 && b[0x339] == 1);
     CHECK(b[0x33a] == 0x1c);
@@ -228,15 +226,14 @@ static void test_player(void)
     CHECK(b[0x34d] == 0x33);
     CHECK(b[0x34e] == 0xee);
     b[0x33b] = 0x99;   /* a DOS pointer: must not be restored */
-#endif
+}
     CHECK(sg_player(b, &back, 0) == 0x34e);
     CHECK(back.palette == NULL);
     back.palette = p.palette;
     CHECK(memcmp(&p, &back, sizeof(p)) == 0);
 }
-#elif DUKE3D_GAMEVER < GAMEVER_14
 /* The DOS 1.3D player_struct (docs/v13d/reference.md, ledger F-007). */
-static void test_player(void)
+static void test_player_2(void)
 {
     static struct player_struct p, back;
     static unsigned char b[2048];
@@ -269,8 +266,7 @@ static void test_player(void)
     back.palette = p.palette;
     CHECK(memcmp(&p, &back, sizeof(p)) == 0);
 }
-#else
-static void test_player(void)
+static void test_player_3(void)
 {
     static struct player_struct p, back;
     static unsigned char b[1024];
@@ -302,7 +298,13 @@ static void test_player(void)
     back.palette = p.palette;
     CHECK(memcmp(&p, &back, sizeof(p)) == 0);
 }
-#endif
+static void test_player(void)
+{
+    if (game_profile->gamever < GAMEVER_10) test_player_0();
+    else if (game_profile->gamever < GAMEVER_13D) test_player_1();
+    else if (game_profile->gamever < GAMEVER_14) test_player_2();
+    else test_player_3();
+}
 
 static void test_small(void)
 {
@@ -362,30 +364,28 @@ static void test_animation_offsets(void)
     CHECK(sg_animptr(offsetof(sectortype,ceilingz),0) == &sector[0].ceilingz);
     CHECK(sg_animptr((MAXSECTORS-1)*sizeof(sectortype)+offsetof(sectortype,floorz),0) == &sector[MAXSECTORS-1].floorz);
     CHECK(sg_animptr(off,0) == &wall[MAXWALLS-1].y);
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
     /* Measured DOS wall base minus sector base, not native linker placement. */
     CHECK(sg_animptr(-0x4b300,1) == &wall[0].x);
     CHECK(sg_animptr(-0x4b300+17*32+4,1) == &wall[17].y);
     CHECK(sg_animptr(-0x4b300+(MAXWALLS-1)*32+4,1) == &wall[MAXWALLS-1].y);
     CHECK(sg_animptr(-0x4b300-32,1) == NULL);
     CHECK(sg_animptr(-0x4b300+8,1) == NULL);
-#elif DUKE3D_GAMEVER >= GAMEVER_15
+} else {
+if (game_profile->gamever >= GAMEVER_15) {
     CHECK(sg_animptr(-0x4b800,1) == &wall[0].x);
     CHECK(sg_animptr(-0x4b800+17*32+4,1) == &wall[17].y);
     CHECK(sg_animptr(-0x4b800+(MAXWALLS-1)*32+4,1) == &wall[MAXWALLS-1].y);
     CHECK(sg_animptr(-0x4b800-32,1) == NULL);
     CHECK(sg_animptr(-0x4b800+8,1) == NULL);
-#endif
+}
+}
     CHECK(sg_animptr(0,0) == NULL);
     CHECK(sg_animptr(1,0) == NULL);
     CHECK(sg_animptr(offsetof(sectortype,ceilingz)+1,0) == NULL);
     CHECK(sg_animptr(INT32_MAX,0) == NULL);
-#if DUKE3D_GAMEVER < GAMEVER_14 || DUKE3D_GAMEVER >= GAMEVER_15
-#if DUKE3D_GAMEVER < GAMEVER_14
-    off = -0x4b300;
-#else
-    off = -0x4b800;
-#endif
+if (game_profile->gamever < GAMEVER_14 || game_profile->gamever >= GAMEVER_15) {
+off = (game_profile->gamever < GAMEVER_14 ? (-0x4b300) : (-0x4b800));
     /* Re-encoding wall[17].y natively can overlap a different DOS field.
        Supply the native bases explicitly, independently of linker placement. */
     CHECK(sg_walloffset(17*32+4,0,0) == 17*32+4); /* disjoint layouts */
@@ -397,7 +397,7 @@ static void test_animation_offsets(void)
     CHECK(sg_walloffset(off+64,0,0) == 64);      /* only DOS fits */
     CHECK(sg_walloffset(64,0,0) == 64);          /* only native fits */
     CHECK(sg_walloffset(64,0,1) == -1);         /* DOS cannot use native fallback */
-#endif
+}
 }
 
 int main(int argc, char **argv)
@@ -412,14 +412,26 @@ int main(int argc, char **argv)
         initcache((intptr_t)cache,sizeof(cache));
         fil = kopen4load(argv[1],0);
         if (fil < 0) return 1;
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
         ok = sg_check10(fil) >= 0;
-#else
-        sg_read32(fil); /* The normal loader checks the edition separately. */
-        ok = sg_checksave(fil);
-#endif
+} else {
+        sg_read32(fil);
+        ok = sg_playerblocksize(fil) == SG_PLAYER_BLOCK0 && sg_checksave(fil);
+}
         kclose(fil);
         return ok ? 0 : 2;
+    }
+    {
+        int early=game_profile->gamever<GAMEVER_13D;
+        int atomic=game_profile->gamever>=GAMEVER_14;
+        int size=game_profile->id==GAME_099SW?0x33f:early?0x34e:atomic?911:0x552;
+        CHECK(SG_PLAYER_SIZE==size);
+        CHECK(SG_DOS_MAXPLAYERS==(early?8:16));
+        CHECK(SG_PLAYER_DFSIZE==(atomic?size*16:size));
+        CHECK(SG_PLAYER_DFCOUNT==(atomic?1:early?8:16));
+        CHECK(SG_PLAYER_BLOCK0==(atomic?size*16:early?size*8:size*12));
+        CHECK(SG_PLAYERORIG_DFSIZE==(early?16:256));
+        CHECK(SG_PLAYERORIG_DFCOUNT==(early?8:1));
     }
     test_wall();
     test_sector();
