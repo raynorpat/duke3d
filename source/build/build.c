@@ -396,6 +396,14 @@ void showmouse(void)
 }
 
 
+/*
+================
+fixrepeats
+
+Recompute wall X repeat from segment length and Y repeat,
+clamping the result to the stored 1..255 range.
+================
+*/
 void fixrepeats(short i)
 {
 	int32_t dax, day, dist;
@@ -621,6 +629,14 @@ int32_t gettile(int32_t tilenum)
 }
 
 
+/*
+================
+changechar
+
+Step a byte-sized editor value, optionally snapping it to an eight-unit grid
+and applying the endpoint bounds.
+================
+*/
 char changechar(char dachar, int32_t dadir, char smooshyalign, char boundcheck)
 {
 	if (dadir < 0)
@@ -650,6 +666,14 @@ char changechar(char dachar, int32_t dadir, char smooshyalign, char boundcheck)
 
 static char visited[8192];
 
+/*
+================
+GetWallZPeg
+
+Select the Z reference for wall texture alignment from its alignment flag
+and the visible ceiling/floor steps on either side.
+================
+*/
 int32_t GetWallZPeg(int32_t nWall)
 {
 	int32_t z=0, nSector, nNextSector;
@@ -679,6 +703,14 @@ int32_t GetWallZPeg(int32_t nWall)
 }
 
 
+/*
+================
+AlignWalls
+
+Continue texture panning from one wall onto another and copy its Y repeat.
+The destination's Z peg is recomputed from its own geometry.
+================
+*/
 void AlignWalls(int32_t nWall0, int32_t z0, int32_t nWall1, int32_t z1, int32_t nTile)
 {
 	int32_t n;
@@ -689,6 +721,8 @@ void AlignWalls(int32_t nWall0, int32_t z0, int32_t nWall1, int32_t z1, int32_t 
 
 	z1 = GetWallZPeg(nWall1);
 
+	/* Round the tile-height shift upward before converting the Z-peg difference
+	 * and copied Y repeat into texture panning units. */
 	for(n=(picsiz[nTile]>>4);((1<<n)<tilesizy[nTile]);n++);
 
 	wall[nWall1].yrepeat = wall[nWall0].yrepeat;
@@ -696,12 +730,22 @@ void AlignWalls(int32_t nWall0, int32_t z0, int32_t nWall1, int32_t z1, int32_t 
 }
 
 
+/*
+================
+AutoAlignWalls
+
+Propagate matching-tile alignment around connected visible wall faces.
+Visited marks terminate cycles while two-sided boundaries allow recursion.
+================
+*/
 void AutoAlignWalls(int32_t nWall0, int32_t ply)
 {
 	int32_t z0, z1, nTile, nWall1, branch, visible, nNextSector, nSector;
 
 	nTile = wall[nWall0].picnum;
 	branch = 0;
+	/* Only the outermost call clears the shared visited set; recursive
+	 * branches must retain it to avoid walking a closed wall network forever. */
 	if (ply == 0)
 	{
 			/* clear visited bits */
@@ -1143,6 +1187,14 @@ int menuselect(void)
 }
 
 
+/*
+================
+fillsector
+
+Draw the overhead sector highlight as staggered horizontal scanlines
+using sorted wall intersections.
+================
+*/
 int fillsector(short sectnum, char fillcolor)
 {
 	int32_t x1, x2, y1, y2, sy, y, templong;
@@ -1170,6 +1222,8 @@ int fillsector(short sectnum, char fillcolor)
 	if (miny < uborder) miny = uborder;
 	if (maxy >= dborder) maxy = dborder-1;
 
+	/* Spread the highlight over three row phases instead of filling every
+	 * row on every frame. */
 	for(sy=miny+(numframes%3);sy<=maxy;sy+=3)
 	{
 		y = posy+(((sy-200)<<14)/zoom);
@@ -1234,6 +1288,8 @@ int clockdir(short wallstart)   /* Returns: 0 is CW, 1 is CCW */
 	}
 	while ((wall[i].point2 != wallstart) && (i < MAXWALLS));
 
+	/* Use the turn at the leftmost vertex to determine loop winding,
+	 * with the Y-order cases handling the limiting vertical-edge cases. */
 	x0 = wall[themin].x;
 	y0 = wall[themin].y;
 	x1 = wall[wall[themin].point2].x;
@@ -1252,6 +1308,14 @@ int clockdir(short wallstart)   /* Returns: 0 is CW, 1 is CCW */
 }
 
 
+/*
+================
+whitelinescan
+
+Construct candidate sector walls by following an unpaired boundary loop.
+Return the proposed wall count, or -1 for a rejected loop winding.
+================
+*/
 short whitelinescan(short dalinehighlight)
 {
 	int32_t i, j, k;
@@ -1338,6 +1402,14 @@ void printcoords16(int32_t posxe, int32_t posye, short ange)
 }
 
 
+/*
+================
+checksectorpointer
+
+Find an oppositely directed edge with matching endpoints in another sector
+and install the two-sided wall links.
+================
+*/
 int checksectorpointer(short i, short sectnum)
 {
 	int32_t j, k, startwall, endwall, x1, y1, x2, y2;
@@ -1355,6 +1427,8 @@ int checksectorpointer(short i, short sectnum)
 				return(0);
 	}
 
+	/* A matching existing partner can exit early above. Otherwise discard
+	 * this wall's old link before searching for reversed endpoints. */
 	wall[i].nextsector = -1;
 	wall[i].nextwall = -1;
 	for(j=0;j<numsectors;j++)
@@ -1378,6 +1452,14 @@ int checksectorpointer(short i, short sectnum)
 }
 
 
+/*
+================
+copysector
+
+Duplicate a sector into the supplied sector/wall slots with rebased links.
+Optionally duplicate its sprites while preserving their status class.
+================
+*/
 void copysector(short soursector, short destsector, short deststartwall, char copystat)
 {
 	short j, k, m, newnumwalls, startwall, endwall;
@@ -1425,6 +1507,8 @@ void copysector(short soursector, short destsector, short deststartwall, char co
 
 				m = insertsprite(destsector,sprite[j].statnum);
 				memcpy(&sprite[m],&sprite[j],sizeof(spritetype));
+				/* The record copy also copied the source sector number; restore the
+				 * destination membership established by insertsprite. */
 				sprite[m].sectnum = destsector;   /* Don't let memcpy overwrite sector! */
 
 				j = k;
@@ -1604,6 +1688,13 @@ void showspritedata(short spritenum)
 
 
 	/* Find closest point (*dax, *day) on wall (dawall) to (x, y) */
+/*
+================
+getclosestpointonwall
+
+Project an XY point onto a finite wall segment, clamping to its endpoints.
+================
+*/
 void getclosestpointonwall(int32_t x, int32_t y, int32_t dawall, int32_t *nx, int32_t *ny)
 {
 	walltype *wal;
@@ -1616,6 +1707,8 @@ void getclosestpointonwall(int32_t x, int32_t y, int32_t dawall, int32_t *nx, in
 	if (i <= 0) { *nx = wal->x; *ny = wal->y; return; }
 	j = dx*dx+dy*dy;
 	if (i >= j) { *nx = wal->x+dx; *ny = wal->y+dy; return; }
+	/* The interior projection fraction uses 30 fractional bits. Endpoint
+	 * checks above avoid division for points outside the finite segment. */
 	i = divscale30(i,j);
 	*nx = wal->x + mulscale30(dx,i);
 	*ny = wal->y + mulscale30(dy,i);
@@ -1721,6 +1814,14 @@ int drawtilescreen(int32_t pictopleft, int32_t picbox)
 }
 
 
+/*
+================
+getpoint
+
+Convert overhead screen coordinates into world XY using editor zoom.
+Clamp both the editor position and the result to the legacy coordinate limits.
+================
+*/
 void getpoint(int32_t searchxe, int32_t searchye, int32_t *x, int32_t *y)
 {
 	if (posx <= -131072) posx = -131072;
@@ -1738,6 +1839,14 @@ void getpoint(int32_t searchxe, int32_t searchye, int32_t *x, int32_t *y)
 }
 
 
+/*
+================
+getlinehighlight
+
+Find the nearest wall by Manhattan distance to its projected segment point.
+For a two-sided boundary, choose the side facing the cursor.
+================
+*/
 int32_t getlinehighlight(int32_t xplc, int32_t yplc)
 {
 	int32_t i, dst, dist, closest, x1, y1, x2, y2, nx, ny;
@@ -1760,6 +1869,8 @@ int32_t getlinehighlight(int32_t xplc, int32_t yplc)
 		y1 = wall[closest].y;
 		x2 = wall[wall[closest].point2].x;
 		y2 = wall[wall[closest].point2].y;
+		/* The cross-product sign selects which of the paired wall faces
+		 * should receive an edit from this cursor position. */
 		if (dmulscale32(xplc-x1,y2-y1,-(x2-x1),yplc-y1) >= 0)
 			closest = wall[closest].nextwall;
 	}
@@ -1768,6 +1879,14 @@ int32_t getlinehighlight(int32_t xplc, int32_t yplc)
 }
 
 
+/*
+================
+getpointhighlight
+
+Choose a nearby wall vertex or sprite for the overhead cursor.
+Return -1 for none; sprite indices carry the 16384 marker.
+================
+*/
 int32_t getpointhighlight(int32_t xplc, int32_t yplc)
 {
 	int32_t i, dst, dist, closest;
@@ -1797,6 +1916,14 @@ int32_t getpointhighlight(int32_t xplc, int32_t yplc)
 }
 
 
+/*
+================
+adjustmark
+
+Snap a proposed point to a sufficiently close existing vertex,
+otherwise apply grid rounding when grid lock is enabled.
+================
+*/
 int adjustmark(int32_t *xplc, int32_t *yplc, short danumwalls)
 {
 	int32_t i, dst, dist, dax, day, pointlockdist;
@@ -1824,6 +1951,8 @@ int adjustmark(int32_t *xplc, int32_t *yplc, short danumwalls)
 	if (dist == pointlockdist)
 		if ((gridlock > 0) && (grid > 0))
 		{
+			/* Bias by half a grid cell, then clear the low bits to round to the
+			 * nearest power-of-two grid coordinate. */
 			dax = ((dax+(1024>>grid))&(0xffffffff<<(11-grid)));
 			day = ((day+(1024>>grid))&(0xffffffff<<(11-grid)));
 		}
@@ -1834,6 +1963,14 @@ int adjustmark(int32_t *xplc, int32_t *yplc, short danumwalls)
 }
 
 
+/*
+================
+checkautoinsert
+
+Report whether a proposed point lies inside an existing wall segment.
+Endpoints are excluded so an existing vertex does not trigger a split.
+================
+*/
 int checkautoinsert(int32_t dax, int32_t day, short danumwalls)
 {
 	int32_t i, x1, y1, x2, y2;
@@ -1858,6 +1995,14 @@ int checkautoinsert(int32_t dax, int32_t day, short danumwalls)
 }
 
 
+/*
+================
+flipwalls
+
+Reverse the XY coordinates in a wall range while leaving its other fields
+and link slots in place.
+================
+*/
 void flipwalls(short numwalls, short newnumwalls)
 {
 	int32_t i, j, nume, templong;
@@ -1873,6 +2018,14 @@ void flipwalls(short numwalls, short newnumwalls)
 }
 
 
+/*
+================
+movewalls
+
+Shift wall records for insertion/deletion and rebase point2/nextwall indices.
+Callers maintain sector wall ranges and sector numbering.
+================
+*/
 int movewalls(int32_t start, int32_t offs)
 {
 	int32_t i;
@@ -1897,6 +2050,14 @@ int movewalls(int32_t start, int32_t offs)
 }
 
 
+/*
+================
+insertpoint
+
+Split a wall at the supplied XY point and, when paired, split its opposite
+side too. Update the sector ranges, repeats and paired links.
+================
+*/
 void insertpoint(short linehighlight, int32_t dax, int32_t day)
 {
 	short sucksect;
@@ -1918,6 +2079,8 @@ void insertpoint(short linehighlight, int32_t dax, int32_t day)
 	fixrepeats((short)j);
 	fixrepeats((short)j+1);
 
+	/* A red boundary has two reversed wall records. Split both sides
+	 * and cross-link the new halves so the sector connection remains paired. */
 	if (wall[j].nextwall >= 0)
 	{
 		k = wall[j].nextwall;
@@ -1946,6 +2109,14 @@ void insertpoint(short linehighlight, int32_t dax, int32_t day)
 }
 
 
+/*
+================
+deletepoint
+
+Join a vertex's predecessor to its successor and drop the old paired links.
+Compact the wall records and recheck the joining edge's sector connection.
+================
+*/
 void deletepoint(short point)
 {
 	int32_t i, j, k, sucksect;
@@ -1976,6 +2147,14 @@ void deletepoint(short point)
 }
 
 
+/*
+================
+deletesector
+
+Remove the sector and its sprites, compact wall/sector storage,
+and adjust the remaining sector references.
+================
+*/
 short deletesector(short sucksect)
 {
 	int32_t i, j, k, nextk, startwall, endwall;
@@ -1993,6 +2172,8 @@ short deletesector(short sucksect)
 		k = headspritesect[i+1];
 		while (k != -1)
 		{
+			/* Moving a sprite changes its sector-list links; retain the next source
+			 * entry before relinking it into the shifted sector. */
 			nextk = nextspritesect[k];
 			changespritesect((short)k,(short)i);
 			k = nextk;
@@ -2018,6 +2199,14 @@ short deletesector(short sucksect)
 }
 
 
+/*
+================
+fixspritesectors
+
+Remove empty sector records and search for valid sectors for misplaced sprites.
+A candidate must contain the sprite XY and pass the sprite-height Z tests.
+================
+*/
 void fixspritesectors(void)
 {
 	int32_t i, j, dax, day, daz;
@@ -2063,11 +2252,21 @@ void clearmidstatbar16(void)
 }
 
 
+/*
+================
+loopinside
+
+Test a point against a wall loop using crossing parity seeded by its winding.
+The winding seed gives inner loops their opposite interpretation.
+================
+*/
 short loopinside(int32_t x, int32_t y, short startwall)
 {
 	int32_t x1, y1, x2, y2, templong;
 	short i, cnt;
 
+	/* Start with the winding bit, then toggle on ray crossings. This lets
+	 * the same routine distinguish an outer boundary from a hole. */
 	cnt = clockdir(startwall);
 	i = startwall;
 	do
@@ -2092,6 +2291,13 @@ short loopinside(int32_t x, int32_t y, short startwall)
 }
 
 
+/*
+================
+numloopsofsector
+
+Count the backward point2 links that close the sector's stored wall loops.
+================
+*/
 int32_t numloopsofsector(short sectnum)
 {
 	int32_t i, numloops, startwall, endwall;
@@ -2105,6 +2311,13 @@ int32_t numloopsofsector(short sectnum)
 }
 
 
+/*
+================
+overheadeditor
+
+Run the overhead editing loop, including selection and map geometry commands.
+================
+*/
 void overheadeditor(void)
 {
 	char buffer[80], *dabuffer;
@@ -4919,6 +5132,13 @@ static void cyclerenderer(void)
 }
 
 
+/*
+================
+editinput
+
+Handle first-person editor input and the geometry/texture edits it requests.
+================
+*/
 void editinput(void)
 {
 	char smooshyalign, repeatpanalign, buffer[80];

@@ -273,6 +273,13 @@ void SpriteName(short spritenum, char *lo2)
     sprintf(lo2,names[sprite[spritenum].picnum]);
 }// end SpriteName
 
+/*
+================
+ExtLoadMap
+
+Prepare editor tile, sprite-size and sky state after a map load.
+================
+*/
 void ExtLoadMap(const char *mapname)
 {
 
@@ -359,11 +366,25 @@ void putsprite (int32_t thex, int32_t they, int32_t zoom, short rot, short tilen
 }
 
 
+/*
+================
+ExtSaveMap
+
+Write the current map to backup.map from the editor save hook.
+================
+*/
 void ExtSaveMap(const char *mapname)
 {
          saveboard("backup.map",&posx,&posy,&posz,&ang,&cursectnum);
 }
 
+/*
+================
+ExtGetSectorCaption
+
+Format the sector's visible tag caption in shared scratch storage.
+================
+*/
 const char *ExtGetSectorCaption(short sectnum)
 {
 
@@ -394,6 +415,14 @@ const char *ExtGetSectorCaption(short sectnum)
          return(tempbuf);
 }
 
+/*
+================
+ExtGetWallCaption
+
+Format wall tags for the selected caption mode and service overhead searches.
+The returned text uses shared scratch storage.
+================
+*/
 const char *ExtGetWallCaption(short wallnum)
 {
     int32_t i=0;
@@ -550,6 +579,14 @@ const char *ExtGetWallCaption(short wallnum)
         return(tempbuf);
 } //end
 
+/*
+================
+ExtGetSpriteCaption
+
+Format the sprite caption for the current name/tag display mode
+in shared scratch storage.
+================
+*/
 const char *ExtGetSpriteCaption(short spritenum)
 {
 
@@ -1249,11 +1286,25 @@ void ExtShowSpriteData(short spritenum)   //F6
  Show2dText("sehelp.hlp");
 }// end ExtShowSpriteData
 
+/*
+================
+ExtEditSectorData
+
+Show sector-tag help through the edit-sector hook.
+================
+*/
 void ExtEditSectorData(short sectnum)    //F7
 {
  Show2dText("sthelp.hlp");
 }// end ExtEditSectorData
 
+/*
+================
+ExtEditWallData
+
+Set the overhead wall-search origin and tag criteria from prompts.
+================
+*/
 void ExtEditWallData(short wallnum)       //F8
 {
     if(qsetmode!=480) return;
@@ -1270,6 +1321,13 @@ void ExtEditWallData(short wallnum)       //F8
 
 }
 
+/*
+================
+ExtEditSpriteData
+
+Set the overhead sprite-search origin and tag criteria from prompts.
+================
+*/
 void ExtEditSpriteData(short spritenum)   //F8
 {
     if(qsetmode!=480) return;
@@ -1324,6 +1382,13 @@ void ReadPaletteTable()
  ReadGamePalette();
 }// end ReadPaletteTable
 
+/*
+================
+Keys3d
+
+Handle Duke-specific shortcuts, help and preview controls in the 3D editor.
+================
+*/
 void Keys3d(void)
 {
     int32_t i,count,rate,nexti;
@@ -1663,6 +1728,13 @@ void Keys3d(void)
 }// end 3d
 
 
+/*
+================
+Keys2d
+
+Handle Duke-specific overhead shortcuts, tag searches and help controls.
+================
+*/
 void Keys2d(void)
 {
     short temp=0;
@@ -1842,6 +1914,13 @@ void Keys2d(void)
 
 
 // Writes build.cfg once, from ExtUnInit or at exit (closing the window).
+/*
+================
+savebuildcfg
+
+Persist the active editor mode, view and input settings for shutdown.
+================
+*/
 static void savebuildcfg(void)
 {
    static char saved = 0;
@@ -1857,6 +1936,13 @@ static void savebuildcfg(void)
        printf("Could not write %s\n",buildcfgpath);
 }
 
+/*
+================
+ExtInit
+
+Initialize the Duke editor resources, saved settings, input and engine state.
+================
+*/
 void ExtInit(void)
 {
     printf("------------------------------------------------------------------------------\n");
@@ -1921,6 +2007,13 @@ void ExtInit(void)
 //  InitWater();
 }
 
+/*
+================
+ExtUnInit
+
+Save the active editor configuration and close its group archive.
+================
+*/
 void ExtUnInit(void)
 {
    savebuildcfg();
@@ -1928,6 +2021,13 @@ void ExtUnInit(void)
 }
 
 static char lockbyte4094;
+/*
+================
+ExtPreCheckKeys
+
+Prepare optional offscreen/sideways rendering and its transformed search cursor.
+================
+*/
 void ExtPreCheckKeys(void) // just before drawrooms
 {
         if (qsetmode == 200)    //In 3D mode
@@ -1939,12 +2039,22 @@ void ExtPreCheckKeys(void) // just before drawrooms
                         if (waloff[4094] == 0)
                                 allocache(&waloff[4094],320L*200L,&lockbyte4094);
                         setviewtotile(4094,320L,200L);
+                        /* Swap and reflect the search cursor to match the sideways tile view.
+                         * The XOR sequence performs the old in-place coordinate exchange. */
                         searchx ^= searchy; searchy ^= searchx; searchx ^= searchy;
                         searchx = ydim-1-searchx;
                 }
         }
 }
 
+/*
+================
+ExtAnalyzeSprites
+
+Adjust temporary view sprites for editor animation, visibility and shading
+without replacing the map's sprite records.
+================
+*/
 void ExtAnalyzeSprites(void)
 {
         int32_t i, j, k;
@@ -2060,6 +2170,13 @@ void ExtAnalyzeSprites(void)
 
 int intro=0;
 
+/*
+================
+ExtCheckKeys
+
+Finish editor view presentation and dispatch the mode-specific extension keys.
+================
+*/
 void ExtCheckKeys(void)
 {
  int32_t i,count,nexti;
