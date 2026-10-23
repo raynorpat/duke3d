@@ -183,6 +183,14 @@ void restore256_palette (void);
 void set16color_palette (void);
 
 
+/*
+================
+output_surface_info
+
+Log the surface size, pixel depth and presentation renderer when debugging is enabled.
+A missing surface is reported without dereferencing it.
+================
+*/
 static void output_surface_info(SDL_Surface *_surface)
 {
     SDL_RendererInfo info;
@@ -205,6 +213,14 @@ static void output_surface_info(SDL_Surface *_surface)
 } /* output_surface_info */
 
 
+/*
+================
+sdl_window_log_driver
+
+Log the selected Build presentation backend and SDL video driver.
+The debug stream gates the whole query/report path.
+================
+*/
 void sdl_window_log_driver(void)
 {
     const char *driver;
@@ -231,6 +247,14 @@ static int vfade_state = 0;  /* 0 none, 1 out (then held black), 2 in */
 static Uint32 vfade_start;  /* SDL_GetTicks of the timeline's 0 */
 static int vfade_shown = 0;  /* the darkness of the last frame shown */
 
+/*
+================
+videofade_at
+
+Evaluate the triangular fade timeline as darkness from zero to 256.
+The first interval reaches black and the second returns to full brightness.
+================
+*/
 int videofade_at(uint32_t ms)
 {
     if (ms <= VIDEOFADE_MS)
@@ -264,6 +288,14 @@ static int vfade_now(void)
 } /* vfade_now */
 
 
+/*
+================
+setvideofadeout
+
+Start fading out, or reverse an in-progress fade-in at its current darkness.
+The out state holds black until fade-in is requested or the hold timeout expires.
+================
+*/
 void setvideofadeout(void)
 {
     Uint32 now = SDL_GetTicks(), ms = now - vfade_start;
@@ -276,6 +308,14 @@ void setvideofadeout(void)
 } /* setvideofadeout */
 
 
+/*
+================
+setvideofadein
+
+Release a held fade-out into the fade-in half of the timeline.
+Calls outside the out state leave the current fade alone.
+================
+*/
 void setvideofadein(void)
 {
     if (vfade_state != 1)
@@ -285,12 +325,27 @@ void setvideofadein(void)
 } /* setvideofadein */
 
 
+/*
+================
+getvideofade
+
+Return the darkness of the last presented frame.
+This query does not itself advance the real-time fade state.
+================
+*/
 int getvideofade(void)
 {
     return(vfade_shown);
 } /* getvideofade */
 
 
+/*
+================
+videofading
+
+Report whether the presentation fade state is active, including its black hold.
+================
+*/
 int videofading(void)
 {
     return(vfade_state != 0);
@@ -302,6 +357,14 @@ static void gl_present8(void);
 #endif
 
 /* Push the 8-bit surface through the palette to the window. */
+/*
+================
+sdl_window_present
+
+Present the indexed surface through the retained GL context or SDL renderer.
+Apply the presentation fade after the surface palette has supplied its colors.
+================
+*/
 void sdl_window_present(void)
 {
     Uint8 k;
@@ -327,6 +390,14 @@ void sdl_window_present(void)
 } /* present_surface */
 
 
+/*
+================
+free_video_surfaces
+
+Release the indexed surface, RGB staging surface and per-mode presentation textures.
+The window and retained GL context have a separate shutdown lifetime.
+================
+*/
 static void free_video_surfaces(void)
 {
 #ifdef USE_OPENGL
@@ -486,6 +557,14 @@ void sdl_window_gl_mouse8(SDL_MouseMotionEvent *m)
 #endif
 
 
+/*
+================
+shutdown_video
+
+Release video surfaces, the retained GL context, renderer and window in order.
+Wait for pending GL work before destroying the context.
+================
+*/
 static void shutdown_video(void)
 {
     free_video_surfaces();
@@ -538,6 +617,14 @@ static Uint8 *get_framebuffer(void)
 static char screenalloctype = 255;
 static void init_res_lookups(int davidoption, int framebuffer);
 
+/*
+================
+init_new_res_vars
+
+Bind Build's dimensions, row stride and frame pointer to the new SDL surface.
+Rebuild the resolution-dependent view and lookup state afterward.
+================
+*/
 static void init_new_res_vars(int davidoption)
 {
     setupmouse();
@@ -601,6 +688,8 @@ static void init_res_lookups(int davidoption, int framebuffer)
 
         if (framebuffer)
             frameplace = ((intptr_t)(screen));
+        /* The optional pixel buffer is followed by two horizon lookup arrays.
+         * Offsets are byte counts even though the tables contain 32-bit entries. */
         horizlookup = (int32_t *)(((intptr_t)(screen))+i);
         horizlookup2 = (int32_t *)(((intptr_t)(screen))+i+j);
     } /* if */
@@ -1360,6 +1449,14 @@ static void gl_remake(int say)
 #endif
 
 
+/*
+================
+setvideosupersample
+
+Request supersampling for eligible active shader frames.
+Return the active state, which can differ from the request; non-GL builds return zero.
+================
+*/
 int setvideosupersample(int level)
 {
 #ifdef USE_OPENGL
@@ -1376,6 +1473,14 @@ int setvideosupersample(int level)
 } /* setvideosupersample */
 
 
+/*
+================
+videosupersampleavailable
+
+Check a supersampling choice against the active renderer, shader and framebuffer limits.
+Availability is a capability query, not a promise that later allocation succeeds.
+================
+*/
 int videosupersampleavailable(int level)
 {
 #ifdef USE_OPENGL
@@ -1396,6 +1501,14 @@ int videosupersampleavailable(int level)
 } /* videosupersampleavailable */
 
 
+/*
+================
+setvideotexfilter
+
+Map the menu's filter choice to Polymost's texture filter mode.
+Apply it to existing fixed-function textures and report current availability.
+================
+*/
 int setvideotexfilter(int filter)
 {
 #ifdef USE_OPENGL
@@ -1416,6 +1529,14 @@ int setvideotexfilter(int filter)
 } /* setvideotexfilter */
 
 
+/*
+================
+videotexfilteravailable
+
+Check whether the active GL path can provide the requested texture filter.
+Shader filtering also requires its filter program to be ready.
+================
+*/
 int videotexfilteravailable(int filter)
 {
 #ifdef USE_OPENGL
@@ -1432,6 +1553,14 @@ int videotexfilteravailable(int filter)
 } /* videotexfilteravailable */
 
 
+/*
+================
+setgamemode_gl
+
+Enter renderer 3 using the retained GL window/context and refreshed view resources.
+Context reuse keeps renderer switches on the same GL lifetime.
+================
+*/
 int setgamemode_gl(char davidoption)
 {
 #ifdef USE_OPENGL
@@ -1726,6 +1855,14 @@ int getvideomodelist(int32_t *w, int32_t *h, int max, int32_t *desktopw, int32_t
 } /* getvideomodelist */
 
 
+/*
+================
+sdl_window_init_renderer
+
+Select the SDL presentation backend and initialize video and timer subsystems.
+BUILD_RENDERER selects the software backend; renderer 3 is a later video-mode choice.
+================
+*/
 void sdl_window_init_renderer(void)
 {
     const char *envr = getenv(BUILD_RENDERER);
@@ -2034,6 +2171,14 @@ int screencapture(char *_filename, char inverseit)
 } /* screencapture */
 
 
+/*
+================
+setvmode
+
+Translate legacy mode requests into SDL video setup or shutdown.
+Mode 3 tears video down; this backend maps mode 0x13 to its existing 800x600 path.
+================
+*/
 void setvmode(int mode)
 {
     int w = -1;
@@ -2085,6 +2230,14 @@ int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim)
 } /* setgamemode */
 
 
+/*
+================
+qsetmode640350
+
+Keep the legacy 640x350 editor entry point.
+Debug builds assert here before the existing release-build mode setup path.
+================
+*/
 void qsetmode640350(void)
 {
     assert(0);
@@ -2093,6 +2246,14 @@ void qsetmode640350(void)
 } /* qsetmode640350 */
 
 
+/*
+================
+qsetmode640480
+
+Enter the 640x480 editor mode with its saved/restorable 16-color palette.
+Reset the page convention and fill the lower editor panel.
+================
+*/
 void qsetmode640480(void)
 {
     if (!in_egapalette)
@@ -2104,6 +2265,14 @@ void qsetmode640480(void)
 } /* qsetmode640480 */
 
 
+/*
+================
+get_dimensions_from_str
+
+Parse a complete WIDTHxHEIGHT string with each dimension greater than one.
+Output pointers are optional; trailing characters make the parse fail.
+================
+*/
 static int get_dimensions_from_str(const char *str, int32_t *_w, int32_t *_h)
 {
     char *xptr = NULL;
@@ -2140,6 +2309,14 @@ static int get_dimensions_from_str(const char *str, int32_t *_w, int32_t *_h)
 } /* get_dimensions_from_str */
 
 
+/*
+================
+get_max_screen_res
+
+Read the configured resolution ceiling, falling back to the built-in limits.
+Each output pointer may be omitted by the caller.
+================
+*/
 static __inline void get_max_screen_res(int32_t *max_w, int32_t *max_h)
 {
     int32_t w = DEFAULT_MAXRESWIDTH;
@@ -2164,6 +2341,14 @@ static __inline void get_max_screen_res(int32_t *max_w, int32_t *max_h)
 } /* get_max_screen_res */
 
 
+/*
+================
+add_vesa_mode
+
+Append one candidate to the parallel legacy resolution arrays.
+Filtering and ordering are deferred until the full candidate list is collected.
+================
+*/
 static void add_vesa_mode(const char *typestr, int w, int h)
 {
     sdl_debug("Adding %s resolution (%dx%d).", typestr, w, h);
@@ -2191,6 +2376,14 @@ static __inline void add_user_defined_resolution(void)
 } /* add_user_defined_resolution */
 
 
+/*
+================
+add_physical_resolutions
+
+Append display-zero modes reported by SDL to the legacy mode list.
+Missing display modes leave the standard and user-specified candidates available.
+================
+*/
 static __inline void add_physical_resolutions(void)
 {
     SDL_DisplayMode mode;
@@ -2211,6 +2404,14 @@ static __inline void add_physical_resolutions(void)
 } /* add_physical_resolutions */
 
 
+/*
+================
+remove_vesa_mode
+
+Remove one mode and compact all three parallel mode arrays together.
+Callers walking forward must revisit the index that just shifted down.
+================
+*/
 static void remove_vesa_mode(int index, const char *reason)
 {
     int i;
@@ -2230,6 +2431,13 @@ static void remove_vesa_mode(int index, const char *reason)
 } /* remove_vesa_mode */
 
 
+/*
+================
+cull_large_vesa_modes
+
+Remove candidates exceeding either dimension of the configured resolution ceiling.
+================
+*/
 static __inline void cull_large_vesa_modes(void)
 {
     int32_t max_w;
@@ -2250,6 +2458,14 @@ static __inline void cull_large_vesa_modes(void)
 } /* cull_large_vesa_modes */
 
 
+/*
+================
+cull_duplicate_vesa_modes
+
+Remove repeated width/height pairs before mode sorting.
+Equal pairs would otherwise keep the legacy swapping loop active.
+================
+*/
 static __inline void cull_duplicate_vesa_modes(void)
 {
     int i;
@@ -2273,6 +2489,14 @@ static __inline void cull_duplicate_vesa_modes(void)
 #define swap_macro(tmp, x, y) { tmp = x; x = y; y = tmp; }
 
 /* be sure to call cull_duplicate_vesa_modes() before calling this. */
+/*
+================
+sort_vesa_modelist
+
+Swap neighboring modes when the first is at least as large in both dimensions.
+Remove duplicates first so equal sizes cannot prevent progress.
+================
+*/
 static __inline void sort_vesa_modelist(void)
 {
     int i;
@@ -2313,6 +2537,14 @@ static __inline void cull_unaligned_vesa_modes(void)
 } /* cull_unaligned_vesa_modes */
 
 
+/*
+================
+cleanup_vesa_modelist
+
+Apply row-alignment, size and duplicate restrictions before ordering modes.
+Keep duplicate removal before the legacy sorting loop.
+================
+*/
 static __inline void cleanup_vesa_modelist(void)
 {
     cull_unaligned_vesa_modes();
@@ -2322,6 +2554,13 @@ static __inline void cleanup_vesa_modelist(void)
 } /* cleanup_vesa_modelist */
 
 
+/*
+================
+output_vesa_modelist
+
+Log the final mode dimensions using the legacy fixed-size debug buffer.
+================
+*/
 static __inline void output_vesa_modelist(void)
 {
     char buffer[256];
@@ -2348,6 +2587,14 @@ static __inline void output_vesa_modelist(void)
 } /* output_vesa_modelist */
 
 
+/*
+================
+getvalidvesamodes
+
+Build the cached list of standard, physical and user-requested resolutions once.
+Filter the candidates before exposing them through Build's legacy mode arrays.
+================
+*/
 void getvalidvesamodes(void)
 {
     static int already_checked = 0;
@@ -2454,6 +2701,14 @@ int VBE_setPalette(int32_t start, int32_t num, char *palettebuffer)
 } /* VBE_setPalette */
 
 
+/*
+================
+VBE_getPalette
+
+Export palette entries as the legacy six-bit BGR0 records.
+The start index also selects the destination offset within the caller's palette buffer.
+================
+*/
 int VBE_getPalette(int32_t start, int32_t num, char *palettebuffer)
 {
     SDL_Color *sdlp;
@@ -2566,6 +2821,14 @@ void drawpixel(intptr_t offset, unsigned char pixel)
 
 
 /* !!! These are incorrect. */
+/*
+================
+drawpixels
+
+Retain the unsupported packed-two-pixel entry point, which reports and exits.
+The store code below the exit is currently unreachable.
+================
+*/
 void drawpixels(int32_t offset, unsigned short pixels)
 {
     Uint8 *surface_end;
@@ -2587,6 +2850,14 @@ void drawpixels(int32_t offset, unsigned short pixels)
 } /* drawpixels */
 
 
+/*
+================
+drawpixelses
+
+Retain the unsupported packed-four-pixel entry point, which reports and exits.
+The store code below the exit is currently unreachable.
+================
+*/
 void drawpixelses(int32_t offset, unsigned int pixelses)
 {
     Uint8 *surface_end;
@@ -2620,6 +2891,14 @@ void drawpixel16(int32_t offset)
 } /* drawpixel16 */
 
 
+/*
+================
+fillscreen16
+
+Fill an editor rectangle using the legacy page/offset convention, then present it.
+Clamp the requested end to the surface boundary before the byte fill.
+================
+*/
 void fillscreen16(int32_t offset, int32_t color, int32_t blocksize)
 {
     Uint8 *surface_end;
@@ -2633,6 +2912,7 @@ void fillscreen16(int32_t offset, int32_t color, int32_t blocksize)
 
     /* Make this function pageoffset aware - DDOI */
     if (!pageoffset) {
+	    /* Page zero's editor panel begins at row 336; its offsets count eight-pixel groups. */
 	    offset = offset << 3;
 	    offset += 640*336;
     }
@@ -2685,6 +2965,14 @@ static __inline void DrawVerticalRun (char **ScreenPtr, int XAdvance, int RunLen
     *ScreenPtr = WorkingScreenPtr;
 }
 
+/*
+================
+drawline16
+
+Draw a clipped editor line with integer error accumulation and horizontal/vertical runs.
+Convert the legacy page-zero panel coordinates before walking framebuffer addresses.
+================
+*/
 void drawline16(int32_t XStart, int32_t YStart, int32_t XEnd, int32_t YEnd, char Color)
 {
     int Temp, AdjUp, AdjDown, ErrorTerm, XAdvance, XDelta, YDelta;
@@ -2782,6 +3070,8 @@ void drawline16(int32_t XStart, int32_t YStart, int32_t XEnd, int32_t YEnd, char
     /* Determine whether the line is X or Y major, and handle accordingly */
     if (XDelta >= YDelta) /* X major line */
     {
+        /* WholeStep gives the base run length; the remainder accumulates extra pixels.
+         * This avoids a divide for every plotted pixel. */
         WholeStep = XDelta / YDelta;
         AdjUp = (XDelta % YDelta) * 2;
         AdjDown = YDelta * 2;
@@ -2841,6 +3131,14 @@ void drawline16(int32_t XStart, int32_t YStart, int32_t XEnd, int32_t YEnd, char
 } /* drawline16 */
 
 
+/*
+================
+clear2dscreen
+
+Clear the editor map area according to the current 350/480-line mode.
+The 480-line path can preserve the lower panel by clearing only the first 336 rows.
+================
+*/
 void clear2dscreen(void)
 {
     SDL_Rect rect;
@@ -2862,6 +3160,14 @@ void clear2dscreen(void)
 } /* clear2dscreen */
 
 
+/*
+================
+_getVideoBase
+
+Return the SDL surface's current pixel storage.
+The caller must have a surface; a subsequent mode change can invalidate this pointer.
+================
+*/
 void *_getVideoBase(void)
 {
     return((void *) surface->pixels);
@@ -2879,6 +3185,14 @@ void limitrate(void)
 } /* limitrate */
 
 
+/*
+================
+set16color_palette
+
+Save the first sixteen palette entries and replace them with the editor EGA colors.
+Remember the substitution so a later game-mode change can restore the saved entries.
+================
+*/
 void set16color_palette(void)
 {
 	/* Backup old palette */
@@ -2891,6 +3205,14 @@ void set16color_palette(void)
 	in_egapalette = 1;
 } /* set16color_palette */
 
+/*
+================
+restore256_palette
+
+Restore the saved first sixteen palette entries after editor palette substitution.
+Clear the flag that tracks whether the EGA replacement is installed.
+================
+*/
 void restore256_palette(void)
 {
 	/*VBE_setPalette (0, 16, (char *)&backup_palette);*/

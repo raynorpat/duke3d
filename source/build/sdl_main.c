@@ -75,6 +75,14 @@ static int root_sdl_event_filter(const SDL_Event *event)
 } /* root_sdl_event_filter */
 
 
+/*
+================
+handle_events
+
+Drain queued SDL events through the synchronous platform dispatcher.
+Input state is updated before control returns to the caller.
+================
+*/
 static void handle_events(void)
 {
     SDL_Event event;
@@ -91,6 +99,14 @@ void _handle_events(void)
 } /* _handle_events */
 
 
+/*
+================
+output_sdl_versions
+
+Log the compiled and linked SDL versions through the optional debug stream.
+Keep the original backend attribution alongside the version information.
+================
+*/
 static __inline void output_sdl_versions(void)
 {
     SDL_version linked;
@@ -110,6 +126,14 @@ static __inline void output_sdl_versions(void)
 
 
 /* lousy -ansi flag.  :) */
+/*
+================
+string_dupe
+
+Allocate a persistent copy of a platform/window title string.
+Return NULL if the allocation fails.
+================
+*/
 static char *string_dupe(const char *str)
 {
     char *retval = malloc(strlen(str) + 1);

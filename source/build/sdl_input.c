@@ -32,6 +32,14 @@ static unsigned int scancodes[SDL_NUM_SCANCODES];
 static SDL_Joystick *joystick = NULL;
 
 
+/*
+================
+set_mouse_grab
+
+Request relative mouse mode and window capture from SDL.
+The caller owns the stored grab-policy flag.
+================
+*/
 static void set_mouse_grab(int grab)
 {
     SDL_SetRelativeMouseMode(grab ? SDL_TRUE : SDL_FALSE);
@@ -40,6 +48,14 @@ static void set_mouse_grab(int grab)
 } /* set_mouse_grab */
 
 
+/*
+================
+sdl_mouse_button_filter
+
+Translate SDL button numbering into Build's left/right/middle bit order.
+Legacy release handling toggles the mapped bit; wheel pulses are handled separately.
+================
+*/
 int sdl_mouse_button_filter(SDL_MouseButtonEvent const *event)
 {
         /*
@@ -79,6 +95,14 @@ int sdl_mouse_button_filter(SDL_MouseButtonEvent const *event)
     return(0);
 }
 
+/*
+================
+sdl_mouse_wheel_filter
+
+Latch vertical wheel direction bits until readmousebstatus consumes them.
+Normalize SDL's flipped-wheel convention before setting the pulse.
+================
+*/
 int sdl_mouse_wheel_filter(SDL_MouseWheelEvent const *event)
 {
     /* bits 3 and 4 are wheel up/down; readmousebstatus() clears them. */
@@ -95,6 +119,14 @@ int sdl_mouse_wheel_filter(SDL_MouseWheelEvent const *event)
 } /* sdl_mouse_wheel_filter */
 
 
+/*
+================
+sdl_mouse_motion_filter
+
+Accumulate mouse or trackball motion and constrain Build's cursor to the active area.
+Indexed frames shown through GL first rescale window coordinates to surface pixels.
+================
+*/
 int sdl_mouse_motion_filter(SDL_Event const *event)
 {
     int w, h;
@@ -157,6 +189,14 @@ int sdl_mouse_motion_filter(SDL_Event const *event)
      *  which we check for explicitly, and give the engine a keypad enter
      *  enter event.
      */
+/*
+================
+handle_keypad_enter_hack
+
+Translate Shift-Return into keypad Enter for the legacy keyboard interface.
+Remember the substituted press so its release uses the same key.
+================
+*/
 static __inline int handle_keypad_enter_hack(const SDL_Event *event)
 {
     static int kp_enter_hack = 0;
@@ -267,6 +307,14 @@ int sdl_key_filter(const SDL_Event *event)
 } /* sdl_key_filter */
 
 
+/*
+================
+_joystick_init
+
+Open the joystick selected by name, or the first device by default.
+The environment can disable detection; a repeated call closes the old device first.
+================
+*/
 void _joystick_init(void)
 {
     const char *envr = getenv(BUILD_SDLJOYSTICK);
@@ -331,6 +379,14 @@ void _joystick_init(void)
 } /* _joystick_init */
 
 
+/*
+================
+_joystick_deinit
+
+Close the open joystick and release its SDL subsystem.
+Clear the pointer so later polling follows the disconnected paths.
+================
+*/
 void _joystick_deinit(void)
 {
     if (joystick != NULL)
@@ -345,6 +401,14 @@ void _joystick_deinit(void)
 } /* _joystick_deinit */
 
 
+/*
+================
+_joystick_update
+
+Refresh SDL's polled joystick state when a device is open.
+Return whether polling had an open device to update.
+================
+*/
 int _joystick_update(void)
 {
     if (joystick == NULL)
@@ -355,6 +419,13 @@ int _joystick_update(void)
 } /* _joystick_update */
 
 
+/*
+================
+_joystick_axis
+
+Read an unscaled signed SDL axis value, or zero with no open joystick.
+================
+*/
 int _joystick_axis(int axis)
 {
     if (joystick == NULL)
@@ -364,6 +435,14 @@ int _joystick_axis(int axis)
 } /* _joystick_axis */
 
 
+/*
+================
+_joystick_hat
+
+Read SDL's hat-direction bits; return -1 when no joystick is open.
+A connected hat centered at rest is represented by SDL's zero value.
+================
+*/
 int _joystick_hat(int hat)
 {
     if (joystick == NULL)
@@ -374,6 +453,14 @@ int _joystick_hat(int hat)
     return(SDL_JoystickGetHat(joystick, hat));
 }
 
+/*
+================
+_joystick_button
+
+Read one joystick button as a pressed/not-pressed value.
+A missing joystick reports not pressed.
+================
+*/
 int _joystick_button(int button)
 {
     if (joystick == NULL)
@@ -383,12 +470,28 @@ int _joystick_button(int button)
 } /* _joystick_button */
 
 
+/*
+================
+_readlastkeyhit
+
+Peek at the last byte delivered through the Build keyboard handler.
+Reading it does not consume or clear the stored byte.
+================
+*/
 unsigned char _readlastkeyhit(void)
 {
     return(lastkey);
 } /* _readlastkeyhit */
 
 
+/*
+================
+setupmouse
+
+Apply capture/cursor policy and reset Build's motion origin to the view center.
+Return zero until a window exists; this does not warp the SDL cursor.
+================
+*/
 int setupmouse(void)
 {
     int w, h;
@@ -431,6 +534,14 @@ void readmousexy(short *x, short *y)
 } /* readmousexy */
 
 
+/*
+================
+readmousebstatus
+
+Return held button bits together with any latched wheel directions.
+Clear only the wheel pulses after reading; held buttons remain set.
+================
+*/
 void readmousebstatus(short *bstatus)
 {
     if (bstatus)

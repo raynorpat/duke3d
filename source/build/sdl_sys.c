@@ -28,6 +28,14 @@ FILE *sdl_debug_file = NULL;
 #ifdef DC
 #define sdl_debug(fmt,args...) printf("BUILDSDL: " fmt "\n",##args)
 #else
+/*
+================
+__out_sdldebug
+
+Write and flush one subsystem-prefixed diagnostic line.
+The caller has already checked that the debug stream exists.
+================
+*/
 static __inline void __out_sdldebug(const char *subsystem,
                                   const char *fmt, va_list ap)
 {
@@ -38,6 +46,14 @@ static __inline void __out_sdldebug(const char *subsystem,
 } /* __out_sdldebug */
 
 
+/*
+================
+sdl_debug
+
+Write an SDL backend diagnostic only when a debug stream is configured.
+Keep varargs handling here so callers share the same prefix and flushing policy.
+================
+*/
 void sdl_debug(const char *fmt, ...)
 {
     va_list ap;
@@ -58,6 +74,14 @@ static int in_vmware = 0;
 static Uint64 timer_start, timer_calls;
 
 
+/*
+================
+sdl_sys_init_debugging
+
+Read the debug-file and hall-of-mirrors environment options at platform startup.
+Replace any previous stream; a filename of minus selects stdout.
+================
+*/
 void sdl_sys_init_debugging(void)
 {
     const char *envr = getenv(BUILD_SDLDEBUG);
@@ -85,6 +109,14 @@ void sdl_sys_init_debugging(void)
 } /* init_debugging */
 
 
+/*
+================
+sdl_sys_detect_vmware
+
+Retain the legacy detection hook with its active path clearing the VMware flag.
+The privileged probe remains in the disabled compatibility branch.
+================
+*/
 void sdl_sys_detect_vmware(void)
 {
 #if 1
@@ -99,6 +131,14 @@ void sdl_sys_detect_vmware(void)
 } /* detect_vmware */
 
 
+/*
+================
+_idle
+
+Pump platform events while a window exists, then yield briefly to SDL.
+Wait loops use this to keep input and window events moving.
+================
+*/
 void _idle(void)
 {
     if (sdl_window != NULL)
@@ -145,6 +185,14 @@ static Uint32 _timer_catcher(Uint32 interval, void *bleh)
 } /* _timer_catcher */
 
 
+/*
+================
+inittimer
+
+Start the SDL callback with its performance-counter epoch and logical count reset.
+The callback derives Build ticks from elapsed time rather than callback frequency.
+================
+*/
 void inittimer(void)
 {
     SDL_ClearError();
@@ -161,6 +209,14 @@ void inittimer(void)
 }
 
 
+/*
+================
+uninittimer
+
+Remove the registered primary timer when present and clear its handle.
+Repeated shutdown calls have no timer left to remove.
+================
+*/
 void uninittimer(void)
 {
     if (primary_timer != 0)
@@ -171,6 +227,14 @@ void uninittimer(void)
 }
 
 
+/*
+================
+getticks
+
+Return SDL's millisecond clock, separate from the fixed-rate Build game clock.
+The unsigned counter wraps; elapsed-time callers subtract unsigned values.
+================
+*/
 uint32_t getticks(void)
 {
     return(SDL_GetTicks());
