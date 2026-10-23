@@ -2051,7 +2051,7 @@ void ExtPreCheckKeys(void) // just before drawrooms
 ================
 ExtAnalyzeSprites
 
-Adjust temporary view sprites for editor animation, visibility and shading
+Adjust temporary view sprites for editor animation, visibility and orientation
 without replacing the map's sprite records.
 ================
 */

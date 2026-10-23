@@ -1206,7 +1206,7 @@ void AL_SetPitchBend
    TotalBend  = pitchbend * Channel[ channel ].PitchBendRange;
    TotalBend /= ( PITCHBEND_CENTER / FINETUNE_RANGE );
 
-   /* Split bend into a whole-note offset and fine-table index before
+   /* Split bend into a semitone offset and fine-table index before
     * retuning every active voice on the channel. */
    Channel[ channel ].KeyOffset  = ( int )( TotalBend / FINETUNE_RANGE );
    Channel[ channel ].KeyOffset -= Channel[ channel ].PitchBendSemiTones;
