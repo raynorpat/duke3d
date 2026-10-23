@@ -83,7 +83,10 @@ int main(void)
                 check(what, tmulscale(a, b, b, a, a, a, k), ref_tmulscale(a, b, b, a, a, a, k));
                 if (b == 0) continue;
                 /* idiv traps when the quotient doesn't fit; the game never relies on that. */
-                q = (int64_t)((uint64_t)(int64_t)a << k) / b;
+                q = (int64_t)((uint64_t)(int64_t)a << k);
+                /* Skip the 64-bit overflow before computing the quotient. */
+                if (q == INT64_MIN && b == -1) continue;
+                q /= b;
                 if (q < INT32_MIN || q > INT32_MAX) continue;
                 snprintf(what, sizeof(what), "divscale(%d,%d,%d)", a, b, k);
                 check(what, divscale(a, b, k), ref_divscale(a, b, k));

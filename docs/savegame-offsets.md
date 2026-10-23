@@ -43,8 +43,9 @@ pointer unflagged, so an all-zero bitmap does not universally prove native origi
 The current macOS builds place native wall offsets at positive values, disjoint
 from the negative DOS windows. A different linker may place the windows over each
 other; unit tests supply such a layout explicitly and check ambiguous refusal,
-positive DOS selection and agreement. A DOS wall pointer is also re-encoded with
-the native writer's offset calculation and loaded back to the same field.
+positive DOS selection and agreement. Tests also re-encode a DOS wall pointer
+with explicit native bases: disjoint or agreeing layouts recover the same field,
+while ambiguous layouts are refused.
 
 Both early unversioned loaders also decode and check bitmap-marked script offsets,
 without overwriting the raw hittype block needed for DOS script-base validation.

@@ -50,7 +50,6 @@ static int same(const buildcfg_t *a, const buildcfg_t *b)
 
 int main(void)
 {
-    const char *tmp = getenv("TMPDIR");
     char dir[512], cfg[600], dat[600], text[4096], out[1024];
 #ifndef _WIN32
     char home[600];
@@ -59,8 +58,8 @@ int main(void)
     FILE *f;
     size_t n;
 
-    snprintf(dir, sizeof(dir), "%s/build_cfg_test_%d", tmp && *tmp ? tmp : "/tmp", (int)getpid());
-    mkdir(dir, 0700);
+    snprintf(dir, sizeof(dir), "build_cfg_test_%d", (int)getpid());
+    if (mkdir(dir, 0700) != 0) { perror(dir); return 1; }
     snprintf(cfg, sizeof(cfg), "%s/build.cfg", dir);
     snprintf(dat, sizeof(dat), "%s/setup.dat", dir);
 

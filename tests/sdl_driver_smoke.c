@@ -640,11 +640,13 @@ static int video_fade(int argc, char **argv)
     printf("turned back at darkness %d: %d\n", d, getvideofade());
     for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < VIDEOFADE_MS; SDL_Delay(5))
         _nextpage();
+    _nextpage();  /* Sample after the deadline, even if the last delay crossed it. */
     if (getvideofade() != 256) { fprintf(stderr, "FAIL: not black again: %d\n", getvideofade()); return 1; }
 
     setvideofadein();
     for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < VIDEOFADE_MS + 20; SDL_Delay(5))
         _nextpage();
+    _nextpage();
     if ((getvideofade() != 0) || (videofading())) { fprintf(stderr, "FAIL: not done: %d\n", getvideofade()); return 1; }
     setvideofadein();  /* with none under way: nothing */
     _nextpage();
@@ -658,6 +660,7 @@ static int video_fade(int argc, char **argv)
     if (getvideofade() != 256) { fprintf(stderr, "FAIL: not held black: %d\n", getvideofade()); return 1; }
     for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < VIDEOFADE_MS + 60; SDL_Delay(5))
         _nextpage();
+    _nextpage();
     printf("held black with no fade-in: %d after %d ms\n", getvideofade(), 4 * VIDEOFADE_MS + 40);
     if ((getvideofade() != 0) || (videofading())) { fprintf(stderr, "FAIL: black held with no end\n"); return 1; }
 

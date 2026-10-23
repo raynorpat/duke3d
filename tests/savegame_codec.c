@@ -365,22 +365,12 @@ static void test_animation_offsets(void)
     /* Measured DOS wall base minus sector base, not native linker placement. */
     CHECK(sg_animptr(-0x4b300,1) == &wall[0].x);
     CHECK(sg_animptr(-0x4b300+17*32+4,1) == &wall[17].y);
-    {
-        int32_t *p = sg_animptr(-0x4b300+17*32+4,1);
-        if (p != NULL)
-            CHECK(sg_animptr((int32_t)((intptr_t)p-(intptr_t)sector),0) == p);
-    }
     CHECK(sg_animptr(-0x4b300+(MAXWALLS-1)*32+4,1) == &wall[MAXWALLS-1].y);
     CHECK(sg_animptr(-0x4b300-32,1) == NULL);
     CHECK(sg_animptr(-0x4b300+8,1) == NULL);
 #elif DUKE3D_GAMEVER >= GAMEVER_15
     CHECK(sg_animptr(-0x4b800,1) == &wall[0].x);
     CHECK(sg_animptr(-0x4b800+17*32+4,1) == &wall[17].y);
-    {
-        int32_t *p = sg_animptr(-0x4b800+17*32+4,1);
-        if (p != NULL)
-            CHECK(sg_animptr((int32_t)((intptr_t)p-(intptr_t)sector),0) == p);
-    }
     CHECK(sg_animptr(-0x4b800+(MAXWALLS-1)*32+4,1) == &wall[MAXWALLS-1].y);
     CHECK(sg_animptr(-0x4b800-32,1) == NULL);
     CHECK(sg_animptr(-0x4b800+8,1) == NULL);
@@ -395,6 +385,11 @@ static void test_animation_offsets(void)
 #else
     off = -0x4b800;
 #endif
+    /* Re-encoding wall[17].y natively can overlap a different DOS field.
+       Supply the native bases explicitly, independently of linker placement. */
+    CHECK(sg_walloffset(17*32+4,0,0) == 17*32+4); /* disjoint layouts */
+    CHECK(sg_walloffset(off+17*32+4,off,0) == 17*32+4); /* same field */
+    CHECK(sg_walloffset(-0x40000+17*32+4,-0x40000,0) == -1); /* different fields */
     CHECK(sg_walloffset(off+64,off+32,0) == -1); /* different valid walls */
     CHECK(sg_walloffset(off+64,off+32,1) == 64);  /* positive DOS evidence */
     CHECK(sg_walloffset(off+64,off,0) == 64);    /* identical interpretations */
