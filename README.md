@@ -169,8 +169,8 @@ Pass these with `-D` when configuring.
 | `DUKE3D_CONTROLS_MENU` | `ON` | In-game controls configuration menu |
 | `DUKE3D_FETCH_SDL` | `AUTO` | `AUTO` uses installed SDL2 and fetches it if missing; `ON` always builds SDL2 2.32.10 from source; `OFF` fails if SDL2 isn't installed |
 
-The default build type is `RelWithDebInfo`. The Watcom/DOS makefiles
-(`source/makefile.dos`, `source/makefile.lnk`) are kept for reference only.
+The default build type is `RelWithDebInfo`. CMake is the supported build
+system; the legacy DOS/Watcom platform code and makefiles have been removed.
 
 ## Renderers
 
@@ -673,43 +673,8 @@ Enjoy the source code.  We can't wait to see what people do with it.  And we rea
 George Broussard & Scott Miller
 3D Realms
 
-# HOW TO COMPILE THE SOURCE CODE (by Charlie Wiederhold)
-
-This source code release was compiled on March 20th, 2003 using the materials in this archive.
-
-Duke was originally written with the Watcom 10.0 C/C++ compiler. This code has been updated to allow it to compile under the free version of the Watcom compiler available from their webpage (http://www.openwatcom.org).
-
-It was compiled under both Open Watcom 1.0 and Watcom 11.0c for Windows.  Both are free to download, and I didn't notice much of a difference between the two when using them. This means, thankfully, that anybody can work with this code right away without trying to find an out of production compiler or wait for someone to port it to other modern compilers.
-
-Step 1) Install Watcom C/C++ onto your system.
-
-Step 2) When you install, make sure that you select DOS 32 Bit as one of your target environments to build for.
-
-Step 3) Choose a place you want to work from and unzip the contents of this .ZIP file into that directory.
-
-From here you have two choices on how to work. You can use the command line compiler that comes with Watcom, or you can use the IDE (basically the development studio that manages your files, options for compiling, editing files, debugger, etc). Whichever one you choose depends on what you are comfortable with.
-
-## IF YOU USE THE COMMAND LINE COMPILER
-
-- In a Command Prompt, go into the Source directory where you should find a MAKEFILE. and a MAKEFILE.LNK file.
-- At the Command Prompt type "wmake" or "wmake makefile" without the quotes.
-- This should compile and create a DUKE3D.EXE file which you can then copy into the directory with your Duke 3D data and run.
-
-## IF YOU USE THE IDE
-
-- Start up the Watcom IDE and go to File -> Open Project.
-- Find the directory where you've unzipped the Source files into, and you should see a DUKE3D.WPJ, select this and hit "OK".
-- Click the "Make Current Target" button, or press "F4" or go to the menu Targets -> Make. You'll see lots of Warnings as it compiles, that's normal.
-- This will create a DUKE3D.EXE file in the same directory where the DUKE3D.WPJ was located, which can then be copied in the directory with your Duke 3D data and run.
-
-## ONCE YOU HAVE DUKE3D.EXE COMPILED
-
-- If you own Duke 3D version 1.5, you are set... simply copy your new .EXE into the directory and run it.
-- If you own Duke 3D version 1.4 or 1.3d, follow the same steps below except don't download the shareware data.
-- If you own neither versions: Download the shareware version of Duke 3D from http://www.3drealms.com (go to Downloads).
-- In the directory you have Duke 3D installed now, copy the four files in the TESTDATA directory into your Duke 3D directory. Now you should be able to play the game well enough to test, though unfortunately there will still be some minor issues. Your best results will come from owning a copy of Duke 3D version 1.5, which can still be purchased from the 3D Realms website.
-
-This should be enough to get you started. Unfortunately nobody at 3D Realms will be able to devote the time to answer any support questions if you do encounter problems. However, go to http://www.3drealms.com/forums.html and you will find people discussing the source code in the Duke 3D Source category and able to answer questions. I will try to answer extremely common questions there shortly after the release, but I promise, within a very short time the community will outgrow my knowledge/understanding of this source and be better suited to answer any questions itself.
+The original DOS/Watcom build instructions have been retired. Use the CMake
+build instructions above for this port.
 
 ## MISC NOTES ABOUT THIS RELEASE
 

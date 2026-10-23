@@ -31,7 +31,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <stdint.h>
 #include <stdlib.h>
 //#include <math.h>
-#include "dpmi.h"
 #include "standard.h"
 #include "pitch.h"
 
@@ -131,7 +130,6 @@ void PITCH_Init
 **********************************************************************/
 
 
-#define PITCH_LockStart PITCH_GetScale
 
 
 /*---------------------------------------------------------------------
@@ -195,65 +193,4 @@ uint32_t PITCH_GetScale
       }
 
    return( scale );
-   }
-
-
-/*---------------------------------------------------------------------
-   Function: PITCH_LockEnd
-
-   Used for determining the length of the functions to lock in memory.
----------------------------------------------------------------------*/
-
-static void PITCH_LockEnd
-   (
-   void
-   )
-
-   {
-   }
-
-
-/*---------------------------------------------------------------------
-   Function: PITCH_UnlockMemory
-
-   Unlocks all neccessary data.
----------------------------------------------------------------------*/
-
-void PITCH_UnlockMemory
-   (
-   void
-   )
-
-   {
-   DPMI_UnlockMemoryRegion( PITCH_LockStart, PITCH_LockEnd );
-   DPMI_Unlock( PitchTable );
-//   DPMI_Unlock( PITCH_Installed );
-   }
-
-
-/*---------------------------------------------------------------------
-   Function: PITCH_LockMemory
-
-   Unlocks all neccessary data.
----------------------------------------------------------------------*/
-
-int PITCH_LockMemory
-   (
-   void
-   )
-
-   {
-   int status;
-
-   status  = DPMI_LockMemoryRegion( PITCH_LockStart, PITCH_LockEnd );
-   status |= DPMI_Lock( PitchTable );
-//   status |= DPMI_Lock( PITCH_Installed );
-
-   if ( status != DPMI_Ok )
-      {
-      PITCH_UnlockMemory();
-      return( PITCH_Error );
-      }
-
-   return( PITCH_Ok );
    }

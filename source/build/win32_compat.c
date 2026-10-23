@@ -45,19 +45,5 @@ const int hbits[64] =
 };
 
 
-/* !!! remove me later! */
-int _inp_handler(int port, char *source_file, int source_line)
-{
-    fprintf(stderr, "inp(0x%X) call in %s, line %d.\n", port, source_file, source_line);
-    return(0);
-} /* _inp_handler */
-
-
-/* !!! remove me later! */
-int _kinp_handler(int port, char *source_file, int source_line)
-{
-    fprintf(stderr, "kinp(0x%X) call in %s, line %d.\n", port, source_file, source_line);
-    return(0);
-} /* _kinp_handler */
 
 /* end of win32_compat.c ... */

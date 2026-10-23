@@ -34,7 +34,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <string.h>
 #include "sndcards.h"
 #include "interrup.h"
-#include "dpmi.h"
 #include "standard.h"
 #include "task_man.h"
 #include "ll_man.h"
@@ -52,7 +51,7 @@ static const int _MIDI_CommandLengths[ NUM_MIDI_CHANNELS ] =
    0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 1, 1, 2, 0
    };
 
-static int cdecl ( *_MIDI_RerouteFunctions[ NUM_MIDI_CHANNELS ] )
+static int ( *_MIDI_RerouteFunctions[ NUM_MIDI_CHANNELS ] )
    (
    int event,
    int c1,
@@ -114,7 +113,6 @@ char MIDI_PatchMap[ 128 ];
 **********************************************************************/
 
 
-#define MIDI_LockStart _MIDI_ReadNumber
 
 
 /*---------------------------------------------------------------------
@@ -536,10 +534,6 @@ static int _MIDI_InterpretControllerInfo
 
    Task that interperates the MIDI data.
 ---------------------------------------------------------------------*/
-// NOTE: We have to use a stack frame here because of a strange bug
-// that occurs with Watcom.  This means that we cannot access Task!
-//Turned off to test if it works with Watcom 10a
-//#pragma aux _MIDI_ServiceRoutine frame;
 /*
 static void test
    (
@@ -769,7 +763,7 @@ static int _MIDI_SendControlChange
 void MIDI_RerouteMidiChannel
    (
    int channel,
-   int cdecl ( *function )( int event, int c1, int c2 )
+   int ( *function )( int event, int c1, int c2 )
    )
 
    {
@@ -1196,7 +1190,6 @@ void MIDI_StopSong
          _MIDI_Funcs->ReleasePatches();
          }
 
-      DPMI_UnlockMemory( _MIDI_TrackPtr, _MIDI_TrackMemSize );
       USRHOOKS_FreeMem( _MIDI_TrackPtr );
 
       _MIDI_TrackPtr     = NULL;
@@ -1281,25 +1274,13 @@ int MIDI_PlaySong
       return( MIDI_NoMemory );
       }
 
-   status = DPMI_LockMemory( _MIDI_TrackPtr, _MIDI_TrackMemSize );
-   if ( status != DPMI_Ok )
-      {
-      USRHOOKS_FreeMem( _MIDI_TrackPtr );
-
-      _MIDI_TrackPtr     = NULL;
-      _MIDI_TrackMemSize = 0;
-      _MIDI_NumTracks    = 0;
-//      MIDI_SetErrorCode( MIDI_DPMI_Error );
-      return( MIDI_Error );
-      }
-
    CurrentTrack = _MIDI_TrackPtr;
    numtracks    = _MIDI_NumTracks;
    while( numtracks-- )
       {
       if ( *( uint32_t * )ptr != MIDI_TRACK_SIGNATURE )
          {
-         DPMI_UnlockMemory( _MIDI_TrackPtr, _MIDI_TrackMemSize );
+
 
          USRHOOKS_FreeMem( _MIDI_TrackPtr );
 
@@ -2137,120 +2118,4 @@ void MIDI_LoadTimbres
       }
 
    _MIDI_ResetTracks();
-   }
-
-
-/*---------------------------------------------------------------------
-   Function: MIDI_LockEnd
-
-   Used for determining the length of the functions to lock in memory.
----------------------------------------------------------------------*/
-
-static void MIDI_LockEnd
-   (
-   void
-   )
-
-   {
-   }
-
-
-/*---------------------------------------------------------------------
-   Function: MIDI_UnlockMemory
-
-   Unlocks all neccessary data.
----------------------------------------------------------------------*/
-
-void MIDI_UnlockMemory
-   (
-   void
-   )
-
-   {
-   DPMI_UnlockMemoryRegion( MIDI_LockStart, MIDI_LockEnd );
-   DPMI_UnlockMemory( ( void * )&_MIDI_CommandLengths[ 0 ],
-      sizeof( _MIDI_CommandLengths ) );
-   DPMI_Unlock( _MIDI_TrackPtr );
-   DPMI_Unlock( _MIDI_NumTracks );
-   DPMI_Unlock( _MIDI_SongActive );
-   DPMI_Unlock( _MIDI_SongLoaded );
-   DPMI_Unlock( _MIDI_Loop );
-   DPMI_Unlock( _MIDI_PlayRoutine );
-   DPMI_Unlock( _MIDI_Division );
-   DPMI_Unlock( _MIDI_ActiveTracks );
-   DPMI_Unlock( _MIDI_TotalVolume );
-   DPMI_Unlock( _MIDI_ChannelVolume );
-   DPMI_Unlock( _MIDI_Funcs );
-   DPMI_Unlock( _MIDI_PositionInTicks );
-   DPMI_Unlock( _MIDI_Division );
-   DPMI_Unlock( _MIDI_Tick );
-   DPMI_Unlock( _MIDI_Beat );
-   DPMI_Unlock( _MIDI_Measure );
-   DPMI_Unlock( _MIDI_Time );
-   DPMI_Unlock( _MIDI_BeatsPerMeasure );
-   DPMI_Unlock( _MIDI_TicksPerBeat );
-   DPMI_Unlock( _MIDI_TimeBase );
-   DPMI_Unlock( _MIDI_FPSecondsPerTick );
-   DPMI_Unlock( _MIDI_Context );
-   DPMI_Unlock( _MIDI_TotalTime );
-   DPMI_Unlock( _MIDI_TotalTicks );
-   DPMI_Unlock( _MIDI_TotalBeats );
-   DPMI_Unlock( _MIDI_TotalMeasures );
-   DPMI_Unlock( MIDI_Tempo );
-   }
-
-
-/*---------------------------------------------------------------------
-   Function: MIDI_LockMemory
-
-   Locks all neccessary data.
----------------------------------------------------------------------*/
-
-int MIDI_LockMemory
-   (
-   void
-   )
-
-   {
-   int status;
-
-   status  = DPMI_LockMemoryRegion( MIDI_LockStart, MIDI_LockEnd );
-   status |= DPMI_LockMemory( ( void * )&_MIDI_CommandLengths[ 0 ],
-      sizeof( _MIDI_CommandLengths ) );
-   status |= DPMI_Lock( _MIDI_TrackPtr );
-   status |= DPMI_Lock( _MIDI_NumTracks );
-   status |= DPMI_Lock( _MIDI_SongActive );
-   status |= DPMI_Lock( _MIDI_SongLoaded );
-   status |= DPMI_Lock( _MIDI_Loop );
-   status |= DPMI_Lock( _MIDI_PlayRoutine );
-   status |= DPMI_Lock( _MIDI_Division );
-   status |= DPMI_Lock( _MIDI_ActiveTracks );
-   status |= DPMI_Lock( _MIDI_TotalVolume );
-   status |= DPMI_Lock( _MIDI_ChannelVolume );
-   status |= DPMI_Lock( _MIDI_Funcs );
-   status |= DPMI_Lock( _MIDI_PositionInTicks );
-   status |= DPMI_Lock( _MIDI_Division );
-   status |= DPMI_Lock( _MIDI_Tick );
-   status |= DPMI_Lock( _MIDI_Beat );
-   status |= DPMI_Lock( _MIDI_Measure );
-   status |= DPMI_Lock( _MIDI_Time );
-   status |= DPMI_Lock( _MIDI_BeatsPerMeasure );
-   status |= DPMI_Lock( _MIDI_TicksPerBeat );
-   status |= DPMI_Lock( _MIDI_TimeBase );
-   status |= DPMI_Lock( _MIDI_FPSecondsPerTick );
-   status |= DPMI_Lock( _MIDI_Context );
-   status |= DPMI_Lock( _MIDI_TotalTime );
-   status |= DPMI_Lock( _MIDI_TotalTicks );
-   status |= DPMI_Lock( _MIDI_TotalBeats );
-   status |= DPMI_Lock( _MIDI_TotalMeasures );
-   status |= DPMI_Lock( MIDI_Tempo );
-
-   if ( status != DPMI_Ok )
-      {
-      MIDI_UnlockMemory();
-//      MIDI_SetErrorCode( MIDI_DPMI_Error );
-      return( MIDI_Error );
-      }
-
-   return( MIDI_Ok );
    }

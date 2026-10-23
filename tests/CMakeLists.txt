@@ -134,6 +134,16 @@ set_tests_properties(dsl_shutdown PROPERTIES
   ENVIRONMENT "SDL_AUDIODRIVER=dummy"
   TIMEOUT 10)
 
+# Reinitializes the mixer and plays a sample in mono/8-bit and stereo/16-bit.
+add_executable(multivoc_lifecycle multivoc_lifecycle.c)
+target_include_directories(multivoc_lifecycle PRIVATE "${PROJECT_SOURCE_DIR}/source")
+target_link_libraries(multivoc_lifecycle PRIVATE audiolib duke3d::SDL2main)
+target_compile_definitions(multivoc_lifecycle PRIVATE SDL_MAIN_HANDLED)
+add_test(NAME multivoc_lifecycle COMMAND multivoc_lifecycle)
+set_tests_properties(multivoc_lifecycle PROPERTIES
+  ENVIRONMENT "SDL_AUDIODRIVER=dummy"
+  TIMEOUT 10)
+
 # Bad DUKE3D_VERSION values must stop the configure step.
 add_test(NAME version_config_rejects
   COMMAND "${CMAKE_COMMAND}" "-DSRC=${PROJECT_SOURCE_DIR}"

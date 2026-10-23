@@ -127,7 +127,6 @@ static int32_t sbarx(int32_t x)
         sbarx(x2)-1,scale(y2,ydim,200)-1);                                 \
 }
 
-void __interrupt __far newint24( int errval, int ax, int bp, int si );
 
 int recfilep,totalreccnt;
 char debug_on = 0,actor_tog = 0,*rtsptr,memorycheckoveride=0;
@@ -143,36 +142,14 @@ void pitch_test( void );
 char restorepalette,screencapt,nomorelogohack;
 int sendmessagecommand = -1;
 
-task *TimerPtr=NULL;
 
 extern int32_t lastvisinc;
 
 // Build Engine port implements this.  --ryan.
-#if PLATFORM_DOS
-static void timerhandler(task *unused)
-{
-    totalclock++;
-}
-
-void inittimer()
-{
-    TimerPtr = TS_ScheduleTask( timerhandler,TICRATE, 1, NULL );
-    TS_Dispatch();
-}
-
-void uninittimer(void)
-{
-   if (TimerPtr)
-      TS_Terminate( TimerPtr );
-   TimerPtr = NULL;
-   TS_Shutdown();
-}
-#else
 void timerhandler(void)
 {
     totalclock++;
 }
-#endif
 
 int gametext(int x,int y,char *t,char s,short dabits)
 {
@@ -2225,17 +2202,6 @@ void showtwoscreens(void)
 
 void binscreen(void)
 {
-#ifdef PLATFORM_DOS
-    int32_t fil;
-#ifdef VOLUMEONE
-    fil = kopen4load("dukesw.bin",1);
-#else
-    fil = kopen4load("duke3d.bin",1);
-#endif
-    if(fil == -1) return;
-    kread(fil,(char *)0xb8000,4000);
-    kclose(fil);
-#endif
 }
 
 
@@ -2772,11 +2738,7 @@ void gameexit(char *msg)
         if(true)
         {
             if(*t == ' ' && *(t+1) == 0) *t = 0;
-            #if PLATFORM_DOS   // Is there a good reason for this? --ryan.
-            printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-            #else
             printf("\n\n%s",t);
-            #endif
         }
 // CTW END - MODIFICATION        
     }
@@ -8782,19 +8744,7 @@ void checkcommandline(int argc,char **argv)
 
 void printstr(short x, short y, char string[81], char attribute)
 {
-        char character;
-        short i, pos;
-
-        pos = (y*80+x)<<1;
-        i = 0;
-        while (string[i] != 0)
-        {
-                character = string[i];
-//                printchrasm(0xb8000+(long)pos,1L,((long)attribute<<8)+(long)character);
-                printchrasm(0xb8000+(int32_t)pos,1L,(char)(((int32_t)attribute<<8)+(int32_t)character));
-                i++;
-                pos+=2;
-        }
+        fputs(string, stdout);
 }
 
 /*
@@ -9129,18 +9079,11 @@ void Startup(void)
    if(networkmode == 255)
        networkmode = 1;
 
-#ifdef PLATFORM_DOS
-   puts("Checking music inits.");
-   MusicStartup();
-   puts("Checking sound inits.");
-   SoundStartup();
-#else
    /* SBF - wasn't sure if swapping them would harm anything. */
    puts("Checking sound inits.");
    SoundStartup();
    puts("Checking music inits.");
    MusicStartup();
-#endif
 
    loadtmb();
 }
@@ -9237,64 +9180,8 @@ void writestring(int32_t a1,int32_t a2,int32_t a3,short a4,int32_t vx,int32_t vy
 
 char testcd( char *fn )
 {
-#if PLATFORM_DOS
- short drive_count, drive;
- int32_t dalen = 0;
- struct find_t dafilet;
- int fil;
-
- union _REGS ir;
- union _REGS or;
- struct _SREGS sr;
-
- if( IDFSIZE != 9961476 )
- {
-     drive = toupper(*fn)-'A';
-
-     ir.w.ax = 0x1500;
-     ir.w.bx = 0;                             /* check that MSCDEX is installed */
-     int386(0x2f, &ir, &or);
-     drive_count = or.w.bx;
-
-     if( drive_count == 0 )
-         return 1;
-
-     ir.w.ax = 0x150b;
-     ir.w.bx = 0;
-     ir.w.cx = drive;
-     int386(0x2f, &ir, &or);
-
-     if (or.w.ax == 0 || or.w.bx != 0xadad)
-         return 1;
-
-     ir.w.ax = 0x1502;
-     ir.w.bx = FP_OFF(buf);
-     sr.es = FP_SEG(buf);
-     ir.w.cx = drive;
-     int386x(0x2f, &ir, &or, &sr);
-
-     if( or.h.al == 0 || or.h.al == 30)
-         return 1;
-
-  }
-
-  fil = open(fn,O_RDONLY,S_IREAD);
-
-  if ( fil < 0 ) return 1;
-
-  // ( DO A SEE/Byte check here.) (Not coded in this version)
-
-
-  dalen = filelength(fil);
-
-  close(fil);
-
-  return( dalen != IDFSIZE );
-
-#else
     STUBBED("CD detection.");
     return 0;
-#endif
 }
 
 
@@ -9507,9 +9394,7 @@ int main(int argc,char **argv)
     setvmode(0x03);
 
 // This is needed for the icculus.org ported Build Engine.
-#if !PLATFORM_DOS
     _platform_init(argc, argv, "Duke Nukem 3D", "Duke3D");
-#endif
 
 	setmmxoverlay(getenv("BUILD_NOPENTIUM") == NULL);
 
@@ -9517,11 +9402,7 @@ int main(int argc,char **argv)
     sixteen[0] = 'D';
     trees[0] = 'I';
 
-#if PLATFORM_DOS
-    printstr(0,0,"                                                                                ",79);
-#else
 	printf("                   ");
-#endif
 
 #ifdef VOLUMEALL
     #ifdef AUSTRALIA
@@ -9537,9 +9418,7 @@ int main(int argc,char **argv)
     #endif
 #endif
 
-#if !PLATFORM_DOS
 		printf("\n");
-#endif
 
 #ifdef BETA
     printstr(0,1,"BETA VERSION BETA VERSION BETA VERSION BETA VERSION BETA VERSION BETA VERSION ",79);
@@ -9557,9 +9436,6 @@ int main(int argc,char **argv)
     printf("\n\n");
 #if DUKE3D_GAMEVER < GAMEVER_10
     puts("Press any key to continue.");
-#if PLATFORM_DOS
-    getchar();
-#endif
 #endif
 
     if (!load_duke3d_groupfile())

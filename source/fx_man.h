@@ -61,7 +61,6 @@ enum FX_ERRORS
    FX_SoundCardError,
    FX_InvalidCard,
    FX_MultiVocError,
-   FX_DPMI_Error
    };
 
 enum fx_BLASTER_Types

@@ -37,83 +37,8 @@ int32_t voxlock[MAXVOXELS][MAXVOXMIPS];
 static char artfilename[20];
 static int32_t numtilefiles, artfil = -1, artfilnum, artfilplc;
 
-/* rcg02132001 Cygwin support. */
-#if (defined C_IDENTIFIERS_UNDERSCORED)
-#define SYM_walock     "_walock"
-#define SYM_pow2char   "_pow2char"
-#define SYM_gotpic     "_gotpic"
-#else
-#define SYM_walock     "walock"
-#define SYM_pow2char   "pow2char"
-#define SYM_gotpic     "gotpic"
-#endif
 
 
-#if (defined USE_I386_ASM)
-
-    #if (defined __WATCOMC__)
-        int setgotpic(int32_t param);
-        #pragma aux setgotpic =\
-        "mov ebx, eax",\
-        "cmp byte ptr walock[eax], 200",\
-        "jae skipit",\
-        "mov byte ptr walock[eax], 199",\
-        "skipit: shr eax, 3",\
-        "and ebx, 7",\
-        "mov dl, byte ptr gotpic[eax]",\
-        "mov bl, byte ptr pow2char[ebx]",\
-        "or dl, bl",\
-        "mov byte ptr gotpic[eax], dl",\
-        parm [eax]\
-        modify exact [eax ebx ecx edx]\
-
-    #elif (defined __GNUC__) || (defined __ICC)
-
-        int __attribute__((noinline)) setgotpic(int32_t i1)
-        {
-            int retval = 0;
-            __asm__ __volatile__ (
-                "\n\t"
-                "movl %%eax, %%ebx\n\t"
-            	"cmpb $200, " SYM_walock "(%%eax)\n\t"
-            	"jae setgotpic_skipit\n\t"
-            	"movb $199, " SYM_walock "(%%eax)\n\t"
-            	"setgotpic_skipit: shrl $3, %%eax\n\t"
-            	"andl $7, %%ebx\n\t"
-            	"movb " SYM_gotpic "(%%eax), %%dl\n\t"
-            	"movb " SYM_pow2char "(%%ebx), %%bl\n\t"
-            	"orb %%bl, %%dl\n\t"
-            	"movb %%dl, (" SYM_gotpic ")(%%eax)\n\t"
-            : "=a" (retval) : "a" (i1) : "ebx", "ecx", "edx", "cc", "memory");
-            return(retval);
-        } /* setgotpic */
-
-    #elif (defined _MSC_VER)
-        int setgotpic(int32_t param)
-        {
-            __asm
-            {
-                mov eax, param
-                mov ebx, eax
-                cmp byte ptr walock[eax], 200
-                jae skipit
-                mov byte ptr walock[eax], 199
-                skipit: shr eax, 3
-                and ebx, 7
-                mov dl, byte ptr gotpic[eax]
-                mov bl, byte ptr pow2char[ebx]
-                or dl, bl
-                mov byte ptr gotpic[eax], dl
-                mov param, eax
-            } /* asm */
-            return(param);
-        } /* setgotpic */
-
-    #else
-        #error Please write Assembly for your platform!
-    #endif
-
-#else   /* !defined USE_I386_ASM */
         void setgotpic(uint32_t param)
         {
 	    unsigned char *gotpic_a = (unsigned char*)gotpic;
@@ -124,7 +49,6 @@ static int32_t numtilefiles, artfil = -1, artfilnum, artfilplc;
 
 	    gotpic_a[param>>3] |= pow2char_a[param&7];
         }
-#endif /* defined USE_I386_ASM */
 
 
 int animateoffs(short tilenum, short fakevar)
@@ -290,12 +214,12 @@ int loadpics(char *filename)
 	/* try dpmi_DETERMINEMAXREALALLOC! */
 
 	cachesize = max(artsize,1048576);
-	while ((pic = (char *)kkmalloc(cachesize)) == NULL)
+	while ((pic = (char *)malloc(cachesize)) == NULL)
 	{
 		cachesize -= 65536L;
 		if (cachesize < 65536) return(-1);
 	}
-	initcache((FP_OFF(pic)+15)&~(intptr_t)15,(cachesize-(int32_t)((-FP_OFF(pic))&15))&0xfffffff0);
+	initcache((((intptr_t)(pic))+15)&~(intptr_t)15,(cachesize-(int32_t)((-((intptr_t)(pic)))&15))&0xfffffff0);
 
 	for(i=0;i<MAXTILES;i++)
 	{
@@ -582,6 +506,6 @@ int changespritestat(short spritenum, short newstatnum)
 
 void engine_tiles_uninit(void)
 {
-	if (pic != NULL) { kkfree(pic); pic = NULL; }
+	if (pic != NULL) { free(pic); pic = NULL; }
 	if (artfil != -1) kclose(artfil);
 }

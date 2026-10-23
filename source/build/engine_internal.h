@@ -14,11 +14,7 @@ extern char britable[16][64];
 
 int animateoffs(short tilenum, short fakevar);
 void engine_tiles_uninit(void);
-#if defined(USE_I386_ASM)
-int setgotpic(int32_t value);
-#else
 void setgotpic(uint32_t value);
-#endif
 extern char picsiz[MAXTILES];
 extern int32_t totalclocklock;
 #ifdef SUPERBUILD

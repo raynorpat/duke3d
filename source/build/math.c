@@ -190,85 +190,8 @@ int32_t pow2long[32] =
 };
 int32_t reciptable[2048], fpuasm;
 
-/* rcg02132001 Cygwin support. */
-#if (defined C_IDENTIFIERS_UNDERSCORED)
-#define SYM_sqrtable   "_sqrtable"
-#define SYM_shlookup   "_shlookup"
-#else
-#define SYM_sqrtable   "sqrtable"
-#define SYM_shlookup   "shlookup"
-#endif
 
 
-#if (defined USE_I386_ASM)
-    #if (defined __WATCOMC__)
-
-        int32_t nsqrtasm(int param);
-        #pragma aux nsqrtasm =\
-        "test eax, 0xff000000",\
-        "mov ebx, eax",\
-        "jnz short over24",\
-        "shr ebx, 12",\
-        "mov cx, word ptr shlookup[ebx*2]",\
-        "jmp short under24",\
-        "over24: shr ebx, 24",\
-        "mov cx, word ptr shlookup[ebx*2+8192]",\
-        "under24: shr eax, cl",\
-        "mov cl, ch",\
-        "mov ax, word ptr sqrtable[eax*2]",\
-        "shr eax, cl",\
-	    parm nomemory [eax]\
-	    modify exact [eax ebx ecx]\
-
-    #elif (defined __GNUC__) || (defined __ICC)
-        static __attribute__((noinline)) int32_t nsqrtasm(int i1)
-        {
-            int32_t retval;
-            __asm__ __volatile__ (
-                "\n\t"
-            	"testl $0xff000000, %%eax\n\t"
-	            "movl %%eax, %%ebx\n\t"
-    	        "jnz nsqrover24\n\t"
-        	    "shrl $12, %%ebx\n\t"
-            	"movw " SYM_shlookup "(, %%ebx, 2), %%cx\n\t"
-	            "jmp nsqrunder24\n\t"
-        	    "nsqrover24: shr $24, %%ebx\n\t"
-    	        "movw (" SYM_shlookup "+ 8192)(, %%ebx, 2), %%cx\n\t"
-        	    "nsqrunder24: shrl %%cl, %%eax\n\t"
-    	        "movb %%ch, %%cl\n\t"
-        	    "movw " SYM_sqrtable "(, %%eax, 2), %%ax\n\t"
-    	        "shrl %%cl, %%eax\n\t"
-            : "=a" (retval) : "a" (i1) : "ebx", "ecx", "cc");
-            return(retval);
-        } /* nsqrtasm */
-
-    #elif (defined _MSC_VER)
-        int32_t nsqrtasm(int param)
-		{
-            __asm
-            {
-                mov eax, param
-                test eax, 0xff000000
-                mov ebx, eax
-                jnz short over24
-                shr ebx, 12
-                mov cx, word ptr shlookup[ebx*2]
-                jmp short under24
-                over24: shr ebx, 24
-                mov cx, word ptr shlookup[ebx*2+8192]
-                under24: shr eax, cl
-                mov cl, ch
-                mov ax, word ptr sqrtable[eax*2]
-                shr eax, cl
-                mov param, eax
-            } /* asm */
-            return(param);
-        }
-    #else
-        #error Please write Assembly code for your platform!
-    #endif
-
-#else /* !defined USE_I386_ASM */
         int32_t nsqrtasm(uint32_t param)
 	{
 	    unsigned short *shlookup_a = (unsigned short*)shlookup;
@@ -286,73 +209,8 @@ int32_t reciptable[2048], fpuasm;
 
 	    return param;
 	}
-#endif /* defined USE_I386_ASM */
 
 
-#if (defined USE_I386_ASM)
-    #if (defined __WATCOMC__)
-        /* 0x007ff000 is (11<<13), 0x3f800000 is (127<<23) */
-        int32_t krecipasm(int32_t param);
-        #pragma aux krecipasm =\
-	    "mov fpuasm, eax",\
-	    "fild dword ptr fpuasm",\
-	    "add eax, eax",\
-	    "fstp dword ptr fpuasm",\
-	    "sbb ebx, ebx",\
-	    "mov eax, fpuasm",\
-	    "mov ecx, eax",\
-	    "and eax, 0x007ff000",\
-	    "shr eax, 10",\
-	    "sub ecx, 0x3f800000",\
-	    "shr ecx, 23",\
-	    "mov eax, dword ptr reciptable[eax]",\
-	    "sar eax, cl",\
-	    "xor eax, ebx",\
-	    parm [eax]\
-	    modify exact [eax ebx ecx]\
-
-    #elif (defined __GNUC__) || (defined __ICC)
-        static int32_t krecipasm(int32_t i1)
-        {
-            int32_t retval;
-            __asm__ __volatile__ (
-                "\n\t"
-                "call _asm_krecipasm\n\t"
-            : "=a" (retval) : "a" (i1)
-        	: "cc", "ebx", "ecx", "memory");
-            return(retval);
-        } /* krecipasm */
-
-    #elif (defined _MSC_VER)
-        /* 0x007ff000 is (11<<13), 0x3f800000 is (127<<23) */
-        int32_t krecipasm(int32_t param)
-        {
-            __asm
-            {
-                mov eax, param
-	            mov fpuasm, eax
-	            fild dword ptr fpuasm
-	            add eax, eax
-	            fstp dword ptr fpuasm
-	            sbb ebx, ebx
-	            mov eax, fpuasm
-	            mov ecx, eax
-	            and eax, 0x007ff000
-	            shr eax, 10
-	            sub ecx, 0x3f800000
-	            shr ecx, 23
-	            mov eax, dword ptr reciptable[eax]
-	            sar eax, cl
-	            xor eax, ebx
-                mov param,eax
-            } /* asm */
-            return(param);
-        } /* krecipasm */
-    #else
-        #error Please write Assembly for your platform!
-    #endif
-
-#else  /* USE_I386_ASM */
 
         static int32_t krecipasm(int32_t param)
         {
@@ -407,80 +265,9 @@ int32_t reciptable[2048], fpuasm;
         return x;
     } 
     */
-#endif /* defined USE_I386_ASM */
 
 
 
-#if (defined USE_I386_ASM)
-    #if (defined __WATCOMC__)
-        int32_t getclipmask(int i1, int i2, int i3, int i4);
-        #pragma aux getclipmask =\
-        "sar eax, 31",\
-        "add ebx, ebx",\
-        "adc eax, eax",\
-        "add ecx, ecx",\
-        "adc eax, eax",\
-        "add edx, edx",\
-        "adc eax, eax",\
-        "mov ebx, eax",\
-        "shl ebx, 4",\
-        "or al, 0xf0",\
-        "xor eax, ebx",\
-        parm [eax][ebx][ecx][edx]\
-        modify exact [eax ebx ecx edx]\
-
-  #elif (defined __GNUC__) || (defined __ICC)
-        int32_t getclipmask(int i1, int i2, int i3, int i4)
-        {
-            int retval;
-            __asm__ __volatile__ (
-        		"\n\t"
-                "sarl $31, %%eax\n\t"
-        		"addl %%ebx, %%ebx\n\t"
-        		"adcl %%eax, %%eax\n\t"
-        		"addl %%ecx, %%ecx\n\t"
-        		"adcl %%eax, %%eax\n\t"
-        		"addl %%edx, %%edx\n\t"
-        		"adcl %%eax, %%eax\n\t"
-        		"movl %%eax, %%ebx\n\t"
-        		"shll $4, %%ebx\n\t"
-        		"orb $0xf0, %%al\n\t"
-        		"xorl %%ebx, %%eax\n\t"
-        	: "=a" (retval) : "a" (i1), "b" (i2), "c" (i3), "d" (i4)
-        	: "cc", "memory");
-            return(retval);
-        } /* getclipmask */
-
-    #elif (defined _MSC_VER)
-        int32_t getclipmask(int i1, int i2, int i3, int i4)
-        {
-            __asm
-            {
-                mov eax, i1
-                mov ebx, i2
-                mov ecx, i3
-                mov edx, i4
-                sar eax, 31
-                add ebx, ebx
-                adc eax, eax
-                add ecx, ecx
-                adc eax, eax
-                add edx, edx
-                adc eax, eax
-                mov ebx, eax
-                shl ebx, 4
-                or al, 0xf0
-                xor eax, ebx
-                mov i1, eax
-            } /* asm */
-            return(i1);
-        } /* getclipmask */
-
-    #else
-        #error Please write Assembly for your platform!
-    #endif
-
-#else  /* !defined USE_I386_ASM */
         int32_t getclipmask(int i1, int i2, int i3, int i4)
         {
 	    uint32_t eax;
@@ -493,7 +280,6 @@ int32_t reciptable[2048], fpuasm;
 	    if (i4&0x80000000) { eax++; }
 	    return ((eax<<4)^(eax|0xf0));
         }
-#endif /* defined USE_I386_ASM */
 
 #if (BUILD_ENGINEREV < 19960427L)
 /* Before revision 19960427 the game logic took square roots with ksqrtasm

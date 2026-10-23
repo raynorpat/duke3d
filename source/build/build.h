@@ -49,11 +49,7 @@
 #endif
 
 
-#ifdef PLATFORM_DOS
-#pragma pack(push,1);
-#else
 #pragma pack(1)
-#endif
 
 /*
  * ceilingstat/floorstat:
@@ -146,11 +142,7 @@ typedef struct
 	short lotag, hitag, extra;
 } spritetype;
 
-#ifdef PLATFORM_DOS
-#pragma pack(pop);
-#else
 #pragma pack()
-#endif
 
 /* A C99 compile-time check: the array size is negative when c is false. */
 #define BUILD_STATIC_ASSERT(c, name) typedef char build_static_assert_##name[(c) ? 1 : -1]

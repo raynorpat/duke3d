@@ -46,8 +46,6 @@ void AL_SetMaxMidiChannel( int channel );
 void AL_Reset( void );
 void AL_NoteOff( int channel, int key, int velocity );
 void AL_NoteOn( int channel, int key, int vel );
-//Turned off to test if it works with Watcom 10a
-//   #pragma aux AL_NoteOn frame;
 void AL_AllNotesOff( int channel );
 void AL_ControlChange( int channel, int type, int data );
 void AL_ProgramChange( int channel, int patch );

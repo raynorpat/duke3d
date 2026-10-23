@@ -52,25 +52,8 @@ volatile char oa1, o3c2, ortca, ortcb, overtbits, laststereoint;
 #define MAXWALLSB 2048
 #define MAXCLIPDIST 1024
 
-#ifdef PLATFORM_DOS
-	/* MUST CALL MALLOC THIS WAY TO FORCE CALLS TO KMALLOC! */
-void *kmalloc(size_t size) { return(malloc(size)); }
-void *kkmalloc(size_t size);
-#pragma aux kkmalloc =\
-	"call kmalloc",\
-	parm [eax]\
-
-	/* MUST CALL FREE THIS WAY TO FORCE CALLS TO KFREE! */
-void kfree(void *buffer) { free(buffer); }
-void kkfree(void *buffer);
-#pragma aux kkfree =\
-	"call kfree",\
-	parm [eax]\
-
-#endif
 
 #ifdef SUPERBUILD
-	/* MUST CALL LOADVOXEL THIS WAY BECAUSE WATCOM STINKS! */
 
 /* !!! wtf does this do?! --ryan. */
 static void loadvoxel(int32_t voxindex)
@@ -78,15 +61,7 @@ static void loadvoxel(int32_t voxindex)
     voxindex = 0;  /* prevent compiler whining. */
 }
 
-#if ((defined __WATCOMC__) && (defined PLATFORM_DOS))
-void kloadvoxel(int32_t voxindex);
-#pragma aux kloadvoxel =\
-	"call loadvoxel",\
-	parm [eax]\
-
-#else
 #define kloadvoxel(a) (loadvoxel(a))
-#endif
 
 	/* These variables need to be copied into BUILD */
 #define MAXXSIZ 128
@@ -130,12 +105,6 @@ char kensmessage[128];
 int has_altivec = 0;  /* PowerPC-specific. */
 
 
-/* rcg02132001 Cygwin support. */
-#if (defined C_IDENTIFIERS_UNDERSCORED)
-#define SYM_dmval      "_dmval"
-#else
-#define SYM_dmval      "dmval"
-#endif
 
 
 static int32_t xb1[MAXWALLSB], yb1[MAXWALLSB], xb2[MAXWALLSB], yb2[MAXWALLSB];
@@ -242,94 +211,7 @@ int32_t totalclocklock;
 
 
 /* !!! can we move this somewhere?   --ryan. */
-#if ((defined USE_I386_ASM) && (defined __WATCOMC__))
-extern int32_t mmxoverlay();
-#pragma aux mmxoverlay modify [eax ebx ecx edx];
-extern int32_t sethlinesizes(int32_t,int32_t,int32_t);
-#pragma aux sethlinesizes parm [eax][ebx][ecx];
-extern int32_t setpalookupaddress(char *);
-#pragma aux setpalookupaddress parm [eax];
-extern int32_t setuphlineasm4(int32_t,int32_t);
-#pragma aux setuphlineasm4 parm [eax][ebx];
-extern int32_t hlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux hlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setuprhlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux setuprhlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t rhlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux rhlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setuprmhlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux setuprmhlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t rmhlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux rmhlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setupqrhlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux setupqrhlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t qrhlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux qrhlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setvlinebpl(int32_t);
-#pragma aux setvlinebpl parm [eax];
-extern int32_t fixtransluscence(int32_t);
-#pragma aux fixtransluscence parm [eax];
-extern int32_t prevlineasm1(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux prevlineasm1 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t vlineasm1(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux vlineasm1 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setuptvlineasm(int32_t);
-#pragma aux setuptvlineasm parm [eax];
-extern int32_t tvlineasm1(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux tvlineasm1 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setuptvlineasm2(int32_t,int32_t,int32_t);
-#pragma aux setuptvlineasm2 parm [eax][ebx][ecx];
-extern int32_t tvlineasm2(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux tvlineasm2 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t mvlineasm1(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux mvlineasm1 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setupvlineasm(int32_t);
-#pragma aux setupvlineasm parm [eax];
-extern int32_t vlineasm4(int32_t,int32_t);
-#pragma aux vlineasm4 parm [ecx][edi] modify [eax ebx ecx edx esi edi];
-extern int32_t setupmvlineasm(int32_t);
-#pragma aux setupmvlineasm parm [eax];
-extern int32_t mvlineasm4(int32_t,int32_t);
-#pragma aux mvlineasm4 parm [ecx][edi] modify [eax ebx ecx edx esi edi];
-extern void setupspritevline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux setupspritevline parm [eax][ebx][ecx][edx][esi][edi];
-extern void spritevline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux spritevline parm [eax][ebx][ecx][edx][esi][edi];
-extern void msetupspritevline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux msetupspritevline parm [eax][ebx][ecx][edx][esi][edi];
-extern void mspritevline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux mspritevline parm [eax][ebx][ecx][edx][esi][edi];
-extern void tsetupspritevline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux tsetupspritevline parm [eax][ebx][ecx][edx][esi][edi];
-extern void tspritevline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux tspritevline parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t mhline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux mhline parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t mhlineskipmodify(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux mhlineskipmodify parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t msethlineshift(int32_t,int32_t);
-#pragma aux msethlineshift parm [eax][ebx];
-extern int32_t thline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux thline parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t thlineskipmodify(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux thlineskipmodify parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t tsethlineshift(int32_t,int32_t);
-#pragma aux tsethlineshift parm [eax][ebx];
-extern int32_t setupslopevlin(int32_t,int32_t,int32_t);
-#pragma aux setupslopevlin parm [eax][ebx][ecx] modify [edx];
-extern int32_t slopevlin(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux slopevlin parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t settransnormal();
-#pragma aux settransnormal parm;
-extern int32_t settransreverse();
-#pragma aux settransreverse parm;
-extern int32_t setupdrawslab(int32_t,int32_t);
-#pragma aux setupdrawslab parm [eax][ebx];
-extern int32_t drawslab(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux drawslab parm [eax][ebx][ecx][edx][esi][edi];
-#else
 #include "a.h"
-#endif
 
 
 static void scansector (short sectnum)
@@ -974,7 +856,7 @@ static void wallscan(int32_t x1, int32_t x2,
 	ynice = (pow2long[picsiz[globalpicnum]>>4] == tsizy);
 	if (ynice) tsizy = (picsiz[globalpicnum]>>4);
 
-	fpalookup = FP_OFF(palookup[globalpal]);
+	fpalookup = ((intptr_t)(palookup[globalpal]));
 
 	setupvlineasm(globalshiftval);
 
@@ -1103,7 +985,7 @@ static void maskwallscan(int32_t x1, int32_t x2,
 	ynice = (pow2long[picsiz[globalpicnum]>>4] == tsizy);
 	if (ynice) tsizy = (picsiz[globalpicnum]>>4);
 
-	fpalookup = FP_OFF(palookup[globalpal]);
+	fpalookup = ((intptr_t)(palookup[globalpal]));
 
 	setupmvlineasm(globalshiftval);
 
@@ -1461,7 +1343,7 @@ static void grouscan (int32_t dax1, int32_t dax2, int32_t sectnum, char dastat)
 	if (sec->visibility != 0) globvis = mulscale4(globvis,(int32_t)((unsigned char)(sec->visibility+16)));
 	globvis = mulscale13(globvis,daz);
 	globvis = mulscale16(globvis,xdimscale);
-	fpalookup = FP_OFF(palookup[globalpal]);
+	fpalookup = ((intptr_t)(palookup[globalpal]));
 
 	setupslopevlin(((int32_t)(picsiz[globalpicnum]&15))+(((int32_t)(picsiz[globalpicnum]>>4))<<8),waloff[globalpicnum],-ylookup[1]);
 
@@ -2273,7 +2155,7 @@ void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
 		}
 		globalposx += mulscale24(singlobalang,i);
 		globalposy -= mulscale24(cosglobalang,i);
-		if (vidoption == 6) frameplace = FP_OFF(screen)+(activepage&1)*65536;
+		if (vidoption == 6) frameplace = ((intptr_t)(screen))+(activepage&1)*65536;
 	}
 
 	if ((xyaspect != oxyaspect) || (xdimen != oxdimen) || (viewingrange != oviewingrange))
@@ -2310,7 +2192,7 @@ void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
  */
 #if 0
 	if (smostwallcnt < 0)
-		if (getkensmessagecrc(FP_OFF(kensmessage)) != 0x56c764d4)
+		if (getkensmessagecrc(((intptr_t)(kensmessage))) != 0x56c764d4)
 			{ setvmode(0x3); printf("Nice try.\n"); exit(0); }
 #endif
 
@@ -2426,7 +2308,7 @@ static void transmaskvline (int32_t x)
 	y2v--;
 	if (y2v < y1v) return;
 
-	palookupoffs = FP_OFF(palookup[globalpal]) + (getpalookup((int32_t)mulscale16(swall[x],globvis),globalshade)<<8);
+	palookupoffs = ((intptr_t)(palookup[globalpal])) + (getpalookup((int32_t)mulscale16(swall[x],globvis),globalshade)<<8);
 
 	vinc = swall[x]*globalyscale;
 	vplc = globalzd + vinc*(y1v-globalhoriz+1);
@@ -2460,8 +2342,8 @@ static void transmaskvline2 (int32_t x)
 	y2ve[1] = min(dwall[x2],startdmost[x2+windowx1]-windowy1)-1;
 	if (y2ve[1] < y1ve[1]) { transmaskvline(x); return; }
 
-	palookupoffse[0] = FP_OFF(palookup[globalpal]) + (getpalookup((int32_t)mulscale16(swall[x],globvis),globalshade)<<8);
-	palookupoffse[1] = FP_OFF(palookup[globalpal]) + (getpalookup((int32_t)mulscale16(swall[x2],globvis),globalshade)<<8);
+	palookupoffse[0] = ((intptr_t)(palookup[globalpal])) + (getpalookup((int32_t)mulscale16(swall[x],globvis),globalshade)<<8);
+	palookupoffse[1] = ((intptr_t)(palookup[globalpal])) + (getpalookup((int32_t)mulscale16(swall[x2],globvis),globalshade)<<8);
 
 	setuptvlineasm2(globalshiftval,palookupoffse[0],palookupoffse[1]);
 
@@ -2681,7 +2563,7 @@ int saveboard(char *filename, int32_t *daposx, int32_t *daposy,
     walltype *w;
     sectortype *sect;
 
-    #if ((defined PLATFORM_DOS) || (defined PLATFORM_WIN32))
+    #if (defined PLATFORM_WIN32)
         permissions = S_IWRITE;
     #elif (defined PLATFORM_UNIX)
         permissions = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
@@ -2883,7 +2765,7 @@ void initengine(void)
 
 void uninitengine(void)
 {
-	if (transluc != NULL) { kkfree(transluc); transluc = NULL; }
+	if (transluc != NULL) { free(transluc); transluc = NULL; }
 	engine_tiles_uninit();
     _uninitengine(); /* video driver specific. */
 }
@@ -3068,7 +2950,7 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 	setgotpic(picnum);
 	bufplc = waloff[picnum];
 
-	palookupoffs = FP_OFF(palookup[dapalnum]) + (getpalookup(0L,(int32_t)dashade)<<8);
+	palookupoffs = ((intptr_t)(palookup[dapalnum])) + (getpalookup(0L,(int32_t)dashade)<<8);
 
 	i = divscale32(1L,z);
 	xv = mulscale14(sinang,i);
@@ -3654,7 +3536,7 @@ static void ceilspritehline (int32_t x2, int32_t y)
 	asm1 = mulscale14(globalx2,v);
 	asm2 = mulscale14(globaly2,v);
 
-	asm3 = FP_OFF(palookup[globalpal]) + (getpalookup((int32_t)mulscale28(klabs(v),globvis),globalshade)<<8);
+	asm3 = ((intptr_t)(palookup[globalpal])) + (getpalookup((int32_t)mulscale28(klabs(v),globvis),globalshade)<<8);
 
 	if ((globalorientation&2) == 0)
 		mhline(globalbufplc,bx,(x2-x1)<<16,0L,by,ylookup[y]+x1+frameoffset);
@@ -3724,7 +3606,7 @@ static void drawvox(int32_t dasprx, int32_t daspry, int32_t dasprz, int32_t dasp
 
 	i = klabs(dmulscale6(dasprx-globalposx,cosang,daspry-globalposy,sinang));
 	j = (int32_t)(getpalookup((int32_t)mulscale21(globvis,i),(int32_t)dashade)<<8);
-	setupdrawslab(ylookup[1],FP_OFF(palookup[dapal])+j);
+	setupdrawslab(ylookup[1],((intptr_t)(palookup[dapal]))+j);
 	j = 1310720;
 	j *= min(daxscale,dayscale); j >>= 6;  /* New hacks (for sized-down voxels) */
 	for(k=0;k<MAXVOXMIPS;k++)
@@ -6240,9 +6122,6 @@ void draw2dgrid(int32_t posxe, int32_t posye, short ange, int32_t zoome, short g
 		if ((yp1 < ydim16) && (yp2 >= 0) && (yp2 >= yp1))
 		{
 			setcolor16(8);
-                        #ifdef PLATFORM_DOS
-			koutp(0x3ce,0x8);
-                        #endif
                         templong = ((yp1*640+pageoffset)>>3)+(intptr_t)_getVideoBase();
 			tempy = yp2-yp1+1;
 			mask = 0;
@@ -6257,18 +6136,7 @@ void draw2dgrid(int32_t posxe, int32_t posye, short ange, int32_t zoome, short g
 				if (xp1 >= 0)
 				{
 
-                    #if (defined PLATFORM_DOS)
-	    				if ((xp1|7) != (xp2|7))
-    					{
-		    				koutp(0x3cf,mask);
-			    			if (((xp2>>3) >= 0) && ((xp2>>3) < 80))
-				    			vlin16first(templong+(xp2>>3),tempy);
-					    	mask = 0;
-    					}
-    					mask |= pow2char[(xp1&7)^7];
-                    #else
 			drawline16(xp1, yp1, xp1, yp2, 8); // bdragon's fix
-                    #endif
 				}
 			}
 			if ((i >= 131072) && (xp1 < 640))
@@ -6276,12 +6144,7 @@ void draw2dgrid(int32_t posxe, int32_t posye, short ange, int32_t zoome, short g
 			if ((mask != 0) && ((xp2>>3) >= 0) && ((xp2>>3) < 80))
 			{
                 /* !!! Does this code ever get hit? Do something with this! */
-#ifdef PLATFORM_DOS
-				koutp(0x3cf,mask);
-				vlin16first(templong+(xp2>>3),tempy);
-#else
 				fprintf (stderr, "STUB: %s:%d\n",__FILE__,__LINE__);
-#endif
 			}
 		}
 
@@ -6382,11 +6245,7 @@ void draw2dscreen(int32_t posxe, int32_t posye, short ange, int32_t zoome, short
 							col += ((numframes&2)<<2);
 					}
 
-#ifdef PLATFORM_DOS
-					templong = (mul5(200+yp1)<<7)+(320+xp1)+pageoffset;
-#else
 					templong = (mul5(200+yp1)<<7)+(320+xp1);
-#endif
 
 					setcolor16((int32_t)col);
 
@@ -6436,11 +6295,7 @@ void draw2dscreen(int32_t posxe, int32_t posye, short ange, int32_t zoome, short
 					if (((320+xp1) >= 2) && ((320+xp1) <= 637))
 						if (((200+yp1) >= 2) && ((200+yp1) <= ydim16-3))
 						{
-#ifdef PLATFORM_DOS
-							templong = (mul5(200+yp1)<<7)+(320+xp1)+pageoffset;
-#else
 							templong = (mul5(200+yp1)<<7)+(320+xp1);
-#endif
 
 							setcolor16((int32_t)col);
 							drawpixel16(templong-1-1280);
@@ -7339,7 +7194,7 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 			else
 				globalshade = ((int32_t)sector[spr->sectnum].floorshade);
 			globalshade = max(min(globalshade+spr->shade+6,numpalookups-1),0);
-			asm3 = FP_OFF(palookup[spr->pal]+(globalshade<<8));
+			asm3 = ((intptr_t)(palookup[spr->pal]+(globalshade<<8)));
 			globvis = globalhisibility;
 			if (sec->visibility != 0) globvis = mulscale4(globvis,(int32_t)((unsigned char)(sec->visibility+16)));
 			globalpolytype = ((spr->cstat&2)>>1)+1;

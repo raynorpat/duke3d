@@ -121,8 +121,6 @@ extern int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf);
 /* sdl_driver.c */
 extern void _handle_events(void);
 extern unsigned char _readlastkeyhit(void);
-extern int mprotect_align(const void *addr, size_t len, int prot);
-extern void unprotect_ASM_pages(void);
 extern void _platform_init(int argc, char **argv, const char *title, const char *icon);
 extern int setvesa(int32_t x, int32_t y);
 extern int screencapture(char *filename, char inverseit);

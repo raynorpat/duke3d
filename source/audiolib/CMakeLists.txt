@@ -14,7 +14,6 @@ add_library(audiolib STATIC
   music.c
   mv_mix.c
   mvreverb.c
-  nodpmi.c
   oplemu.c
   pitch.c
   user.c)

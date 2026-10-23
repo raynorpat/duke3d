@@ -53,9 +53,6 @@ struct weaponhit hittype[MAXSPRITES];
 short spriteq[1024],spriteqloc,spriteqamount=64;
 
 // ported build engine has this, too.  --ryan.
-#if PLATFORM_DOS
-short moustat = 0;
-#endif
 
 struct animwalltype animwall[MAXANIMWALLS];
 short numanimwalls;
@@ -294,10 +291,7 @@ void FixFilePath(char *filename)
 }
 
 
-#if PLATFORM_DOS
- /* no-op. */
-
-#elif PLATFORM_WIN32
+#if   PLATFORM_WIN32
 int _dos_findfirst(char *filename, int x, struct find_t *f)
 {
     intptr_t rc = _findfirst(filename, &f->data);
@@ -423,7 +417,6 @@ int _dos_findnext(struct find_t *f)
 #endif
 
 
-#if !PLATFORM_DOS
 void _dos_getdate(struct dosdate_t *date)
 {
 	time_t curtime = time(NULL);
@@ -442,7 +435,6 @@ void _dos_getdate(struct dosdate_t *date)
 		date->dayofweek = tm->tm_wday + 1;
 	}
 }
-#endif
 
 
 int FindDistance2D(int ix, int iy)
@@ -698,11 +690,6 @@ void SafeFree (void * ptr)
 #define BIG_ENDIAN 4321
 #endif
 
-#if PLATFORM_DOS
-#ifndef BYTE_ORDER
-#define BYTE_ORDER LITTLE_ENDIAN
-#endif
-#endif
 
 #ifdef PLATFORM_WIN32
 #define BYTE_ORDER LITTLE_ENDIAN
@@ -1000,7 +987,6 @@ int dukescreencapture(char *str, char inverseit)
         strcpy(named + nlen - 3, ScreenshotFormat);
         str = named;
     }
-#ifndef PLATFORM_DOS
     // respect prefpath...
     const char *SCREENSHOTDIR = "Screenshots";
     size_t slen = strlen(ApogeePath) + strlen(str) +
@@ -1016,7 +1002,6 @@ int dukescreencapture(char *str, char inverseit)
     strcat(path, PATH_SEP_STR);
     strcat(path, str);
     str = path;
-#endif
 
     return(screencapture(str, inverseit));
 }

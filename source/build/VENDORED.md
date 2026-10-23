@@ -38,13 +38,16 @@ those implementations before the split.
 
 ## Local changes
 
+- Removed the optional PhysicsFS backend, DOS platform/Watcom branches and
+  obsolete assembly dispatch. The portable C engine and native GRP/file I/O
+  are retained. The imported `doscmpat.h` has been removed; the original import
+  list above is historical provenance.
+
 - `VENDORED.md`: added (this file).
 - `CMakeLists.txt`: added (build glue).
-- `win32_compat.c`: added. Defines `hbits[]`, `_inp_handler()` and
-  `_kinp_handler()` for Windows; upstream only defines them in
+- `win32_compat.c`: added. Defines `hbits[]` for Windows; upstream only defines it in
   `unix_compat.c`, which refuses to build without `PLATFORM_UNIX`.
-- `win32_compat.h`: don't include `<dos.h>` under MSVC (it no longer ships
-  one); only map `snprintf` to `_snprintf` before VS2015; under MSVC, define
+- `win32_compat.h`: removed `<dos.h>` and the legacy port-I/O stubs; only map `snprintf` to `_snprintf` before VS2015; under MSVC, define
   `S_IRWXU`, `S_IRUSR`, `S_IWUSR`, `S_IRGRP`, `S_IWGRP` and `S_IROTH` (the
   game uses them for `mkdir` and `savetemp`).
 - `sdl_driver.c`: ported from SDL 1.2 to SDL2:

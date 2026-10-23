@@ -61,8 +61,8 @@ static void initfastcolorlookup(int32_t rscale, int32_t gscale, int32_t bscale)
 		j += 129-(i<<1);
 	}
 
-	clearbufbyte((void *)FP_OFF(colhere),sizeof(colhere),0L);
-	clearbufbyte((void *)FP_OFF(colhead),sizeof(colhead),0L);
+	clearbufbyte((void *)((intptr_t)(colhere)),sizeof(colhere),0L);
+	clearbufbyte((void *)((intptr_t)(colhead)),sizeof(colhead),0L);
 
 	pal1 = (char *)&palette[768-3];
 	for(i=255;i>=0;i--,pal1-=3)
@@ -93,15 +93,15 @@ void engine_loadpalette(void)
 	kread(fil,palette,768);
 	kread16(fil,&numpalookups);
 
-	if ((palookup[0] = (char *)kkmalloc(numpalookups<<8)) == NULL)
+	if ((palookup[0] = (char *)malloc(numpalookups<<8)) == NULL)
 		allocache((intptr_t *)&palookup[0],numpalookups<<8,&permanentlock);
-	if ((transluc = (char *)kkmalloc(65536L)) == NULL)
+	if ((transluc = (char *)malloc(65536L)) == NULL)
 		allocache((intptr_t *)&transluc,65536,&permanentlock);
 
 	globalpalwritten = palookup[0]; globalpal = 0;
 	setpalookupaddress(globalpalwritten);
 
-	fixtransluscence(FP_OFF(transluc));
+	fixtransluscence(((intptr_t)(transluc)));
 
 	kread(fil,palookup[globalpal],numpalookups<<8);
 
@@ -123,7 +123,7 @@ void engine_loadpalette(void)
 				for(i=0;i<256;i++)
 				{
 					dist = palette[i*3]*3+palette[i*3+1]*5+palette[i*3+2]*2;
-					ptr = (char *)(FP_OFF(palookup[k])+i);
+					ptr = (char *)(((intptr_t)(palookup[k]))+i);
 					for(j=0;j<32;j++)
 						ptr[j<<8] = (char)min(max(mulscale10(dist,32-j),0),15);
 				}
@@ -142,7 +142,7 @@ void engine_loadpalette(void)
 int setgamemode(char davidoption, int32_t daxdim, int32_t daydim)
 {
 	strcpy(kensmessage,"!!!! BUILD engine&tools programmed by Ken Silverman of E.G. RI.  (c) Copyright 1995 Ken Silverman.  Summary:  BUILD = Ken. !!!!");
-	if (getkensmessagecrc(FP_OFF(kensmessage)) != 0x56c764d4)
+	if (getkensmessagecrc(((intptr_t)(kensmessage))) != 0x56c764d4)
 		{ setvmode(0x3); printf("Nice try.\n"); exit(0); }
     return(_setgamemode(davidoption, daxdim, daydim));
 } /* setgamemode */
@@ -463,7 +463,7 @@ void makepalookup(int32_t palnum, char *remapbuf, signed char r,
 	if (palookup[palnum] == NULL)
 	{
 			/* Allocate palookup buffer */
-		if ((palookup[palnum] = (char *)kkmalloc(numpalookups<<8)) == NULL)
+		if ((palookup[palnum] = (char *)malloc(numpalookups<<8)) == NULL)
 			allocache((intptr_t *)&palookup[palnum],numpalookups<<8,&permanentlock);
 	}
 
@@ -478,15 +478,15 @@ void makepalookup(int32_t palnum, char *remapbuf, signed char r,
 	{
 		for(i=0;i<256;i++)
 		{
-			ptr = (char *)(FP_OFF(palookup[0])+remapbuf[i]);
-			ptr2 = (char *)(FP_OFF(palookup[palnum])+i);
+			ptr = (char *)(((intptr_t)(palookup[0]))+remapbuf[i]);
+			ptr2 = (char *)(((intptr_t)(palookup[palnum]))+i);
 			for(j=0;j<numpalookups;j++)
 				{ *ptr2 = *ptr; ptr += 256; ptr2 += 256; }
 		}
 	}
 	else
 	{
-		ptr2 = (char *)FP_OFF(palookup[palnum]);
+		ptr2 = (char *)((intptr_t)(palookup[palnum]));
 		for(i=0;i<numpalookups;i++)
 		{
 			palscale = divscale16(i,numpalookups);
@@ -505,7 +505,7 @@ void makepalookup(int32_t palnum, char *remapbuf, signed char r,
 		for(i=0;i<256;i++)
 		{
 			dist = palette[i*3]*3+palette[i*3+1]*5+palette[i*3+2]*2;
-			ptr = (char *)(FP_OFF(palookup[palnum])+i);
+			ptr = (char *)(((intptr_t)(palookup[palnum]))+i);
 			for(j=0;j<32;j++)
 				ptr[j<<8] = (char)min(max(mulscale10(dist,32-j),0),15);
 		}
@@ -656,7 +656,7 @@ void clearview(int32_t dacol)
 	dacol += (dacol<<8); dacol += (dacol<<16);
 	if (vidoption == 6)
 	{
-		p = FP_OFF(screen)+ylookup[windowy1]+windowx1;
+		p = ((intptr_t)(screen))+ylookup[windowy1]+windowx1;
 		for(y=windowy1;y<=windowy2;y++)
 		{
 			clearbufbyte((void *)p,dx,dacol);

@@ -74,7 +74,6 @@ void hlineasm4(int32_t cnt, int32_t skiploadincs, int32_t paloffs, uint32_t by, 
 
 	//Sloped ceiling/floor vertical line functions: the icculus port's, which follow
 	//A.ASM's float reciprocal exactly (JFBuild's krecip version rounds differently).
-/* #pragma aux setupslopevlin parm [eax][ebx][ecx] modify [edx] */
 static intptr_t slopemach_ebx;
 static int32_t slopemach_ecx;
 static int32_t slopemach_edx;
@@ -100,7 +99,6 @@ extern int32_t globalx3, globaly3;
 extern int32_t fpuasm;
 #define low32(a) ((a&0xffffffff))
 
-/* #pragma aux slopevlin parm [eax][ebx][ecx][edx][esi][edi] */
 void slopevlin(intptr_t i1, int32_t _i2, intptr_t *i3, int32_t i4, int32_t i5, int32_t i6)
 {
     uint32_t i2 = (uint32_t)_i2;
@@ -430,7 +428,6 @@ void setuptvlineasm2(int32_t i1, intptr_t i2, intptr_t i3)
 	tran2pal_ecx = i3;
 } /* */
 
-/* #pragma aux tvlineasm2 parm [eax][ebx][ecx][edx][esi][edi] */
 void tvlineasm2(uint32_t i1, uint32_t i2, uintptr_t i3, uintptr_t i4, uint32_t i5, uintptr_t i6)
 {
 	uint32_t ebp = i1;
@@ -542,7 +539,6 @@ void setuprmhlineasm4(int32_t i1, int32_t i2, int32_t i3, intptr_t i4, int32_t i
     rmmach_esi = i5;
 } /* setuprmhlineasm4 */
 
-/* #pragma aux rmhlineasm4 parm [eax][ebx][ecx][edx][esi][edi] */
 void rmhlineasm4(int32_t i1, intptr_t i2, int32_t i3, int32_t i4, int32_t i5, intptr_t i6)
 {
     uint32_t ebp;
@@ -569,14 +565,12 @@ void rmhlineasm4(int32_t i1, intptr_t i2, int32_t i3, int32_t i4, int32_t i5, in
 } /* rmhlineasm4 */
 
 
-/* #pragma aux setupqrhlineasm4 parm [eax][ebx][ecx][edx][esi][edi] */
 void setupqrhlineasm4(int32_t i1, int32_t i2, int32_t i3, intptr_t i4, int32_t i5, int32_t i6)
 {
     setuprhlineasm4(i1,i2,i3,i4,i5,i6);
 } /* setupqrhlineasm4 */
 
 
-/* #pragma aux qrhlineasm4 parm [eax][ebx][ecx][edx][esi][edi] */
 void qrhlineasm4(int32_t i1, intptr_t i2, int32_t i3, int32_t i4, int32_t i5, intptr_t i6)
 {
     rhlineasm4(i1,i2,i3,i4,i5,i6);

@@ -201,58 +201,6 @@ boolean GetExtension( char *filename, char *extension );
 //==========================================================================
 void SetExtension( char *filename, const char *extension );
 
-#ifdef __MSDOS__
-//******************************************************************************
-//
-// GetPath
-//
-// Purpose
-//    To parse the directory entered by the user to make the directory.
-//
-// Parms
-//    Path - the path to be parsed.
-//
-// Returns
-//    Pointer to next path
-//
-//******************************************************************************
-char * GetPath (char * path, char *dir);
-
-//******************************************************************************
-//
-// ChangeDirectory ()
-//
-// Purpose
-//    To change to a directory.  Checks for drive changes.
-//
-// Parms
-//    path - The path to change to.
-//
-// Returns
-//    TRUE  - If successful.
-//    FALSE - If unsuccessful.
-//
-//******************************************************************************
-boolean ChangeDirectory (char * path);
-
-//******************************************************************************
-//
-// ChangeDrive ()
-//
-// Purpose
-//    To change drives.
-//
-// Parms
-//    drive - The drive to change to.
-//
-// Returns
-//    TRUE  - If drive change successful.
-//    FALSE - If drive change unsuccessful.
-//
-//******************************************************************************
-boolean ChangeDrive (char *drive);
-
-#endif
 
 #ifdef __cplusplus
 };

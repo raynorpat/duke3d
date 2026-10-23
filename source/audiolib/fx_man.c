@@ -96,9 +96,6 @@ char *FX_ErrorString
          ErrorString = MV_ErrorString( MV_Error );
          break;
 
-      case FX_DPMI_Error :
-         ErrorString = "DPMI Error in FX_MAN.";
-         break;
 
       default :
          ErrorString = "Unknown Fx error code.";
@@ -220,13 +217,6 @@ int FX_Init
       return( FX_Error );
       }
 
-   status = LL_LockMemory();
-   if ( status != LL_Ok )
-      {
-      FX_SetErrorCode( FX_DPMI_Error );
-      return( FX_Error );
-      }
-
    FX_MixRate = mixrate;
 
    status = FX_Ok;
@@ -255,11 +245,7 @@ int FX_Init
          status = FX_Error;
       }
 
-   if ( status != FX_Ok )
-      {
-      LL_UnlockMemory();
-      }
-   else
+   if ( status == FX_Ok )
       {
       FX_Installed = TRUE;
       }
@@ -312,7 +298,7 @@ int FX_Shutdown
       }
 
    FX_Installed = FALSE;
-   LL_UnlockMemory();
+
 
    return( status );
    }
