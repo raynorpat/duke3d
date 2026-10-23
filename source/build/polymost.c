@@ -79,6 +79,7 @@ static double dxb1[MAXWALLSB], dxb2[MAXWALLSB];
 #define PI 3.14159265358979323
 
 static double gyxscale, gxyaspect, gviewxrange, ghalfx, grhalfxdown10, grhalfxdown10x, ghoriz;
+static double gfocalx;
 static double gcosang, gsinang, gcosang2, gsinang2;
 static double gchang, gshang, gctang, gstang;
 static float gtang = 0.0;
@@ -182,7 +183,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 		{
 			ox = dpx[i]-ghalfx;
 			oy = dpy[i]-ghoriz;
-			oz = ghalfx;
+			oz = gfocalx;
 
 				//Up/down rotation
 			ox2 = ox;
@@ -198,7 +199,7 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 			 * threshold here; the GL path carries a flag for its later handling. */
 			if (oz < SCISDIST) { if (rendmode != 3) return; behind = 1; } //annoying hack to avoid bugs in software rendering
 
-			r = ghalfx / oz;
+			r = gfocalx / oz;
 
 			dd[j] = (dpx[i]*gdx + dpy[i]*gdy + gdo)*r;
 			uu[j] = (dpx[i]*gux + dpy[i]*guy + guo)*r;
@@ -1308,11 +1309,13 @@ void polymost_drawrooms ()
 	gcosang2 = gcosang*((double)viewingrange)/65536.0;
 	gsinang2 = gsinang*((double)viewingrange)/65536.0;
 	ghalfx = (double)halfxdimen; grhalfxdown10 = 1.0/(((double)ghalfx)*1024);
+	/* Pitch and roll use the focal length, independent of viewport width. */
+	gfocalx = ghalfx*65536.0/(double)viewingrange;
 	ghoriz = viewhorizonfraction ? renderhorizon : (double)globalhoriz;
 
 		//global cos/sin height angle
 	r = (double)((ydimen>>1)-ghoriz);
-	gshang = r/sqrt(r*r+ghalfx*ghalfx);
+	gshang = r/sqrt(r*r+gfocalx*gfocalx);
 	gchang = sqrt(1.0-gshang*gshang);
 	ghoriz = (double)(ydimen>>1);
 
@@ -1330,7 +1333,7 @@ void polymost_drawrooms ()
 	py[0] = py[1] = 0-1; py[2] = py[3] = windowy2+1-windowy1+2; n = 4;
 	for(i=0;i<n;i++)
 	{
-		ox = px[i]-ghalfx; oy = py[i]-ghoriz; oz = ghalfx;
+		ox = px[i]-ghalfx; oy = py[i]-ghoriz; oz = gfocalx;
 
 			//Tilt rotation (backwards)
 		ox2 = ox*gctang + oy*gstang;
@@ -1360,7 +1363,7 @@ void polymost_drawrooms ()
 	if (n2 < 3) { enddrawing(); return; }
 	for(i=0;i<n2;i++)
 	{
-		r = ghalfx / pz2[i];
+		r = gfocalx / pz2[i];
 		sx[i] = px2[i]*r + ghalfx;
 		sy[i] = py2[i]*r + ghoriz;
 	}
@@ -1371,7 +1374,7 @@ void polymost_drawrooms ()
 		short hitsect, hitwall, hitsprite;
 		int32_t vx, vy, vz, hitx, hity, hitz;
 
-		ox2 = searchx-ghalfx; oy2 = searchy-ghoriz; oz2 = ghalfx;
+		ox2 = searchx-ghalfx; oy2 = searchy-ghoriz; oz2 = gfocalx;
 
 			//Tilt rotation
 		ox = ox2*gctang + oy2*gstang;
@@ -2067,11 +2070,17 @@ void polymost_dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short 
 	signed char dashade, unsigned char dapalnum, unsigned short dastat, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2)
 {
 	int32_t i, n, nn, x, zz, xoff, yoff, xsiz, ysiz, method;
+	int32_t rsxyaspect = xyaspect, rsyxaspect = yxaspect;
 	int32_t ogpicnum, ogshade, ogpal, oxdimen, oydimen;
 	intptr_t ofoffset;
 	double ogchang, ogshang, ogctang, ogstang, oghalfx, oghoriz, fx, fy, x1, y1, x2, y2;
 	double ogrhalfxdown10, ogrhalfxdown10x;
 	double d, cosang, sinang, cosang2, sinang2, px[8], py[8], px2[8], py2[8];
+
+	if (widescreen && (dastat&2) && (dastat&512)) {
+		rsyxaspect = divscale16(ydim*320,xdim*200);
+		rsxyaspect = divscale32(1,rsyxaspect);
+	}
 
 	ogpicnum = globalpicnum; globalpicnum = picnum;
 	ogshade  = globalshade;  globalshade  = dashade;
@@ -2113,11 +2122,11 @@ void polymost_dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short 
 	{
 		if (!(dastat&8))
 		{
-			if (widescreen) {
+			if (widescreen && !(dastat&512)) {
 				x = ydimenscale;   //= scale(ydimen,yxaspect,mulscale16(200,pixelaspect));
 				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),oydimen<<16,200*pixelaspect);
 			} else {
-				x = xdimenscale;   //= scale(xdimen,yxaspect,320);
+				x = scale(oxdimen,rsyxaspect,320);   //= scale(xdimen,yxaspect,320);
 				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),oxdimen,320);
 			}
 			sy = ((cy1+cy2+2)<<15)+mulscale16(sy-(200<<15),x);
@@ -2126,11 +2135,11 @@ void polymost_dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short 
 		{
 				//If not clipping to startmosts, & auto-scaling on, as a
 				//hard-coded bonus, scale to full screen instead
-			if (widescreen) {
+			if (widescreen && !(dastat&512)) {
 				x = scale(ydim<<16,yxaspect,200*pixelaspect);
 				sx = (xdim<<15)+32768+scale(sx-(320<<15),ydim<<16,200*pixelaspect);
 			} else {
-				x = scale(xdim,yxaspect,320);
+				x = scale(xdim,rsyxaspect,320);
 				sx = (xdim<<15)+32768+scale(sx-(320<<15),xdim,320);
 			}
 			sy = (ydim<<15)+32768+mulscale16(sy-(200<<15),x);
@@ -2142,7 +2151,7 @@ void polymost_dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short 
 	cosang2 = cosang = (double)sintable[(a+512)&2047]*d;
 	sinang2 = sinang = (double)sintable[a&2047]*d;
 	if (((dastat&2) && !(dastat&256)) || (!(dastat&8))) //Don't aspect unscaled perms
-		{ d = (double)xyaspect/65536.0; cosang2 *= d; sinang2 *= d; }
+		{ d = (double)rsxyaspect/65536.0; cosang2 *= d; sinang2 *= d; }
 	else if (pixelaspect == 65536 && ((dastat&2) && (dastat&256))) //Skew 1:1 to 1.2:1 aspect
 		{ d = 1.2; cosang2 *= d; sinang2 *= d; }
 	px[0] = (double)sx/65536.0 - (double)xoff*cosang2+ (double)yoff*sinang2;

@@ -207,10 +207,12 @@ no OpenGL); using the classic renderer.`
 
 Other settings, all under `[Screen Setup]`:
 
-- Widescreen and tallscreen: modes wider than 4:3 get a wider view. The
-  status bar's artwork is carried out to both screen edges, while its
-  numbers and icons and the rest of the HUD stay in the 4:3 area. This
-  applies to every renderer. 320x200, 640x400 and other 4:3 modes draw as
+- Widescreen and tallscreen: modes wider than 4:3 use Hor+: they show more
+  of the world horizontally while preserving the vertical field of view,
+  including when looking up or down. The full status bar and multiplayer
+  frag bar, including their numbers and icons, stretch across the screen
+  without extra artwork at the sides. This applies to every renderer.
+  320x200, 640x400 and other 4:3 modes draw as
   before. The small HUD (the smallest screen size, with no status bar) is
   anchored to the screen edges in widescreen: health at the left edge, ammo
   at the right, and the inventory box just left of the ammo.

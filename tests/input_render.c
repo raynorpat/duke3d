@@ -6,6 +6,7 @@ extern int32_t cosglobalang, singlobalang, globalhoriz;
 int main(int argc, char **argv)
 {
     int32_t sine, horizon;
+    int w, f;
     _platform_init(argc, argv, "input_render", "input_render");
     initengine();
     if (_setgamemode(1, 1024, 768)) return 1;
@@ -27,6 +28,19 @@ int main(int argc, char **argv)
     if (singlobalang != sine || globalhoriz != horizon) {
         puts("FAIL integer renderer behavior changed");
         return 1;
+    }
+    /* At equal height, Hor+ keeps the horizon at the same screen row.
+     * Integer and fractional look must both use the vertical focal length. */
+    for (w = 640; w <= 1600; w += 320) {
+        if (_setgamemode(1, w, 480)) return 1;
+        for (f = 0; f < 2; f++) {
+            setviewanglefraction(0, f ? 32768 : 0);
+            drawrooms(0, 0, 0, 0, 130, MAXSECTORS);
+            if (globalhoriz != (f ? 313 : 311)) {
+                printf("FAIL Hor+ horizon at %dx480: %d\n", w, (int)globalhoriz);
+                return 1;
+            }
+        }
     }
     uninitengine();
     return 0;

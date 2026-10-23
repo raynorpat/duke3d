@@ -2168,7 +2168,7 @@ Masked walls and sprites are collected for the later drawmasks pass.
 void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
                short daang, int32_t dahoriz, short dacursectnum)
 {
-	int32_t i, j, z, cz, fz, closest;
+	int32_t i, j, z, cz, fz, closest, horizscale;
 	short *shortptr1, *shortptr2;
 
 	beforedrawrooms = 0;
@@ -2177,13 +2177,15 @@ void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
 	globalposx = daposx; globalposy = daposy; globalposz = daposz;
 	globalang = (daang&2047);
     renderangle = globalang + viewyawfraction / 65536.0;
+    /* Match the world's vertical projection as the horizontal FOV widens. */
+    horizscale = mulscale16(xdimenscale,viewingrangerecip);
     renderhorizon = (dahoriz - 100 + viewhorizonfraction / 65536.0) *
-        xdimenscale / 65536.0 + (ydimen >> 1);
+        horizscale / 65536.0 + (ydimen >> 1);
 
     if (viewhorizonfraction)
         globalhoriz = (int32_t)renderhorizon;
     else
-        globalhoriz = mulscale16(dahoriz-100,xdimenscale)+(ydimen>>1);
+        globalhoriz = mulscale16(dahoriz-100,horizscale)+(ydimen>>1);
 	globaluclip = (0-globalhoriz)*xdimscale;
 	globaldclip = (ydimen-globalhoriz)*xdimscale;
 
@@ -2928,7 +2930,13 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 	intptr_t p, q, bufplc, palookupoffs;
 	int32_t xsiz, ysiz, xoff, yoff, npoints, yplc, yinc, lx, rx, xx, xend;
 	int32_t xv, yv, xv2, yv2, obuffermode=0, qlinemode=0, y1ve[4], y2ve[4], u4, d4;
+	int32_t rsxyaspect = xyaspect, rsyxaspect = yxaspect;
 	char bad;
+
+	if (widescreen && (dastat&2) && (dastat&512)) {
+		rsyxaspect = divscale16(ydim*320,xdim*200);
+		rsxyaspect = divscale32(1,rsyxaspect);
+	}
 
 #ifdef POLYMOST
 	if (rendmode) { polymost_dorotatesprite(sx,sy,z,a,picnum,dashade,dapalnum,dastat,cx1,cy1,cx2,cy2); return; }
@@ -2950,12 +2958,12 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 	{
 		if ((dastat&8) == 0)
 		{
-			if (widescreen) {
+			if (widescreen && !(dastat&512)) {
 				x = ydimenscale;
 				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),ydimen<<16,200*pixelaspect);
 			} else {
-				x = xdimenscale;   /* = scale(xdimen,yxaspect,320); */
-				if (stereomode) x = scale(windowx2-windowx1+1,yxaspect,320);
+				x = scale(xdimen,rsyxaspect,320);   /* = scale(xdimen,yxaspect,320); */
+				if (stereomode) x = scale(windowx2-windowx1+1,rsyxaspect,320);
 				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),xdimen,320);
 			}
 			sy = ((cy1+cy2+2)<<15)+mulscale16(sy-(200<<15),x);
@@ -2966,11 +2974,11 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 			   * If not clipping to startmosts, & auto-scaling on, as a
 			   *  hard-coded bonus, scale to full screen instead
                */
-			if (widescreen) {
+			if (widescreen && !(dastat&512)) {
 				x = scale(ydim<<16,yxaspect,200*pixelaspect);
 				sx = (xdim<<15)+32768+scale(sx-(320<<15),ydim<<16,200*pixelaspect);
 			} else {
-				x = scale(xdim,yxaspect,320);
+				x = scale(xdim,rsyxaspect,320);
 				sx = (xdim<<15)+32768+scale(sx-(320<<15),xdim,320);
 			}
 			sy = (ydim<<15)+32768+mulscale16(sy-(200<<15),x);
@@ -2982,8 +2990,8 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 	yv = mulscale14(sinang,z);
 	if (((dastat&2) != 0 && (dastat&256) == 0) || ((dastat&8) == 0)) /* Don't aspect unscaled perms */
 	{
-		xv2 = mulscale16(xv,xyaspect);
-		yv2 = mulscale16(yv,xyaspect);
+		xv2 = mulscale16(xv,rsxyaspect);
+		yv2 = mulscale16(yv,rsxyaspect);
 	}
 	else if (pixelaspect == 65536 && ((dastat&2) && (dastat&256))) /* Skew 1:1 to 1.2:1 aspect */
 	{
@@ -3051,8 +3059,8 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 	yv = mulscale14(cosang,i);
 	if (((dastat&2) != 0 && (dastat&256) == 0) || ((dastat&8) == 0)) /* Don't aspect unscaled perms */
 	{
-		yv2 = mulscale16(-xv,yxaspect);
-		xv2 = mulscale16(yv,yxaspect);
+		yv2 = mulscale16(-xv,rsyxaspect);
+		xv2 = mulscale16(yv,rsyxaspect);
 	}
 	else if (pixelaspect == 65536 && ((dastat&2) && (dastat&256))) /* Skew 1:1 to 1.2:1 aspect */
 	{
