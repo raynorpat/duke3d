@@ -1,3 +1,10 @@
+# Discover maps in disposable game/profile directories without game data.
+add_executable(usermaps_test usermaps.c "${PROJECT_SOURCE_DIR}/source/usermaps.c")
+target_include_directories(usermaps_test PRIVATE "${PROJECT_SOURCE_DIR}/source")
+add_test(NAME usermaps COMMAND "${CMAKE_COMMAND}"
+  "-DTEST=$<TARGET_FILE:usermaps_test>" "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/um"
+  -P "${CMAKE_CURRENT_SOURCE_DIR}/usermaps.cmake")
+
 # Drives the SDL2 video and timer layer of the Build engine without game
 # data. Runs headless via SDL's dummy video driver.
 add_executable(sdl_driver_smoke sdl_driver_smoke.c)

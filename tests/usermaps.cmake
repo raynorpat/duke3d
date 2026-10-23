@@ -1,0 +1,34 @@
+file(REMOVE_RECURSE "${WORK}")
+file(MAKE_DIRECTORY "${WORK}/current/maps" "${WORK}/profile/maps"
+                    "${WORK}/current/directory.map" "${WORK}/current/maps/nested")
+foreach(_file current/alpha.MAP current/duplicate.map current/maps/duplicate.map
+              profile/duplicate.map profile/maps/duplicate.map profile/maps/zeta.map
+              current/maps/rooftop_rampage_extended.map current/notmap.txt
+              current/directory.map/ignored.map current/maps/nested/ignored.map)
+  file(WRITE "${WORK}/${_file}" "fixture")
+endforeach()
+file(CREATE_LINK "${WORK}/current" "${WORK}/alias" SYMBOLIC RESULT _link)
+set(_mode main)
+if(NOT _link STREQUAL "0")
+  set(_mode no-symlink)
+endif()
+execute_process(COMMAND "${TEST}" "${WORK}/profile" "${_mode}"
+  WORKING_DIRECTORY "${WORK}/current" RESULT_VARIABLE _result)
+if(NOT _result STREQUAL "0")
+  message(FATAL_ERROR "user map discovery failed: ${_result}")
+endif()
+foreach(_i RANGE 0 299)
+  if(_i LESS 10)
+    set(_name "00${_i}")
+  elseif(_i LESS 100)
+    set(_name "0${_i}")
+  else()
+    set(_name "${_i}")
+  endif()
+  file(WRITE "${WORK}/current/maps/bulk${_name}.map" "fixture")
+endforeach()
+execute_process(COMMAND "${TEST}" "${WORK}/profile" bulk
+  WORKING_DIRECTORY "${WORK}/current" RESULT_VARIABLE _result)
+if(NOT _result STREQUAL "0")
+  message(FATAL_ERROR "user map bulk discovery failed: ${_result}")
+endif()

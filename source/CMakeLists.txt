@@ -19,6 +19,8 @@ add_library(duke3d_game OBJECT
   sector.c
   sounds.c)
 
+target_sources(duke3d_game PRIVATE usermaps.c)
+
 if(DUKE3D_ROUTEBOT)
   target_sources(duke3d_game PRIVATE routebot.c)
   target_compile_definitions(duke3d_game PUBLIC DUKE3D_ROUTEBOT=1)
