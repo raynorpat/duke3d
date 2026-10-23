@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Exercises the actual SDL GameController path with a virtual device. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
@@ -24,6 +25,7 @@ static void pollpad(void)
 
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     SDL_Joystick *pad;
     int device, action = gamefunc_Jump;
     char guid[33], mapping[1024];
@@ -241,5 +243,6 @@ int main(int argc, char **argv)
     return failures != 0;
 }
 #else
-int main(void) { return 77; }
+int main(int argc, char **argv) {
+    if (!test_select_profile(&argc,argv,NULL)) return 1; return 77; }
 #endif

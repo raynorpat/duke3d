@@ -9449,6 +9449,8 @@ int main(int argc,char **argv)
     int32_t i, j, k, l;
     int32 tempautorun;
 
+    game_profile_select_build_default();
+
 #ifdef DC
     platform_init(&argc,&argv);
 #endif

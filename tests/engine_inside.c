@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Checks inside() against the point-in-sector test of each engine revision.
  *  The sector is a diamond at the edge of the map, where the cross product
@@ -38,8 +39,9 @@ static void diamond(int s, int w, int32_t r)
     sector[s].wallptr = w; sector[s].wallnum = 4;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     diamond(0, 0, 1000);
     diamond(1, 4, 131072);
     numsectors = 2;

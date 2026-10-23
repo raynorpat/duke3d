@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Checks cansee(), hitscan() and clipmove() against each engine revision on
  *  a tiny map: two 1024-unit squares side by side, sector 0 on the left and
@@ -99,8 +100,9 @@ static void sprite_contracts(void)
     check("reuse deleted sprite", insertsprite(1, 3), a);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     short hitsect, hitwall, hitsprite, sect;
     int32_t hitx, hity, hitz, x, y, z;
     int i, r;

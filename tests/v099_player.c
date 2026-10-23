@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Literal beta player cases from the EXE comparison in 0.99-player.md. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
@@ -43,8 +44,9 @@ static void button(int n)
     if(n<32) CONTROL_ButtonState1 |= 1u<<n;
     else CONTROL_ButtonState2 |= 1u<<(n-32);
 }
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     struct player_struct *p;
     initengine();
     p=setup(); forceplayerangle(p); check("force angle center",p->return_to_center,8);

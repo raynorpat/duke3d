@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Checks game helper functions against the original DOS libraries'
  *  results (MACT386.LIB), and in 1.3D builds the episode and skill names
@@ -35,8 +36,9 @@ static void check_str(const char *what, const char *got, const char *want)
     }
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     /* Early CON failures can exit before any video mode or framebuffer exists. */
     qsetmode=0;
     showtwoscreens();

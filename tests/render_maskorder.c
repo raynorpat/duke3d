@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * drawmasks' order of sprites and masked walls (JFBuild 61483f0), headless:
  *  a two-sector map with a slanted masked wall of a solid tile, a sprite
@@ -111,6 +112,7 @@ static void draw(unsigned char *buf)
 
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     short walltile, spritetile, behind, front;
     unsigned char *with, *without, *neither;
     int32_t i, a, diff, shown, see;

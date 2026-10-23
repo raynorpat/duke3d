@@ -1077,3 +1077,7 @@ add_test(NAME game_profile COMMAND game_profile "${CMAKE_CURRENT_BINARY_DIR}/pro
 add_executable(game_version_args game_version_args.c)
 target_link_libraries(game_version_args PRIVATE duke3d_profile)
 add_test(NAME game_version_args COMMAND game_version_args)
+
+add_executable(game_state game_state.c)
+target_link_libraries(game_state PRIVATE duke3d_game_options buildengine audiolib)
+add_test(NAME game_state COMMAND game_state)

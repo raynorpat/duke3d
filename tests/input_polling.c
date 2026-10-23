@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Device sampling must not consume gameplay input. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
@@ -25,6 +26,7 @@ static void event(int type, int x, int y)
 }
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     ControlInfo a, b;
     int fire = gamefunc_Fire;
     _platform_init(argc, argv, "input_polling", "input_polling");

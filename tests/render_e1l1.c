@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Renders the start view of E1L1 from a real DUKE3D.GRP, headless, and
  *  checks the frame against a known checksum.
@@ -155,6 +156,7 @@ static int draw_tilts(int32_t x, int32_t y, int32_t z, short a, short sect, unsi
 
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     int32_t posx, posy, posz;
     short ang, sectnum;
     uint32_t hash = 2166136261u;

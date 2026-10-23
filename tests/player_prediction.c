@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Early prediction must apply the same movement friction as processinput. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
@@ -31,8 +32,9 @@ static void setup(int water, int shrunk)
     sync[0].fvel=128; sync[0].svel=64;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     int water,shrunk;
     initengine();
     for(water=0;water<2;water++) for(shrunk=0;shrunk<2;shrunk++) {

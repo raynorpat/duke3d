@@ -1,10 +1,12 @@
+#include "profile_test_support.h"
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
 #include "routebot.h"
 static int failures;
 #define CHECK(c) do { if(!(c)) { printf("FAIL line %d: %s\n",__LINE__,#c); failures++; } } while(0)
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     FILE *f=fopen("routebot-test.route","w"); input in; int i;
     fputs("# test\n0 0 wait 2\n1024 0 use\n1024 1024 fire\n2048 1024 jump\n",f); fclose(f);
     initengine(); CHECK(routebot_load("routebot-test.route"));

@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Real beta sector/setup functions on a small in-memory board; no game data. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
@@ -45,8 +46,9 @@ static void setup(void)
     totalclock=100; randomseed=17; SoundToggle=0; MusicToggle=0;
     sintable[0]=0; sintable[512]=16384;
 }
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     int i,j,k; int32_t seed;
     static const int32_t activate[]={69,777,4};
     setup(); ps[0].steroids_amount=400; resetinventory(0);

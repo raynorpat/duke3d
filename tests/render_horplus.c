@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Hor+: widening a view must preserve its central 4:3 picture, even pitched.
  * Uses real E1L1 data and the same camera at a fixed framebuffer height. */
 #include <stdio.h>
@@ -111,6 +112,7 @@ static int hud_width(int renderer)
 
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     unsigned char *ref, *pic;
     /* 16:9, 21:9 and 32:9 at a common height. */
     static const int widths[] = { 640, 840, 1280 };

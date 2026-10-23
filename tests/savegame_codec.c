@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Checks the save record codec against byte offsets worked out by hand
  * from the DOS 1.5 layout: struct fields packed to 1 byte, little-endian.
@@ -401,6 +402,7 @@ static void test_animation_offsets(void)
 
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     if (argc > 1)
     {
         static unsigned char cache[4<<20];

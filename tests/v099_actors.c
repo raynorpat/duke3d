@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Literal actor expectations from docs/v099/notes/0.99-actors.md.
  * Calls the real actor/engine functions; no game data is needed. */
 #define SDL_MAIN_HANDLED
@@ -93,8 +94,9 @@ static void movingsectorflags(void)
     check("stationary SE30 does not carry",ps[0].on_sector_effector,0);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     int i, j, k;
     movingsectorflags();
     setup(); ps[0].curr_weapon=RPG_WEAPON;

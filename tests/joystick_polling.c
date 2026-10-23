@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Legacy joystick axes and buttons use the same frame sampler as gamepads. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
@@ -10,6 +11,7 @@ static void check(const char *name, int ok)
 }
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     SDL_Joystick *stick;
     int device;
     ControlInfo a, b;
@@ -78,5 +80,6 @@ int main(int argc, char **argv)
     return failures != 0;
 }
 #else
-int main(void) { return 77; }
+int main(int argc, char **argv) {
+    if (!test_select_profile(&argc,argv,NULL)) return 1; return 77; }
 #endif

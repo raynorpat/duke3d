@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Draws HUD rotatesprites and the textured map view of E1L1 with the
  *  classic renderer at a given 8-bit mode, headless, and checks both frames
@@ -107,6 +108,7 @@ static void draw_hud(int32_t x, int32_t y, char stat)
 
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     int32_t posx, posy, posz, w, h;
     short ang, sectnum;
     char stat;

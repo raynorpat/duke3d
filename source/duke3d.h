@@ -85,6 +85,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #endif
 
 #include "gamever.h"
+#include "gameprofile.h"
+#define GAME_SCRIPT_CAPACITY 20460
+#define GAME_WEAPRECS_CAPACITY 256
 
 // Define plutopak if volumeall. --ryan. The Plutonium Pak came with 1.4.
 #if (defined VOLUMEALL) && DUKE3D_GAMEVER >= GAMEVER_14
@@ -472,7 +475,7 @@ struct player_struct
     short dummyplayersprite,extra_extra8,quick_kick;
     short heat_amount,actorsqu,timebeforeexit,customexitsound;
 
-    short weaprecs[MAX_WEAPRECS],weapreccnt,interface_toggle_flag;
+    short weaprecs[GAME_WEAPRECS_CAPACITY],weapreccnt,interface_toggle_flag;
 
     short rotscrnang,dead_flag,show_empty_weapon;
     short scuba_amount,jetpack_amount,steroids_amount,shield_amount;
@@ -483,9 +486,8 @@ struct player_struct
 
     char gm,on_warping_sector,footprintcount;
     char hbomb_on,jumping_toggle,rapid_fire_hold,on_ground;
-#if DUKE3D_GAMEVER < GAMEVER_10
     char on_sector_effector; // beta displayrooms uses the current moving-sector view
-#endif
+
     char name[32],inven_icon,buttonpalette;
 
     char jetpack_on,spritebridge,lastrandomspot;
@@ -498,15 +500,13 @@ struct player_struct
     char walking_snd_toggle, palookup, hard_landing;
     char max_secret_rooms,secret_rooms,/*fire_flag,*/pals[3];
     char max_actors_killed,actors_killed,return_to_center;
-#if DUKE3D_GAMEVER < GAMEVER_13D
     short spacesuit_amount; // 1.1's inventory item 5, the space suit
     char spacesuit_used, spacesuit_on;
     int32_t burn_time; // set when a THROWFLAME hits the player
-#endif
-#if DUKE3D_GAMEVER < GAMEVER_11
+
     char auto_run; // 1.0: per player, toggled by input bit 17 (G10-S06)
     char unnamed_322; // 1.0: the save's byte 0x322, which nothing sets (reference.md)
-#endif
+
 };
 
 extern unsigned char tempbuf[2048], packbuf[576];
@@ -543,7 +543,7 @@ extern char waitabort;
 #endif
 extern char sounds[NUM_SOUNDS][14];
 
-extern int32_t script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;
+extern int32_t script[GAME_SCRIPT_CAPACITY],*scriptptr,*insptr,*labelcode,labelcnt;
 BUILD_STATIC_ASSERT(sizeof(script[0]) == 4, script_element_size);
 extern char *label,*textptr,error,warning,killit_flag;
 extern int32_t actorscrptr[MAXTILES],*parsing_actor;

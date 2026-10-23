@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Writes buffers with the engine's dfwrite() and reads them back with
  *  kdfread(), so the LZW compressor and decompressor have to agree. Needs
@@ -145,6 +146,7 @@ static void check_dos_save(const char *path)
 
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     static unsigned char buf[100000];
     size_t i;
 

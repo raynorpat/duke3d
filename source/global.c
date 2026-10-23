@@ -142,7 +142,7 @@ char playerreadyflag[MAXPLAYERS],ready2send;
 char playerquitflag[MAXPLAYERS];
 int32_t vel, svel, angvel, horiz, ototalclock, respawnactortime=768, respawnitemtime=768, groupfile;
 
-int32_t script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;
+int32_t script[GAME_SCRIPT_CAPACITY],*scriptptr,*insptr,*labelcode,labelcnt;
 int32_t actorscrptr[MAXTILES],*parsing_actor;
 char *label,*textptr,error,warning,killit_flag;
 char *music_pointer;

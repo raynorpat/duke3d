@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Literal DOS cases: docs/v10-v11/notes/1.1-player.md (0x4517a,
  * 0x45bdc, 0x449a5, 0x4625c), 1.1-actors.md (0x25634), and ledger
  * G10-L14 (0x43c52) / G11-A35 (SE24 0x2c92f). No native goldens. */
@@ -46,8 +47,9 @@ static struct player_struct *setup(void)
     memset(sintable,0,sizeof(sintable)); sintable[512]=16384; sintable[1536]=-16384;
     return &ps[0];
 }
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     struct player_struct *p;
     int i,j,k;
     initengine();

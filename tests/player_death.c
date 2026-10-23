@@ -1,9 +1,11 @@
+#include "profile_test_support.h"
 /* DOS death rolls draw the side bit before the low-byte angle. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     static const int seeds[]={1,17,1047}, angles[]={82,1070,58};
     static const uint32_t ends[]={2052237015u,86936935u,2419763165u};
     static const int x[]={0,32768,32768,0}, y[]={0,0,32768,32768};

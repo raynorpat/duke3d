@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* The renderer must retain orientation below one Build angle/horizon unit. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
@@ -5,6 +6,7 @@
 extern int32_t cosglobalang, singlobalang, globalhoriz;
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     int32_t sine, horizon;
     int w, f;
     _platform_init(argc, argv, "input_render", "input_render");

@@ -1,11 +1,13 @@
+#include "profile_test_support.h"
 /* Recording must finalize even when its last batch filled the buffer. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
 #include "build/cache1d.h"
 static int failures;
 extern int32_t recfilep;
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     int sizes[]={1,RECSYNCBUFSIZ,RECSYNCBUFSIZ+1},n,i;
     static unsigned char cache[1024*1024];
     initengine(); initcache((intptr_t)cache,sizeof(cache)); connecthead=0; connectpoint2[0]=-1; ud.multimode=1;

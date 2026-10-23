@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Data-free getnames refusal peer, using the real Build UDP transport.
  * Includes Atomic 1.5 (117) and its shareware protocol number (27), whose
  * game build is unsupported. This fixture does not run those game versions. */
@@ -15,6 +16,7 @@ void keyhandler(void) { }
 void faketimerhandler(void) { }
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     char packet[2048], version[3];
     short other;
     int i, byteversion=atoi(argv[argc-1]);

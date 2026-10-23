@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Compiles the in-repo CON scripts with the game's real compiler and checks
  *  that every script address it stores is a byte offset into script[].
@@ -139,6 +140,7 @@ static int compare_reference(const char *reffile)
 
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     int32_t i, a, b, addrslots = 0, addrlabels = 0, actors = 0;
 
     groupfile = -1;          /* no GRP: never offer the internal defaults */
