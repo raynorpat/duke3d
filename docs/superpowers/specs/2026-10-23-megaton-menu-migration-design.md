@@ -1,12 +1,11 @@
 # Megaton menus on RmlUi
 
 Date: 2026-10-23
-Status: Draft for user approval. The user selected the faithful RmlUi port;
-the detailed policies below remain proposals until this document is approved.
+Status: Approved by the user on 2026-10-23, including the proposed GL-only
+new UI and classic-menu fallback for true no-GL operation.
 
 Builder review: completed. The reviewer identified only the proposed GL-only
-boundary as a decision requiring user approval. Reference asset availability
-remains an already-pending user question.
+boundary as a decision requiring user approval; that approval is now recorded.
 
 ## Intent and agreed direction
 
@@ -23,10 +22,15 @@ binding capture, confirmations, and save/load previews where the underlying
 game supports them. Keep new-game/episode/difficulty selection, in-game
 pause/resume/quit, local saves and maps, and game/audio/video/input settings.
 
-The exact reference resource set is unresolved: the public repository omits
-artwork/fonts and some RML documents requested by its loader. The user has
-been asked whether a local Megaton installation is available. Do not claim
-visual or functional parity until the required reference material is available.
+The user authorized inspecting their Steam installation. The reference is
+`~/Library/Application Support/Steam/steamapps/common/Duke Nukem 3D/gameroot/data`.
+It contains the missing layouts, including `gamepad.rml` and `usermaps.rml`,
+and 21 files in `assets/` (20 uncompressed 32-bit TGA images and
+`dukefont.ttf`, totaling 37,354,732 bytes). All literal image/style references
+in the installed RML/RCSS resolve. Use this installed version as the fidelity
+reference where it differs from GitHub. Inspect it read-only; do not import
+its private assets into git or alter its files. Availability of reference
+material does not by itself establish visual or functional parity.
 
 ## Approaches
 
@@ -72,7 +76,7 @@ software fallback. Megaton's animated cursor also issues GL calls directly.
 
 ## Proposed rendering boundary
 
-**Author's scope choice for approval:** the new UI requires compatible GL
+**Approved scope choice:** the new UI requires compatible GL
 presentation. It works with game renderers 0-3; software game rendering and
 software UI presentation are separate concerns. True no-GL runs, including
 `DUKE3D_POLYMOST=OFF`, keep the existing classic menus. A new CPU UI renderer
@@ -199,8 +203,8 @@ Record upstream attribution and inspect licensing for each imported source
 and resource; repository visibility alone is not a grant for its art/font
 files. Do not commit commercial installation files. Public menu files live
 in a dedicated UI resource directory; `assets/` references resolve against
-one explicit external, read-only Megaton asset directory. The exact directory
-mapping is to be set after inspecting the reference installation. Do not
+one explicit external, read-only Megaton data directory: `gameroot/data`,
+containing the `assets/` subdirectory. Do not
 search the user's disk or alter their installation to assemble resources.
 
 Validate the required resource manifest before activating the UI. Missing
@@ -254,12 +258,10 @@ flows and Steam removal audit; visual and compatibility verification. These
 are design boundaries, not an approved implementation plan. Keep the UI
 opt-in until the parity checklist is complete and the user accepts it.
 
-## Decisions still needing user input
+## Decision status and builder discretion
 
-- Availability/path of a Megaton installation containing the missing reference
-  artwork, font and layouts. Resource fidelity work depends on this answer.
-- Approval of the proposed GL-only new UI with classic-menu fallback for
-  true no-GL operation, as part of approving this document.
+The design and GL boundary are approved, and the Steam reference directory
+has been located. No design question remains pending.
 
 The builder chooses filenames, the smallest adapter signatures, dependency
 fetch details, exact layout adaptations for extra settings, and test fixture
