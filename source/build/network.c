@@ -80,6 +80,13 @@ void deinit_network_transport(gcomtype *gcom);
 void callcommit(void);
 
 
+/*
+================
+initcrc
+
+Build the 16-bit checksum table used by the legacy packet envelope.
+================
+*/
 void initcrc(void)
 {
 	int32_t i, j, k, a;
@@ -100,6 +107,13 @@ void initcrc(void)
 }
 
 
+/*
+================
+getcrc
+
+Compute the packet checksum by visiting payload bytes in reverse order.
+================
+*/
 int32_t getcrc(char *buffer, short bufleng)
 {
 	int32_t i, j;
@@ -109,6 +123,14 @@ int32_t getcrc(char *buffer, short bufleng)
 	return(j&65535);
 }
 
+/*
+================
+initmultiplayers
+
+Initialize packet history and either a local connection list or the
+configured transport. Convert transport player numbers to game indices.
+================
+*/
 void initmultiplayers(char damultioption, char dacomrateoption, char dapriority)
 {
 	int32_t i;
@@ -160,6 +182,14 @@ void initmultiplayers(char damultioption, char dacomrateoption, char dapriority)
 }
 
 
+/*
+================
+dosendpackets
+
+Send the next one or two queued payloads in a reliability envelope.
+Include receive position, resend-control counters and the packet checksum.
+================
+*/
 static void dosendpackets(int32_t other)
 {
 	int32_t i, j, k, messleng;
@@ -178,6 +208,8 @@ static void dosendpackets(int32_t other)
 	if (outcntplc[other]+1 == outcntend[other])
 	{     /* Send 1 sub-packet */
 		k = 0;
+		/* The low sequence byte selects the first payload in this envelope;
+		 * bit 7 of the next byte distinguishes one payload from two. */
 		gcom->buffer[k++] = (outcntplc[other]&255);
 		gcom->buffer[k++] = (errorgotnum[other]&7)+((errorresendnum[other]&7)<<3);
 		gcom->buffer[k++] = (incnt[other]&255);
@@ -191,6 +223,8 @@ static void dosendpackets(int32_t other)
 	else
 	{     /* Send 2 sub-packets */
 		k = 0;
+		/* The low sequence byte selects the first payload in this envelope;
+		 * bit 7 of the next byte distinguishes one payload from two. */
 		gcom->buffer[k++] = (outcntplc[other]&255);
 		gcom->buffer[k++] = (errorgotnum[other]&7)+((errorresendnum[other]&7)<<3)+128;
 		gcom->buffer[k++] = (incnt[other]&255);
@@ -234,6 +268,14 @@ static void dosendpackets(int32_t other)
 }
 
 
+/*
+================
+sendpacket
+
+Queue a game payload in resend storage and transmit the next envelope.
+Identical adjacent payloads can share backup bytes.
+================
+*/
 void sendpacket(int32_t other, char *bufptr, int32_t messleng)
 {
 	int32_t i = 0;
@@ -248,6 +290,8 @@ void sendpacket(int32_t other, char *bufptr, int32_t messleng)
 		for(i=messleng-1;i>=0;i--)
 			if (bakpacketbuf[(i+j)&(BAKSIZ-1)] != bufptr[i]) break;
 	}
+	/* The queued sequence chooses one of 256 descriptors. Payload storage
+	 * wraps independently in the BAKSIZ byte ring. */
 	bakpacketlen[other][outcntend[other]&255] = messleng;
 
 	if (i < 0)   /* Point to last packet to save space on bakpacketbuf */
@@ -266,6 +310,13 @@ void sendpacket(int32_t other, char *bufptr, int32_t messleng)
 }
 
 
+/*
+================
+setpackettimeout
+
+Set retry timing in Build clock ticks and restart each peer's send timer.
+================
+*/
 void setpackettimeout(int32_t datimeoutcount, int32_t daresendagaincount)
 {
 	int32_t i;
@@ -276,6 +327,13 @@ void setpackettimeout(int32_t datimeoutcount, int32_t daresendagaincount)
 }
 
 
+/*
+================
+uninitmultiplayers
+
+Release the transport state and clear the shared transport pointer.
+================
+*/
 void uninitmultiplayers(void)
 {
     deinit_network_transport(gcom);
@@ -286,6 +344,13 @@ void sendlogon(void)
 {
 }
 
+/*
+================
+sendlogoff
+
+Queue the two-byte departure message to every other connected player.
+================
+*/
 void sendlogoff(void)
 {
 	int32_t i;
@@ -308,6 +373,14 @@ void setsocket(short newsocket)
 }
 
 
+/*
+================
+getpacket
+
+Poll transport and reliability state, returning an accepted payload length.
+Return zero when this poll delivers no game payload.
+================
+*/
 short getpacket (short *other, char *bufptr)
 {
 	int32_t i, messleng;
@@ -318,6 +391,8 @@ short getpacket (short *other, char *bufptr)
 	for(i=connecthead;i>=0;i=connectpoint2[i])
 		if (i != myconnectindex)
 		{
+			/* Recover the retry timer if the Build clock moved backward instead
+			 * of waiting for an obsolete future timestamp. */
 			if (totalclock < lastsendtime[i]) lastsendtime[i] = totalclock;
 			if (totalclock > lastsendtime[i]+timeoutcount)
 			{
@@ -335,6 +410,8 @@ short getpacket (short *other, char *bufptr)
 			}
 		}
 
+	/* A two-payload datagram is exposed through two API calls; the second
+	 * payload has already passed the envelope checks and is buffered here. */
 	if (inlastpacket != 0)
 	{
 			/* 2ND half of good double-packet */
@@ -372,12 +449,16 @@ short getpacket (short *other, char *bufptr)
 		return(0);
 	}
 
+	/* Only three bits of each resend-control counter cross the wire.
+	 * Advance local counters to match the peer's acknowledged request state. */
 	while ((errorfixnum[*other]&7) != ((gcom->buffer[1]>>3)&7))
 		errorfixnum[*other]++;
 
 	if ((gcom->buffer[1]&7) != (errorresendnum[*other]&7))
 	{
 		errorresendnum[*other]++;
+		/* Reconstruct the peer's requested low-byte sequence in the current
+		 * 256-entry window, stepping back a window if it would lie beyond the queue. */
 		outcntplc[*other] = (outcntend[*other]&0xffffff00)+gcom->buffer[2];
 		if (outcntplc[*other] > outcntend[*other]) outcntplc[*other] -= 256;
 	}
@@ -445,6 +526,8 @@ short getpacket (short *other, char *bufptr)
 	memcpy(bufptr,&gcom->buffer[5],messleng);
 	memcpy(lastpacket,&gcom->buffer[messleng+5],lastpacketleng);
 
+	/* Both sequences are accepted now, even though the second payload
+	 * will not be returned to the game until its next polling call. */
 	incnt[*other] += 2;
 	return(messleng);
 }
@@ -475,6 +558,13 @@ void flushpackets()
 #endif
 }
 
+/*
+================
+genericmultifunction
+
+Forward a bounded control payload and command through the shared transport block.
+================
+*/
 void genericmultifunction(int32_t other, char *bufptr, int32_t messleng, int32_t command)
 {
 	if (numplayers < 2) return;
@@ -488,16 +578,39 @@ void genericmultifunction(int32_t other, char *bufptr, int32_t messleng, int32_t
 
 
 #if STUB_NETWORKING
+/*
+================
+init_network_transport
+
+Return configured transport state, or NULL when initialization fails
+or networking support is stubbed out.
+================
+*/
 gcomtype *init_network_transport(char **ARGV, int argpos)
 {
     printf("No networking support built in.\n");
     return NULL;
 } /* init_network_transport */
 
+/*
+================
+deinit_network_transport
+
+Release backend transport resources; the stub backend performs no cleanup.
+================
+*/
 void deinit_network_transport(gcomtype *gcom)
 {
 }
 
+/*
+================
+callcommit
+
+Dispatch the command in the shared transport block to the selected backend.
+The stub backend performs no operation.
+================
+*/
 void callcommit(void)
 {
 }
@@ -626,6 +739,14 @@ static char *static_ipstring(int ip)
 }
 
 
+/*
+================
+send_udp_packet
+
+Send one UDP datagram to the supplied host-order address and port.
+Report success only when sendto returns the entire requested byte count.
+================
+*/
 static int send_udp_packet(int ip, short port, void *pkt, size_t pktsize)
 {
     /* !!! FIXME: See if this would ever block. */
@@ -660,6 +781,14 @@ static void process_udp_send_queue(void)
 }
 
 
+/*
+================
+get_udp_packet
+
+Receive a native datagram and filter it against registered peers.
+The caller treats zero or negative results as no delivered packet.
+================
+*/
 static int get_udp_packet(int *ip, short *_port, void *pkt, size_t pktsize)
 {
     int err = 0;
@@ -695,6 +824,8 @@ static int get_udp_packet(int *ip, short *_port, void *pkt, size_t pktsize)
      * Reject packets from unallowed IPs. Prevents (ha) DoS attacks and
      *  other confusion...
      */
+    /* Discovery runs before the global transport block is installed.
+     * Once installed, receive delivery is restricted to registered endpoints. */
     if (gcom == NULL)
         valid = 1;
     else
@@ -761,6 +892,14 @@ static int get_udp_packet(int *ip, short *_port, void *pkt, size_t pktsize)
 }
 
 
+/*
+================
+read_whole_file
+
+Read a configuration file into owned storage with two trailing zero bytes.
+Return NULL on failure; the parser releases the returned allocation.
+================
+*/
 static char *read_whole_file(const char *cfgfile)
 {
     char *buf;
@@ -798,6 +937,14 @@ static char *read_whole_file(const char *cfgfile)
     return(buf);
 }
 
+/*
+================
+get_token
+
+Split the next whitespace-delimited token in place and advance the cursor.
+Returned text aliases the mutable configuration buffer.
+================
+*/
 static char *get_token(char **ptr)
 {
     char *retval;
@@ -822,6 +969,13 @@ static char *get_token(char **ptr)
     return(retval);
 }
 
+/*
+================
+set_socket_blockmode
+
+Select blocking or non-blocking operation through the platform socket API.
+================
+*/
 static int set_socket_blockmode(int onOrOff)
 {
     int flags;
@@ -854,6 +1008,13 @@ static int set_socket_blockmode(int onOrOff)
 }
 
 
+/*
+================
+set_socket_broadcast
+
+Enable or disable UDP broadcast permission on the current socket.
+================
+*/
 static int set_socket_broadcast(int onOrOff)
 {
     int f = (onOrOff) ? 1 : 0;
@@ -871,6 +1032,13 @@ static int set_socket_broadcast(int onOrOff)
 }
 
 
+/*
+================
+open_udp_socket
+
+Create and bind the UDP socket for the selected local interface.
+================
+*/
 static int open_udp_socket(int ip, int port)
 {
     struct sockaddr_in addr;
@@ -932,6 +1100,13 @@ typedef struct
 } PacketPeerGreeting;
 
 
+/*
+================
+send_peer_greeting
+
+Build a peer discovery greeting with a little-endian random player ID.
+================
+*/
 static void send_peer_greeting(int ip, short port, short myid)
 {
     PacketPeerGreeting packet;
@@ -943,6 +1118,14 @@ static void send_peer_greeting(int ip, short port, short myid)
 
 
 /* peer to peer init. */
+/*
+================
+connect_to_everyone
+
+Exchange peer greetings and establish a common player order from random IDs.
+Keep addresses and ports paired while ordering the participants.
+================
+*/
 static int connect_to_everyone(gcomtype *gcom, int myip, int bcast)
 {
     PacketPeerGreeting packet;
@@ -1078,6 +1261,8 @@ static int connect_to_everyone(gcomtype *gcom, int myip, int bcast)
 
     /* ok, now everyone is talking to you. Sort them into player numbers... */
 
+    /* Include our own ID in the same sort so every peer computes the same
+     * player numbering from the discovered participants. */
     heard_from[max] = my_id; /* so we sort, too... */
     allowed_addresses[max].host = myip;
     allowed_addresses[max].port = udpport;
@@ -1150,6 +1335,14 @@ static int connect_to_everyone(gcomtype *gcom, int myip, int bcast)
     return(1);
 }
 
+/*
+================
+parse_ip
+
+Parse a dotted IPv4 value into host-order bytes, or use zero for any.
+Legacy parsing masks octets rather than validating their range.
+================
+*/
 static int parse_ip(const char *str, int *ip)
 {
     int ip1, ip2, ip3, ip4;
@@ -1176,6 +1369,14 @@ static int parse_ip(const char *str, int *ip)
     return(1);
 }
 
+/*
+================
+parse_interface
+
+Split an address and optional port in place, applying the default UDP port.
+The port spelling any selects zero for an OS-assigned local port.
+================
+*/
 static int parse_interface(char *str, int *ip, short *udpport)
 {
     char *ptr = strchr(str, ':');
@@ -1198,6 +1399,13 @@ static int parse_interface(char *str, int *ip, short *udpport)
     return(1);
 }
 
+/*
+================
+initialize_sockets
+
+Initialize platform socket support; Winsock requires explicit startup.
+================
+*/
 static int initialize_sockets(void)
 {
 #if PLATFORM_WIN32
@@ -1226,6 +1434,13 @@ static int initialize_sockets(void)
     return(1);
 }
 
+/*
+================
+deinitialize_sockets
+
+Release platform socket support when the platform requires it.
+================
+*/
 static void deinitialize_sockets(void)
 {
 #if PLATFORM_WIN32
@@ -1233,6 +1448,14 @@ static void deinitialize_sockets(void)
 #endif
 }
 
+/*
+================
+parse_udp_config
+
+Read the local interface, transport mode and permitted peers,
+then bind the socket and run the selected connection setup.
+================
+*/
 static int parse_udp_config(const char *cfgfile, gcomtype *gcom)
 {
     char *buf;
@@ -1338,6 +1561,14 @@ static int parse_udp_config(const char *cfgfile, gcomtype *gcom)
 }
 
 
+/*
+================
+init_network_transport
+
+Return configured transport state, or NULL when initialization fails
+or networking support is stubbed out.
+================
+*/
 gcomtype *init_network_transport(char **ARGV, int argpos)
 {
     gcomtype *retval;
@@ -1381,6 +1612,13 @@ gcomtype *init_network_transport(char **ARGV, int argpos)
 }
 
 
+/*
+================
+deinit_network_transport
+
+Release backend transport resources; the stub backend performs no cleanup.
+================
+*/
 void deinit_network_transport(gcomtype *gcom)
 {
     printf("\n\nUDP NETWORK TRANSPORT DEINITIALIZING...\n");
@@ -1406,6 +1644,14 @@ void deinit_network_transport(gcomtype *gcom)
 }
 
 
+/*
+================
+callcommit
+
+Dispatch the command in the shared transport block to the selected backend.
+The stub backend performs no operation.
+================
+*/
 void callcommit(void)
 {
     int ip, i, rc;
@@ -1428,6 +1674,8 @@ void callcommit(void)
                     if ( (allowed_addresses[i].host == ip) &&
                          (allowed_addresses[i].port == port) )
                     {
+                        /* The transport numbers peers from one; the game-facing receive path
+                         * subtracts one before returning the player index. */
                         gcom->other = i;
                         return;
                     }
