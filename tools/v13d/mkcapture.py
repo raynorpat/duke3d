@@ -1,12 +1,12 @@
-"""Make a scratch copy of a DUKE3D.EXE (1.3D full or shareware, or 1.1 or 1.0
+"""Make a scratch copy of a DUKE3D.EXE (1.3D full or shareware, or 1.1, 1.0 or 0.99
 shareware) that, when a demo ends, writes the game state to STATE.BIN and then
 hangs. Optionally starts the title demo loop at demo N.
 
-usage: mkcapture.py <full|sw|sw11|sw10> <in.exe> <out.exe> <demo number> [krandlog]
+usage: mkcapture.py <full|sw|sw11|sw10|sw099> <in.exe> <out.exe> <demo number> [krandlog] [demogod]
 
 STATE.BIN = reccnt (4) + randomseed (4) + sprite[4096] (44 each) + ps[0] (0x552, the
 1.3D player_struct layout, see ledger F-007; 0x34e for sw11 and sw10, see
-docs/v10-v11/reference.md).
+docs/v10-v11/reference.md; 0x33f for sw099, docs/v099/reference.md).
 
 krandlog: every direct call to krand goes through a logger first, which records
 the caller while reccnt is 0 (the demo's last tic, when the demo is cut to end
@@ -15,37 +15,18 @@ there). STATE.BIN then also holds the runtime and link address of the logger
 subtract the runtime-minus-link difference to get EXE addresses; sw11 has room
 for 41). The code object is read-only, so the log lives in the slack after the
 data object."""
-import re, struct, sys
-ED = {
-    'full': dict(krand=0x6c241, randomseed=0x251998, sprite=0x1cdbc0, reccnt=0x14de0a, which_demo=0xc76d6, cave=0xaa620, log=0x2d5400, ps=0x11bd30),
-    'sw':   dict(krand=0x6bf61, randomseed=0x251ae8, sprite=0x1cdd10, reccnt=0x14df5a, which_demo=0xc782e, cave=0xaa330, log=0x2d5550, ps=0x11be80),
-    # 1.1 and 1.0 shareware (docs/v10-v11/reference.md): other LE offsets, 8 x 0x34e
-    # ps[], a smaller code cave, and only 0xb0 bytes of log slack in 1.1
-    'sw11': dict(krand=0x67a71, randomseed=0x22ae04, sprite=0x1a7030, reccnt=0x130562, which_demo=0xc6c8d, cave=0xa4700, log=0x2abf50, ps=0x1162e0,
-                 le=0x290fc, stub=0x26654, cavesize=0x900, pssize=0x34e, logn=41, flat='sw11.bin'),
-    'sw10': dict(krand=0x661e7, randomseed=0x22aaf0, sprite=0x1a6d1c, reccnt=0x130ebb, which_demo=0xc6783, cave=0xa2aa0, log=0x2abaf0, ps=0x112ab0,
-                 le=0x290fc, stub=0x26654, cavesize=0x560, pssize=0x34e, flat='sw10.bin'),
-}
+import importlib.util, os, re, struct, sys
+# Load by path so the tools also work with Python's isolated (-I) mode.
+spec = importlib.util.spec_from_file_location('capture_le', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'le.py'))
+le = importlib.util.module_from_spec(spec); spec.loader.exec_module(le)
+ED = le.ED
 ed = ED[sys.argv[1]]
-LE, STUB = ed.get('le', 0x37c3c), ed.get('stub', 0x352a4)
 FLAT = __import__('os').environ.get('V13D_FLAT') or __import__('os').path.expanduser('~/Projects/ref/ghidra/' + ed.get('flat', f'{sys.argv[1]}13.bin'))
 LOGN = ed.get('logn', 256); exe = bytearray(open(sys.argv[2], 'rb').read()); demo = int(sys.argv[4])
-H = lambda o, f: struct.unpack_from(f, exe, LE + o)[0]
-objtab, pmap, datapages = H(0x40, '<I'), H(0x48, '<I'), H(0x80, '<I')
-objs = [struct.unpack_from('<6I', exe, LE + objtab + i*24) for i in range(H(0x44, '<I'))]
-def foff(addr):
-    for vs, base, fl, pmi, pmn, _ in objs:
-        if base <= addr < base + pmn*0x1000:
-            j = (addr - base) // 0x1000
-            e = exe[LE + pmap + (pmi - 1 + j)*4: LE + pmap + (pmi + j)*4]
-            num = (e[0] << 16) | (e[1] << 8) | e[2]
-            return STUB + datapages + (num - 1)*0x1000 + (addr - base) % 0x1000
-    raise SystemExit(f'{addr:#x} not in a file-backed page')
-def rd(addr, n): o = foff(addr); return bytes(exe[o:o+n])
-def wr(addr, b): o = foff(addr); exe[o:o+len(b)] = b
-# the demo-end branch in playback: cmp [reccnt],0 / jg / cmp byte [esp+4],0 / jnz END
+image = le.LEImage(exe, ed); rd, wr = image.rd, image.wr
+# the demo-end branch in playback: cmp [reccnt],0 / jg / cmp byte [esp+4],0 / jnz END (esp+8 in 0.99)
 code = open(FLAT, 'rb').read()[:0x30000]  # flattened image (le_flatten.py), fixups applied
-pat = re.compile(rb'\x83\x3d' + re.escape(struct.pack('<I', ed['reccnt'])) + rb'\x00\x7f.\x80\x7c\x24\x04\x00\x0f\x85(....)', re.S)
+pat = re.compile(rb'\x83\x3d' + re.escape(struct.pack('<I', ed['reccnt'])) + rb'\x00\x7f.\x80\x7c\x24' + bytes([ed.get('demostack', 4)]) + rb'\x00\x0f\x85(....)', re.S)
 m = list(pat.finditer(code)); assert len(m) == 1, len(m)
 jnz = 0x10000 + m[0].start() + 14           # address of the 0f 85
 end = jnz + 6 + struct.unpack('<i', m[0].group(1))[0]
@@ -70,7 +51,7 @@ if krandlog:
     write(ed['log'], 12 + LOGN*4)
 c += b'\x66\x89\xfb\xb4\x3e\xcd\x21'         # close
 c += b'\xeb\xfe'                             # hang
-fname = cave + len(c); c += b'STATE.BIN\x00'
+fname = cave + len(c); c += le.CAPTURE_FILE
 struct.pack_into('<i', c, fname_fix, fname - nxt)
 if krandlog:
     hook = cave + len(c); hn = hook + 9      # address of the pop after its call
@@ -92,7 +73,7 @@ if krandlog:
     h += struct.pack('<i', ed['krand'] - (hook + len(h) + 4))   # jmp krand
     c += bytes(h)
     whole = open(FLAT, 'rb').read()
-    sites = [k + 0x10000 for k in range(0, 0xa0000 - 5) if whole[k] == 0xe8
+    sites = [k + 0x10000 for k in range(0, ed.get('codeend', 0xb0000) - 0x10000 - 5) if whole[k] == 0xe8
              and k + 0x10000 + 5 + struct.unpack_from('<i', whole, k + 1)[0] == ed['krand']]
     for k in sites: wr(k + 1, struct.pack('<i', hook - (k + 5)))
     print(f'krandlog: {len(sites)} krand calls go through {hook:#x}')
@@ -110,6 +91,16 @@ elif len(sys.argv) > 5 and sys.argv[5] == 'firsttic':
     k = calls[1] if len(calls) > 1 else calls[0]; wr(k + 1, struct.pack('<i', cave - (k + 5))); print(f'diagnostic: call at {k:#x} -> cave')
 else:
     wr(jnz + 2, struct.pack('<i', cave - (jnz + 6)))
+if sys.argv[1] == 'sw099':
+    # Playback returns on MODE_EOL before reaching the normal record-end branch.
+    assert rd(0x2a8ab, 13) == bytes.fromhex('240825ff0000000f85fd000000')
+    wr(0x2a8b4, struct.pack('<i', cave - 0x2a8b8))
+if 'demogod' in sys.argv[5:]:
+    assert sys.argv[1] == 'sw099', 'demogod is a beta reference option'
+    # checkcommandline: xor ah,ah; ...; mov byte [god],ah. No later reset.
+    assert rd(0x293aa, 2) == b'\x30\xe4', 'unexpected beta god initializer'
+    wr(0x293aa, b'\xb4\x01')  # mov ah,1
+    print('demogod: initialize beta god mode at startup')
 wr(ed['which_demo'], bytes([demo]))
 open(sys.argv[3], 'wb').write(exe)
 print(f'jnz at {jnz:#x} (was -> {end:#x}), cave at {cave:#x}, {len(c)} bytes, start demo {demo}')

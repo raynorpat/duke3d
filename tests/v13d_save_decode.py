@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent decoder for Duke Nukem 3D 1.3D, 1.1 and 1.0 (DOS) saves.
+"""Independent decoder for Duke Nukem 3D 1.3D, 1.1, 1.0 and 0.99 (DOS) saves.
 
 Written from the DOS file layouts (docs/v13d/reference.md and
 docs/v10-v11/reference.md, "Save file"), not from the game's save code. All
@@ -17,7 +17,8 @@ this file implements itself.
       "actor" for each non-zero actorscrptr[0..4096) entry. Script addresses
       are byte offsets from script[0], which is how all three store them.
       The save's layout is told from its first block: a 1.3D BYTEVERSION, 1.1's
-      BYTEVERSION 12, or 1.0's 19-byte save name (1.0 writes no version).
+      BYTEVERSION 12, or the 19-byte save name in 1.0/0.99 (no version). Their player-block
+      sizes distinguish 1.0 from 0.99.
 
   v13d_save_decode.py truncate <save> <out> <n>
       write the save without its last n bytes.
@@ -34,6 +35,7 @@ PLAYER_SIZE = 0x552
 BYTEVERSIONS = (103, 14)  # full, shareware
 BYTEVERSION_11 = 12
 PLAYER_SIZE_11 = 0x34e    # 1.1 and 1.0
+PLAYER_SIZE_099 = 0x33f
 
 
 def uncompress(b):
@@ -127,7 +129,8 @@ def read_script(path):
 
 def read_script_10(r):
     """1.0: no BYTEVERSION, only numwalls walls and numsectors sectors, and a
-    raw hittype[] before the animated walls."""
+    raw hittype[] before the animated walls. The beta has the same prefix,
+    a smaller player block, and no show2dsector block."""
     for size, count in ((19, 1), (4, 1), (4, 1), (4, 1), (160, 100)):
         r.read(size, count)
     numwalls, = struct.unpack('<h', r.read(2, 1))
@@ -137,11 +140,23 @@ def read_script_10(r):
     for size, count in ((44, 4096),
                         (2, 1025), (2, 4096), (2, 4096),
                         (2, 1025), (2, 4096), (2, 4096),
-                        (2, 1), (12, 256), (PLAYER_SIZE_11, 8), (16, 8),
-                        (71, 2048),
-                        (2, 1), (3072, 1), (4, 2048), (4, 2048),
-                        (2, 1), (2, 64), (2, 1), (2, 64), (2, 64), (1, 128)):
+                        (2, 1), (12, 256)):
         r.read(size, count)
+    pos = r.pos
+    pbytes = len(r.block())
+    r.pos = pos
+    if pbytes == PLAYER_SIZE_099 * 8:
+        psize = PLAYER_SIZE_099
+    elif pbytes == PLAYER_SIZE_11 * 8:
+        psize = PLAYER_SIZE_11
+    else:
+        raise ValueError('not a 0.99 or 1.0 player block (%d bytes)' % pbytes)
+    for size, count in ((psize, 8), (16, 8), (71, 2048),
+                        (2, 1), (3072, 1), (4, 2048), (4, 2048),
+                        (2, 1), (2, 64), (2, 1), (2, 64), (2, 64)):
+        r.read(size, count)
+    if psize == PLAYER_SIZE_11:
+        r.read(1, 128)
     r.read(1, 10240)
     script = struct.unpack('<10240i', r.read(4, 10240))
     # Every entry is stored minus the script's run-time address, so an empty
@@ -187,12 +202,15 @@ def calls_10(bl):
     for size, count in ((2, 1025), (2, 4096), (2, 4096),
                         (2, 1025), (2, 4096), (2, 4096), (2, 1), (12, 256)):
         call('', size, count)
-    call('ps', PLAYER_SIZE_11, 8)
+    beta = len(bl[i]) == 8 * 0x33f
+    call('ps', 0x33f if beta else PLAYER_SIZE_11, 8)
     call('po', 16, 8)
     call('hittype', 71, 2048)
     for size, count in ((2, 1), (3072, 1), (4, 2048), (4, 2048),
-                        (2, 1), (2, 64), (2, 1), (2, 64), (2, 64), (1, 128)):
+                        (2, 1), (2, 64), (2, 1), (2, 64), (2, 64)):
         call('', size, count)
+    if not beta:
+        call('', 1, 128)
     call('script bitmap', 1, 10240)
     call('script', 4, 10240)
     call('actorscrptr', 4, 4096)
@@ -202,18 +220,23 @@ def calls_10(bl):
     call('animatecnt', 4, 1)
     call('', 2, 64)
     call('animateptr', 4, 64)
-    for size, count in ((4, 64), (4, 64), (1, 1), (2, 1), (4, 1), (4, 1)):
+    for size, count in ((4, 64), (4, 64), (1, 1), (2, 1)):
+        call('', size, count)
+    for size, count in (((2, 1),) if beta else ((4, 1), (4, 1))):
         call('', size, count)
     return out
 
 
 def layout_10(bl):
     c = {name: (first, n) for name, first, n in calls_10(bl) if name}
+    beta = len(bl[c['ps'][0]]) == 8 * 0x33f
     return dict(allowed={c['script bitmap'][0]: 'script bitmap',
                          c['lockclock'][0]: 'lockclock'},
                 animatecnt=c['animatecnt'][0], animateptr=c['animateptr'][0],
                 ps=tuple(range(c['ps'][0], c['ps'][0] + c['ps'][1])),
-                psize=PLAYER_SIZE_11, palette=0x33a, gm=0x30c, gmmask=0)
+                psize=0x33f if beta else PLAYER_SIZE_11,
+                palette=0x308 if beta else 0x33a, gm=0x2dc if beta else 0x30c, gmmask=0,
+                redraw=(0x322, 0x326) if beta else None)
 
 
 def chunks(path):
@@ -318,6 +341,11 @@ def compare(dos, ours):
         for p in range(0, len(ps), size):
             ps[p + L['palette']:p + L['palette'] + 4] = bytes(4)
             ps[p + L['gm']] &= L['gmmask']
+        # Native loadplayer/vscrn request a redraw for the active player.
+        # Inactive players' saved display flags must still match exactly.
+        if L.get('redraw'):
+            first, last = L['redraw']
+            ps[first:last] = bytes(last - first)
         o = 0
         for k in L['ps']:
             x[k], o = bytes(ps[o:o + len(x[k])]), o + len(x[k])

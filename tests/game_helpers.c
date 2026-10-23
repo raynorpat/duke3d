@@ -16,6 +16,8 @@
 #endif
 
 static int failures;
+void showtwoscreens(void);
+extern int32_t qsetmode;
 
 static void check(const char *what, int got, int want)
 {
@@ -35,6 +37,30 @@ static void check_str(const char *what, const char *got, const char *want)
 
 int main(void)
 {
+    /* Early CON failures can exit before any video mode or framebuffer exists. */
+    qsetmode=0;
+    showtwoscreens();
+    check("quit ads before video setup",qsetmode,0);
+#if DUKE3D_GAMEVER >= GAMEVER_10 && DUKE3D_GAMEVER < GAMEVER_11
+    {
+        /* DOS 1.0's Watcom rand, initial seed 1 (sw10 0x97f61, 0xd0a8c). */
+        static const int expected[] = {
+            16838, 5758, 10113, 17515, 31051, 5627, 23010, 7419,
+            16212, 4086, 2749, 12767, 9084, 12060, 32225, 17543
+        };
+        unsigned i;
+        for(i = 0; i < sizeof(expected)/sizeof(expected[0]); i++)
+        {
+            /* Native networking's host RNG must not reset the DOS game stream. */
+            if(i == 8) { srand(123); (void)(rand)(); }
+            check("1.0 Watcom rand", i&1 ? game_rand() : rand(), expected[i]);
+        }
+        ud.multimode=1;
+        ps[0].auto_run=1;
+        newgame(0,0,2);
+        check("1.0 new game preserves local auto-run",ps[0].auto_run,1);
+    }
+#endif
     /* On an axis the original returns the exact length, not the estimate. */
     check("FindDistance2D(1000,0)", FindDistance2D(1000, 0), 1000);
     check("FindDistance2D(0,-1000)", FindDistance2D(0, -1000), 1000);
@@ -54,6 +80,15 @@ int main(void)
 #if DUKE3D_GAMEVER < GAMEVER_14
     /* 1.3D CONs have no definevolumename or defineskillname. */
     check_str("volume_names[0]", volume_names[0], "L.A. MELTDOWN");
+#if DUKE3D_GAMEVER < GAMEVER_10
+    check_str("volume_names[1]", volume_names[1], "COSMIC WASTELAND");
+    check_str("volume_names[2]", volume_names[2], "SHUTDOWN AT GROUND ZERO");
+    check_str("skill_names[0]", skill_names[0], "EASY");
+    check_str("skill_names[1]", skill_names[1], "MEDIUM");
+    check_str("skill_names[2]", skill_names[2], "NORMAL");
+    check_str("skill_names[3]", skill_names[3], "HARD");
+    check_str("skill_names[4]", skill_names[4], "HEADACHE");
+#else
     check_str("volume_names[1]", volume_names[1], "LUNAR APOCALYPSE");
 #if DUKE3D_GAMEVER < GAMEVER_13D
     check_str("volume_names[2]", volume_names[2], "SCHRAPNEL CITY"); /* the 1.1 EXE's spelling */
@@ -64,6 +99,7 @@ int main(void)
     check_str("skill_names[1]", skill_names[1], "LET'S ROCK");
     check_str("skill_names[2]", skill_names[2], "COME GET SOME");
     check_str("skill_names[3]", skill_names[3], "DAMN I'M GOOD");
+#endif
 
     /* 1.3D saves and loads locally even in a network game: a negative slot
        (the menu's multiplayer request) must not queue a request that 1.3D
@@ -106,13 +142,26 @@ int main(void)
         ud.multimode = 1;
     }
 
+    {
+        char *args[] = { "duke3d", "-demodump", "/tmp/map-state.bin",
+            "-loadverify", "/tmp/save.sav", "-saveverify", "/tmp/out.sav" };
+        boardfilename[0]=0; checkcommandline(7,args);
+        check("diagnostic paths don't enable respawn",ud.m_respawn_monsters,0);
+        check("diagnostic paths don't select a map",boardfilename[0],0);
+    }
+
     /* The GRP check: a known release GRP that isn't this build's release
        gets a warning; this build's own GRP, a modded one and an unknown one
        don't. CRC-32 is the standard (zlib) one. */
     check("grpcrc32(\"123456789\")", (int)grpcrc32(0, (const unsigned char *)"123456789", 9), (int)0xCBF43926);
     check("unknown GRP", grpmismatch(123456, 0x12345678) != NULL, 0);
     check("modded GRP the size of a release", grpmismatch(26524524, 0x12345678) != NULL, 0);
-#if DUKE3D_GAMEVER < GAMEVER_11
+#if DUKE3D_GAMEVER < GAMEVER_10
+    check("0.99 shareware GRP", grpmismatch(9690241, 0x02F18900) != NULL, 0);
+    check("1.0 shareware GRP", grpmismatch(10429258, 0xA28AA589) != NULL, 1);
+    check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
+    check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
+#elif DUKE3D_GAMEVER < GAMEVER_11
     check("1.0 shareware GRP", grpmismatch(10429258, 0xA28AA589) != NULL, 0);
     check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
     check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
@@ -137,6 +186,9 @@ int main(void)
     check("Atomic GRP", grpmismatch(44356548, 0xFD3DCFF1) != NULL, 0);
     check("1.4 GRP", grpmismatch(44348015, 0xF514A6AC) != NULL, 1);
     check("1.3D full GRP", grpmismatch(26524524, 0xBBC9CE44) != NULL, 1);
+#endif
+#if DUKE3D_GAMEVER >= GAMEVER_10
+    check("0.99 shareware GRP", grpmismatch(9690241, 0x02F18900) != NULL, 1);
 #endif
 #if DUKE3D_GAMEVER >= GAMEVER_13D
     check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);

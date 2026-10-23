@@ -511,7 +511,11 @@ void resetplayerstats(short snum)
     p->bobcounter       = 0;
     p->on_ground        = 0;
     p->player_par       = 0;
+#if DUKE3D_GAMEVER < GAMEVER_10
+    p->return_to_center = 4;
+#else
     p->return_to_center = 9;
+#endif
     p->airleft          = 15*26;
     p->rapid_fire_hold  = 0;
     p->toggle_key_flag  = 0;
@@ -527,7 +531,9 @@ void resetplayerstats(short snum)
     pus = 1;
     p->on_warping_sector = 0;
     p->spritebridge      = 0;
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+    p->over_shoulder_on = 0;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
     // 1.1 keeps the third-person view across levels, with the camera reset.
     if(p->over_shoulder_on)
     {
@@ -630,7 +636,9 @@ void resetinventory(short snum)
     p->holoduke_on = -1;
     p->holoduke_amount =    0;
     p->firstaid_amount = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_10
     p->steroids_amount = 0;
+#endif
 #if DUKE3D_GAMEVER < GAMEVER_13D
     p->spacesuit_amount = 0;
     p->spacesuit_on = 0;
@@ -993,7 +1001,11 @@ void prelevel(char g)
             case W_FORCEFIELD+2:
                 if(wal->shade > 31)
                     wal->cstat = 0;
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                else wal->cstat |= 85;
+#else
                 else wal->cstat |= 85+256;
+#endif
 
 
                 if(wal->lotag && wal->nextwall >= 0)
@@ -1050,9 +1062,13 @@ void prelevel(char g)
                 animwall[numanimwalls].tag = -1;
                 if(ud.lockout)
                 {
+#if DUKE3D_GAMEVER < GAMEVER_10
+                    wal->picnum = VIEWSCREENBROKE;
+#else
                     if(wal->picnum == FEMPIC1)
                         wal->picnum = BLANKSCREEN;
                     else wal->picnum = SCREENBREAK6;
+#endif
                 }
 
                 animwall[numanimwalls].wallnum = i;
@@ -1148,7 +1164,12 @@ void newgame(char vn,char ln,char sk)
     }
 #endif
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+    p->auto_run = 0;
+    p->frag = p->fraggedself = 0;
+#else
     show_shareware = 26*34;
+#endif
 
     ud.level_number =   ln;
     ud.volume_number =  vn;
@@ -1309,8 +1330,13 @@ void resetpspritevars(char g)
         {
             s->owner = i;
             s->shade = 0;
+#if DUKE3D_GAMEVER < GAMEVER_10
+            s->xrepeat = 48;
+            s->yrepeat = 44;
+#else
             s->xrepeat = 42;
             s->yrepeat = 36;
+#endif
             s->cstat = 1+256;
             s->xoffset = 0;
             s->clipdist = 64;
@@ -1470,7 +1496,11 @@ void dofrontscreens(void)
 
         rotatesprite(320<<15,200<<15,65536L,0,LOADSCREEN,0,0,2+8+64,0,0,xdim-1,ydim-1);
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+        if(boardfilename[0] != 0)
+#else
         if( boardfilename[0] != 0 && ud.level_number == 7 && ud.volume_number == 0 )
+#endif
         {
             menutext(160,90,0,0,"ENTERING USER MAP");
             gametextpal(160,90+10,boardfilename,14,2);
@@ -1478,7 +1508,11 @@ void dofrontscreens(void)
         else
         {
             menutext(160,90,0,0,"ENTERING");
+#if DUKE3D_GAMEVER < GAMEVER_10
+            menutext(160,90+16+8,0,0,level_names[ud.volume_number*9+(ud.from_bonus ? 5 : ud.level_number)]);
+#else
             menutext(160,90+16+8,0,0,level_names[(ud.volume_number*11) + ud.level_number]);
+#endif
         }
 
         nextpage();
@@ -1495,7 +1529,11 @@ void dofrontscreens(void)
         palto(0,0,0,0);
         if (widescreen) clearallviews(0L);
         rotatesprite(320<<15,200<<15,65536L,0,LOADSCREEN,0,0,2+8+64,0,0,xdim-1,ydim-1);
+#if DUKE3D_GAMEVER < GAMEVER_10
+        menutext(160,105,0,0,"LOADING DEMO...");
+#else
         menutext(160,105,0,0,"LOADING...");
+#endif
         nextpage();
     }
 }
@@ -1616,16 +1654,23 @@ void enterlevel(char g)
 
 #else
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+    strcpy(levname,boardfilename[0] ? boardfilename : level_file_names[(ud.volume_number*11)+ud.level_number]);
+#else
     l = (int32_t)strlen(level_file_names[ (ud.volume_number*11)+ud.level_number]);
     copybufbyte( level_file_names[ (ud.volume_number*11)+ud.level_number],&levname[0],l);
     levname[l] = 255;
     levname[l+1] = 0;
+#endif
 
     if ( loadboard( levname,&ps[0].posx, &ps[0].posy, &ps[0].posz, &ps[0].ang,&ps[0].cursectnum ) == -1)
     {
         sprintf(tempbuf,"Map %s not found!",level_file_names[(ud.volume_number*11)+ud.level_number]);
         gameexit(tempbuf);
     }
+#endif
+#if DUKE3D_GAMEVER < GAMEVER_10
+    boardfilename[0] = 0;
 #endif
 
 #if DUKE3D_GAMEVER >= GAMEVER_13D && DUKE3D_GAMEVER < GAMEVER_14
@@ -1642,7 +1687,11 @@ void enterlevel(char g)
     resetpspritevars(g);
 
     cachedebug = 0;
+#if DUKE3D_GAMEVER < GAMEVER_10
+    automapping = 1;
+#else
     automapping = 0;
+#endif
 
 #if DUKE3D_GAMEVER >= GAMEVER_14
     if(ud.recstat != 2) MUSIC_StopSong();
@@ -1676,7 +1725,11 @@ void enterlevel(char g)
         opendemowrite();
 
 #ifdef VOLUMEONE
+#if DUKE3D_GAMEVER < GAMEVER_10
+    if(ud.recstat != 2) FTA(40,&ps[myconnectindex]);
+#else
     if(ud.level_number == 0 && ud.recstat != 2) FTA(40,&ps[myconnectindex]);
+#endif
 #endif
 
     for(i=connecthead;i>=0;i=connectpoint2[i])
@@ -1686,7 +1739,9 @@ void enterlevel(char g)
             case FLOORSLIME:
             case FLOORPLASMA:
                 resetweapons(i);
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 resetinventory(i);
+#endif
                 ps[i].gotweapon[PISTOL_WEAPON] = 0;
                 ps[i].ammo_amount[PISTOL_WEAPON] = 0;
                 ps[i].curr_weapon = KNEE_WEAPON;

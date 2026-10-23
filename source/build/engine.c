@@ -4413,19 +4413,22 @@ int inside(int32_t x, int32_t y, short sectnum)
 	i = sector[sectnum].wallnum;
 	do
 	{
-		y1 = wal->y-y; y2 = wall[wal->point2].y-y;
+		y1 = (int32_t)((uint32_t)wal->y-(uint32_t)y);
+		y2 = (int32_t)((uint32_t)wall[wal->point2].y-(uint32_t)y);
 		if ((y1^y2) < 0)
 		{
-			x1 = wal->x-x; x2 = wall[wal->point2].x-x;
+			x1 = (int32_t)((uint32_t)wal->x-(uint32_t)x);
+			x2 = (int32_t)((uint32_t)wall[wal->point2].x-(uint32_t)x);
+			// Preserve the DOS 32-bit products and differences without signed overflow.
 #if (BUILD_ENGINEREV < 19960320L)
 			if ((x1^x2) < 0)
-				cnt ^= (x1*y2<x2*y1)^(y1<y2);
+				cnt ^= ((int32_t)((uint32_t)x1*(uint32_t)y2)<(int32_t)((uint32_t)x2*(uint32_t)y1))^(y1<y2);
 			else if (x1 >= 0)
 				cnt ^= 1;
 #elif (BUILD_ENGINEREV < 19960427L)
-			if ((x1^x2) < 0) cnt ^= (x1*y2-x2*y1)^(y1-y2); else cnt ^= ~x1;
+			if ((x1^x2) < 0) cnt ^= (int32_t)(((uint32_t)x1*(uint32_t)y2-(uint32_t)x2*(uint32_t)y1)^((uint32_t)y1-(uint32_t)y2)); else cnt ^= ~x1;
 #else
-			if ((x1^x2) >= 0) cnt ^= x1; else cnt ^= (x1*y2-x2*y1)^y2;
+			if ((x1^x2) >= 0) cnt ^= x1; else cnt ^= ((uint32_t)x1*(uint32_t)y2-(uint32_t)x2*(uint32_t)y1)^(uint32_t)y2;
 #endif
 		}
 		wal++; i--;
@@ -6334,7 +6337,11 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 			if (j != 0)
 			{
 				i = ((sec->ceilingz-zs)<<8)+dmulscale15(dax,ys-wal->y,-day,xs-wal->x);
+#if (BUILD_ENGINEREV < 19960129L)
+				if (klabs(i>>1) < klabs(j))
+#else
 				if (((i^j) >= 0) && ((klabs(i)>>1) < klabs(j)))
+#endif
 				{
 					i = divscale30(i,j);
 					x1 = xs + mulscale30(vx,i);
@@ -6346,7 +6353,11 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 		else if ((vz < 0) && (zs >= sec->ceilingz))
 		{
 			z1 = sec->ceilingz; i = z1-zs;
+#if (BUILD_ENGINEREV < 19960129L)
+			if (klabs(i>>1) < -vz)
+#else
 			if ((klabs(i)>>1) < -vz)
+#endif
 			{
 				i = divscale30(i,vz);
 				x1 = xs + mulscale30(vx,i);
@@ -6373,7 +6384,11 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 			if (j != 0)
 			{
 				i = ((sec->floorz-zs)<<8)+dmulscale15(dax,ys-wal->y,-day,xs-wal->x);
+#if (BUILD_ENGINEREV < 19960129L)
+				if (klabs(i>>1) < klabs(j))
+#else
 				if (((i^j) >= 0) && ((klabs(i)>>1) < klabs(j)))
+#endif
 				{
 					i = divscale30(i,j);
 					x1 = xs + mulscale30(vx,i);
@@ -6385,7 +6400,11 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 		else if ((vz > 0) && (zs <= sec->floorz))
 		{
 			z1 = sec->floorz; i = z1-zs;
+#if (BUILD_ENGINEREV < 19960129L)
+			if (klabs(i>>1) < vz)
+#else
 			if ((klabs(i)>>1) < vz)
+#endif
 			{
 				i = divscale30(i,vz);
 				x1 = xs + mulscale30(vx,i);

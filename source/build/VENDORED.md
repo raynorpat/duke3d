@@ -93,6 +93,9 @@ BUILDLIC.TXT LICENSE.md
 - `engine.c`: version-guarded 1.1 and 1.0 engine logic, on `BUILD_ENGINEREV`:
   the early `inside`, which compares the two products and keeps a one-byte
   count (see ledger E11-001)
+- `engine.c`: `inside` computes coordinate differences, products and determinants
+  as unsigned 32-bit arithmetic, preserving each revision's DOS wraparound
+  without C signed overflow (E11-001, E-004).
 - `engine.c`: version-guarded 1.0 engine logic, on `BUILD_ENGINEREV <
   19960220L`: `cansee`'s side test and `lintersect`; `hitscan` without a
   cliptype (always `CLIPMASK1`) that resets only `*hitsect`; `clipmove`
@@ -631,3 +634,11 @@ the surface's palette (the faded one on screen); the editor's 640-wide 2D
 mode uses the 16-colour `vgapal16` and still honours `inverseit`. `build.c`'s
 editor captures are named `captxxxx.png`. If there's no picture, the encoder
 fails or a write fails, it removes the file and returns -1.
+
+## 0.99 beta hitscan
+
+`BUILD_ENGINEREV < 19960129L` retains the beta's slope-plane intersections behind
+ray origins and halves signed height differences before taking their absolute value
+in all four plane range tests. E099-001/002, measured from the Jan4 DOS EXE; guarded
+branches in `engine.c:hitscan`, cases in `tests/engine_trace.c`. All later revisions
+retain their existing sign/range checks.

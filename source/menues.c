@@ -261,7 +261,7 @@ int loadplayerfile(char *fnptr, signed char spot)
 {
      short k,music_changed;
      char scriptptrs[MAXSCRIPTSIZE];
-     int32_t fil, bv, i, j, x, animoffs[MAXANIMATES];
+     int32_t fil, bv, i, j, x, dos = 0, animoffs[MAXANIMATES];
      int32 nump;
 
      if ((fil = kopen4load(fnptr,0)) == -1) return(-1);
@@ -274,7 +274,11 @@ int loadplayerfile(char *fnptr, signed char spot)
      bv = sg_check10(fil);
      if(bv < 0)
      {
+#if DUKE3D_GAMEVER < GAMEVER_10
+        printf("%s is not a DOS 0.99 save.\n",fnptr);
+#else
         printf("%s is not a DOS 1.0 save.\n",fnptr);
+#endif
         FTA(114,&ps[myconnectindex]);
         kclose(fil);
         ototalclock = totalclock;
@@ -304,6 +308,15 @@ int loadplayerfile(char *fnptr, signed char spot)
 #else
         printf("%s is not a DOS 1.5 save (player block is %d bytes).\n",fnptr,i);
 #endif
+        FTA(114,&ps[myconnectindex]);
+        kclose(fil);
+        ototalclock = totalclock;
+        ready2send = 1;
+        return 1;
+     }
+     if(!sg_checksave(fil))
+     {
+        printf("%s has an invalid or truncated save layout.\n",fnptr);
         FTA(114,&ps[myconnectindex]);
         kclose(fil);
         ototalclock = totalclock;
@@ -384,6 +397,10 @@ int loadplayerfile(char *fnptr, signed char spot)
      sg_read16s(fil,nextspritestat,2,MAXSPRITES);
      numcyclers = clampcount(sg_read16(fil),MAXCYCLERS);
      sg_read16s(fil,&cyclers[0][0],12,MAXCYCLERS);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     memset(&ps[SG_DOS_MAXPLAYERS],0,sizeof(ps)-SG_DOS_MAXPLAYERS*sizeof(ps[0]));
+     memset(&po[SG_DOS_MAXPLAYERS],0,sizeof(po)-SG_DOS_MAXPLAYERS*sizeof(po[0]));
+#endif
      sg_readrecs(fil,ps,sizeof(struct player_struct),sg_player,SG_DOS_MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
      for(i=0;i<MAXPLAYERS;i++) ps[i].palette = (char *) &palette[0];
      sg_readrecs(fil,po,sizeof(struct player_orig),sg_playerorig,SG_DOS_MAXPLAYERS,SG_PLAYERORIG_DFSIZE,SG_PLAYERORIG_DFCOUNT);
@@ -410,7 +427,11 @@ int loadplayerfile(char *fnptr, signed char spot)
      mirrorcnt = clampcount(sg_read16(fil),64);
      sg_read16s(fil,mirrorwall,2,64);
      sg_read16s(fil,mirrorsector,2,64);
+#if DUKE3D_GAMEVER >= GAMEVER_10
      kdfread(&show2dsector[0],sizeof(char),MAXSECTORS>>3,fil);
+#else
+     memset(show2dsector,0,sizeof(show2dsector));
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D saves no actortype, boardfilename or clouds
      clearbufbyte(actortype,MAXTILES,0L);
      kdfread(&actortype[0],sizeof(char),SG_DOS_MAXTILES,fil);
@@ -423,6 +444,8 @@ int loadplayerfile(char *fnptr, signed char spot)
 #endif
 
      kdfread(&scriptptrs[0],1,SG_DOS_MAXSCRIPT,fil);
+     for(i=0;i<SG_DOS_MAXSCRIPT;i++)
+         if(scriptptrs[i]) { dos = 1; break; }
      sg_read32s(fil,script,4,SG_DOS_MAXSCRIPT);
 
      clearbuf(actorscrptr,MAXTILES,0L);
@@ -455,13 +478,17 @@ int loadplayerfile(char *fnptr, signed char spot)
      animatecnt = clampcount(sg_read32(fil),MAXANIMATES);
      sg_read16s(fil,animatesect,2,MAXANIMATES);
      sg_read32s(fil,animoffs,4,MAXANIMATES);
-     for(i = animatecnt-1;i>=0;i--) animateptr[i] = (int32_t *)((char *)&sector[0]+animoffs[i]);
+     for(i = animatecnt-1;i>=0;i--) animateptr[i] = sg_animptr(animoffs[i],dos);
      sg_read32s(fil,animategoal,4,MAXANIMATES);
      sg_read32s(fil,animatevel,4,MAXANIMATES);
 
      earthquaketime = sg_read8(fil);
      ud.from_bonus = sg_read16(fil);
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+     ud.respawn_monsters = (uint16_t)sg_read16(fil);
+     ud.m_respawn_monsters = ud.respawn_monsters;
+     ud.respawn_items = ud.m_respawn_items = 0;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
      // 1.1 ends with 7 scalars; auto_run and crosshair are bytes. 1.0 ends
      // with the first 4.
      ud.respawn_monsters = sg_read32(fil);
@@ -675,6 +702,10 @@ int saveplayerfile(char *fnptr, signed char spot)
      char scriptptrs[MAXSCRIPTSIZE];
      FILE *fil;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     if(script[0] > SG_DOS_MAXSCRIPT*4)
+         printf("Warning: DOS saves store only %d script longs; this CON uses %d.\n",SG_DOS_MAXSCRIPT,script[0]/4);
+#endif
      if ((fil = fopen(fnptr,"wb")) == 0) return(-1);
 
      ready2send = 0;
@@ -718,7 +749,10 @@ int saveplayerfile(char *fnptr, signed char spot)
 #if DUKE3D_GAMEVER < GAMEVER_11
      // 1.0 saves hittype[] here, raw: an actor's script offsets in
      // temp_data[1], [4] and [5] go out as DOS addresses (F10-003), and
-     // scriptptrs marks them to undo after.
+     // scriptptrs marks them to undo after. Native slots have no type tags:
+     // a numeric value equal to an aligned script offset is ambiguous here.
+     // Correctly distinguishing it requires tracking slot types at assignment,
+     // including native actor code; the DOS save format has no such metadata.
      for(i=0;i<SG_DOS_MAXHITTYPES;i++)
          for(j=0;j<3;j++)
          {
@@ -746,7 +780,9 @@ int saveplayerfile(char *fnptr, signed char spot)
      sg_write16(fil,mirrorcnt);
      sg_write16s(fil,mirrorwall,2,64);
      sg_write16s(fil,mirrorsector,2,64);
+#if DUKE3D_GAMEVER >= GAMEVER_10
      dfwrite(&show2dsector[0],sizeof(char),MAXSECTORS>>3,fil);
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D saves no actortype, boardfilename or clouds
      dfwrite(&actortype[0],sizeof(char),SG_DOS_MAXTILES,fil);
      dfwrite(&boardfilename[0],sizeof(boardfilename),1,fil);
@@ -797,7 +833,9 @@ int saveplayerfile(char *fnptr, signed char spot)
 
      sg_write8(fil,earthquaketime);
      sg_write16(fil,ud.from_bonus);
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+     sg_write16(fil,ud.respawn_monsters);
+#elif DUKE3D_GAMEVER < GAMEVER_13D
      sg_write32(fil,ud.respawn_monsters);
      sg_write32(fil,ud.respawn_items);
 #if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 ends here
@@ -1936,6 +1974,51 @@ static void non3dr_menus(void)
 #if DUKE3D_GAMEVER < GAMEVER_11
 // 1.0's credits: six pages, with no hardware page, as its menus() draws them
 // (page, y, line) (G10-G08).
+#if DUKE3D_GAMEVER < GAMEVER_10
+static const struct { short page, y; const char *text; } credits099[] =
+{
+    { 0, 50, "ORIGINAL CONCEPT BY" },
+    { 0, 59, "TODD J REPLOGLE" },
+    { 0, 68, "ALLEN H BLUM III" },
+    { 0, 90, "PRODUCED & DIRECTED BY" },
+    { 0, 99, "GREG MALONE" },
+    { 0, 121, "EXECUTIVE PRODUCER" },
+    { 0, 130, "GEORGE BROUSSARD" },
+    { 1, 50, "GAME PROGRAMMED BY" },
+    { 1, 59, "TODD REPLOGLE" },
+    { 1, 80, "BUILD 3D ENGINE" },
+    { 1, 89, "KEN SILVERMAN" },
+    { 1, 111, "SUPPORT PROGRAMMING" },
+    { 1, 120, "MARK DOCHTERMANN" },
+    { 1, 129, "JIM DOSE" },
+    { 2, 50, "MAP DEVELOPMENT" },
+    { 2, 59, "ALLEN H BLUM III" },
+    { 2, 68, "RICHARD GRAY" },
+    { 2, 90, "3D ACTOR MODELING" },
+    { 2, 99, "CHUCK JONES" },
+    { 2, 108, "MIKE TIDWELL" },
+    { 2, 117, "MARCUS FISHER" },
+    { 3, 40, "PIXEL ART" },
+    { 3, 49, "DIRK JONES" },
+    { 3, 58, "STEPHEN HORNBACK" },
+    { 3, 67, "JAMES STOREY" },
+    { 3, 89, "SOUND & MUSIC DEVELOPMENT" },
+    { 3, 98, "ROBERT PRINCE" },
+    { 3, 107, "LEE JACKSON" },
+    { 3, 129, "VOICE DEVELOPMENT" },
+    { 3, 138, "LANI MINELLA" },
+    { 3, 147, "DUKE NUKEM" },
+    { 4, 50, "SPECIAL THANKS TO" },
+    { 4, 68, "STEVEN BLACKBURN" },
+    { 4, 77, "JOE SIEGLER" },
+    { 4, 86, "TERRY NAGY" },
+    { 5, 100, "MADE IN DALLAS, TEXAS USA" },
+    { 6, 94, "DUKE NUKEM IS A TRADEMARK OF" },
+    { 6, 103, "3D REALMS ENTERTAINMENT" },
+    { 6, 116, "DUKE NUKEM 3D" },
+    { 6, 125, "(C) 1996 3D REALMS ENTERTAINMENT" },
+};
+#endif
 static const struct { short page, y; const char *text; } credits10[] =
 {
     { 0, 50, "ORIGINAL CONCEPT" },
@@ -2128,6 +2211,14 @@ static const struct { short page, y; const char *text; } credits13[] =
 };
 #endif
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+#define MAIN_MENU_TOP 55
+#define GAME_MENU_TOP 55
+#else
+#define MAIN_MENU_TOP 67-3
+#define GAME_MENU_TOP 67
+#endif
+
 void menus(void)
 {
     int count;
@@ -2192,6 +2283,24 @@ void menus(void)
 
         case 20000:
             x = probe(326,190,0,0);
+#if DUKE3D_GAMEVER < GAMEVER_10
+            gametext(160,10,"YOU ARE PLAYING THE SHAREWARE",0,2+8+16);
+            gametext(160,19,"VERSION OF DUKE NUKEM 3D.  THIS",0,2+8+16);
+            gametext(160,28,"VERSION CONTAINS EPISODE 1 OF",0,2+8+16);
+            gametext(160,37,"THE 3-EPISODE COMPLETE",0,2+8+16);
+            gametext(160,46,"REGISTERED VERSION",0,2+8+16);
+            gametext(28,64,"* 18 ADDITIONAL LEVELS",0,2+8+16);
+            gametext(28,73,"* SEVERAL NEW MONSTERS",0,2+8+16);
+            gametext(28,82,"* 3 ADDITIONAL SUPER-COOL WEAPONS",0,2+8+16);
+            gametext(28,91,"* UP TO 8 SIMULTANEOUS",0,2+8+16);
+            gametext(28,100,"    NETWORK PLAYERS",0,2+8+16);
+            gametext(28,109,"* LOTS MORE WILD SUPRISES",0,2+8+16);
+            gametext(28,118,"    AND HOT ACTION!",0,2+8+16);
+            gametext(160,134,"IF YOU WISH TO UPGRADE TO THE",0,2+8+16);
+            gametext(160,143,"REGISTERED VERSION OF DUKE NUKEM 3D,",0,2+8+16);
+            gametext(160,152,"CALL US AT 1-800-GAME123 OR SEE YOUR,",0,2+8+16);
+            gametext(160,161,"LOCAL SOFTWARE DEALER.",0,2+8+16);
+#else
             gametext(160,50-8,"YOU ARE PLAYING THE SHAREWARE",0,2+8+16);
             gametext(160,59-8,"VERSION OF DUKE NUKEM 3D.  WHILE",0,2+8+16);
             gametext(160,68-8,"THIS VERSION IS REALLY COOL, YOU",0,2+8+16);
@@ -2209,6 +2318,7 @@ void menus(void)
             gametext(160,149+16,"PRESS ANY KEY...",0,2+8+16);
 #endif
 
+#endif
             if( x >= -1 ) cmenu(100);
             break;
 // CTW - REMOVED
@@ -2257,7 +2367,11 @@ void menus(void)
 
             if( KB_KeyPressed(sc_Escape) || KB_KeyPressed(sc_N) || RMB)
             {
+#if DUKE3D_GAMEVER < GAMEVER_10
+                if(current_menu == 15000 && KB_KeyPressed(sc_N))
+#else
                 if(sprite[ps[myconnectindex].i].extra <= 0)
+#endif
                 {
                     enterlevel(MODE_GAME);
                     return;
@@ -2301,12 +2415,24 @@ void menus(void)
 
             c = 60;
             rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
-            menutext(160,24,0,0,"ADULT MODE");
+            menutext(160,24,0,0,
+#if DUKE3D_GAMEVER < GAMEVER_10
+                "PARENTAL LOCK"
+#else
+                "ADULT MODE"
+#endif
+);
 
             x = probe(60,50+16,16,2);
             if(x == -1) { cmenu(200); break; }
 
-            menutext(c,50+16,SHX(-2),PHX(-2),"ADULT MODE");
+            menutext(c,50+16,SHX(-2),PHX(-2),
+#if DUKE3D_GAMEVER < GAMEVER_10
+                "PARENTAL LOCK"
+#else
+                "ADULT MODE"
+#endif
+);
             menutext(c,50+16+16,SHX(-3),PHX(-3),"ENTER PASSWORD");
 
             if(ud.lockout) menutext(c+160+40,50+16,0,0,"OFF");
@@ -2327,9 +2453,11 @@ void menus(void)
                         buf[0] = 0;
 
                         for(x=0;x<numanimwalls;x++)
+#if DUKE3D_GAMEVER >= GAMEVER_10
                             if( wall[animwall[x].wallnum].picnum != W_SCREENBREAK &&
                                 wall[animwall[x].wallnum].picnum != W_SCREENBREAK+1 &&
                                 wall[animwall[x].wallnum].picnum != W_SCREENBREAK+2 )
+#endif
                                     if( wall[animwall[x].wallnum].extra >= 0 )
                                         wall[animwall[x].wallnum].picnum = wall[animwall[x].wallnum].extra;
 
@@ -2349,12 +2477,16 @@ void menus(void)
                         if(ud.pwlockout[0] == 0)
                         {
                             ud.lockout = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_10
                             for(x=0;x<numanimwalls;x++)
+#if DUKE3D_GAMEVER >= GAMEVER_10
                             if( wall[animwall[x].wallnum].picnum != W_SCREENBREAK &&
                                 wall[animwall[x].wallnum].picnum != W_SCREENBREAK+1 &&
                                 wall[animwall[x].wallnum].picnum != W_SCREENBREAK+2 )
+#endif
                                     if( wall[animwall[x].wallnum].extra >= 0 )
                                         wall[animwall[x].wallnum].picnum = wall[animwall[x].wallnum].extra;
+#endif
                         }
                         else
                         {
@@ -2372,11 +2504,17 @@ void menus(void)
                             switch(wall[animwall[x].wallnum].picnum)
                             {
                                 case FEMPIC1:
+#if DUKE3D_GAMEVER >= GAMEVER_10
                                     wall[animwall[x].wallnum].picnum = BLANKSCREEN;
                                     break;
+#endif
                                 case FEMPIC2:
                                 case FEMPIC3:
+#if DUKE3D_GAMEVER < GAMEVER_10
+                                    wall[animwall[x].wallnum].picnum = BLANKSCREEN;
+#else
                                     wall[animwall[x].wallnum].picnum = SCREENBREAK6;
+#endif
                                     break;
                             }
                     }
@@ -2411,10 +2549,16 @@ void menus(void)
 
             dispnames();
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
             sprintf(tempbuf,"PLAYERS: %-2d                      ",numplr);
             gametext(160,158,tempbuf,0,2+8+16);
+#endif
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+            sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+volnum,1+levnum,plrskl+1);
+#else
             sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+volnum,1+levnum,plrskl);
+#endif
             gametext(160,170,tempbuf,0,2+8+16);
 
             gametext(160,90,"LOAD game:",0,2+8+16);
@@ -2528,10 +2672,16 @@ void menus(void)
             menutext(160,24,0,0,"SAVE GAME");
 
             rotatesprite(101<<16,97<<16,65536L,512,MAXTILES-3,-32,0,4+10+64,0,0,xdim-1,ydim-1);
+#if DUKE3D_GAMEVER >= GAMEVER_10
             sprintf(tempbuf,"PLAYERS: %-2d                      ",ud.multimode);
             gametext(160,158,tempbuf,0,2+8+16);
+#endif
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+            sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill+1);
+#else
             sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill);
+#endif
             gametext(160,170,tempbuf,0,2+8+16);
 
             dispnames();
@@ -2569,6 +2719,22 @@ void menus(void)
         case 995:
         case 996:
         case 997:
+#if DUKE3D_GAMEVER < GAMEVER_10
+            rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
+            menutext(160,24,0,0,"CREDITS");
+            x=probe(190,184,0,0);
+            if(x == -1) { cmenu(0); break; }
+            if(x >= 0 || KB_KeyPressed(sc_Space))
+            {
+                KB_ClearKeyDown(sc_Space);
+                cmenu(current_menu == 996 ? 0 : current_menu+1);
+            }
+            for(l=0;l<(int)(sizeof(credits099)/sizeof(credits099[0]));l++)
+                if(credits099[l].page == current_menu-990)
+                    gametext(160,credits099[l].y,(char *)credits099[l].text,0,2+8+16);
+            break;
+#else
+
 
 //            rotatesprite(c<<16,200<<15,65536L,0,MENUSCREEN,16,0,10+64,0,0,xdim-1,ydim-1);
 //            rotatesprite(c<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
@@ -2663,6 +2829,8 @@ void menus(void)
 #endif
             break;
 
+#endif
+
         case 0:
             c = (320>>1);
             rotatesprite(c<<16,(28<<16)-5,65536L,0,INGAMEDUKETHREEDEE,0,0,10,0,0,xdim-1,ydim-1);
@@ -2670,12 +2838,12 @@ void menus(void)
             rotatesprite((c+100)<<16,(36<<16)-5,65536L,0,PLUTOPAKSPRITE+2,(sintable[(totalclock<<4)&2047]>>11),0,2+8,0,0,xdim-1,ydim-1);
 #endif
 // CTW - MODIFICATION
-//          x = probe(c,67-3,16,7);
+//          x = probe(c,MAIN_MENU_TOP,16,7);
             count = 6;
-#if NET_MENU
+#if NET_MENU && DUKE3D_GAMEVER >= GAMEVER_10
             count++;
 #endif
-            x = probe(c,67-3,16,count);
+            x = probe(c,MAIN_MENU_TOP,16,count);
 // CTW END - MODIFICATION
             if(x >= 0)
             {
@@ -2736,7 +2904,7 @@ void menus(void)
                             break;
                         case 3: KB_FlushKeyboardQueue();cmenu(400);break;
                         case 4: cmenu(990);break;
-#if NET_MENU
+#if NET_MENU && DUKE3D_GAMEVER >= GAMEVER_10
                         case 5: cmenu(30000);break;
                         case 6: cmenu(500);break;
 #else
@@ -2763,41 +2931,41 @@ void menus(void)
             if(movesperpacket == 4)
             {
                 if( myconnectindex == connecthead )
-                    menutext(c,67-3,SHX(-2),PHX(-2),"NEW GAME");
+                    menutext(c,MAIN_MENU_TOP,SHX(-2),PHX(-2),"NEW GAME");
                 else
-                    menutext(c,67-3,SHX(-2),1,"NEW GAME");
+                    menutext(c,MAIN_MENU_TOP,SHX(-2),1,"NEW GAME");
             }
             else
-                menutext(c,67-3,SHX(-2),PHX(-2),"NEW GAME");
+                menutext(c,MAIN_MENU_TOP,SHX(-2),PHX(-2),"NEW GAME");
 
 // CTW - REMOVED
 /*          if(movesperpacket != 4 && numplayers < 2)
-                menutext(c,67-3+16,SHX(-3),PHX(-3),"PLAY ON TEN");
+                menutext(c,MAIN_MENU_TOP+16,SHX(-3),PHX(-3),"PLAY ON TEN");
             else
-                menutext(c,67-3+16,SHX(-3),1,"PLAY ON TEN");*/
+                menutext(c,MAIN_MENU_TOP+16,SHX(-3),1,"PLAY ON TEN");*/
 // CTW END - REMOVED
 
 // CTW - MODIFICATION - Not going to comment out the exact old code here.
 // I shifted up every menu option by 16.
 // I shifted up every menu result by 1.
-            menutext(c,67-3+16,SHX(-3),PHX(-3),"OPTIONS");
+            menutext(c,MAIN_MENU_TOP+16,SHX(-3),PHX(-3),"OPTIONS");
 
             if(movesperpacket == 4 && connecthead != myconnectindex)
-                menutext(c,67-3+16+16,SHX(-4),1,"LOAD GAME");
-            else menutext(c,67-3+16+16,SHX(-4),PHX(-4),"LOAD GAME");
+                menutext(c,MAIN_MENU_TOP+16+16,SHX(-4),1,"LOAD GAME");
+            else menutext(c,MAIN_MENU_TOP+16+16,SHX(-4),PHX(-4),"LOAD GAME");
 
 #ifndef VOLUMEALL
-            menutext(c,67-3+16+16+16,SHX(-5),PHX(-5),"HOW TO ORDER");
+            menutext(c,MAIN_MENU_TOP+16+16+16,SHX(-5),PHX(-5),"HOW TO ORDER");
 #else
-            menutext(c,67-3+16+16+16,SHX(-5),PHX(-5),"HELP");
+            menutext(c,MAIN_MENU_TOP+16+16+16,SHX(-5),PHX(-5),"HELP");
 #endif
-            menutext(c,67-3+16+16+16+16,SHX(-6),PHX(-6),"CREDITS");
+            menutext(c,MAIN_MENU_TOP+16+16+16+16,SHX(-6),PHX(-6),"CREDITS");
 
-#if NET_MENU
-            menutext(c,67-3+16+16+16+16+16,SHX(-7),PHX(-7),"NETWORK GAME");
-            menutext(c,67-3+16+16+16+16+16+16,SHX(-8),PHX(-8),"QUIT");
+#if NET_MENU && DUKE3D_GAMEVER >= GAMEVER_10
+            menutext(c,MAIN_MENU_TOP+16+16+16+16+16,SHX(-7),PHX(-7),"NETWORK GAME");
+            menutext(c,MAIN_MENU_TOP+16+16+16+16+16+16,SHX(-8),PHX(-8),"QUIT");
 #else
-            menutext(c,67-3+16+16+16+16+16,SHX(-7),PHX(-7),"QUIT");
+            menutext(c,MAIN_MENU_TOP+16+16+16+16+16,SHX(-7),PHX(-7),"QUIT");
 #endif
 
             break;
@@ -2809,7 +2977,7 @@ void menus(void)
 #if DUKE3D_GAMEVER >= GAMEVER_14 // no Plutonium Pak logo in 1.3D's menus
             rotatesprite((c+100)<<16,36<<16,65536L,0,PLUTOPAKSPRITE+2,(sintable[(totalclock<<4)&2047]>>11),0,2+8,0,0,xdim-1,ydim-1);
 #endif
-            x = probe(c,67,16,7);
+            x = probe(c,GAME_MENU_TOP,16,7);
             switch(x)
             {
                 case 0:
@@ -2874,33 +3042,36 @@ void menus(void)
 
             if(movesperpacket == 4 && connecthead != myconnectindex)
             {
-                menutext(c,67                  ,SHX(-2),1,"NEW GAME");
-                menutext(c,67+16               ,SHX(-3),1,"SAVE GAME");
-                menutext(c,67+16+16            ,SHX(-4),1,"LOAD GAME");
+                menutext(c,GAME_MENU_TOP                  ,SHX(-2),1,"NEW GAME");
+                menutext(c,GAME_MENU_TOP+16               ,SHX(-3),1,"SAVE GAME");
+                menutext(c,GAME_MENU_TOP+16+16            ,SHX(-4),1,"LOAD GAME");
             }
             else
             {
-                menutext(c,67                  ,SHX(-2),PHX(-2),"NEW GAME");
-                menutext(c,67+16               ,SHX(-3),PHX(-3),"SAVE GAME");
-                menutext(c,67+16+16            ,SHX(-4),PHX(-4),"LOAD GAME");
+                menutext(c,GAME_MENU_TOP                  ,SHX(-2),PHX(-2),"NEW GAME");
+                menutext(c,GAME_MENU_TOP+16               ,SHX(-3),PHX(-3),"SAVE GAME");
+                menutext(c,GAME_MENU_TOP+16+16            ,SHX(-4),PHX(-4),"LOAD GAME");
             }
 
-            menutext(c,67+16+16+16         ,SHX(-5),PHX(-5),"OPTIONS");
+            menutext(c,GAME_MENU_TOP+16+16+16         ,SHX(-5),PHX(-5),"OPTIONS");
 #ifndef VOLUMEALL
-            menutext(c,67+16+16+16+16      ,SHX(-6),PHX(-6),"HOW TO ORDER");
+            menutext(c,GAME_MENU_TOP+16+16+16+16      ,SHX(-6),PHX(-6),"HOW TO ORDER");
 #else
-            menutext(c,67+16+16+16+16      ,SHX(-6),PHX(-6)," HELP");
+            menutext(c,GAME_MENU_TOP+16+16+16+16      ,SHX(-6),PHX(-6)," HELP");
 #endif
             if(numplayers > 1)
-                menutext(c,67+16+16+16+16+16   ,SHX(-7),1,"QUIT TO TITLE");
-            else menutext(c,67+16+16+16+16+16   ,SHX(-7),PHX(-7),"QUIT TO TITLE");
-            menutext(c,67+16+16+16+16+16+16,SHX(-8),PHX(-8),"QUIT GAME");
+                menutext(c,GAME_MENU_TOP+16+16+16+16+16   ,SHX(-7),1,"QUIT TO TITLE");
+            else menutext(c,GAME_MENU_TOP+16+16+16+16+16   ,SHX(-7),PHX(-7),"QUIT TO TITLE");
+            menutext(c,GAME_MENU_TOP+16+16+16+16+16+16,
+                SHX(-8),PHX(-8),"QUIT GAME");
             break;
 
         case 100:
             rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
             menutext(160,24,0,0,"SELECT AN EPISODE");
-#ifdef PLUTOPAK
+#if DUKE3D_GAMEVER < GAMEVER_10
+            x = probe(160,60,20,3);
+#elif defined PLUTOPAK
             if(boardfilename[0])
                 x = probe(160,60,20,5);
             else x = probe(160,60,20,4);
@@ -2987,6 +3158,20 @@ void menus(void)
             c = (320>>1);
             rotatesprite(c<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
             menutext(c,24,0,0,"SELECT SKILL");
+#if DUKE3D_GAMEVER < GAMEVER_10
+            x=probe(c,50,16,5);
+            if(x >= 0)
+            {
+                ud.m_player_skill=x;
+                if(x == 4) ud.m_respawn_monsters=1;
+                else ud.respawn_monsters=0;
+                newgame(ud.m_volume_number,ud.m_level_number,x);
+                enterlevel(MODE_GAME);
+            }
+            else if(x == -1) cmenu(100);
+            for(l=0;l<5;l++) menutext(c,50+16*l,SHX(-l-2),PHX(-l-2),skill_names[l]);
+            break;
+#else
             x = probe(c,70,19,4);
             if(x >= 0)
             {
@@ -3034,7 +3219,58 @@ void menus(void)
             menutext(c,70+19+19+19,SHX(-5),PHX(-5),skill_names[3]);
             break;
 
+#endif
+
         case 200:
+#if DUKE3D_GAMEVER < GAMEVER_10
+            {
+                static char *labels[]={"DETAIL","SHADOWS","SCREEN TILTING","SCREEN SIZE",
+                    "BRIGHTNESS","MOUSE SENSITIVITY","SOUNDS","PARENTAL LOCK"};
+                short value;
+                rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
+                menutext(160,24,0,0,"OPTIONS");
+                count=9;
+#if CONTROLS_CONFIG_MENU
+                count++;
+#endif
+                onbar=(probey>=3 && probey<=5);
+                x=probe(40,50,16,count);
+                if(x == -1) { cmenu((ps[myconnectindex].gm&MODE_GAME)?50:0); break; }
+                if(!onbar) switch(x)
+                {
+                    case 0: ud.detail=1-ud.detail; break;
+                    case 1: ud.shadows=1-ud.shadows; break;
+                    case 2: ud.screen_tilting=1-ud.screen_tilting; break;
+                    case 6: if(FXDevice != 13) cmenu(700); break;
+                    case 7: cmenu(10000); break;
+#if CONTROLS_CONFIG_MENU
+                    case 8: cmenu(MENU_CONTROLS); break;
+#endif
+                    default:
+                        if(x == count-1)
+                        {
+                            video_pagebegin();
+                            cmenu(710);
+                        }
+                        break;
+                }
+                for(l=0;l<8;l++) menutext(40,50+16*l,SHX(-l-2),PHX(-l-2),labels[l]);
+                menutext(240,50,0,0,ud.detail?"HIGH":"LOW");
+                menutext(240,66,0,0,ud.shadows?"ON":"OFF");
+                menutext(240,82,0,0,ud.screen_tilting?"ON":"OFF");
+                value=ud.screen_size; bar(247,98,&value,-4,x==3,0,0); ud.screen_size=value;
+                value=ud.brightness; bar(247,114,&value,8,x==4,0,0); ud.brightness=value;
+                if(x==4) setbrightness(ud.brightness>>2,ps[myconnectindex].palette);
+                value=CONTROL_GetMouseSensitivity()>>10;
+                bar(247,130,&value,4,x==5,0,0); CONTROL_SetMouseSensitivity(value<<10);
+#if CONTROLS_CONFIG_MENU
+                menutext(40,178,SHX(-10),PHX(-10),"CONTROLS...");
+#endif
+                menutext(40,50+16*(count-1),SHX(-11),PHX(-11),"VIDEO...");
+            }
+            break;
+#else
+
 
             rotatesprite(320<<15,10<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
             menutext(320>>1,15,0,0,"OPTIONS");
@@ -3171,6 +3407,8 @@ void menus(void)
 #endif
             menutext(c,31+15*(count-1),SHX(-12),PHX(-12),"VIDEO...");
             break;
+
+#endif
 
         case 710:
             // VIDEO: every live video setting, rows from y 31, 15 apart, as
@@ -3561,9 +3799,15 @@ void menus(void)
 
             if(current_menu >= 360 && current_menu <= 369 )
             {
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 sprintf(tempbuf,"PLAYERS: %-2d                      ",ud.multimode);
                 gametext(160,158,tempbuf,0,2+8+16);
+#endif
+#if DUKE3D_GAMEVER < GAMEVER_10
+                sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill+1);
+#else
                 sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill);
+#endif
                 gametext(160,170,tempbuf,0,2+8+16);
 
                 x = strget((320>>1),184,&ud.savegame[current_menu-360][0],19, 999 );
@@ -3626,9 +3870,15 @@ void menus(void)
                   }
 
                   rotatesprite(101<<16,97<<16,65536L,512,MAXTILES-3,-32,0,4+10+64,0,0,xdim-1,ydim-1);
+#if DUKE3D_GAMEVER >= GAMEVER_10
                   sprintf(tempbuf,"PLAYERS: %-2d                      ",numplr);
                   gametext(160,158,tempbuf,0,2+8+16);
+#endif
+#if DUKE3D_GAMEVER < GAMEVER_10
+                  sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+volnum,1+levnum,plrskl+1);
+#else
                   sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+volnum,1+levnum,plrskl);
+#endif
                   gametext(160,170,tempbuf,0,2+8+16);
               }
               else menutext(69,70,0,0,"EMPTY");
@@ -3643,9 +3893,15 @@ void menus(void)
                   rotatesprite(101<<16,97<<16,65536L,512,MAXTILES-3,-32,0,4+10+64,0,0,xdim-1,ydim-1);
               }
               else menutext(69,70,0,0,"EMPTY");
+#if DUKE3D_GAMEVER >= GAMEVER_10
               sprintf(tempbuf,"PLAYERS: %-2d                      ",ud.multimode);
               gametext(160,158,tempbuf,0,2+8+16);
+#endif
+#if DUKE3D_GAMEVER < GAMEVER_10
+              sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill+1);
+#else
               sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill);
+#endif
               gametext(160,170,tempbuf,0,2+8+16);
           }
 
@@ -3714,6 +3970,17 @@ void menus(void)
 
             c = 320>>1;
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+            if(KB_KeyPressed(sc_Escape))
+            { cmenu((ps[myconnectindex].gm&MODE_GAME)?50:0); return; }
+            if(KB_KeyWaiting())
+            {
+                KB_Getch();
+                current_menu++;
+                if(current_menu > 403)
+                { cmenu((ps[myconnectindex].gm&MODE_GAME)?50:0); return; }
+            }
+#else
             if( KB_KeyPressed( sc_LeftArrow ) ||
                 KB_KeyPressed( sc_kpad_4 ) ||
                 KB_KeyPressed( sc_UpArrow ) ||
@@ -3763,6 +4030,7 @@ void menus(void)
                 return;
             }
 
+#endif
             flushperms();
             if (widescreen) clearallviews(0L);
             rotatesprite(0,0,65536L,0,ORDERING+current_menu-400,0,0,10+16+64,0,0,xdim-1,ydim-1);
@@ -3896,8 +4164,10 @@ void menus(void)
             {
                 KB_FlushKeyboardQueue();
                 ps[myconnectindex].gm = MODE_DEMO;
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 if(ud.recstat == 1)
                     closedemowrite();
+#endif
                 cmenu(0);
             }
 

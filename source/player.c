@@ -78,6 +78,9 @@ void incur_damage( struct player_struct *p )
         }
 
         sprite[p->i].extra = p->last_extra + damage;
+#if DUKE3D_GAMEVER < GAMEVER_10
+        pus = 1;
+#endif
     }
 }
 
@@ -92,7 +95,11 @@ void quickkill(struct player_struct *p)
     p->pals[1] = 48;
     p->pals[2] = 48;
 #endif
+#if DUKE3D_GAMEVER < GAMEVER_10
+    p->pals_time = totalclock+32;
+#else
     p->pals_time = 48;
+#endif
 
     sprite[p->i].extra = 0;
     sprite[p->i].cstat |= 32768;
@@ -113,7 +120,11 @@ void forceplayerangle(struct player_struct *p)
     n = 128-(TRAND&255);
 
     p->horiz += 64;
+#if DUKE3D_GAMEVER < GAMEVER_10
+    p->return_to_center = 8;
+#else
     p->return_to_center = 9;
+#endif
     p->look_ang = n>>1;
     p->rotscrnang = n>>1;
 }
@@ -128,8 +139,10 @@ void tracers(int32_t x1,int32_t y1,int32_t z1,int32_t x2,int32_t y2,int32_t z2,i
 	 yv = (y2-y1)/i;
 	 zv = (z2-z1)/i;
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
      if( ( klabs(x1-x2)+klabs(y1-y2) ) < 3084 )
          return;
+#endif
 
 	 for(i=n;i>0;i--)
 	 {
@@ -464,7 +477,11 @@ void shoot(short i,short atwith)
             {
                 if(p >= 0)
                 {
+#if DUKE3D_GAMEVER < GAMEVER_10
+                    zvel = (100-ps[p].horiz-ps[p].horizoff)*30;
+#else
                     zvel = (100-ps[p].horiz-ps[p].horizoff)<<5;
+#endif
                     sz += (6<<8);
                     sa += 15;
                 }
@@ -847,7 +864,11 @@ void shoot(short i,short atwith)
                 j = aim( s, 48 );
                 if(j >= 0)
                 {
+#if DUKE3D_GAMEVER < GAMEVER_10
+                    dal = ((sprite[j].xrepeat*tilesizy[sprite[j].picnum])<<1)+(8<<8);
+#else
                     dal = ((sprite[j].xrepeat*tilesizy[sprite[j].picnum])<<1)+(10<<8);
+#endif
                     zvel = ( (sprite[j].z-sz-dal)*vel ) / ldist(&sprite[ps[p].i], &sprite[j]);
                     if( sprite[j].picnum != RECON )
                         sa = getangle(sprite[j].x-sx,sprite[j].y-sy);
@@ -935,6 +956,9 @@ void shoot(short i,short atwith)
 
             j = ps[findplayer(s,&x)].i;
             x = ldist(&sprite[j],s);
+#if DUKE3D_GAMEVER < GAMEVER_10
+            x += 4096;
+#endif
 
             zvel = -x>>1;
 
@@ -1000,7 +1024,12 @@ void shoot(short i,short atwith)
                     zvel = ( (sprite[j].z-sz-dal-(4<<8))*768) / (ldist( &sprite[ps[p].i], &sprite[j]));
                     sa = getangle(sprite[j].x-sx,sprite[j].y-sy);
                 }
+                // Fix: beta and 1.0 use x100; x97 belongs to 1.1 (sw10 0x40f4d).
+#if DUKE3D_GAMEVER < GAMEVER_11
+                else zvel = (100-ps[p].horiz-ps[p].horizoff)*100;
+#else
                 else zvel = (100-ps[p].horiz-ps[p].horizoff)*97;
+#endif
             }
             else if(s->statnum != 3)
             {
@@ -1974,6 +2003,19 @@ void displaymasks(short snum)
     else
         p = sector[ps[snum].cursectnum].floorpal;
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+    if(ps[snum].scuba_on)
+    {
+        rotatesprite(0,0,65536,0,SCUBAMASK,0,0,18,windowx1,windowy1,windowx2,windowy2);
+        rotatesprite(320<<16,0,65536,1024,SCUBAMASK,0,0,22,windowx1,windowy1,windowx2,windowy2);
+        rotatesprite(0,(216-tilesizy[SCUBAMASK+1])<<16,65536,0,SCUBAMASK+1,0,0,18,windowx1,windowy1,windowx2,windowy2);
+        rotatesprite(320<<16,(216-tilesizy[SCUBAMASK+1])<<16,65536,1024,SCUBAMASK+1,0,0,22,windowx1,windowy1,windowx2,windowy2);
+        rotatesprite(tilesizx[SCUBAMASK]<<16,0,65536,0,SCUBAMASK+2,0,0,18,windowx1,windowy1,windowx2,windowy2);
+        rotatesprite((tilesizx[SCUBAMASK]+tilesizx[SCUBAMASK+2])<<16,0,65536,0,SCUBAMASK+2,0,0,18,windowx1,windowy1,windowx2,windowy2);
+        rotatesprite(0,tilesizy[SCUBAMASK]<<16,65536,0,SCUBAMASK+3,0,0,18,windowx1,windowy1,windowx2,windowy2);
+        rotatesprite(320<<16,tilesizy[SCUBAMASK]<<16,65536,1024,SCUBAMASK+3,0,0,22,windowx1,windowy1,windowx2,windowy2);
+    }
+#else
      if(ps[snum].scuba_on)
 	 {
         if(ud.screen_size > 4)
@@ -1991,6 +2033,7 @@ void displaymasks(short snum)
             rotatesprite((320-43)<<16,(200-tilesizy[SCUBAMASK])<<16,65536,1024,SCUBAMASK,0,p,2+4+16,windowx1,windowy1,windowx2,windowy2);
         }
 	 }
+#endif
 }
 
 char animatetip(short gs,short snum)
@@ -2566,13 +2609,21 @@ void getinput(short snum)
 
     CONTROL_GetInput( &info );
 
-    if( (p->gm&MODE_MENU) || (p->gm&MODE_TYPE) || (ud.pause_on && !KB_KeyPressed(sc_Pause)) )
+    if( (p->gm&MODE_MENU) || (p->gm&MODE_TYPE)
+#if DUKE3D_GAMEVER >= GAMEVER_10
+        || (ud.pause_on && !KB_KeyPressed(sc_Pause))
+#endif
+      )
     {
          loc.fvel = vel = 0;
          loc.svel = svel = 0;
          loc.avel = angvel = 0;
          loc.horz = horiz = 0;
+#if DUKE3D_GAMEVER < GAMEVER_10
+         loc.bits = 0;
+#else
          loc.bits = (((int32_t)gamequit)<<26);
+#endif
          info.dz = info.dyaw = 0;
          return;
     }
@@ -2684,7 +2735,9 @@ void getinput(short snum)
 #endif
     loc.bits |=   BUTTON(gamefunc_Holo_Duke)<<24;
     loc.bits |=   BUTTON(gamefunc_Jetpack)<<25;
+#if DUKE3D_GAMEVER >= GAMEVER_10
     loc.bits |=   (((int32_t)gamequit)<<26);
+#endif
     loc.bits |=   BUTTON(gamefunc_Inventory_Right)<<27;
     loc.bits |=   BUTTON(gamefunc_TurnAround)<<28;
     loc.bits |=   BUTTON(gamefunc_Open)<<29;
@@ -2841,6 +2894,9 @@ void getinput(short snum)
     if(horiz < -MAXHORIZ) horiz = -MAXHORIZ;
     if(horiz > MAXHORIZ) horiz = MAXHORIZ;
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+    daang = ps[myconnectindex].ang;
+#else
     if(ud.scrollmode && ud.overhead_on)
     {
         ud.folfvel = vel;
@@ -2856,14 +2912,17 @@ void getinput(short snum)
         daang = myang;
     else daang = p->ang;
 
+#endif
     momx = mulscale9(vel,sintable[(daang+2560)&2047]);
     momy = mulscale9(vel,sintable[(daang+2048)&2047]);
 
     momx += mulscale9(svel,sintable[(daang+2048)&2047]);
     momy += mulscale9(svel,sintable[(daang+1536)&2047]);
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
     momx += fricxv;
     momy += fricyv;
+#endif
 
     loc.fvel = momx;
     loc.svel = momy;
@@ -2886,7 +2945,12 @@ char doincrements(struct player_struct *p)
     p->player_par++;
 
     if(p->invdisptime > 0)
+    {
         p->invdisptime--;
+#if DUKE3D_GAMEVER < GAMEVER_10
+        if(p->invdisptime == 0 && myconnectindex == screenpeek) vscrn();
+#endif
+    }
 
     if(p->tipincs > 0) p->tipincs--;
 
@@ -2894,10 +2958,15 @@ char doincrements(struct player_struct *p)
     {
         p->last_pissed_time--;
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+        if( p->last_pissed_time == (26*59) )
+#else
         if( p->last_pissed_time == (26*219) )
+#endif
         {
             spritesound(FLUSH_TOILET,p->i);
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+#elif DUKE3D_GAMEVER < GAMEVER_13D
             if(snum == screenpeek || ud.coop != 0)
 #else
             if(snum == screenpeek || ud.coop == 1)
@@ -2905,7 +2974,11 @@ char doincrements(struct player_struct *p)
                 spritesound(DUKE_PISSRELIEF,p->i);
         }
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+        if( p->last_pissed_time == (26*58) )
+#else
         if( p->last_pissed_time == (26*218) )
+#endif
         {
             p->holster_weapon = 0;
             p->weapon_pos = 10;
@@ -2929,7 +3002,11 @@ char doincrements(struct player_struct *p)
     {
         p->fta--;
         if(p->fta == 1)
+#if DUKE3D_GAMEVER < GAMEVER_10
+            pub = pus = 1;
+#else
             pub = NUMPAGES;
+#endif
     }
 #endif
 
@@ -2937,9 +3014,14 @@ char doincrements(struct player_struct *p)
     {
         p->steroids_amount--;
         if(p->steroids_amount == 0)
+#if DUKE3D_GAMEVER < GAMEVER_10
+            p->inven_icon = 0;
+#else
             checkavailinven(p);
+#endif
         if( !(p->steroids_amount&7) )
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+#elif DUKE3D_GAMEVER < GAMEVER_13D
             if(snum == screenpeek || ud.coop != 0)
 #else
             if(snum == screenpeek || ud.coop == 1)
@@ -2953,7 +3035,12 @@ char doincrements(struct player_struct *p)
         if( p->heat_amount == 0 )
         {
             p->heat_on = 0;
+
+#if DUKE3D_GAMEVER < GAMEVER_10
+            p->inven_icon = 0;
+#else
             checkavailinven(p);
+#endif
             spritesound(NITEVISION_ONOFF,p->i);
             setpal(p);
         }
@@ -2972,7 +3059,12 @@ char doincrements(struct player_struct *p)
             spritesound(TELEPORTER,p->i);
 #endif
             p->holoduke_on = -1;
+
+#if DUKE3D_GAMEVER < GAMEVER_10
+            p->inven_icon = 0;
+#else
             checkavailinven(p);
+#endif
         }
     }
 
@@ -2986,7 +3078,12 @@ char doincrements(struct player_struct *p)
         if(p->jetpack_amount <= 0)
         {
             p->jetpack_on = 0;
+
+#if DUKE3D_GAMEVER < GAMEVER_10
+            p->inven_icon = 0;
+#else
             checkavailinven(p);
+#endif
             spritesound(DUKE_JETPACK_OFF,p->i);
             stopsound(DUKE_JETPACK_IDLE);
             stopsound(DUKE_JETPACK_ON);
@@ -3000,7 +3097,12 @@ char doincrements(struct player_struct *p)
         if(p->spacesuit_amount == 0)
         {
             p->spacesuit_on = 0;
+
+#if DUKE3D_GAMEVER < GAMEVER_10
+            p->inven_icon = 0;
+#else
             checkavailinven(p);
+#endif
             p->spacesuit_used = 1;
         }
     }
@@ -3015,6 +3117,60 @@ char doincrements(struct player_struct *p)
         else if( p->quick_kick == 0 )
             addweapon(p,p->last_full_weapon);
     }
+
+#if DUKE3D_GAMEVER < GAMEVER_10
+    if(p->knee_incs > 0)
+    {
+        p->knee_incs++;
+        p->horiz -= 32;
+        p->return_to_center = 8;
+        if(p->knee_incs > 18)
+        {
+            p->knee_incs = 0;
+            if(p->weapon_pos < 0) p->weapon_pos = -p->weapon_pos;
+            if(p->actorsqu >= 0)
+            {
+                guts(&sprite[p->actorsqu],JIBS6,7,-1);
+                spawn(p->actorsqu,BLOODPOOL);
+                spritesound(SQUISHED,p->actorsqu);
+                deletesprite(p->actorsqu);
+            }
+            p->actorsqu = -1;
+        }
+        else if(p->actorsqu >= 0)
+            p->ang += getincangle(p->ang,getangle(sprite[p->actorsqu].x-p->posx,sprite[p->actorsqu].y-p->posy))>>2;
+    }
+
+    if(p->fist_incs)
+    {
+        p->fist_incs++;
+        if(p->fist_incs == 28)
+        {
+            sound(PIPEBOMB_EXPLODE);
+            p->pals[0] = p->pals[1] = p->pals[2] = 64;
+            p->pals_time = totalclock+32;
+        }
+        if(p->fist_incs > 42)
+        {
+            if(p->buttonpalette && ud.from_bonus == 0)
+            {
+                ud.from_bonus = ud.level_number+1;
+                ud.level_number = 5;
+            }
+            else if(ud.from_bonus)
+            {
+                ud.level_number = ud.from_bonus;
+                ud.from_bonus = 0;
+            }
+            else ud.level_number++;
+            ud.m_level_number = ud.level_number;
+            for(i=connecthead;i>=0;i=connectpoint2[i]) ps[i].gm = MODE_EOL;
+            p->fist_incs = 0;
+            return 1;
+        }
+    }
+
+#endif
 
     if(p->access_incs)
 #else
@@ -3092,7 +3248,12 @@ char doincrements(struct player_struct *p)
         if(p->scuba_amount == 0)
         {
             p->scuba_on = 0;
+
+#if DUKE3D_GAMEVER < GAMEVER_10
+            p->inven_icon = 0;
+#else
             checkavailinven(p);
+#endif
         }
     }
 
@@ -3102,7 +3263,8 @@ char doincrements(struct player_struct *p)
         if(p->knuckle_incs==10)
         {
             if(totalclock > 1024)
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+#elif DUKE3D_GAMEVER < GAMEVER_13D
                 if(snum == screenpeek || ud.coop != 0)
 #else
                 if(snum == screenpeek || ud.coop == 1)
@@ -3149,12 +3311,12 @@ void checkweapons(struct player_struct *p)
         spawn(p->i,EXPLOSION2);
         quickkill(p);
     }
-    return;
-#endif
+#else
     if(cw)
     {
         if(TRAND&1)
             spawn(p->i,weapon_sprites11[cw]);
+#endif
 #elif DUKE3D_GAMEVER < GAMEVER_14
     // 1.3D drops a freezer as a FREEZEBLAST, and has no range check.
     if(cw)
@@ -3169,6 +3331,7 @@ void checkweapons(struct player_struct *p)
         if(TRAND&1)
             spawn(p->i,weapon_sprites[cw]);
 #endif
+#if DUKE3D_GAMEVER >= GAMEVER_11
         else switch(cw)
         {
             case RPG_WEAPON:
@@ -3177,6 +3340,7 @@ void checkweapons(struct player_struct *p)
                 break;
         }
     }
+#endif
 }
 
 void processinput(short snum)
@@ -3198,7 +3362,11 @@ void processinput(short snum)
     kb = &p->kickback_pic;
 
     if(p->cheat_phase <= 0) sb_snum = sync[snum].bits;
+#if DUKE3D_GAMEVER < GAMEVER_10
+    else sb_snum = sync[snum].bits&~3u;
+#else
     else sb_snum = 0;
+#endif
 
     psect = p->cursectnum;
     if(psect == -1)
@@ -3233,8 +3401,10 @@ void processinput(short snum)
 
     j = getflorzofslope(psect,p->posx,p->posy);
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
     p->truefz = j;
     p->truecz = getceilzofslope(psect,p->posx,p->posy);
+#endif
 
     truefdist = klabs(p->posz-j);
     if( (lz&49152) == 16384 && psectlotag == 1 && truefdist > PHEIGHT+(16<<8) )
@@ -3246,6 +3416,26 @@ void processinput(short snum)
     p->ohoriz = p->horiz;
     p->ohorizoff = p->horizoff;
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+    if(p->on_ground && psectlotag != 2 && (sector[psect].floorstat&2))
+    {
+        x = p->posx+(sintable[(p->ang+512)&2047]>>10);
+        y = p->posy+(sintable[p->ang&2047]>>10);
+        // G099-086: global search matches measured DOS stale-hint fallbacks.
+        tempsect = -1;
+        updatesector(x,y,&tempsect);
+        if(tempsect == psect)
+        {
+            k = getflorzofslope(tempsect,x,y);
+            p->horizoff += (((j-k)>>2)-p->horizoff)>>2;
+        }
+    }
+    else
+    {
+        p->horizoff -= p->horizoff>>2;
+        if(klabs(p->horizoff) < 4) p->horizoff = 0;
+    }
+#else
     if( p->aim_mode == 0 && p->on_ground && psectlotag != 2 && (sector[psect].floorstat&2) )
     {
           x = p->posx+(sintable[(p->ang+512)&2047]>>5);
@@ -3263,6 +3453,8 @@ void processinput(short snum)
      }
      if (p->horizoff > 0) p->horizoff -= ((p->horizoff>>3)+1);
      else if (p->horizoff < 0) p->horizoff += (((-p->horizoff)>>3)+1);
+
+#endif
 
     if( hz >= 0 && (hz&49152) == 49152)
     {
@@ -3313,6 +3505,9 @@ void processinput(short snum)
     }
 
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+    p->on_sector_effector = 0; // Beta processinput 0x40586.
+#endif
     if ( s->extra > 0 ) incur_damage( p );
     else
     {
@@ -3334,9 +3529,26 @@ void processinput(short snum)
     }
 #endif
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+    if(earthquaketime && p->on_ground == 1)
+    {
+        if(earthquaketime <= 16)
+        {
+            p->posz += 512-(earthquaketime&1)*1024;
+            p->ang += (earthquaketime&2) ? -4 : 4;
+        }
+        else
+        {
+            p->posz += 1024-(earthquaketime&1)*2048;
+            p->ang += (earthquaketime&2) ? -8 : 8;
+        }
+    }
+#endif
+
     if(p->loogcnt > 0) p->loogcnt--;
     else p->loogcnt = 0;
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
     if(p->fist_incs)
     {
         p->fist_incs++;
@@ -3399,16 +3611,24 @@ void processinput(short snum)
         }
     }
 
+#endif
+
     if(p->timebeforeexit > 1 && p->last_extra > 0)
     {
         p->timebeforeexit--;
+#if DUKE3D_GAMEVER < GAMEVER_10
+        if(p->timebeforeexit == 26*3)
+#else
         if(p->timebeforeexit == 26*5)
+#endif
         {
             FX_StopAllSounds();
 #if DUKE3D_GAMEVER >= GAMEVER_13D
             clearsoundlocks();
 #endif
+#if DUKE3D_GAMEVER >= GAMEVER_10
             if(p->customexitsound >= 0)
+#endif
             {
                 sound(p->customexitsound);
                 FTA(102,p);
@@ -3453,8 +3673,10 @@ void processinput(short snum)
         }
     }
   */
+#if DUKE3D_GAMEVER >= GAMEVER_10
     if(p->pals_time > 0)
         p->pals_time--;
+#endif
 
 #if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 counts fta in doincrements
     if(p->fta > 0)
@@ -3473,9 +3695,16 @@ void processinput(short snum)
     {
         if(p->dead_flag == 0)
         {
+            int death_side;
 #if DUKE3D_GAMEVER < GAMEVER_13D
             // 1.1 has no pal 1 tests and doesn't lift the body.
             checkweapons(p);
+#if DUKE3D_GAMEVER < GAMEVER_10
+            p->fraggedself++;
+            death_side = TRAND&1;
+            p->dead_flag = 256-(death_side<<9)+(TRAND&127)-64;
+            if(p->dead_flag == 0) p->dead_flag = 1;
+#else
             p->pals[0] = 63;
             p->pals[1] = 0;
             p->pals[2] = 0;
@@ -3484,8 +3713,10 @@ void processinput(short snum)
             if(ud.recstat == 1 && ud.multimode < 2)
                 closedemowrite();
 
-            p->dead_flag = (512-((TRAND&1)<<10)+(TRAND&255)-512)&2047;
+            death_side = TRAND&1;
+            p->dead_flag = (512-(death_side<<10)+(TRAND&255)-512)&2047;
             if(p->dead_flag == 0) p->dead_flag = -512;
+#endif
 #else
 #if DUKE3D_GAMEVER < GAMEVER_14
             if(s->pal != 1)
@@ -3505,19 +3736,25 @@ void processinput(short snum)
                 closedemowrite();
 
             if(s->pal != 1)
-                p->dead_flag = (512-((TRAND&1)<<10)+(TRAND&255)-512)&2047;
+            {
+                death_side = TRAND&1;
+                p->dead_flag = (512-(death_side<<10)+(TRAND&255)-512)&2047;
+            }
 #endif
 
             p->jetpack_on = 0;
             p->holoduke_on = -1;
 
             stopsound(DUKE_JETPACK_IDLE);
+#if DUKE3D_GAMEVER >= GAMEVER_10
             if(p->scream_voice > FX_Ok)
             {
                 FX_StopSound(p->scream_voice);
                 testcallback(DUKE_SCREAM);
                 p->scream_voice = FX_Ok;
             }
+
+#endif
 
 #if DUKE3D_GAMEVER < GAMEVER_13D
             if( (s->cstat&32768) == 0) s->cstat = 0;
@@ -3653,7 +3890,9 @@ void processinput(short snum)
         {
             p->ang += sync[snum].avel;
             hittype[pi].owner = pi;
+#if DUKE3D_GAMEVER >= GAMEVER_10
             p->wackedbyactor = -1;
+#endif
         }
 #endif
 
@@ -3695,20 +3934,33 @@ void processinput(short snum)
 
     doubvel = TICSPERFRAME;
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+    p->rotscrnang -= p->rotscrnang>>2;
+    if(klabs(p->rotscrnang) < 5) p->rotscrnang = 0;
+#else
     if (p->rotscrnang > 0) p->rotscrnang -= ((p->rotscrnang>>1)+1);
     else if (p->rotscrnang < 0) p->rotscrnang += (((-p->rotscrnang)>>1)+1);
+#endif
 
     p->look_ang -= (p->look_ang>>2);
 
     if( sb_snum&(1<<6) )
     {
+#if DUKE3D_GAMEVER < GAMEVER_10
+        p->look_ang -= 196;
+#else
         p->look_ang -= 152;
+#endif
         p->rotscrnang += 24;
     }
 
     if( sb_snum&(1<<7) )
     {
+#if DUKE3D_GAMEVER < GAMEVER_10
+        p->look_ang += 196;
+#else
         p->look_ang += 152;
+#endif
         p->rotscrnang -= 24;
     }
 
@@ -3790,7 +4042,11 @@ void processinput(short snum)
 
         p->pycount += 32;
         p->pycount &= 2047;
+#if DUKE3D_GAMEVER < GAMEVER_10
+        p->pyoff = sintable[p->pycount]>>6;
+#else
         p->pyoff = sintable[p->pycount]>>7;
+#endif
 #if DUKE3D_GAMEVER < GAMEVER_13D
         p->burn_time = 0;
 #endif
@@ -3856,6 +4112,7 @@ void processinput(short snum)
             p->poszv = 0;
         }
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
         if( p->scuba_on && (TRAND&255) < 8 )
         {
             j = spawn(pi,WATERBUBBLE);
@@ -3867,6 +4124,7 @@ void processinput(short snum)
             sprite[j].yrepeat = 2;
             sprite[j].z = p->posz+(8<<8);
         }
+#endif
     }
 
     else if(p->jetpack_on)
@@ -3874,11 +4132,17 @@ void processinput(short snum)
         p->on_ground = 0;
         p->jumping_counter = 0;
         p->hard_landing = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_10
         p->falling_counter = 0;
+#endif
 
         p->pycount += 32;
         p->pycount &= 2047;
+#if DUKE3D_GAMEVER < GAMEVER_10
+        p->pyoff = sintable[p->pycount]>>6;
+#else
         p->pyoff = sintable[p->pycount]>>7;
+#endif
 
         if(p->jetpack_on < 11)
         {
@@ -3888,8 +4152,12 @@ void processinput(short snum)
         else if(p->jetpack_on == 11 && Sound[DUKE_JETPACK_IDLE].num < 1)
             spritesound(DUKE_JETPACK_IDLE,pi);
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+        j = 2048;
+#else
         if(shrunk) j = 512;
         else j = 2048;
+#endif
 
         if ( sb_snum&1 )                            //A (soar high)
         {
@@ -3899,15 +4167,28 @@ void processinput(short snum)
 
         if (sb_snum&(1<<1))                            //Z (soar low)
         {
+#if DUKE3D_GAMEVER < GAMEVER_10
+            p->posz += 2560;
+#else
             p->posz += j;
+#endif
             p->crack_time = 777;
         }
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+        if(psectlotag == 0 || psectlotag == 2) k = 64;
+#else
         if( shrunk == 0 && (psectlotag == 0 || psectlotag == 2)) k = 32;
+#endif
         else k = 16;
 
         if( psectlotag != 2 && p->scuba_on == 1 )
+        {
             p->scuba_on = 0;
+#if DUKE3D_GAMEVER < GAMEVER_10
+            pus = 1;
+#endif
+        }
 
         if(p->posz > (fz-(k<<8)) )
             p->posz += ((fz-(k<<8))-p->posz)>>1;
@@ -3921,11 +4202,21 @@ void processinput(short snum)
             p->airleft = 15*26; //Aprox twenty seconds.
 
         if(p->scuba_on == 1)
+        {
             p->scuba_on = 0;
+#if DUKE3D_GAMEVER < GAMEVER_10
+            pus = 1;
+#endif
+        }
 
 #if DUKE3D_GAMEVER < GAMEVER_13D
         if( inspace == 0 && p->spacesuit_on == 1 )
+        {
             p->spacesuit_on = 0;
+#if DUKE3D_GAMEVER < GAMEVER_10
+            pus = 1;
+#endif
+        }
 #endif
 
         if( psectlotag == 1 && p->spritebridge == 0)
@@ -4010,6 +4301,7 @@ void processinput(short snum)
                 p->poszv += (gc+80); // (TICSPERFRAME<<6);
 #endif
                 if(p->poszv >= (4096+2048)) p->poszv = (4096+2048);
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 if(p->poszv > 2400 && p->falling_counter < 255)
                 {
                     p->falling_counter++;
@@ -4017,6 +4309,7 @@ void processinput(short snum)
                         p->scream_voice = spritesound(DUKE_SCREAM,pi);
                 }
 
+#endif
                 if( (p->posz+p->poszv) >= (fz-(i<<8)) ) // hit the ground
 #if DUKE3D_GAMEVER < GAMEVER_13D
                     if(psectlotag != 1 && psectlotag != 2)
@@ -4024,6 +4317,17 @@ void processinput(short snum)
                     if(sector[p->cursectnum].lotag != 1)
 #endif
                     {
+#if DUKE3D_GAMEVER < GAMEVER_10
+                        if(p->poszv >= 0x1400)
+                        {
+                            spritesound(DUKE_LAND_HURT,pi);
+                            s->extra -= TRAND%(max_player_health>>3)+10;
+                            p->pals[0] = 16;
+                            p->pals[1] = p->pals[2] = 0;
+                            p->pals_time = totalclock+32;
+                        }
+                        else if(p->poszv > 0x800) spritesound(DUKE_LAND,pi);
+#else
                         if( p->falling_counter > 62 ) quickkill(p);
 
                         else if( p->falling_counter > 9 )
@@ -4050,18 +4354,22 @@ void processinput(short snum)
                             p->pals_time = 32;
                         }
                         else if(p->poszv > 2048) spritesound(DUKE_LAND,pi);
+#endif
                     }
             }
         }
 
         else
         {
+#if DUKE3D_GAMEVER >= GAMEVER_10
             p->falling_counter = 0;
             if(p->scream_voice > FX_Ok)
             {
                 FX_StopSound(p->scream_voice);
                 p->scream_voice = FX_Ok;
             }
+
+#endif
 
             if(psectlotag != 1 && psectlotag != 2 && p->on_ground == 0 && p->poszv > (6144>>1))
                 p->hard_landing = p->poszv>>10;
@@ -4078,6 +4386,27 @@ void processinput(short snum)
                 p->poszv -= 768;
                 if(p->poszv < 0) p->poszv = 0;
             }
+#if DUKE3D_GAMEVER < GAMEVER_10
+            else
+            {
+                if(p->jumping_counter == 0)
+                    p->posz += ((fz-(i<<7))-p->posz)/3;
+                if(p->on_warping_sector == 0) p->poszv >>= 1;
+                else
+                {
+                    if(p->poszv > 0)
+                    {
+                        p->poszv -= 256;
+                        if(p->poszv < 0) p->poszv = 0;
+                    }
+                    if(p->poszv < 0)
+                    {
+                        p->poszv += 256;
+                        if(p->poszv > 0) p->poszv = 0;
+                    }
+                }
+            }
+#else
             else if(p->jumping_counter == 0)
             {
                 p->posz += ((fz-(i<<7))-p->posz)>>1; //Smooth on the water
@@ -4088,9 +4417,11 @@ void processinput(short snum)
                 }
             }
 
+#endif
+
             p->on_warping_sector = 0;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER >= GAMEVER_10 && DUKE3D_GAMEVER < GAMEVER_13D
             if( (sb_snum&2) && shrunk == 0 )
 #else
             if( (sb_snum&2) )
@@ -4103,7 +4434,7 @@ void processinput(short snum)
             if( (sb_snum&1) == 0 && p->jumping_toggle == 1)
                 p->jumping_toggle = 0;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER >= GAMEVER_10 && DUKE3D_GAMEVER < GAMEVER_13D
             else if( (sb_snum&1) && p->jumping_toggle == 0 && shrunk == 0 )
 #else
             else if( (sb_snum&1) && p->jumping_toggle == 0 )
@@ -4167,7 +4498,11 @@ void processinput(short snum)
 
         p->posz += p->poszv;
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+        if(p->posz < (cz+(12<<8)))
+#else
         if(p->posz < (cz+(4<<8)))
+#endif
         {
             p->jumping_counter = 0;
 #if DUKE3D_GAMEVER >= GAMEVER_14
@@ -4175,7 +4510,11 @@ void processinput(short snum)
                 p->posxv = p->posyv = 0;
 #endif
             p->poszv = 128;
+#if DUKE3D_GAMEVER < GAMEVER_10
+            p->posz = cz+(12<<8);
+#else
             p->posz = cz+(4<<8);
+#endif
         }
     }
 
@@ -4263,9 +4602,15 @@ void processinput(short snum)
                             if(Sound[DUKE_LONGTERM_PAIN].num < 1)
                                 spritesound(DUKE_LONGTERM_PAIN,pi);
                             p->pals[0] = 64; p->pals[1] = 64; p->pals[2] = 64;
+#if DUKE3D_GAMEVER < GAMEVER_10
+                            p->pals_time = totalclock+32;
+#else
                             p->pals_time = 32;
+#endif
                             s->extra -= 1+(TRAND&3);
+#if DUKE3D_GAMEVER >= GAMEVER_10
                             if(Sound[SHORT_CIRCUIT].num < 1)
+#endif
                                 spritesound(SHORT_CIRCUIT,pi);
                         }
                     }
@@ -4280,7 +4625,11 @@ void processinput(short snum)
                             if(Sound[DUKE_LONGTERM_PAIN].num < 1)
                                 spritesound(DUKE_LONGTERM_PAIN,pi);
                             p->pals[0] = 0; p->pals[1] = 8; p->pals[2] = 0;
+#if DUKE3D_GAMEVER < GAMEVER_10
+                            p->pals_time = totalclock+32;
+#else
                             p->pals_time = 32;
+#endif
                             s->extra -= 1+(TRAND&3);
                         }
                     }
@@ -4295,7 +4644,11 @@ void processinput(short snum)
                             if(Sound[DUKE_LONGTERM_PAIN].num < 1)
                                 spritesound(DUKE_LONGTERM_PAIN,pi);
                             p->pals[0] = 8; p->pals[1] = 0; p->pals[2] = 0;
+#if DUKE3D_GAMEVER < GAMEVER_10
+                            p->pals_time = totalclock+32;
+#else
                             p->pals_time = 32;
+#endif
                             s->extra -= 1+(TRAND&3);
                         }
                     }
@@ -4308,7 +4661,11 @@ void processinput(short snum)
             FTA(75,p);
             p->boot_amount -= 2;
             if(p->boot_amount <= 0)
+#if DUKE3D_GAMEVER < GAMEVER_10
+                p->inven_icon = 0;
+#else
                 checkavailinven(p);
+#endif
         }
     }
 
@@ -4346,9 +4703,14 @@ void processinput(short snum)
                             }
                             break;
                         case 1:
+#if DUKE3D_GAMEVER < GAMEVER_10
+                            spritesound(DUKE_ONWATER,pi);
+                            p->walking_snd_toggle = 8;
+#else
                             if((TRAND&1) == 0)
                                 spritesound(DUKE_ONWATER,pi);
                             p->walking_snd_toggle = 1;
+#endif
                             break;
                     }
                 }
@@ -4358,7 +4720,11 @@ void processinput(short snum)
                 p->walking_snd_toggle --;
         }
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+        if(p->steroids_amount > 0 && p->steroids_amount < 400)
+#else
         if(p->jetpack_on == 0 && p->steroids_amount > 0 && p->steroids_amount < 400)
+#endif
             doubvel <<= 1;
 
         p->posxv += ((sync[snum].fvel*doubvel)<<6);
@@ -4414,6 +4780,10 @@ void processinput(short snum)
                 mulscale16(p->posyv,dukefriction-(dukefriction>>1)+(dukefriction>>2));
         }
 #endif
+#if DUKE3D_GAMEVER < GAMEVER_10
+        if(p->horiz > 65 && p->horiz < 135)
+            p->horiz += 33-p->horiz/3;
+#endif
     }
 
     HORIZONLY:
@@ -4437,7 +4807,8 @@ void processinput(short snum)
                 &p->posz,&p->cursectnum,
                 p->posxv,p->posyv,164L,(4L<<8),i,CLIPMASK0);
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+#elif DUKE3D_GAMEVER < GAMEVER_13D
         if(shrunk)
             p->posz += 8<<8;
 #else
@@ -4457,7 +4828,11 @@ void processinput(short snum)
                     p->pycount += 52;
                     p->pycount &= 2047;
                     p->pyoff =
+#if DUKE3D_GAMEVER < GAMEVER_10
+                        klabs(s->xvel*sintable[p->pycount])/768;
+#else
                         klabs(s->xvel*sintable[p->pycount])/1596;
+#endif
                 }
             }
             else if( psectlotag != 2 && psectlotag != 1 )
@@ -4522,6 +4897,21 @@ void processinput(short snum)
 #endif
         }
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+        if(sb_snum&(1<<18) || p->hard_landing) p->return_to_center = 8;
+        if(sb_snum&(1<<13))
+        {
+            p->return_to_center = 8;
+            p->horiz += (sb_snum&(1<<5)) ? 32 : 16;
+        }
+        else if(sb_snum&(1<<14))
+        {
+            p->return_to_center = 8;
+            p->horiz -= (sb_snum&(1<<5)) ? 32 : 16;
+        }
+        else if(sb_snum&(1<<3)) p->horiz += (sb_snum&(1<<5)) ? 24 : 12;
+        else if(sb_snum&(1<<4)) p->horiz -= (sb_snum&(1<<5)) ? 32 : 16;
+#else
         if( sb_snum&(1<<18) || p->hard_landing)
             p->return_to_center = 9;
 
@@ -4550,6 +4940,7 @@ void processinput(short snum)
             if( sb_snum&(1<<5) ) p->horiz -= 6;
             p->horiz -= 6;
         }
+#endif
         if(p->return_to_center > 0)
             if( (sb_snum&(1<<13)) == 0 && (sb_snum&(1<<14)) == 0 )
         {
@@ -4565,11 +4956,13 @@ void processinput(short snum)
 
         if(p->aim_mode)
             p->horiz += sync[snum].horz>>1;
+#if DUKE3D_GAMEVER >= GAMEVER_10
         else
         {
              if( p->horiz > 95 && p->horiz < 105) p->horiz = 100;
              if( p->horizoff > -5 && p->horizoff < 5) p->horizoff = 0;
         }
+#endif
 
         if(p->horiz > 299) p->horiz = 299;
         else if(p->horiz < -99) p->horiz = -99;
@@ -4601,6 +4994,7 @@ void processinput(short snum)
     }
 #endif
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
     if(p->knee_incs > 0)
     {
         p->knee_incs++;
@@ -4679,6 +5073,8 @@ void processinput(short snum)
             p->ang += getincangle(p->ang,getangle(sprite[p->actorsqu].x-p->posx,sprite[p->actorsqu].y-p->posy))>>2;
     }
 
+#endif
+
     if( doincrements(p) ) return;
 
     if(p->weapon_pos != 0)
@@ -4742,11 +5138,17 @@ void processinput(short snum)
 
         if(p->holster_weapon == 1)
         {
+#if DUKE3D_GAMEVER < GAMEVER_10
+            if(p->last_pissed_time < 26*58)
+#else
             if( p->last_pissed_time <= (26*218) && p->weapon_pos == -9)
+#endif
             {
                 p->holster_weapon = 0;
                 p->weapon_pos = 10;
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 FTA(74,p);
+#endif
             }
         }
         else switch(p->curr_weapon)
@@ -4902,7 +5304,11 @@ void processinput(short snum)
 #endif
                     {
                         k = 140;
+#if DUKE3D_GAMEVER < GAMEVER_10
+                        i = -512-((p->horiz-p->horizoff-100)*20);
+#else
                         i = -512-((p->horiz+p->horizoff-100)*20);
+#endif
                     }
 
                     j = EGS(p->cursectnum,
@@ -5057,12 +5463,21 @@ void processinput(short snum)
 
                 (*kb)++;
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+                if(*kb <= 10)
+#else
                 if( *(kb) <= 12 )
+#endif
                 {
+#if DUKE3D_GAMEVER < GAMEVER_10
+                    if((*kb&1) == 0)
+#else
                     if( ((*(kb))%3) == 0 )
+#endif
                     {
                         p->ammo_amount[CHAINGUN_WEAPON]--;
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
                         if( (*(kb)%3) == 0 )
                         {
                             j = spawn(pi,SHELL);
@@ -5073,6 +5488,8 @@ void processinput(short snum)
                             sprite[j].z += (3<<8);
                             ssp(j,CLIPMASK0);
                         }
+
+#endif
 
                         spritesound(CHAINGUN_FIRE,pi);
                         shoot(pi,CHAINGUN);

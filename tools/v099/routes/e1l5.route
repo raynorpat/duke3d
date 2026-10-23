@@ -1,0 +1,554 @@
+# DEMOGOD
+# E1L5 normal skill; matching -demogod required (unprotected death741).
+# Explicit jetpack input uses existing beta god fuel at two disconnected rises:
+#116->62 earthquake touchplate and369->257 demolition tunnel.
+# Native author/replay validation and exact commands: scratch e1l5-author-success.md.
+60335 26095
+# portal wall1284 sector210->209 width1536 rise-20 gap96
+59460 26048
+59068 26048
+# portal wall1279 sector209->208 width2172 rise0 gap116
+57995 25909 pass
+57717 26187 pass
+# portal wall1275 sector208->207 width1086 rise0 gap116
+54700 30400 pass
+# portal wall1273 sector207->315 width1536 rise-200 gap116; large drop 200 units; damage/dive
+54272 35964 pass
+54272 36356 pass
+# portal wall2039 sector315->456 width2563 rise0 gap552
+53636 38730 pass
+53244 38710 pass
+50869 37621 pass
+50507 37259 pass
+# portal wall2958 sector456->457 width916 rise11 gap541
+50281 35360 pass
+50199 34976 pass
+49792 34624 pass
+# portal wall2965 sector457->455 width1984 rise4 gap512
+48836 34528
+48444 34528
+48256 34368
+# portal wall2954 sector455->457 width1984 rise-4 gap512
+48444 34528
+48836 34528
+49792 34624
+# portal wall2969 sector457->456 width916 rise-11 gap541
+50199 34976 pass
+50281 35360 pass
+50507 37259 pass
+50869 37621 pass
+# portal wall2961 sector456->315 width2563 rise0 gap552
+53244 38710 pass
+53636 38730 pass
+# portal wall2038 sector315->311 width5146 rise0 gap552
+55956 40061 pass
+55916 40451 pass
+# portal wall2012 sector311->113 width2084 rise-221 gap552; large drop 221 units; damage/dive
+54020 42096 pass
+53756 42384 pass
+# portal wall687 sector113->114 width905 rise46 gap740
+52427 42507 jump
+52149 42229 jump
+43136 38720 pass
+42624 38720 pass
+40192 38976 pass
+36917 40843 pass
+# portal wall700 sector114->116 width1408 rise-5 gap1239
+31172 45312 pass
+30780 45312 pass
+30780 45312 wait 26
+30780 45312 jetpack
+30780 45312 jump 34
+30976 43200
+30976 43200 jetpack
+30976 43200 wait 600 # land on TOUCHPLATE565 and allow quake terrain shifts
+30780 45312 pass
+# portal wall727 sector116->65 width3791 rise-119 gap1396
+24552 45312 pass
+24472 45696 pass
+# portal wall450 sector65->290 width4866 rise-136 gap1540; large drop 136 units; damage/dive
+23896 46801 pass
+23720 47151 pass
+# portal wall1847 sector290->202 width4278 rise-8 gap1676
+15832 47173
+15528 47419
+# portal wall1234 sector202->203 width5479 rise8 gap1676
+13943 47652 pass
+13705 47964 pass
+16181 49653 pass
+# portal wall1241 sector203->293 width2084 rise0 gap195
+20364 50753 pass
+20316 51009 pass
+# portal wall1871 sector293->294 width1639 rise0 gap164
+20614 51367
+20858 51673
+# portal wall1878 sector294->211 width2391 rise8 gap167
+21635 52980
+22013 52876
+# portal wall1288 sector211->221 width1669 rise8 gap120
+22653 53135
+23043 53105
+# portal wall1331 sector221->212 width1094 rise9 gap84
+23816 53125
+24184 52987
+# portal wall1292 sector212->222 width1056 rise4 gap76
+24514 53008
+24894 53104
+# portal wall1337 sector222->213 width1541 rise6 gap79
+25710 53118
+26002 53378
+# portal wall1298 sector213->215 width1833 rise6 gap100
+26222 53774
+26386 54130
+# portal wall1308 sector215->216 width1493 rise8 gap106
+26213 54552
+26011 54888
+# portal wall1311 sector216->214 width1778 rise6 gap126
+25833 55133
+25495 55331
+# portal wall1302 sector214->218 width2191 rise10 gap150
+24515 55575
+24125 55529
+# portal wall1317 sector218->219 width1669 rise12 gap156
+23299 55793
+22909 55823
+# portal wall1323 sector219->220 width1890 rise6 gap130
+21869 56029
+21523 55843
+# portal wall1327 sector220->217 width1903 rise5 gap163
+21009 55556
+20719 55292
+# portal wall1315 sector217->223 width2064 rise10 gap209
+20065 55274
+19871 54934
+# portal wall1339 sector223->321 width1669 rise7 gap297
+19075 54671
+18685 54641
+# portal wall2080 sector321->322 width1493 rise9 gap279
+18344 53797
+18008 53595
+# portal wall2084 sector322->323 width1541 rise8 gap264
+17682 53122
+17390 52862
+# portal wall2089 sector323->292 width5081 rise0 gap264
+15232 51756
+14976 52052
+# portal wall1865 sector292->68 width1622 rise-6 gap264
+10502 51463
+10138 51609
+# portal wall466 sector68->69 width1280 rise-10 gap280
+10653 52682
+10339 52918
+# portal wall472 sector69->70 width1280 rise-7 gap296
+10141 52682
+9827 52918
+# portal wall478 sector70->72 width572 rise-4 gap112
+8623 53224
+8273 53400
+# portal wall489 sector72->73 width640 rise-7 gap112
+8157 53450
+7843 53686
+# portal wall494 sector73->71 width802 rise-3 gap120
+7660 53762
+7316 53950
+# portal wall485 sector71->74 width1094 rise-7 gap124
+7160 54011
+6792 54149
+# portal wall499 sector74->88 width746 rise-78 gap132
+6565 53928
+6363 53592
+# portal wall569 sector88->297 width1669 rise-12 gap206
+4431 52291
+4401 51901
+# portal wall1892 sector297->460 width4090 rise-7 gap505
+3389 50488
+3523 50120
+3189 46709 pass
+2912 46432 pass
+# portal wall3005 sector460->304 width4167 rise-58 gap424
+2396 46209
+2468 45823
+896 44352
+896 43840
+1589 43147
+# portal wall1946 sector304->369 width9137 rise-417 gap2139; large drop 417 units; damage/dive
+3290 42112
+3366 41728
+8011 31221
+# portal wall2337 sector369->81 width1950 rise56 gap2500
+2500 30000 wait 26
+2500 30000 jetpack
+2500 30000 jump 104
+2176 27800
+2176 21500 wait 26
+2176 21500 jetpack
+2176 21500 wait 52
+2176 21500 weapon 5
+2176 21500 face 1536
+2176 21500 fire 26
+2176 21500 wait 156
+2176 27800
+2500 30000
+8011 31221 pass
+12147 27124 jump
+12301 26764 jump
+# portal wall532 sector81->258 width1448 rise-77 gap398
+11979 24139
+11701 23861
+# portal wall1605 sector258->331 width4128 rise70 gap327
+11937 21354 jump
+11743 21014 jump
+# portal wall2141 sector331->199 width2415 rise22 gap81
+8616 20634
+8408 20966
+# portal wall1215 sector199->133 width1493 rise12 gap184
+-408 19237
+-744 19035
+# portal wall878 sector133->130 width1280 rise12 gap340
+-1354 18141
+-1590 17827
+# portal wall841 sector130->152 width1145 rise21 gap319
+-4113 15384
+-4463 15208
+# portal wall986 sector152->153 width1639 rise21 gap307
+-5287 14010
+-5593 13766
+# portal wall991 sector153->232 width2268 rise16 gap196
+-8521 11836
+-8631 11460 jump
+-7744 11328
+-4544 11328
+# portal wall1391 sector232->233 width1145 rise-16 gap80
+-4376 11281
+-4200 11631
+# portal wall1409 sector233->234 width923 rise-10 gap101
+-99 14931
+227 15149
+2304 16256
+2816 16256
+# portal wall1438 sector234->151 width640 rise-1 gap99
+3324 16128
+3716 16128
+4288 15872
+4800 15872
+# portal wall974 sector151->307 width905 rise2 gap96
+6974 16356
+7362 16412
+# portal wall1988 sector307->235 width2432 rise-8 gap348
+13180 18560
+13572 18560
+# portal wall1449 sector235->231 width3093 rise-16 gap142
+26991 13298
+27153 12942
+# portal wall1387 sector231->447 width859 rise-51 gap349
+26984 11439
+27160 11089
+26944 10432
+26432 4032
+23029 -4747
+22667 -5109
+12021 -11915
+11659 -12277
+# portal wall2870 sector447->142 width1379 rise10 gap457
+10742 -14967
+10378 -15113
+# portal wall918 sector142->141 width1056 rise2 gap450
+10110 -14864
+9730 -14960
+# portal wall914 sector141->140 width810 rise15 gap473
+9338 -15102
+8966 -14978 jump
+# portal wall910 sector140->139 width810 rise16 gap476
+8570 -14590
+8198 -14466 jump
+# portal wall908 sector139->135 width1280 rise34 gap387
+7606 -14173 jump
+7370 -13859 jump
+# portal wall889 sector135->136 width810 rise26 gap3538
+7166 -13434 jump
+7042 -13062 jump
+# portal wall893 sector136->137 width1145 rise29 gap3463
+7320 -12271 jump
+7144 -11921 jump
+# portal wall897 sector137->138 width994 rise18 gap3406
+7533 -11517
+7635 -11139 jump
+# portal wall901 sector138->406 width1645 rise8 gap224
+8242 -10943
+8334 -10561 jump
+6272 -9408
+640 -8384
+-500 -8400
+-600 -7600
+# portal wall2624 sector406->335 width1024 rise16 gap208
+-1664 -5636
+-1664 -5244
+# portal wall2156 sector335->376 width1728 rise4 gap132
+-1348 -3616
+-956 -3616
+# portal wall2385 sector376->162 width1728 rise0 gap0
+-836 -3616 use
+# Door delay estimate, adjust from real run
+-836 -3616 wait 26
+-444 -3616 use
+# portal wall1057 sector162->343 width3008 rise0 gap0
+-452 -3648 use
+# Door delay estimate, adjust from real run
+-452 -3648 wait 26
+-60 -3648 use
+# portal wall2193 sector343->342 width2944 rise0 gap132
+60 -3648
+452 -3648
+# portal wall2189 sector342->344 width2880 rise0 gap132
+572 -3648
+964 -3648
+# portal wall2197 sector344->348 width2816 rise0 gap132
+1084 -3648
+1476 -3648
+# portal wall2213 sector348->347 width2752 rise0 gap132
+1596 -3648
+1988 -3648
+# portal wall2209 sector347->346 width2688 rise0 gap132
+2108 -3648
+2500 -3648
+# portal wall2205 sector346->345 width2624 rise0 gap132
+2620 -3648
+3012 -3648
+# portal wall2201 sector345->349 width2560 rise0 gap132
+3132 -3648
+3524 -3648
+# portal wall2217 sector349->350 width2496 rise0 gap132
+3644 -3648
+4036 -3648
+# portal wall2221 sector350->351 width2432 rise0 gap132
+4156 -3648
+4042 -3649 wait 26
+4042 -3649 weapon 2
+4042 -3649 face 0
+4042 -3649 fire 260
+4548 -3648
+# portal wall2225 sector351->352 width2368 rise0 gap132
+4668 -3648
+5060 -3648
+# portal wall2229 sector352->353 width2304 rise0 gap132
+5180 -3648
+5572 -3648
+# portal wall2233 sector353->354 width2208 rise0 gap132
+5692 -3664
+6084 -3664
+# portal wall2237 sector354->355 width2144 rise0 gap132
+6204 -3664
+6596 -3664
+# portal wall2241 sector355->358 width2080 rise0 gap132
+6716 -3664
+7108 -3664
+# portal wall2253 sector358->357 width2016 rise0 gap132
+7228 -3664
+7620 -3664
+# portal wall2249 sector357->356 width1952 rise0 gap132
+7740 -3664
+8132 -3664
+# portal wall2247 sector356->373 width2048 rise0 gap132
+8252 -3584
+8644 -3584
+# portal wall2372 sector373->371 width3721 rise0 gap168
+10024 -3503
+10200 -3153
+# portal wall2363 sector371->198 width3665 rise0 gap168
+10254 -3122
+10363 -2886
+# portal wall1212 sector198->191 width3665 rise10 gap0
+10341 -2938 use
+# Door delay estimate, adjust from real run
+10341 -2938 wait 26
+10395 -2822 use
+# portal wall1186 sector191->194 width3665 rise-10 gap0
+10373 -2874 use
+# Door delay estimate, adjust from real run
+10373 -2874 wait 26
+10427 -2758 use
+# portal wall1196 sector194->193 width3665 rise112 gap0; UNRESOLVED vertical rise 112 units
+10405 -2810 use
+# Door delay estimate, adjust from real run
+10405 -2810 wait 26
+10459 -2694 use
+# portal wall1194 sector193->195 width3665 rise-112 gap0
+10437 -2746 use
+# Door delay estimate, adjust from real run
+10437 -2746 wait 26
+10491 -2630 use
+# portal wall1200 sector195->192 width3665 rise10 gap0
+10469 -2682 use
+# Door delay estimate, adjust from real run
+10469 -2682 wait 26
+10523 -2566 use
+# portal wall1188 sector192->197 width3665 rise-10 gap0
+10501 -2618 use
+# Door delay estimate, adjust from real run
+10501 -2618 wait 26
+10555 -2502 use
+# portal wall1210 sector197->196 width3665 rise10 gap0
+10533 -2554 use
+# Door delay estimate, adjust from real run
+10533 -2554 wait 26
+10587 -2438 use
+# portal wall1206 sector196->374 width3665 rise-10 gap0
+10565 -2490 use
+# Door delay estimate, adjust from real run
+10565 -2490 wait 26
+10619 -2374 use
+# portal wall2377 sector374->372 width3665 rise-1 gap168
+10597 -2426
+10706 -2190
+# portal wall2366 sector372->163 width5152 rise0 gap884
+8700 -1200
+8629 -758 wait 26
+8629 -758 face 768
+8629 -758 use
+8629 -758 wait 260
+10920 -1647
+11096 -1297
+# portal wall1067 sector163->164 width4293 rise0 gap908
+11304 -687
+11480 -337
+# portal wall1071 sector164->172 width3435 rise0 gap964
+11688 273
+11864 623
+# portal wall1103 sector172->173 width2576 rise0 gap297
+12072 1233
+12248 1583
+# portal wall1107 sector173->169 width1717 rise0 gap296
+12456 2193
+12632 2543
+# portal wall1091 sector169->188 width859 rise0 gap428
+12840 3153
+13016 3503
+# portal wall1173 sector188->182 width659 rise-1377 gap451; large drop 1377 units; damage/dive
+12929 3381
+13119 3723
+# SE7 tag7070 sector182->396; water may require dive/ascend beyond API
+13312 4288
+# Expected transporter destination; only reachable after transport
+-55936 37632 wait 26
+# portal wall2522 sector396->340 width859 rise-8 gap164
+-55151 37336
+-54801 37160
+# portal wall2181 sector340->246 width2576 rise0 gap108
+-53231 36568
+-52881 36392
+# portal wall1520 sector246->422 width1024 rise0 gap108
+-51268 37120
+-50944 37120
+# portal wall2711 sector422->420 width1088 rise0 gap108
+-51200 37632 wait 26
+-51200 37632 face 0
+-51200 37632 use
+-51200 37632 wait 52
+-50400 37632
+# portal wall2676 sector417->463 width4608 rise0 gap248
+-43460 37632
+-43068 37632
+# portal wall3042 sector463->417 width4608 rise0 gap248
+-43068 37632
+-43460 37632
+# portal wall2678 sector417->418 width1557 rise40 gap128
+-48608 38847 jump
+-48672 39233 jump
+-48576 39552
+-48896 39936
+# portal wall2684 sector418->417 width1557 rise-40 gap128
+-48672 39233
+-48608 38847
+# portal wall2682 sector417->419 width1557 rise40 gap132
+-48608 36417 jump
+-48672 36031 jump
+-48640 35328
+-48640 35840
+# portal wall2688 sector419->417 width1557 rise-40 gap132
+-48672 36031
+-48608 36417
+-50400 37632 wait 26
+-50400 37632 face 1024
+-50400 37632 wait 52
+-51200 37632
+# portal wall2706 sector422->247 width1024 rise0 gap108
+-50944 38144
+-51268 38144
+# portal wall1525 sector247->477 width2172 rise0 gap108
+-52725 40565
+-53003 40843
+# portal wall3130 sector477->478 width3668 rise0 gap108
+-54357 41632
+-54699 41440
+# portal wall3132 sector478->474 width572 rise16 gap0
+-55768 43089 use
+# Door delay estimate, adjust from real run
+-55768 43089 wait 26
+-55651 43321 use
+# portal wall3108 sector474->476 width572 rise0 gap0
+-55709 43335 use
+# Door delay estimate, adjust from real run
+-55709 43335 wait 26
+-55623 43506 use
+-55936 43712 wait 26 # shotgun475
+-55750 42900
+# portal wall3135 sector478->477 width3668 rise0 gap108
+-54699 41440
+-54357 41632
+# portal wall3131 sector477->247 width2172 rise0 gap108
+-53003 40843
+-52725 40565
+-51200 37632
+-50400 37632
+# portal wall2676 sector417->463 width4608 rise0 gap248
+-43460 37632
+-43068 37632
+# portal wall3039 sector463->424 width1024 rise0 gap248
+-40192 38596
+-40192 38204 jump
+-39936 37632
+-39936 37632 wait 210
+# portal wall2723 sector424->463 width1024 rise0 gap248
+-40192 38204
+-40192 38596
+# portal wall3047 sector463->462 width3072 rise128 gap0; UNRESOLVED vertical rise 128 units
+-36292 37888 use
+# Door delay estimate, adjust from real run
+-36292 37888 wait 26
+-35900 37888 use
+# portal wall3037 sector462->464 width3072 rise-128 gap0; large drop 128 units; damage/dive
+-36036 37888 use
+# Door delay estimate, adjust from real run
+-36036 37888 wait 26
+-35644 37888 use
+# portal wall3058 sector464->465 width3072 rise0 gap248
+-35524 37888
+-35200 37888
+-35328 39168
+-35072 39424
+-35019 39477
+-34635 39115
+# portal wall3068 sector465->379 width2176 rise64 gap248
+-34564 37888 jump
+-34304 37888 jump
+# portal wall2402 sector379->248 width2048 rise-244 gap248; large drop 244 units; damage/dive
+-34368 37888
+-34108 37888
+-34108 37888 weapon 5
+-33216 37824 fire 1000
+-33280 37888 wait 260
+# portal wall1531 sector248->499 width2048 rise244 gap0; UNRESOLVED vertical rise 244 units
+-32452 37888 use
+# Door delay estimate, adjust from real run
+-32452 37888 wait 26
+-32128 37888 use
+# portal wall3547 sector499->500 width2048 rise0 gap0
+-32256 37888 use
+# Door delay estimate, adjust from real run
+-32256 37888 wait 26
+-31932 37888 use
+-31808 37888
+-31808 37888 wait 26
+-31808 37888 face 0
+-31808 37888 use
+-31808 37888 wait 80

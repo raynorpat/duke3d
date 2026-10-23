@@ -103,10 +103,18 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 // #define AUSTRALIA
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+#define MAXSLEEPDIST  8192
+#define SLEEPTIME 6*64
+#else
 #define MAXSLEEPDIST  16384
 #define SLEEPTIME 24*64
+#endif
 
-#if DUKE3D_GAMEVER < GAMEVER_11
+#if DUKE3D_GAMEVER < GAMEVER_10
+    // 0.99: no version field in DOS; 9 distinguishes our net handshake.
+    #define BYTEVERSION 9
+#elif DUKE3D_GAMEVER < GAMEVER_11
     // 1.0: the shareware release has no version field; 10 is unused by any
     //  release and only guards this build's net handshake.
     #define BYTEVERSION 10
@@ -277,6 +285,12 @@ struct player_struct;
 #define dodgebullet 4096
 
 #define TRAND krand()
+
+#if DUKE3D_GAMEVER >= GAMEVER_10 && DUKE3D_GAMEVER < GAMEVER_11
+// DOS 1.0 shares Watcom rand across game logic, drawing and sound (C10-002).
+int game_rand(void);
+#define rand() game_rand()
+#endif
 
 
 #define MAX_WEAPONS  12
@@ -476,6 +490,9 @@ struct player_struct
 
     char gm,on_warping_sector,footprintcount;
     char hbomb_on,jumping_toggle,rapid_fire_hold,on_ground;
+#if DUKE3D_GAMEVER < GAMEVER_10
+    char on_sector_effector; // beta displayrooms uses the current moving-sector view
+#endif
     char name[32],inven_icon,buttonpalette;
 
     char jetpack_on,spritebridge,lastrandomspot;

@@ -722,14 +722,27 @@ G10-L14, each one ended with the same seed and `sprite[]`, and with only
 `tests/data/v13d_save_refs.cmake` rows with `_EDITION` `sw10` or `sw11` describe saves
 made by the original EXEs without anyone at the keyboard. Each is in that release's
 `<data dir>/refsaves/<name>.SAV`. `tools/v13d/mksave.py <sw10|sw11> <in.exe> <out.exe>
-<demo n> <tic> <slot>` first runs `mkcapture.py`. It then diverts playback's call to
-`domovethings` (1.1 `0x1fb8a`, 1.0 `0x1f7ba`) to a 59-byte hook placed `0x100`
-bytes into the cave. The hook counts tics in the log slack. Right after tic `<tic>` it
+<demo n> <tic> <slot> [save name]` first runs `mkcapture.py`. Both tools use the edition
+addresses and LE page mapping in `tools/v13d/le.py`. It then diverts playback's call to
+`domovethings` (1.1 `0x1fb8a`, 1.0 `0x1f7ba`) to a hook at the next multiple of `0x100`
+bytes from the cave start beyond the capture payload. With no name the hook is 59 bytes and starts
+`0x100` bytes into the cave, as before. The filename at the end of the plain capture
+payload determines its used length; the full save hook must fit in the cave.
+The hook counts tics in the log slack. Right after tic `<tic>` it
 calls `saveplayer(<slot>)`, which writes `GAME<slot>.SAV`, and then jumps to the
 `STATE.BIN` dump, so the dump and the save hold the same moment. `saveplayer` in both
 releases is plain file output (no network wait, no screen work), so it can run from
 playback. The demo is `gendemo.py sw10|sw11 DEMO1.DMO <vol> <lev> 2 3000 <seed>`, played
 as demo 1. For some saves the GRP's map start was first moved with `startnear.py`.
+An optional name sets the slot's name in DOS memory before calling `saveplayer`, so
+the original save writer records it. The name is at most 18 ASCII characters followed
+by NUL, padded to the 19 bytes written by DOS. The buffers have a 22-byte slot stride:
+
+| Edition | Slot-zero name address | `saveplayer` evidence (flat image addresses) |
+|---|---|---|
+| 1.1 | `0x130420` | `0x38fc8` multiplies the slot by `0x16`; `0x38fd0` sets size `0x13`; `0x38fd7` adds the buffer base, then calls `dfwrite` (`0x72565`) |
+| 1.0 | `0x130d7a` | `0x38909` multiplies the slot by `0x16`; `0x3890c` sets size `0x13`; `0x38918` adds the buffer base, then calls `dfwrite` (`0x70c65`) |
+
 `mksave.py values <edition> STATE.BIN <name> <level>` prints the rows. Health is the
 player sprite's `extra`, armor is `shield_amount`, ammo is
 `ammo_amount[curr_weapon]`, and X/Y are the player sprite's.
@@ -747,10 +760,13 @@ saves hold the state between a tic and its frame.
 | `e1l2door` | 2 | E1L2, map start | 1 | 40 | the start elevator (lotag 18) moving: `animatecnt` 2 |
 | `e1inv` | 3 | E1L1, `startnear` on the CHAINGUNSPRITE at (16000, 48256) (`which` 0 in 1.0, 2 in 1.1) | 13 (1.0), 3 (1.1) | 1200 (1.0), 700 (1.1) | pistol, shotgun, chaingun, RPG and pipebombs; the current weapon is the pistol (1.0) or the pipebombs (1.1) |
 | `e1l2inv` | 4 | E1L2, `startnear` on the STEROIDS at (3136, 40576) | 6 | 40 | inventory: steroids, holoduke, jetpack, and heat (1.0 only) |
+| `e1armor` | 0 | E1L1, `startnear` on the first SHIELD (54) | 1 | 7 | armor 100, health 100, pistol 48; DOS names `ARMORED 10` / `ARMORED 11` |
 
 No E1L1 spot the random walk could reach gave both several weapons and inventory items.
 The weapons room around (16000, 48256) has no reachable inventory item, so `e1l2inv` is
-an extra save that covers the inventory fields. No save has armor.
+an extra save that covers the inventory fields. The later `e1armor` captures
+exercise armor and nonempty names. They use a 30-tic generated demo and save at
+tic 7; the first SHIELD is map sprite 511 in 1.0 and sprite 94 in 1.1.
 
 MD5s of the `refsaves/` copies:
 
@@ -761,8 +777,9 @@ MD5s of the `refsaves/` copies:
 | `e1l2door` | `7f990ae1590ef8ce717aa4a78eacfe01` | `8fa72ba62440a628930e729093c1ff59` |
 | `e1inv` | `0ef80ba63a0ff3f375ee7a5d3aa943e9` | `028fdb3c94a2a5b920fef045c4c47d0b` |
 | `e1l2inv` | `6a204428db925ae4cda90422b4bc68d9` | `ec2dcb62d9e1c073e09d7d5a914ab049` |
+| `e1armor` | `b2a3783c7158fe692c635bb927471be3` | `a21955c38df6b680c82d80c5c345a3e7` |
 
-Every save was made twice. Both runs gave byte-identical `STATE.BIN` files, and the
+The initial five saves were each made twice. Both runs gave byte-identical `STATE.BIN` files, and the
 saves decode to the same blocks except for two that are not game state:
 
 - **The thumbnail.** Nothing renders the save-screen tile during playback, so

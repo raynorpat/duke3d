@@ -7,6 +7,7 @@
  *  DUKE3D_GAMEVER from DUKE3D_VERSION; guard game code with, for example,
  *  #if DUKE3D_GAMEVER < GAMEVER_15.
  */
+#define GAMEVER_099 199601040L
 #define GAMEVER_10  199601290L
 #define GAMEVER_11  199602200L
 #define GAMEVER_13D 199604190L

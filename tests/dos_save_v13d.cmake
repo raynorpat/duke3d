@@ -1,4 +1,4 @@
-# Runs a 1.3D, 1.1 or 1.0 build headless on a DOS save of its own release. MODE is
+# Runs a 1.3D, 1.1, 1.0 or 0.99 build headless on a DOS save of its own release. MODE is
 # one of:
 #   load    -loadverify must print the reference state (tests/data/v13d_save_refs.cmake);
 #           then -saveverify writes the game back out. That copy must hold the same
@@ -94,8 +94,8 @@ elseif(MODE STREQUAL "refuse")
   # A 1.5 save's first block: BYTEVERSION 117, uncompressed.
   file(COPY_FILE "${CMAKE_CURRENT_LIST_DIR}/data/v15_save_header.sav" "${_run}/v15.sav")
   list(APPEND _files v15.sav)
-  if(EDITION STREQUAL "sw10")
-    # 1.0 saves have no version, so a damaged 1.0 save must be refused by its
+  if(EDITION STREQUAL "sw10" OR EDITION STREQUAL "sw099")
+    # 0.99/1.0 saves have no version, so a damaged save must be refused by its
     # layout: one cut short, and one whose hittype holds a script address
     # past the end of the script.
     execute_process(COMMAND "${PYTHON}" -I "${DECODER}" truncate
@@ -105,7 +105,7 @@ elseif(MODE STREQUAL "refuse")
                             "${DATA}/refsaves/e1l1start.SAV" badaddr.sav
       WORKING_DIRECTORY "${_run}" RESULT_VARIABLE _result2)
     if(NOT _result EQUAL 0 OR NOT _result2 EQUAL 0)
-      message(FATAL_ERROR "couldn't make the damaged 1.0 saves")
+      message(FATAL_ERROR "couldn't make the damaged unversioned saves")
     endif()
     list(APPEND _files short.sav badaddr.sav)
   endif()
@@ -116,7 +116,7 @@ elseif(MODE STREQUAL "refuse")
     endif()
     # A 1.0 save has no version: its first four name bytes are read as one.
     # A 1.0 build has none either, and goes by the layout.
-    if(NOT _out MATCHES "is a version -?[0-9]+ save, not|is not a DOS 1\\.0 save")
+    if(NOT _out MATCHES "is a version -?[0-9]+ save, not|is not a DOS (1\\.0|0\\.99) save")
       message(FATAL_ERROR "${_file}: no version or layout message")
     endif()
   endforeach()
