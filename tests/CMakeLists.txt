@@ -58,7 +58,7 @@ add_executable(version_macros version_macros.c)
 # options rather than its objects.
 target_include_directories(version_macros PRIVATE "${PROJECT_SOURCE_DIR}/source")
 target_link_libraries(version_macros PRIVATE
-  duke3d_game_options buildengine audiolib duke3d::SDL2main)
+  duke3d_game_options buildengine audiolib)
 target_compile_definitions(version_macros PRIVATE
   SDL_MAIN_HANDLED EXPECT_GAMEVER=${_vgame}L EXPECT_ENGINEREV=${_veng}L
   EXPECT_BYTEVERSION=${_vbyte} EXPECT_PLUTOPAK=${_vpluto}
@@ -134,7 +134,7 @@ set_tests_properties(opl_music PROPERTIES TIMEOUT 30)
 # audio driver, so it needs no sound hardware.
 add_executable(dsl_shutdown dsl_shutdown.c)
 target_include_directories(dsl_shutdown PRIVATE "${PROJECT_SOURCE_DIR}/source")
-target_link_libraries(dsl_shutdown PRIVATE audiolib duke3d::SDL2main)
+target_link_libraries(dsl_shutdown PRIVATE audiolib)
 target_compile_definitions(dsl_shutdown PRIVATE SDL_MAIN_HANDLED)
 add_test(NAME dsl_shutdown COMMAND dsl_shutdown)
 set_tests_properties(dsl_shutdown PROPERTIES
@@ -144,7 +144,7 @@ set_tests_properties(dsl_shutdown PROPERTIES
 # Reinitializes the mixer and plays a sample in mono/8-bit and stereo/16-bit.
 add_executable(multivoc_lifecycle multivoc_lifecycle.c)
 target_include_directories(multivoc_lifecycle PRIVATE "${PROJECT_SOURCE_DIR}/source")
-target_link_libraries(multivoc_lifecycle PRIVATE audiolib duke3d::SDL2main)
+target_link_libraries(multivoc_lifecycle PRIVATE audiolib)
 target_compile_definitions(multivoc_lifecycle PRIVATE SDL_MAIN_HANDLED)
 add_test(NAME multivoc_lifecycle COMMAND multivoc_lifecycle)
 set_tests_properties(multivoc_lifecycle PROPERTIES
@@ -401,14 +401,14 @@ target_link_libraries(game_helpers PRIVATE duke3d_game)
 add_test(NAME game_helpers COMMAND game_helpers)
 
 add_executable(usermaps_menu usermaps_menu.c "${_game_c}")
-target_link_libraries(usermaps_menu PRIVATE duke3d_game duke3d::SDL2main)
+target_link_libraries(usermaps_menu PRIVATE duke3d_game)
 add_test(NAME usermaps_menu COMMAND "${CMAKE_COMMAND}"
   "-DTEST=$<TARGET_FILE:usermaps_menu>" "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/umm"
   -P "${CMAKE_CURRENT_SOURCE_DIR}/usermaps_menu.cmake")
 set_tests_properties(usermaps_menu PROPERTIES TIMEOUT 30)
 
 add_executable(gamepad gamepad.c "${_game_c}")
-target_link_libraries(gamepad PRIVATE duke3d_game duke3d::SDL2main)
+target_link_libraries(gamepad PRIVATE duke3d_game)
 add_test(NAME gamepad COMMAND gamepad)
 set_tests_properties(gamepad PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1"
@@ -1058,7 +1058,7 @@ target_include_directories(video_opts PRIVATE "${PROJECT_SOURCE_DIR}/source")
 add_test(NAME video_opts COMMAND video_opts)
 
 add_executable(input_polling input_polling.c "${_game_c}")
-target_link_libraries(input_polling PRIVATE duke3d_game duke3d::SDL2main)
+target_link_libraries(input_polling PRIVATE duke3d_game)
 add_test(NAME input_polling COMMAND input_polling)
 set_tests_properties(input_polling PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;BUILD_WINDOWED=1;BUILD_SDLJOYSTICK=none"
@@ -1072,14 +1072,14 @@ endif()
 add_test(NAME input_aim COMMAND input_aim)
 
 add_executable(joystick_polling joystick_polling.c "${_game_c}")
-target_link_libraries(joystick_polling PRIVATE duke3d_game duke3d::SDL2main)
+target_link_libraries(joystick_polling PRIVATE duke3d_game)
 add_test(NAME joystick_polling COMMAND joystick_polling)
 set_tests_properties(joystick_polling PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1"
   SKIP_RETURN_CODE 77 TIMEOUT 30)
 
 add_executable(input_render input_render.c "${_game_c}")
-target_link_libraries(input_render PRIVATE duke3d_game duke3d::SDL2main)
+target_link_libraries(input_render PRIVATE duke3d_game)
 add_test(NAME input_render COMMAND input_render)
 set_tests_properties(input_render PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"

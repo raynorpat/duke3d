@@ -1,7 +1,7 @@
 #ifndef _INCL_DUKEWIN_H_
 #define _INCL_DUKEWIN_H_ 1
 
-#ifndef _MSC_VER  /* might need this. */
+#if !defined(_MSC_VER) && !defined(__int64)
 typedef long long __int64;
 #endif
 
