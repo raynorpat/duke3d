@@ -2,6 +2,7 @@
  * Checks the save record codec against byte offsets worked out by hand
  * from the DOS 1.5 layout: struct fields packed to 1 byte, little-endian.
  */
+#define SDL_MAIN_HANDLED  /* game.c's main() is renamed; this one is ours. */
 #include "duke3d.h"
 #include "savegame.h"
 

@@ -20,3 +20,6 @@ add_library(audiolib STATIC
   user.c)
 
 target_link_libraries(audiolib PUBLIC duke3d_compile_options duke3d::SDL2)
+if(NOT WIN32 AND NOT APPLE)
+  target_link_libraries(audiolib PUBLIC m)
+endif()
