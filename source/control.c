@@ -28,6 +28,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "control.h"
 #include "mouse.h"
 #include "joystick.h"
+#include "inputaim.h"
 
 //***************************************************************************
 // FIXME  These will need to be removed once the buildengine directory
@@ -38,6 +39,7 @@ int _joystick_update(void);
 int _joystick_axis(int axis);
 int _joystick_button(int button);
 int _joystick_hat(int hat);
+int _joystick_instance(void);
 //#include "build/display.h"
 //***************************************************************************
 
@@ -61,10 +63,10 @@ uint32   CONTROL_ButtonHeldState2;
 uint32   CONTROL_JoyHatState[MAXJOYHATS];
 
 static short mouseButtons = 0;
-static short lastmousebuttons = 0;
+static short mouse_wheel_buttons;
 
 static short joyHats[MAXJOYHATS];
-static short lastjoyHats[MAXJOYHATS];
+
 
 //***************************************************************************
 //
@@ -90,61 +92,204 @@ static int32 JoyButtonMapping[MAXJOYBUTTONS];
 static float JoyAnalogScale[MAXJOYAXES];
 static int32 JoyAnalogDeadzone[MAXJOYAXES];
 
-static void SETBUTTON(int i)
+static int32 mousePositionX, mousePositionY;
+static int32 mouseRelativeX, mouseRelativeY;
+
+static InputAim local_aim, submitted_aim;
+static struct { int32 sequence; InputAim delta; int base_turn, base_look; } look_fifo[MOVEFIFOSIZ];
+static InputAim packet_look;
+static int packet_base_turn, packet_base_look;
+static int immediate_look, was_active = -1, previous_aimmode = -1;
+static Uint64 last_poll;
+static int32_t turn_rate, pitch_rate;
+
+int CONTROL_ImmediateLook(void) { return immediate_look; }
+
+static int turnscale(void)
 {
-	int b;
-	
-	if (i < 32) {
-		b = 1 << i;
-		
-		CONTROL_ButtonState1 |= b;
-	} else {
-		i -= 32;
-		
-		b = 1 << i;
-		
-		CONTROL_ButtonState2 |= b;
-	}
+#if DUKE3D_GAMEVER < GAMEVER_11
+    return TICSPERFRAME;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+    return 1;
+#else
+    return 2;
+#endif
 }
 
-static void RESBUTTON(int i)
+static int turn_delta(int turn)
 {
-	int b;
-	
-	if (i < 32) {
-		b = 1 << i;
-		
-		CONTROL_ButtonState1 &= ~b;
-	} else {
-		i -= 32;
-		
-		b = 1 << i;
-		
-		CONTROL_ButtonState2 &= ~b;
-	}
+#if DUKE3D_GAMEVER < GAMEVER_11
+    return (turn + (turn >> 3)) * TICSPERFRAME;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
+    return turn;
+#else
+    int delta = turn * 2;
+    int sect = ps[myconnectindex].cursectnum;
+    if (sect >= 0 && sect < numsectors && sector[sect].lotag == 2)
+        delta -= delta >> 3;
+    return delta;
+#endif
+}
+
+void CONTROL_GetView(int32 *yaw, int32 *horizon)
+{
+    *yaw = (int32)(local_aim.yaw + submitted_aim.yaw);
+    *horizon = (int32)(local_aim.horizon + submitted_aim.horizon);
+}
+
+void CONTROL_ConsumeLook(int32 *turn, int32 *look, int maxturn, int maxlook)
+{
+    int slot = movefifoend[myconnectindex] & (MOVEFIFOSIZ - 1);
+    int base_turn = min(max(*turn, -maxturn), maxturn);
+    int base_look = min(max(*look, -maxlook), maxlook);
+    int32 t, h;
+    int delta, step = local_aim.yaw >= 0 ? 1 : -1;
+    int64_t desired = local_aim.yaw;
+    INPUT_ConsumeLook(&local_aim, turnscale(), &t, &h);
+    /* Quantize against the release's actual turn transform, without overshoot. */
+    *turn = base_turn;
+    while (*turn + step >= -maxturn && *turn + step <= maxturn) {
+        int64_t next = (int64_t)(turn_delta(*turn + step) - turn_delta(base_turn)) * 65536;
+        if ((step > 0 && next > desired) || (step < 0 && next < desired)) break;
+        *turn += step;
+    }
+    *look = min(max(base_look + h, -maxlook), maxlook);
+    *look -= (*look - base_look) % 2;
+    local_aim.horizon += (int64_t)(h - (*look - base_look)) * 32768;
+    delta = turn_delta(*turn) - turn_delta(base_turn);
+    local_aim.yaw = desired - (int64_t)delta * 65536;
+    look_fifo[slot].base_turn = base_turn;
+    look_fifo[slot].base_look = base_look;
+    look_fifo[slot].sequence = movefifoend[myconnectindex];
+    look_fifo[slot].delta.yaw = (int64_t)delta * 65536;
+    look_fifo[slot].delta.horizon = (int64_t)(*look - base_look) * 32768;
+    submitted_aim.yaw += look_fifo[slot].delta.yaw;
+    submitted_aim.horizon += look_fifo[slot].delta.horizon;
+}
+
+/* Record the actual averaged/copied FIFO entry, rather than raw getinput. */
+void CONTROL_QueueInput(int32 sequence, int turn, int look)
+{
+    int slot = sequence & (MOVEFIFOSIZ - 1);
+    int previous = (sequence - 1) & (MOVEFIFOSIZ - 1);
+    InputAim represented, refund;
+    if (look_fifo[slot].sequence != sequence) {
+        look_fifo[slot].base_turn = turn;
+        look_fifo[slot].base_look = look;
+        look_fifo[slot].delta.yaw = look_fifo[slot].delta.horizon = 0;
+    }
+    packet_base_turn += look_fifo[slot].base_turn;
+    packet_base_look += look_fifo[slot].base_look;
+    packet_look.yaw += look_fifo[slot].delta.yaw;
+    packet_look.horizon += look_fifo[slot].delta.horizon;
+    if (sequence & (movesperpacket - 1)) {
+        look_fifo[slot].base_turn = look_fifo[previous].base_turn;
+        look_fifo[slot].base_look = look_fifo[previous].base_look;
+    } else {
+        look_fifo[slot].base_turn = packet_base_turn / movesperpacket;
+        look_fifo[slot].base_look = packet_base_look / movesperpacket;
+    }
+    represented.yaw = (int64_t)(turn_delta(turn) - turn_delta(look_fifo[slot].base_turn)) * 65536;
+    represented.horizon = (int64_t)((look >> 1) - (look_fifo[slot].base_look >> 1)) * 65536;
+    if (!(sequence & (movesperpacket - 1))) {
+        refund.yaw = packet_look.yaw - represented.yaw * movesperpacket;
+        refund.horizon = packet_look.horizon - represented.horizon * movesperpacket;
+        local_aim.yaw += refund.yaw; local_aim.horizon += refund.horizon;
+        submitted_aim.yaw -= refund.yaw; submitted_aim.horizon -= refund.horizon;
+        packet_look.yaw = packet_look.horizon = 0;
+        packet_base_turn = packet_base_look = 0;
+    }
+    look_fifo[slot].sequence = sequence;
+    look_fifo[slot].delta = represented;
+}
+
+void CONTROL_AcknowledgeInput(int32 sequence)
+{
+    int slot = sequence & (MOVEFIFOSIZ - 1);
+    if (look_fifo[slot].sequence != sequence) return;
+    submitted_aim.yaw -= look_fifo[slot].delta.yaw;
+    submitted_aim.horizon -= look_fifo[slot].delta.horizon;
+    look_fifo[slot].sequence = -1;
+}
+
+static uint64_t keyboard_buttons, mouse_buttons_held, joy_buttons, pressed_buttons;
+static uint64_t previous_buttons, suppressed_buttons;
+static unsigned char key_down[256];
+static ControlInfo mouse_pending, joystick_sample;
+
+static uint64_t actionbit(int action)
+{
+    return action >= 0 && action < MAXGAMEBUTTONS ? UINT64_C(1) << action : 0;
+}
+
+static void publish_buttons(void)
+{
+    uint64_t held = keyboard_buttons | mouse_buttons_held | joy_buttons |
+        GAMEPAD_ButtonState1 | ((uint64_t)GAMEPAD_ButtonState2 << 32);
+    suppressed_buttons &= held;
+    pressed_buttons |= held & ~previous_buttons & ~suppressed_buttons;
+    previous_buttons = held;
+    held = (held | pressed_buttons) & ~suppressed_buttons;
+    CONTROL_ButtonState1 = (uint32_t)held;
+    CONTROL_ButtonState2 = (uint32_t)(held >> 32);
 }
 
 void CONTROL_UpdateKeyboardState(int key, int pressed)
 {
-	int i;
-	
-	for (i = 0; i < MAXGAMEBUTTONS; i++) {
-		if (KeyMapping[i].key_active == false) {
-			continue;
-		}
-		
-		if (KeyMapping[i].key1 == key || 
-			KeyMapping[i].key2 == key) {
-			
-			if (pressed) {
-				SETBUTTON(i);
-			} else {
-				RESBUTTON(i);
-			}
-		}
-	}	
+    int i;
+    if (key < 0 || key >= 256) return;
+    key_down[key] = pressed != 0;
+    keyboard_buttons = 0;
+    for (i = 0; i < MAXGAMEBUTTONS; i++)
+        if (KeyMapping[i].key_active &&
+            ((KeyMapping[i].key1 && key_down[KeyMapping[i].key1]) ||
+             (KeyMapping[i].key2 && key_down[KeyMapping[i].key2])))
+            keyboard_buttons |= actionbit(i);
+    publish_buttons();
 }
 
+void CONTROL_EndInput(void)
+{
+    pressed_buttons = 0;
+    publish_buttons();
+}
+
+void CONTROL_ResetInput(void)
+{
+    int i;
+    local_aim.yaw = local_aim.horizon = 0;
+    submitted_aim.yaw = submitted_aim.horizon = 0;
+    packet_look.yaw = packet_look.horizon = 0;
+    packet_base_turn = packet_base_look = 0;
+    memset(look_fifo, 0, sizeof(look_fifo));
+    for (i = 0; i < MOVEFIFOSIZ; i++) look_fifo[i].sequence = -1;
+    last_poll = 0;
+    turn_rate = pitch_rate = 0;
+    GAMEPAD_ResetInput();
+    KB_ClearKeysDown();
+    immediate_look = 0;
+    mouseRelativeX = mouseRelativeY = mouse_wheel_buttons = 0;
+    keyboard_buttons = mouse_buttons_held = joy_buttons = pressed_buttons = 0;
+    previous_buttons = suppressed_buttons = 0;
+    memset(key_down, 0, sizeof(key_down));
+    memset(&mouse_pending, 0, sizeof(mouse_pending));
+    memset(&joystick_sample, 0, sizeof(joystick_sample));
+    clearmouseinput();
+    mouseButtons = 0;
+    publish_buttons();
+}
+
+int CONTROL_GetWheelDirection(void)
+{
+    int direction = readmousewheel();
+    int action = MouseMapping[direction > 0 ? 3 : 4];
+    if (direction == 0) return 0;
+    if (action == gamefunc_Previous_Weapon) return -1;
+    if (action == gamefunc_Next_Weapon) return 1;
+    pressed_buttons |= actionbit(action);
+    publish_buttons();
+    return 0;
+}
 
 // added.  --ryan.
 const char *CONTROL_GetMappingName(int32 which)
@@ -215,7 +360,12 @@ boolean CONTROL_FlagActive( int32 which )
 
 void CONTROL_ClearAssignments( void )
 {
-	STUBBED("CONTROL_ClearAssignments");
+    memset(KeyMapping, 0, sizeof(KeyMapping));
+    memset(MouseMapping, -1, sizeof(MouseMapping));
+    memset(JoyButtonMapping, -1, sizeof(JoyButtonMapping));
+    memset(JoyHatMapping, -1, sizeof(JoyHatMapping));
+    memset(JoyAxisMapping, -1, sizeof(JoyAxisMapping));
+    CONTROL_ResetInput();
 }
 
 void CONTROL_GetUserInput( UserInput *info )
@@ -223,11 +373,66 @@ void CONTROL_GetUserInput( UserInput *info )
 	STUBBED("CONTROL_GetUserInput");
 }
 
-void CONTROL_GetInput( ControlInfo *info )
+static int prepare_input(void)
 {
+    int active;
+    active = (ps[myconnectindex].gm & MODE_GAME) &&
+        !(ps[myconnectindex].gm & (MODE_MENU | MODE_TYPE | MODE_EOL | MODE_RESTART)) &&
+        !ud.pause_on && !ud.show_help && !(ud.scrollmode && ud.overhead_on) && ud.recstat != 2 &&
+        ps[myconnectindex].newowner < 0;
+    if ((was_active >= 0 && active != was_active) ||
+        (previous_aimmode >= 0 && myaimmode != previous_aimmode)) CONTROL_ResetInput();
+    previous_aimmode = myaimmode;
+    was_active = active;
+    immediate_look = active;
+    return active;
+}
+
+static void control_event(const SDL_Event *event)
+{
+    int action = -1, button, j;
+    if (event == NULL) { prepare_input(); return; }
+    action = GAMEPAD_EventAction(event);
+    if (event->type == SDL_MOUSEBUTTONDOWN) {
+        button = event->button.button;
+        if (button == SDL_BUTTON_LEFT) action = MouseMapping[0];
+        else if (button == SDL_BUTTON_RIGHT) action = MouseMapping[1];
+        else if (button == SDL_BUTTON_MIDDLE) action = MouseMapping[2];
+    } else if (CONTROL_JoystickEnabled && !GAMEPAD_Connected()) {
+        if (event->type == SDL_JOYBUTTONDOWN && event->jbutton.which == _joystick_instance() &&
+            event->jbutton.button < MAXJOYBUTTONS)
+            action = JoyButtonMapping[event->jbutton.button];
+        else if (event->type == SDL_JOYHATMOTION && event->jhat.which == _joystick_instance() &&
+                 event->jhat.hat < MAXJOYHATS)
+            for (j = 0; j < 8; j++)
+                if (event->jhat.value & (1 << j))
+                    pressed_buttons |= actionbit(JoyHatMapping[event->jhat.hat][j]);
+    }
+    pressed_buttons |= actionbit(action) & ~suppressed_buttons;
+    publish_buttons();
+}
+
+void CONTROL_PollDevices(void)
+{
+    ControlInfo sample, *info = &sample;
     int32 sens = CONTROL_GetMouseSensitivity() >> 9;
     int32 mx, my;
-    int i, j;
+    int i, j, active;
+    int32 padturn, padpitch;
+    int basehorizon;
+    Uint64 now = SDL_GetPerformanceCounter();
+    int64_t elapsed;
+    active = prepare_input();
+    elapsed = last_poll ? (now - last_poll) * 1000000 / SDL_GetPerformanceFrequency() : 0;
+    last_poll = now;
+    basehorizon = (numplayers > 1 ? myhoriz : ps[myconnectindex].horiz) +
+        (int)(submitted_aim.horizon / 65536);
+    if (active) {
+        INPUT_AddRate(&local_aim,
+            (int64_t)turn_rate * turnscale() * TICRATE / TICSPERFRAME,
+            (int64_t)pitch_rate * TICRATE / (2 * TICSPERFRAME),
+            (uint32_t)elapsed, basehorizon, getviewhorizscale());
+    }
     GAMEPAD_Poll();
     memset(info, '\0', sizeof (ControlInfo));
 
@@ -264,19 +469,31 @@ void CONTROL_GetInput( ControlInfo *info )
                break;
        }
 
-    // TODO: releasing the mouse button does not honor if a keyboard key with
-    // the same function is still pressed. how should it?
-    for(i=0; i<MAXMOUSEBUTTONS;++i)
-    {
-	if( MouseMapping[i] != -1 )
-	{
-	    if(!(lastmousebuttons & (1<<i)) && mouseButtons & (1<<i))
-		SETBUTTON(MouseMapping[i]);
-	    else if(lastmousebuttons & (1<<i) && !(mouseButtons & (1<<i)))
-		RESBUTTON(MouseMapping[i]);
-	}
+    if (active) {
+        int64_t yaw = 0, pitch = 0;
+        if (!BUTTON(gamefunc_Strafe)) {
+#if DUKE3D_GAMEVER < GAMEVER_11
+            yaw = (int64_t)mx * CONTROL_GetMouseSensitivity() * 65536 * turnscale() / (512 * 256);
+#else
+            yaw = (int64_t)mx * CONTROL_GetMouseSensitivity() * 65536 * turnscale() / (512 * 64);
+#endif
+            info->dyaw = 0;
+        }
+        if (myaimmode || ControllerType == controltype_joystickandmouse) {
+            pitch = (int64_t)my * CONTROL_GetMouseSensitivity() * 65536 / (512 * 186);
+            if (ud.mouseflip) pitch = -pitch;
+            info->dpitch = 0;
+        }
+        INPUT_AddLook(&local_aim, yaw, pitch, basehorizon, getviewhorizscale());
     }
-    lastmousebuttons = mouseButtons;
+    mouse_pending.dyaw += info->dyaw;
+    mouse_pending.dpitch += info->dpitch;
+    mouse_pending.dz += info->dz;
+    memset(info, 0, sizeof(*info));
+    mouse_buttons_held = joy_buttons = 0;
+    for (i = 0; i < MAXMOUSEBUTTONS; i++)
+        if (i != 3 && i != 4 && (mouseButtons & (1 << i)))
+            mouse_buttons_held |= actionbit(MouseMapping[i]);
 
     // update stick state.
     if ((CONTROL_JoystickEnabled) && !GAMEPAD_Connected() && (_joystick_update()))
@@ -290,17 +507,10 @@ void CONTROL_GetInput( ControlInfo *info )
 
                        for(j=0; j<8; j++)
                        {
-                               if(!(lastjoyHats[i] & (1<<j)) && (joyHats[i] & (1<<j)))
-                               {
-                                       SETBUTTON(JoyHatMapping[i][j]);
-                               }
-                               else if((lastjoyHats[i] & (1<<j)) && !(joyHats[i] & (1<<j)))
-                               {
-                                       RESBUTTON(JoyHatMapping[i][j]);
-                               }
+                               if (joyHats[i] & (1 << j))
+                                   joy_buttons |= actionbit(JoyHatMapping[i][j]);
                        }
 
-                       lastjoyHats[i] = joyHats[i];
                }
                
 
@@ -363,20 +573,44 @@ void CONTROL_GetInput( ControlInfo *info )
         {
             if(_joystick_button(i))
             {
-                SETBUTTON(JoyButtonMapping[i]);
-            }
-            else
-            {
-                RESBUTTON(JoyButtonMapping[i]);
+                joy_buttons |= actionbit(JoyButtonMapping[i]);
             }
         }
     }
+    GAMEPAD_GetLook(&padturn, &padpitch);
+    turn_rate = padturn;
+    if (!BUTTON(gamefunc_Strafe))
+#if DUKE3D_GAMEVER < GAMEVER_11
+        turn_rate += (int32_t)((int64_t)sample.dyaw * 65536 / 256);
+#else
+        turn_rate += (int32_t)((int64_t)sample.dyaw * 65536 / 64);
+#endif
+    pitch_rate = padpitch + (int32_t)((int64_t)sample.dpitch * 65536 / 186 * (ud.mouseflip ? -1 : 1));
+    if (active) {
+        if (!BUTTON(gamefunc_Strafe)) sample.dyaw = 0;
+        sample.dpitch = 0;
+    }
+    joystick_sample = sample;
+    publish_buttons();
 }
+
+void CONTROL_GetInput(ControlInfo *info)
+{
+    *info = joystick_sample;
+    info->dyaw += mouse_pending.dyaw;
+    info->dpitch += mouse_pending.dpitch;
+    info->dz += mouse_pending.dz;
+    memset(&mouse_pending, 0, sizeof(mouse_pending));
+}
+
 
 void CONTROL_ClearButton( int32 whichbutton )
 {
-	RESBUTTON(whichbutton);
+    uint64_t bit = actionbit(whichbutton);
+    suppressed_buttons |= bit;
+    pressed_buttons &= ~bit;
     GAMEPAD_ClearButton(whichbutton);
+    publish_buttons();
 }
 
 void CONTROL_ClearUserInput( UserInput *info )
@@ -428,16 +662,19 @@ void CONTROL_Startup
 
     _joystick_init();
     GAMEPAD_Init();
+    CONTROL_ResetInput();
+    setinputcallback(CONTROL_PollDevices, CONTROL_ResetInput, control_event);
 
     for (i=0; i < MAXJOYHATS; i++)
     {
 	    joyHats[i] = 0;
-	    lastjoyHats[i] = 0;
     }
 }
 
 void CONTROL_Shutdown( void )
 {
+    setinputcallback(NULL, NULL, NULL);
+    CONTROL_ResetInput();
     GAMEPAD_Shutdown();
     _joystick_deinit();
 }
@@ -543,16 +780,15 @@ void    MOUSE_HideCursor( void )
 	STUBBED("MOUSE_HideCursor");
 }
 
-static int32 mousePositionX = 0;
-static int32 mousePositionY = 0;
-static int32 mouseRelativeX = 0;
-static int32 mouseRelativeY = 0;
+
 
 static void updateMouse(void)
 {
     // this is in buildengine.
-    short x, y;
-    getmousevalues(&x, &y, &mouseButtons);
+    int32 x, y;
+    getmousevalues32(&x, &y, &mouseButtons);
+    mouse_wheel_buttons |= mouseButtons & 24;
+    mouseButtons |= mouse_wheel_buttons;
 
     mouseRelativeX += x;
     mouseRelativeY += y;
@@ -562,8 +798,12 @@ static void updateMouse(void)
 
 int32   MOUSE_GetButtons( void )
 {
+    int32 buttons;
     updateMouse();
-    return ((int32) mouseButtons);
+    buttons = mouseButtons;
+    mouse_wheel_buttons = 0;
+    mouseButtons &= ~24;
+    return buttons;
 }
 
 void    MOUSE_GetPosition( int32*x, int32*y  )

@@ -7,6 +7,7 @@ add_library(duke3d_game OBJECT
   control.c
   gamedef.c
   gamepad.c
+  inputaim.c
   global.c
   keyboard.c
   menues.c

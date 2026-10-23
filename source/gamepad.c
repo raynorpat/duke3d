@@ -11,6 +11,14 @@ static int axes[4];
 static unsigned previous_keys;
 static Uint32 repeat_at[4];
 
+static const int actions[] = {
+        gamefunc_Jump, gamefunc_Crouch, gamefunc_Open, gamefunc_Inventory,
+        gamefunc_Map, -1, -1, gamefunc_Run, gamefunc_Crouch,
+        gamefunc_Previous_Weapon, gamefunc_Next_Weapon,
+        gamefunc_MedKit, gamefunc_Jetpack, gamefunc_Inventory_Left, gamefunc_Inventory_Right
+    };
+static unsigned trigger_held;
+
 static int stick(int value)
 {
     const int deadzone = 8000;
@@ -77,14 +85,34 @@ void GAMEPAD_ClearButton(int action)
         GAMEPAD_ButtonState2 &= ~(UINT32_C(1) << (action - 32));
 }
 
+int GAMEPAD_EventAction(const SDL_Event *event)
+{
+    int action = -1;
+    if (event->type == SDL_CONTROLLERDEVICEADDED) GAMEPAD_Poll();
+    if (controller == NULL || !(ps[myconnectindex].gm & MODE_GAME) ||
+        (ps[myconnectindex].gm & (MODE_MENU | MODE_TYPE))) return -1;
+    if (event->type == SDL_CONTROLLERBUTTONDOWN &&
+        event->cbutton.which == SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller)) &&
+        event->cbutton.button < sizeof(actions)/sizeof(actions[0])) {
+        action = actions[event->cbutton.button];
+        if (action >= 0) suppressed &= ~(UINT64_C(1) << action);
+    } else if (event->type == SDL_CONTROLLERAXISMOTION &&
+               event->caxis.which == SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller)) &&
+               (event->caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT ||
+                event->caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT)) {
+        unsigned bit = event->caxis.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT ? 1u : 2u;
+        int held = event->caxis.value > 8000;
+        if (held && !(trigger_held & bit))
+            action = bit == 1u ? gamefunc_Quick_Kick : gamefunc_Fire;
+        if (held) trigger_held |= bit;
+        else trigger_held &= ~bit;
+        if (action >= 0 && (suppressed & (UINT64_C(1) << action))) action = -1;
+    }
+    return action;
+}
+
 void GAMEPAD_Poll(void)
 {
-    static const int actions[] = {
-        gamefunc_Jump, gamefunc_Crouch, gamefunc_Open, gamefunc_Inventory,
-        gamefunc_Map, -1, -1, gamefunc_Run, gamefunc_Crouch,
-        gamefunc_Previous_Weapon, gamefunc_Next_Weapon,
-        gamefunc_MedKit, gamefunc_Jetpack, gamefunc_Inventory_Left, gamefunc_Inventory_Right
-    };
     static const int keys[] = {
         sc_UpArrow, sc_DownArrow, sc_LeftArrow, sc_RightArrow, sc_Enter, sc_Escape
     };
@@ -168,12 +196,35 @@ void GAMEPAD_Poll(void)
     previous_keys = menu_keys;
 }
 
+void GAMEPAD_ResetInput(void)
+{
+    suppressed = UINT64_MAX;
+    trigger_held = 0;
+    if (controller != NULL) {
+        if (SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 8000) trigger_held |= 1u;
+        if (SDL_GameControllerGetAxis(controller, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 8000) trigger_held |= 2u;
+    }
+    GAMEPAD_ButtonState1 = GAMEPAD_ButtonState2 = 0;
+    previous_keys = 0;
+    was_menu = -1;
+    memset(axes, 0, sizeof(axes));
+    memset((void *)KB_GamepadKeyDown, 0, sizeof(KB_GamepadKeyDown));
+}
+
+void GAMEPAD_GetLook(int32_t *turn, int32_t *look)
+{
+    *turn = (int32_t)((int64_t)axes[2] * 45 * 65536 / 32767);
+    *look = (int32_t)(-(int64_t)axes[3] * 32 * 65536 / 32767);
+}
+
 void GAMEPAD_AddInput(int running, int32_t *forward, int32_t *strafe,
                      int32_t *turn, int32_t *look)
 {
     int speed = running ? 80 : 40;
     *forward -= axes[1] * speed / 32767;
     *strafe -= axes[0] * speed / 32767;
-    *turn += axes[2] * 45 / 32767;
-    *look -= axes[3] * 32 / 32767;
+    if (!CONTROL_ImmediateLook()) {
+        *turn += axes[2] * 45 / 32767;
+        *look -= axes[3] * 32 / 32767;
+    }
 }

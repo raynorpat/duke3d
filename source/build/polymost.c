@@ -1295,10 +1295,14 @@ void polymost_drawrooms ()
 	gviewxrange = ((double)viewingrange)*((double)xdimen)/(32768.0*1024.0);
 	gcosang = ((double)cosglobalang)/262144.0;
 	gsinang = ((double)singlobalang)/262144.0;
+    if (viewyawfraction) {
+        gcosang = cos(renderangle * (3.14159265358979323846 / 1024.0)) / 16.0;
+        gsinang = sin(renderangle * (3.14159265358979323846 / 1024.0)) / 16.0;
+    }
 	gcosang2 = gcosang*((double)viewingrange)/65536.0;
 	gsinang2 = gsinang*((double)viewingrange)/65536.0;
 	ghalfx = (double)halfxdimen; grhalfxdown10 = 1.0/(((double)ghalfx)*1024);
-	ghoriz = (double)globalhoriz;
+	ghoriz = viewhorizonfraction ? renderhorizon : (double)globalhoriz;
 
 		//global cos/sin height angle
 	r = (double)((ydimen>>1)-ghoriz);

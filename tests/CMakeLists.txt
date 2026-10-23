@@ -1023,3 +1023,31 @@ set_tests_properties(editor_mode PROPERTIES
 add_executable(video_opts video_opts.c "${PROJECT_SOURCE_DIR}/source/videoopts.c")
 target_include_directories(video_opts PRIVATE "${PROJECT_SOURCE_DIR}/source")
 add_test(NAME video_opts COMMAND video_opts)
+
+add_executable(input_polling input_polling.c "${_game_c}")
+target_link_libraries(input_polling PRIVATE duke3d_game duke3d::SDL2main)
+add_test(NAME input_polling COMMAND input_polling)
+set_tests_properties(input_polling PROPERTIES
+  ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;BUILD_WINDOWED=1;BUILD_SDLJOYSTICK=none"
+  TIMEOUT 30)
+
+add_executable(input_aim input_aim.c "${PROJECT_SOURCE_DIR}/source/inputaim.c")
+target_include_directories(input_aim PRIVATE "${PROJECT_SOURCE_DIR}/source")
+if(NOT WIN32)
+  target_link_libraries(input_aim PRIVATE m)
+endif()
+add_test(NAME input_aim COMMAND input_aim)
+
+add_executable(joystick_polling joystick_polling.c "${_game_c}")
+target_link_libraries(joystick_polling PRIVATE duke3d_game duke3d::SDL2main)
+add_test(NAME joystick_polling COMMAND joystick_polling)
+set_tests_properties(joystick_polling PROPERTIES
+  ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1"
+  SKIP_RETURN_CODE 77 TIMEOUT 30)
+
+add_executable(input_render input_render.c "${_game_c}")
+target_link_libraries(input_render PRIVATE duke3d_game duke3d::SDL2main)
+add_test(NAME input_render COMMAND input_render)
+set_tests_properties(input_render PROPERTIES
+  ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+  TIMEOUT 30)

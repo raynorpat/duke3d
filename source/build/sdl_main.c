@@ -54,6 +54,12 @@ static int root_sdl_event_filter(const SDL_Event *event)
         case SDL_MOUSEWHEEL:
             return(sdl_mouse_wheel_filter(&event->wheel));
         case SDL_WINDOWEVENT:
+            if (event->window.event == SDL_WINDOWEVENT_FOCUS_LOST ||
+                event->window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+                sdl_input_focused = event->window.event == SDL_WINDOWEVENT_FOCUS_GAINED;
+                clearmouseinput();
+                if (sdl_input_reset != NULL) sdl_input_reset();
+            }
             if (event->window.event == SDL_WINDOWEVENT_EXPOSED)
                 sdl_window_present();
 #ifdef USE_OPENGL
@@ -87,8 +93,13 @@ static void handle_events(void)
 {
     SDL_Event event;
 
-    while (SDL_PollEvent(&event))
+    /* NULL lets the game clear old context before fresh events arrive. */
+    if (sdl_input_focused && sdl_input_event != NULL) sdl_input_event(NULL);
+    while (SDL_PollEvent(&event)) {
         root_sdl_event_filter(&event);
+        if (sdl_input_focused && sdl_input_event != NULL) sdl_input_event(&event);
+    }
+    if (sdl_input_focused && sdl_input_poll != NULL) sdl_input_poll();
 } /* handle_events */
 
 

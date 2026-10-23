@@ -144,7 +144,7 @@ static char * keydefaults[] =
    "Show_Opponents_Weapon", "", "",
    "Map_Follow_Mode", "F", "", 
    "See_Coop_View", "K", "", 
-   "Mouse_Aiming", "U", "", 
+   "Mouse_Aiming", "", "",
    "Toggle_Crosshair", "I", "", 
    "Steroids", "R", "", 
    "Quick_Kick", "`", "", 

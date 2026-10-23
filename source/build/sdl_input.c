@@ -32,6 +32,58 @@ static unsigned int scancodes[SDL_NUM_SCANCODES];
 static SDL_Joystick *joystick = NULL;
 
 
+void (*sdl_input_poll)(void), (*sdl_input_reset)(void);
+void (*sdl_input_event)(const SDL_Event *);
+int sdl_input_focused = 1;
+struct mousewheel { int count; struct mousewheel *next; };
+static struct mousewheel *wheel_head, *wheel_tail;
+static double wheel_fraction;
+
+void setinputcallback(void (*poll)(void), void (*reset)(void),
+                      void (*event)(const SDL_Event *))
+{
+    sdl_input_poll = poll; sdl_input_reset = reset; sdl_input_event = event;
+}
+
+int readmousewheel(void)
+{
+    struct mousewheel *w = wheel_head;
+    int direction;
+    if (w == NULL) return 0;
+    direction = w->count > 0 ? 1 : -1;
+    w->count -= direction;
+    if (w->count == 0) {
+        wheel_head = w->next;
+        if (wheel_head == NULL) wheel_tail = NULL;
+        SDL_free(w);
+    }
+    return direction;
+}
+
+void clearmouseinput(void)
+{
+    mouse_relative_x = mouse_relative_y = mouse_buttons = 0;
+    wheel_fraction = 0;
+    while (wheel_head != NULL) {
+        struct mousewheel *next = wheel_head->next;
+        SDL_free(wheel_head);
+        wheel_head = next;
+    }
+    wheel_tail = NULL;
+}
+
+void readmousexy32(int32_t *x, int32_t *y)
+{
+    if (x) *x = mouse_relative_x * 4;
+    if (y) *y = mouse_relative_y * 4;
+    mouse_relative_x = mouse_relative_y = 0;
+}
+
+int _joystick_instance(void)
+{
+    return joystick != NULL ? SDL_JoystickInstanceID(joystick) : -1;
+}
+
 /*
 ================
 set_mouse_grab
@@ -53,7 +105,7 @@ static void set_mouse_grab(int grab)
 sdl_mouse_button_filter
 
 Translate SDL button numbering into Build's left/right/middle bit order.
-Legacy release handling toggles the mapped bit; wheel pulses are handled separately.
+Release clears the mapped bit; wheel pulses are handled separately.
 ================
 */
 int sdl_mouse_button_filter(SDL_MouseButtonEvent const *event)
@@ -71,7 +123,7 @@ int sdl_mouse_button_filter(SDL_MouseButtonEvent const *event)
     Uint8 button = event->button;
 
     /* SDL2 reports the wheel separately; buttons 4/5 are X1/X2 now. */
-    if (button > SDL_BUTTON_RIGHT)
+    if (!sdl_input_focused || button > SDL_BUTTON_RIGHT)
         return(0);
 
     if (button == SDL_BUTTON_RIGHT)
@@ -82,7 +134,7 @@ int sdl_mouse_button_filter(SDL_MouseButtonEvent const *event)
     if (((const SDL_MouseButtonEvent*)event)->state)
         mouse_buttons |= 1<<(button-1);
     else if (button != 4 && button != 5)
-        mouse_buttons ^= 1<<(button-1);
+        mouse_buttons &= ~(1<<(button-1));
 
 #if 0
     Uint8 bmask = SDL_GetMouseState(NULL, NULL);
@@ -99,23 +151,36 @@ int sdl_mouse_button_filter(SDL_MouseButtonEvent const *event)
 ================
 sdl_mouse_wheel_filter
 
-Latch vertical wheel direction bits until readmousebstatus consumes them.
-Normalize SDL's flipped-wheel convention before setting the pulse.
+Queue ordered wheel steps for game input and latch legacy direction bits.
+Preserve precise-wheel fractions between events.
 ================
 */
 int sdl_mouse_wheel_filter(SDL_MouseWheelEvent const *event)
 {
-    /* bits 3 and 4 are wheel up/down; readmousebstatus() clears them. */
     Sint32 y = event->y;
-
-    if (event->direction == SDL_MOUSEWHEEL_FLIPPED)
-        y = -y;
-
-    if (y > 0)
-        mouse_buttons |= 8;
-    else if (y < 0)
-        mouse_buttons |= 16;
-    return(0);
+    struct mousewheel *w;
+    if (!sdl_input_focused) return 0;
+    if (event->direction == SDL_MOUSEWHEEL_FLIPPED) y = -y;
+#if SDL_VERSION_ATLEAST(2, 0, 18)
+    if (event->preciseY != 0.0f) {
+        double delta = event->preciseY;
+        if (event->direction == SDL_MOUSEWHEEL_FLIPPED) delta = -delta;
+        wheel_fraction += delta;
+        y = (Sint32)wheel_fraction;
+        wheel_fraction -= y;
+    }
+#endif
+    if (y == 0) return 0;
+    if (y > 0) mouse_buttons |= 8;
+    else mouse_buttons |= 16;
+    if (sdl_input_poll == NULL) return 0;
+    w = SDL_malloc(sizeof(*w));
+    if (w == NULL) return 0;
+    w->count = y; w->next = NULL;
+    if (wheel_tail != NULL) wheel_tail->next = w;
+    else wheel_head = w;
+    wheel_tail = w;
+    return 0;
 } /* sdl_mouse_wheel_filter */
 
 
@@ -134,7 +199,7 @@ int sdl_mouse_motion_filter(SDL_Event const *event)
     SDL_Event scaled;
 #endif
 
-    if (sdl_window == NULL)
+    if (sdl_window == NULL || !sdl_input_focused)
         return(0);
 
 #ifdef USE_OPENGL
@@ -405,14 +470,18 @@ void _joystick_deinit(void)
 ================
 _joystick_update
 
-Refresh SDL's polled joystick state when a device is open.
-Return whether polling had an open device to update.
+Refresh SDL's joystick state, reopening a device when needed.
+Return zero if no attached device is available.
 ================
 */
 int _joystick_update(void)
 {
-    if (joystick == NULL)
-        return(0);
+    if (joystick == NULL && SDL_NumJoysticks() > 0) _joystick_init();
+    if (joystick == NULL) return 0;
+    if (!SDL_JoystickGetAttached(joystick)) {
+        _joystick_deinit();
+        return 0;
+    }
 
     SDL_JoystickUpdate();
     return(1);
@@ -527,10 +596,10 @@ Clear both accumulators after returning the motion so each event is counted once
 */
 void readmousexy(short *x, short *y)
 {
-    if (x) *x = mouse_relative_x << 2;
-    if (y) *y = mouse_relative_y << 2;
-
-    mouse_relative_x = mouse_relative_y = 0;
+    int32_t dx, dy;
+    readmousexy32(&dx, &dy);
+    if (x) *x = (short)min(max(dx, -32768), 32767);
+    if (y) *y = (short)min(max(dy, -32768), 32767);
 } /* readmousexy */
 
 

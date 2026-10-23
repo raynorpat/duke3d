@@ -29,6 +29,9 @@
 extern SDL_Window *sdl_window;
 extern SDL_Surface *surface;
 extern int sdl_mouse_grabbed;
+extern int sdl_input_focused;
+extern void (*sdl_input_poll)(void), (*sdl_input_reset)(void);
+extern void (*sdl_input_event)(const SDL_Event *);
 extern int sdl_displaymode, sdl_displaymode_wanted;
 extern int sdl_debug_hall_of_mirrors;
 extern char *sdl_titlelong;

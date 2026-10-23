@@ -3488,6 +3488,64 @@ void allignwarpelevators(void)
 
 
 
+/* Cycle commands are discrete input events, even during a weapon change. */
+static void cycleweapon(short snum, uint32_t *bits)
+{
+    struct player_struct *p = &ps[snum];
+    int command = (*bits >> 8) & 15;
+    int step, weapon, count, selected = KNEE_WEAPON;
+    int oldpos, oldweapon;
+    if (command != CONTROL_WEAPON_PREVIOUS && command != CONTROL_WEAPON_NEXT) return;
+    *bits &= ~(15u << 8);
+    if (ud.pause_on || p->newowner >= 0 || p->cheat_phase || p->show_empty_weapon ||
+        p->kickback_pic || p->quick_kick || p->access_incs || p->knee_incs ||
+        sprite[p->i].xrepeat <= 32) return;
+#if DUKE3D_GAMEVER < GAMEVER_10
+    if (p->last_pissed_time >= 26*58) return;
+#else
+    if (p->last_pissed_time > 26*218) return;
+#endif
+    step = command == CONTROL_WEAPON_PREVIOUS ? -1 : 1;
+    weapon = p->curr_weapon;
+#if DUKE3D_GAMEVER >= GAMEVER_10
+    if (weapon == HANDREMOTE_WEAPON) weapon = HANDBOMB_WEAPON;
+#endif
+#if DUKE3D_GAMEVER >= GAMEVER_14
+    if (weapon == GROW_WEAPON) weapon = SHRINKER_WEAPON;
+#endif
+    for (count = 0; count < 10; count++) {
+        int candidate;
+        weapon = (weapon + step + 10) % 10;
+        candidate = weapon;
+#if DUKE3D_GAMEVER >= GAMEVER_14
+        if (weapon == SHRINKER_WEAPON) {
+            if ((p->subweapon & (1 << GROW_WEAPON)) &&
+                p->gotweapon[GROW_WEAPON] && p->ammo_amount[GROW_WEAPON] > 0)
+                candidate = GROW_WEAPON;
+            else if ((!p->gotweapon[SHRINKER_WEAPON] || p->ammo_amount[SHRINKER_WEAPON] == 0) &&
+                     p->gotweapon[GROW_WEAPON] && p->ammo_amount[GROW_WEAPON] > 0)
+                candidate = GROW_WEAPON;
+        }
+#endif
+        if (p->gotweapon[candidate] && p->ammo_amount[candidate] > 0) {
+            selected = candidate;
+            break;
+        }
+    }
+    if (selected == p->curr_weapon) return;
+#if DUKE3D_GAMEVER >= GAMEVER_14
+    if (selected == GROW_WEAPON) p->subweapon |= 1 << GROW_WEAPON;
+    else if (selected == SHRINKER_WEAPON) p->subweapon &= ~(1 << GROW_WEAPON);
+#endif
+    oldpos = p->weapon_pos;
+    oldweapon = p->last_weapon;
+    addweapon(p, selected);
+    if (oldpos < 0 && !p->holster_weapon) {
+        p->weapon_pos = oldpos;
+        p->last_weapon = oldweapon;
+    }
+}
+
 #if DUKE3D_GAMEVER < GAMEVER_13D
 // 1.1's cheatkeys (G11-S13): bit 23 toggles the aim mode, any key from bit 8
 // up is debounced, the quick kick switches to the boot, and the inventory
@@ -3502,6 +3560,7 @@ void cheatkeys(short snum)
 
     sb_snum = sync[snum].bits;
     p = &ps[snum];
+    cycleweapon(snum, &sb_snum);
 
 #if DUKE3D_GAMEVER < GAMEVER_10
     if(p->cheat_phase != 0) return;
@@ -3914,6 +3973,7 @@ void cheatkeys(short snum)
 
     sb_snum = sync[snum].bits;
     p = &ps[snum];
+    cycleweapon(snum, &sb_snum);
 
     if(p->cheat_phase == 1) return;
 

@@ -549,7 +549,7 @@ void resetplayerstats(short snum)
 
 #if DUKE3D_GAMEVER < GAMEVER_14
     if(ud.last_level == -1 || ud.recstat == 2)
-        p->aim_mode = 0;
+        p->aim_mode = ud.recstat == 2 ? 0 : myaimmode;
 #endif
 
     ud.show_help        = 0;
@@ -1253,10 +1253,11 @@ void newgame(char vn,char ln,char sk)
     struct player_struct *p = &ps[0];
     short i;
 
+    CONTROL_ResetInput();
     video_flushpending();  // shows frames of its own
 
 #if DUKE3D_GAMEVER < GAMEVER_14
-    if(ud.multimode < 2) p->aim_mode = 0;
+    if(ud.multimode < 2) p->aim_mode = ud.recstat == 2 ? 0 : myaimmode;
 #else
     if(globalskillsound >= 0)
         while(Sound[globalskillsound].lock>=200);
@@ -1779,6 +1780,7 @@ void enterlevel(char g)
     int32_t l;
     char levname[256];
 
+    CONTROL_ResetInput();
     video_flushpending();  // shows frames of its own
     if( (g&MODE_DEMO) != MODE_DEMO ) ud.recstat = ud.m_recstat;
     ud.respawn_monsters = ud.m_respawn_monsters;
