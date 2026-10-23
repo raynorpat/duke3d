@@ -10,17 +10,22 @@ set_tests_properties(sdl_driver_smoke PROPERTIES
 
 add_test(NAME sdl_driver_smoke_gl_fallback COMMAND sdl_driver_smoke gl_fallback)
 add_test(NAME sdl_driver_smoke_displaymode_setter COMMAND sdl_driver_smoke displaymode_setter)
+add_test(NAME sdl_driver_smoke_mode_sizes COMMAND sdl_driver_smoke mode_sizes)
 add_test(NAME sdl_driver_smoke_palette_fade COMMAND sdl_driver_smoke palette_fade)
 add_test(NAME sdl_driver_smoke_screencapture COMMAND sdl_driver_smoke screencapture_formats)
+add_test(NAME sdl_driver_smoke_video_fade COMMAND sdl_driver_smoke video_fade)
 set_tests_properties(sdl_driver_smoke_gl_fallback sdl_driver_smoke_displaymode_setter
+                     sdl_driver_smoke_mode_sizes
                      sdl_driver_smoke_palette_fade
-                     sdl_driver_smoke_screencapture PROPERTIES
+                     sdl_driver_smoke_screencapture
+                     sdl_driver_smoke_video_fade PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
   TIMEOUT 30)
 
 # Checks DUKE3D_GAMEVER, BUILD_ENGINEREV, BYTEVERSION and the volume macros
 # against this configuration's DUKE3D_VERSION. The table is kept here, apart
 # from the one that sets them, so a mistake in either shows up.
+set(_vexp_0.99_sw 199601040 19960104 9   0)
 set(_vexp_1.0_sw  199601290 19960129 10  0)
 set(_vexp_1.1_sw  199602200 19960220 12  0)
 set(_vexp_1.3D    199604190 19960419 103 0)
@@ -71,6 +76,26 @@ add_executable(engine_inside engine_inside.c)
 target_include_directories(engine_inside PRIVATE "${PROJECT_SOURCE_DIR}/source")
 target_link_libraries(engine_inside PRIVATE buildengine)
 add_test(NAME engine_inside COMMAND engine_inside)
+
+add_executable(net_protocol_peer net_protocol_peer.c)
+target_link_libraries(net_protocol_peer PRIVATE buildengine duke3d::SDL2main)
+
+function(add_protocol_refusal_tests name data port)
+  # Other releases need no sibling build or private data folder. Optional
+  # DUKE3D_NET_PEERS entries still exercise complete external game builds.
+  foreach(_byteversion 9 10 12 14 103 116 117 27)
+    if(_byteversion EQUAL _vbyte)
+      continue()
+    endif()
+    math(EXPR port "${port} + 2")
+    add_test(NAME net_refuse_${name}_protocol_${_byteversion}
+      COMMAND "${CMAKE_COMMAND}" "-DA=$<TARGET_FILE:net_game>" "-DA_DATA=${data}"
+        "-DB=$<TARGET_FILE:net_protocol_peer>" -DB_VERSION=${_byteversion}
+        -DPORT=${port} -DMODE=refuse "-DWORK=${CMAKE_BINARY_DIR}/np_${name}_${_byteversion}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
+    set_tests_properties(net_refuse_${name}_protocol_${_byteversion} PROPERTIES TIMEOUT 90)
+  endforeach()
+endfunction()
 
 add_executable(engine_trace engine_trace.c)
 target_include_directories(engine_trace PRIVATE "${PROJECT_SOURCE_DIR}/source")
@@ -258,6 +283,30 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
       ENVIRONMENT "BUILD_WINDOWED=1"
       SKIP_RETURN_CODE 77
       TIMEOUT 30)
+    # The VIDEO page's live renderer switch, from a run with no GL context
+    # yet, its modes, and the fade around them.
+    add_test(NAME render_gl_video
+      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" video)
+    set_tests_properties(render_gl_video PROPERTIES
+      ENVIRONMENT "BUILD_WINDOWED=1"
+      SKIP_RETURN_CODE 77
+      TIMEOUT 60)
+    # Supersampling on the shader path: the frame shown is the large one
+    # box-filtered down, its sizes, clamp and the settings that turn it off.
+    add_test(NAME render_gl_supersample
+      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" supersample)
+    set_tests_properties(render_gl_supersample PROPERTIES
+      ENVIRONMENT "BUILD_WINDOWED=1"
+      SKIP_RETURN_CODE 77
+      TIMEOUT 60)
+    # Texture filtering on every draw path: close to nearest, translucency
+    # and fades kept, nearest again byte for byte, with supersampling too.
+    add_test(NAME render_gl_filter
+      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" filter)
+    set_tests_properties(render_gl_filter PROPERTIES
+      ENVIRONMENT "BUILD_WINDOWED=1"
+      SKIP_RETURN_CODE 77
+      TIMEOUT 90)
   endif()
 
   # Boots the real game to its title loop and into E1L1, headless. It uses
@@ -303,9 +352,9 @@ file(READ "${PROJECT_SOURCE_DIR}/testdata/game.con" _game_con)
 file(WRITE "${_con_dir}/prefix.con"
   "action CONCOMPILE_PREFIX 0 1 1 1 1\r\n${_game_con}")
 
-# The in-repo CONs are 1.5 scripts, which a 1.3D, 1.1 or 1.0 build can't
+# The in-repo CONs are 1.5 scripts, which a 1.3D, 1.1, 1.0 or 0.99 build can't
 # compile.
-if(NOT DUKE3D_VERSION MATCHES "^(1\\.3D|1\\.1|1\\.0)$")
+if(NOT DUKE3D_VERSION MATCHES "^(1\\.3D|1\\.1|1\\.0|0\\.99)$")
   add_test(NAME con_compile COMMAND con_compile WORKING_DIRECTORY "${_con_dir}")
   set_tests_properties(con_compile PROPERTIES TIMEOUT 30)
 endif()
@@ -314,6 +363,110 @@ endif()
 add_executable(game_helpers game_helpers.c "${_game_c}")
 target_link_libraries(game_helpers PRIVATE duke3d_game)
 add_test(NAME game_helpers COMMAND game_helpers)
+
+add_executable(gamepad gamepad.c "${_game_c}")
+target_link_libraries(gamepad PRIVATE duke3d_game duke3d::SDL2main)
+add_test(NAME gamepad COMMAND gamepad)
+set_tests_properties(gamepad PROPERTIES
+  ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1"
+  SKIP_RETURN_CODE 77 TIMEOUT 30)
+
+if(UNIX)
+  add_executable(input_defaults input_defaults.c "${_game_c}")
+  target_link_libraries(input_defaults PRIVATE duke3d_game)
+  add_test(NAME input_defaults COMMAND input_defaults)
+  set_tests_properties(input_defaults PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;BUILD_WINDOWED=1"
+    TIMEOUT 30)
+endif()
+
+# The small full-screen HUD (screen_size 4) at several 8-bit modes: in
+# widescreen modes health sits at the screen's left edge and ammo and the
+# inventory at its right; 4:3 and tall modes keep their layout. Then a
+# deathmatch's frag bar and full status bar, which widescreen carries out to
+# the screen's edges. Each frame is drawn between guard bytes, so a write
+# past either end of the 8-bit frame fails. Pinned checksums, hex, of the
+# frame without and with an inventory item and of the bars; empty just
+# prints them. Needs game data.
+add_executable(minihud minihud.c "${_game_c}")
+target_link_libraries(minihud PRIVATE duke3d_game)
+if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
+  foreach(_pin "320x200;f2070c6d;f191ac15;12e20f57" "640x480;3444f9f9;fab217a1;7e4e5ac7"
+               "1280x1024;b324dd41;8b7c4151;b110fc47" "480x640;6b424f6e;b6211dae;46b43892"
+               "1280x720;d08e6033;f49c6dcd;22bd6018" "1600x900;742b8451;ac001fed;84cc6798"
+               "1600x675;43b810d6;14f9723b;383cc14b")
+    list(GET _pin 0 _size)
+    list(GET _pin 1 _plain)
+    list(GET _pin 2 _inv)
+    list(GET _pin 3 _bars)
+    string(REPLACE "x" ";" _wh "${_size}")
+    add_test(NAME minihud_${_size}
+      COMMAND minihud "${DUKE3D_GRP}"
+              "${CMAKE_CURRENT_BINARY_DIR}/minihud_${_size}" ${_wh}
+              "${_plain}" "${_inv}" "${_bars}")
+    set_tests_properties(minihud_${_size} PROPERTIES
+      ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+      TIMEOUT 30)
+  endforeach()
+endif()
+
+add_executable(net_game net_game.c "${_game_c}")
+target_link_libraries(net_game PRIVATE duke3d_game)
+
+if(NOT DUKE3D_VERSION MATCHES "^(0\\.99|1\\.0)$")
+  add_executable(player_death player_death.c "${_game_c}")
+  target_link_libraries(player_death PRIVATE duke3d_game)
+  add_test(NAME player_death COMMAND player_death)
+  set_tests_properties(player_death PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 30)
+endif()
+
+if(DUKE3D_VERSION MATCHES "^1\\.[01]$")
+  add_executable(early_scenarios early_scenarios.c "${_game_c}")
+  target_link_libraries(early_scenarios PRIVATE duke3d_game)
+  add_test(NAME early_scenarios COMMAND early_scenarios)
+  set_tests_properties(early_scenarios PROPERTIES TIMEOUT 30)
+  add_executable(player_prediction player_prediction.c "${_game_c}")
+  target_link_libraries(player_prediction PRIVATE duke3d_game)
+  add_test(NAME player_prediction COMMAND player_prediction)
+  set_tests_properties(player_prediction PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 30)
+endif()
+
+# The private copy reports the first game tic; the shipped executable has no hook.
+configure_file("${_game_c}" "${CMAKE_CURRENT_BINARY_DIR}/boot_game_impl.c" COPYONLY)
+set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/boot_game_impl.c" PROPERTIES
+  COMPILE_DEFINITIONS "SDL_MAIN_HANDLED;main=duke3d_main;DUKE3D_BOOT_TEST=1")
+add_executable(boot_game boot_game.c "${CMAKE_CURRENT_BINARY_DIR}/boot_game_impl.c")
+target_link_libraries(boot_game PRIVATE duke3d_game)
+
+if(DUKE3D_ROUTEBOT)
+  add_executable(routebot_test routebot.c "${_game_c}")
+  target_link_libraries(routebot_test PRIVATE duke3d_game)
+  add_test(NAME routebot COMMAND routebot_test)
+endif()
+
+add_executable(demo_writer demo_writer.c "${_game_c}")
+target_link_libraries(demo_writer PRIVATE duke3d_game)
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/demo_writer_run")
+add_test(NAME demo_writer COMMAND demo_writer)
+set_tests_properties(demo_writer PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/demo_writer_run"
+  PASS_REGULAR_EXPRESSION "demo writer checks reached completion" FAIL_REGULAR_EXPRESSION "FAIL;ERROR")
+
+if(DUKE3D_VERSION STREQUAL "0.99")
+  add_executable(con_runtime_v099 con_runtime_v099.c "${_game_c}")
+  target_link_libraries(con_runtime_v099 PRIVATE duke3d_game)
+  foreach(_module actors player sector game menus)
+    add_executable(v099_${_module} v099_${_module}.c "${_game_c}")
+    target_link_libraries(v099_${_module} PRIVATE duke3d_game)
+    add_test(NAME v099_${_module} COMMAND v099_${_module})
+    set_tests_properties(v099_${_module} PROPERTIES ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 30)
+  endforeach()
+  add_executable(v099_render_camera v099_render_camera.c "${_game_c}")
+  target_link_libraries(v099_render_camera PRIVATE duke3d_game)
+  add_test(NAME con_runtime_v099 COMMAND con_runtime_v099)
+  set_tests_properties(con_runtime_v099 PROPERTIES TIMEOUT 30)
+endif()
 
 # Checks the save record codec against the DOS 1.5 byte layout. Needs no
 # game data.
@@ -330,6 +483,36 @@ set(DUKE3D_ATOMIC_GRP "" CACHE FILEPATH
 set(DUKE3D_DOS_SAVES_DIR "" CACHE PATH
     "Folder searched for DOS 1.5 .sav files for the DOS save tests")
 find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+  add_test(NAME capture_tools COMMAND "${Python3_EXECUTABLE}" -I
+    "${CMAKE_CURRENT_SOURCE_DIR}/capture_tools.py")
+endif()
+
+function(add_save_hardening_test name data save)
+  if(EXISTS "${save}")
+    if(ARGC GREATER 3)
+      set(_reader --codec "$<TARGET_FILE:savegame_codec>")
+    else()
+      set(_reader --duke3d "$<TARGET_FILE:duke3d>" --data "${data}")
+    endif()
+    add_test(NAME save_hardening_${name}
+      COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/savegame_hardening.py"
+        ${_reader} --save "${save}"
+        --version "${DUKE3D_VERSION}" --work "${CMAKE_BINARY_DIR}/sh_${name}")
+    set_tests_properties(save_hardening_${name} PROPERTIES TIMEOUT 180)
+  endif()
+endfunction()
+if(DUKE3D_VERSION MATCHES "^1\\.[45]$" AND DUKE3D_DOS_SAVES_DIR AND Python3_Interpreter_FOUND)
+  # 1.4 and 1.5 share the DOS block layout. This codec check deliberately
+  # bypasses the game's edition header check and needs no Atomic GRP.
+  file(GLOB_RECURSE _codec_saves "${DUKE3D_DOS_SAVES_DIR}/*")
+  list(FILTER _codec_saves INCLUDE REGEX "\\.[sS][aA][vV]$")
+  list(SORT _codec_saves)
+  if(_codec_saves)
+    list(GET _codec_saves 0 _codec_save)
+    add_save_hardening_test(codec "" "${_codec_save}" codec)
+  endif()
+endif()
 if(DUKE3D_VERSION STREQUAL "1.5" AND NOT DUKE3D_SHAREWARE AND
    DUKE3D_ATOMIC_GRP AND EXISTS "${DUKE3D_ATOMIC_GRP}" AND
    DUKE3D_DOS_SAVES_DIR AND IS_DIRECTORY "${DUKE3D_DOS_SAVES_DIR}" AND
@@ -384,6 +567,8 @@ if(DUKE3D_VERSION STREQUAL "1.5" AND NOT DUKE3D_SHAREWARE AND
 
   if(_saves)
     list(GET _saves 0 _first)
+    get_filename_component(_atomic_data "${DUKE3D_ATOMIC_GRP}" DIRECTORY)
+    add_save_hardening_test(v15 "${_atomic_data}" "${_first}")
     add_dos_save_test(dos_save_refuse refuse "${_first}")
     add_dos_save_test(dos_save_hostile hostile "${_first}")
   endif()
@@ -416,11 +601,12 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
   if(_v13d_data)
     add_test(NAME game_boot_v13d_${_v13d_edition}
       COMMAND "${CMAKE_COMMAND}"
-              "-DDUKE3D=$<TARGET_FILE:duke3d>"
+              "-DDUKE3D=$<TARGET_FILE:boot_game>"
               "-DDATA=${_v13d_data}" "-DEDITION=${_v13d_edition}"
               "-DWORK=${CMAKE_BINARY_DIR}/gb13"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/game_boot_v13d.cmake")
     set_tests_properties(game_boot_v13d_${_v13d_edition} PROPERTIES TIMEOUT 240)
+    add_save_hardening_test(v13d_${_v13d_edition} "${_v13d_data}" "${_v13d_data}/refsaves/e1l1start.SAV")
   endif()
   if(_v13d_data)
     # The original demos, played to the end and compared with the DOS state.
@@ -440,6 +626,19 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
       set_tests_properties(demo_sync_v13d_${_v13d_edition}_${_demo} PROPERTIES TIMEOUT 400)
     endforeach()
+    # Demo 1 again, drawn, with the renderer and mode switched every 100 tics
+    # as the VIDEO page does, each faded and waited for (OpenGL fails
+    # headless, and stays off): still in sync. The demo stands still during
+    # each switch; net_videocycle switches while play goes on.
+    add_test(NAME demo_switch_v13d_${_v13d_edition}
+      COMMAND "${CMAKE_COMMAND}"
+              "-DDUKE3D=$<TARGET_FILE:duke3d>"
+              "-DDATA=${_v13d_data}" "-DEDITION=${_v13d_edition}"
+              -DDEMO=1 "-DFLAGS=-demoswitch 100"
+              "-DREFS=${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_demo_refs.cmake"
+              "-DWORK=${CMAKE_BINARY_DIR}/dsw13"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
+    set_tests_properties(demo_switch_v13d_${_v13d_edition} PROPERTIES TIMEOUT 400)
     add_test(NAME demo_refuse_v13d_${_v13d_edition}
       COMMAND "${CMAKE_COMMAND}"
               "-DDUKE3D=$<TARGET_FILE:duke3d>"
@@ -513,12 +712,27 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
     endif()
     add_test(NAME net_connect_v13d_${_v13d_edition}
       COMMAND "${CMAKE_COMMAND}"
-              "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_v13d_data}"
-              "-DB=$<TARGET_FILE:duke3d>" "-DB_DATA=${_v13d_data}"
+              "-DA=$<TARGET_FILE:net_game>" "-DA_DATA=${_v13d_data}"
+              "-DB=$<TARGET_FILE:net_game>" "-DB_DATA=${_v13d_data}"
               -DPORT=${_net_port} -DMODE=connect "-DARGS=/v1 /l1"
               "-DWORK=${CMAKE_BINARY_DIR}/nc13"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
     set_tests_properties(net_connect_v13d_${_v13d_edition} PROPERTIES TIMEOUT 90)
+    # One peer changes renderer and resolution as the VIDEO page does, every
+    # 20 frames (OpenGL fails headless; BUILD_WINDOWED keeps both windowed):
+    # still in sync.
+    math(EXPR _net_cycle_port "${_net_port} + 50")
+    add_test(NAME net_videocycle_v13d_${_v13d_edition}
+      COMMAND "${CMAKE_COMMAND}"
+              "-DA=$<TARGET_FILE:net_game>" "-DA_DATA=${_v13d_data}"
+              "-DB=$<TARGET_FILE:net_game>" "-DB_DATA=${_v13d_data}"
+              -DPORT=${_net_cycle_port} -DMODE=connect "-DARGS=/v1 /l1"
+              "-DA_ARGS=-videocycle 20" "-DA_EXPECT=VIDEOCYCLE renderer [0-9] -> [12].*drawn at 1600x900"
+              "-DWORK=${CMAKE_BINARY_DIR}/nv13"
+              -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
+    set_tests_properties(net_videocycle_v13d_${_v13d_edition} PROPERTIES TIMEOUT 90)
+    math(EXPR _protocol_port "${_net_port} + 500")
+    add_protocol_refusal_tests(v13d_${_v13d_edition} "${_v13d_data}" ${_protocol_port})
     set(_net_n 0)
     foreach(_peer IN LISTS DUKE3D_NET_PEERS)
       string(REGEX REPLACE "=.*" "" _peer_exe "${_peer}")
@@ -527,7 +741,7 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
       math(EXPR _net_port "${_net_port} + 2")
       add_test(NAME net_refuse_v13d_${_v13d_edition}_${_net_n}
         COMMAND "${CMAKE_COMMAND}"
-                "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_v13d_data}"
+                "-DA=$<TARGET_FILE:net_game>" "-DA_DATA=${_v13d_data}"
                 "-DB=${_peer_exe}" "-DB_DATA=${_peer_data}"
                 -DPORT=${_net_port} -DMODE=refuse
                 "-DWORK=${CMAKE_BINARY_DIR}/nr13_${_net_n}"
@@ -545,19 +759,24 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
   endif()
 endif()
 
-# 1.1 and 1.0 shareware builds: the same scripts as the 1.3D tests, with the
-# editions sw11 and sw10 (docs/v10-v11/reference.md).
+# 1.1, 1.0 and 0.99 shareware builds: the same scripts as the 1.3D tests, with the
+# editions sw11, sw10 and sw099 (docs/v10-v11/ and docs/v099/).
 set(DUKE3D_V11_SW_DATA_DIR "" CACHE PATH "Duke Nukem 3D 1.1 shareware folder")
 set(DUKE3D_V10_SW_DATA_DIR "" CACHE PATH "Duke Nukem 3D 1.0 shareware folder")
-if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpreter_FOUND)
+set(DUKE3D_V099_SW_DATA_DIR "" CACHE PATH "Duke Nukem 3D 0.99 beta shareware folder")
+if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3_Interpreter_FOUND)
   if(DUKE3D_VERSION STREQUAL "1.1")
     set(_vold_edition sw11)
     set(_vold_name v11_sw)
     set(_vold_data "${DUKE3D_V11_SW_DATA_DIR}")
-  else()
+  elseif(DUKE3D_VERSION STREQUAL "1.0")
     set(_vold_edition sw10)
     set(_vold_name v10_sw)
     set(_vold_data "${DUKE3D_V10_SW_DATA_DIR}")
+  else()
+    set(_vold_edition sw099)
+    set(_vold_name v099_sw)
+    set(_vold_data "${DUKE3D_V099_SW_DATA_DIR}")
   endif()
   if(_vold_data)
     add_test(NAME con_compile_${_vold_name}
@@ -569,15 +788,72 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
               "-DWORK=${CMAKE_BINARY_DIR}/cc_${_vold_name}"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/con_compile_v13d.cmake")
     set_tests_properties(con_compile_${_vold_name} PROPERTIES TIMEOUT 120)
+  endif()
+  if(_vold_data)
     add_test(NAME game_boot_${_vold_name}
-      COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
+      COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:boot_game>"
               "-DDATA=${_vold_data}" "-DEDITION=${_vold_edition}"
               "-DWORK=${CMAKE_BINARY_DIR}/gb_${_vold_name}"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/game_boot_v13d.cmake")
     set_tests_properties(game_boot_${_vold_name} PROPERTIES TIMEOUT 240)
+    add_save_hardening_test(${_vold_name} "${_vold_data}" "${_vold_data}/refsaves/e1l1start.SAV")
+  endif()
+  if(_vold_data AND _vold_edition STREQUAL "sw099")
+    # Private game.c copy: ending automation is absent from the shipped game.
+    configure_file("${_game_c}" "${CMAKE_CURRENT_BINARY_DIR}/episode_game.c" COPYONLY)
+    set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/episode_game.c" PROPERTIES
+      COMPILE_DEFINITIONS "SDL_MAIN_HANDLED;main=duke3d_main;DUKE3D_EPISODE_TEST=1")
+    add_executable(v099_episode_end v099_episode_end.c "${CMAKE_CURRENT_BINARY_DIR}/episode_game.c")
+    target_link_libraries(v099_episode_end PRIVATE duke3d_game)
+    if(EXISTS "${_vold_data}/refdemos/E1L5.DMO")
+      add_test(NAME episode_end_v099_sw
+        COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:v099_episode_end>"
+          "-DDATA=${_vold_data}" "-DDEMO=${_vold_data}/refdemos/E1L5.DMO"
+          "-DWORK=${CMAKE_BINARY_DIR}/ee_v099" -P "${CMAKE_CURRENT_SOURCE_DIR}/episode_end_v099.cmake")
+      set_tests_properties(episode_end_v099_sw PROPERTIES TIMEOUT 140)
+    endif()
+    add_test(NAME v099_render_camera
+      COMMAND v099_render_camera "${_vold_data}/DUKE3D.GRP")
+    set_tests_properties(v099_render_camera PROPERTIES
+      ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 30)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_demo_refs.cmake")
+    foreach(_level RANGE 1 6)
+      if(EXISTS "${_vold_data}/refdemos/E1L${_level}.DMO")
+        add_test(NAME demo_sync_v099_sw_e1l${_level}
+          COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
+            "-DDATA=${_vold_data}" -DEDITION=sw099 -DDEMO=1 "-DREFNAME=E1L${_level}"
+            "-DDEMOFILE=${_vold_data}/refdemos/E1L${_level}.DMO"
+            "-DDEMOGOD=${V13D_DEMO_SW099_E1L${_level}_DEMOGOD}"
+            "-DREFS=${CMAKE_CURRENT_SOURCE_DIR}/data/v13d_demo_refs.cmake"
+            "-DWORK=${CMAKE_BINARY_DIR}/ds_v099_e1l${_level}"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
+        set_tests_properties(demo_sync_v099_sw_e1l${_level} PROPERTIES TIMEOUT 400)
+      endif()
+    endforeach()
+    if(DUKE3D_ROUTEBOT)
+      add_test(NAME routebot_record_v099_sw
+        COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
+          "-DDATA=${_vold_data}" "-DWORK=${CMAKE_BINARY_DIR}/routebot_record"
+          -P "${CMAKE_CURRENT_SOURCE_DIR}/routebot_record.cmake")
+      set_tests_properties(routebot_record_v099_sw PROPERTIES TIMEOUT 90)
+      add_test(NAME routebot_record_god_v099_sw
+        COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
+          "-DDATA=${_vold_data}" -DDEMOGOD=ON "-DWORK=${CMAKE_BINARY_DIR}/routebot_record_god"
+          -P "${CMAKE_CURRENT_SOURCE_DIR}/routebot_record.cmake")
+      set_tests_properties(routebot_record_god_v099_sw PROPERTIES TIMEOUT 90)
+    endif()
+    foreach(_mode refuse roundtrip)
+      add_test(NAME demo_${_mode}_${_vold_name}
+        COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
+          "-DDATA=${_vold_data}" -DEDITION=sw099 -DDEMO=1 "-DMODE=${_mode}"
+          "-DPYTHON=${Python3_EXECUTABLE}"
+          "-DWORK=${CMAKE_BINARY_DIR}/d${_mode}_${_vold_name}"
+          -P "${CMAKE_CURRENT_SOURCE_DIR}/demo_sync_v13d.cmake")
+      set_tests_properties(demo_${_mode}_${_vold_name} PROPERTIES TIMEOUT 120)
+    endforeach()
   endif()
   # The original demos, played to the end and compared with the DOS state.
-  if(_vold_data)
+  if(_vold_data AND NOT _vold_edition STREQUAL "sw099")
     foreach(_demo 1 2 3)
       add_test(NAME demo_sync_${_vold_name}_${_demo}
         COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
@@ -610,7 +886,7 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
     foreach(_var IN LISTS _vars)
       if(_var MATCHES "^V13D_SAVE_(.+)_EDITION$" AND "${${_var}}" STREQUAL _vold_edition)
         set(_ref "${CMAKE_MATCH_1}")
-        string(REGEX REPLACE "^sw1[01]_" "" _name "${_ref}")
+        string(REGEX REPLACE "^sw(099|1[01])_" "" _name "${_ref}")
         add_test(NAME dos_save_${_vold_name}_${_name}
           COMMAND "${CMAKE_COMMAND}" -DMODE=load "-DNAME=${_ref}"
                   "-DDUKE3D=$<TARGET_FILE:duke3d>"
@@ -626,14 +902,14 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
     # The other release's and the 1.3D shareware saves, when their folders are
     # set, and a 1.5 one must be refused (rulings.md: 1.1's BYTEVERSION 12
     # collides with neither; 1.0 has none and goes by its layout).
-    if(_vold_edition STREQUAL "sw11")
+    if(_vold_edition STREQUAL "sw11" OR _vold_edition STREQUAL "sw099")
       set(_vold_other_dir "${DUKE3D_V10_SW_DATA_DIR}")
     else()
       set(_vold_other_dir "${DUKE3D_V11_SW_DATA_DIR}")
     endif()
     set(_vold_others "")
-    foreach(_other "${_vold_other_dir}" "${DUKE3D_V13D_SW_DATA_DIR}")
-      if(_other AND EXISTS "${_other}/refsaves/e1l1start.SAV")
+    foreach(_other "${_vold_other_dir}" "${DUKE3D_V13D_SW_DATA_DIR}" "${DUKE3D_V099_SW_DATA_DIR}")
+      if(_other AND NOT _other STREQUAL _vold_data AND EXISTS "${_other}/refsaves/e1l1start.SAV")
         if(_vold_others)
           string(APPEND _vold_others "$<SEMICOLON>")
         endif()
@@ -653,7 +929,7 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
   # Two copies of the 1.1 build must meet over UDP on localhost, and both
   # peers must refuse each DUKE3D_NET_PEERS build (1.0, 1.3D sw, ...) by
   # BYTEVERSION alone (rulings.md). The same for the 1.0 build, on its own ports.
-  if(_vold_data)
+  if(_vold_data AND NOT _vold_edition STREQUAL "sw099")
     set(DUKE3D_NET_PEERS "" CACHE STRING "Other duke3d builds to test multiplayer refusal against")
     # DukeMatch (the default) and co-op (/c), both put straight into E1L1.
     if(_vold_edition STREQUAL "sw11")
@@ -671,14 +947,16 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
       endif()
       add_test(NAME ${_net_test}
         COMMAND "${CMAKE_COMMAND}"
-                "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_vold_data}"
-                "-DB=$<TARGET_FILE:duke3d>" "-DB_DATA=${_vold_data}"
+                "-DA=$<TARGET_FILE:net_game>" "-DA_DATA=${_vold_data}"
+                "-DB=$<TARGET_FILE:net_game>" "-DB_DATA=${_vold_data}"
                 -DPORT=${_net_port} -DMODE=connect "-DARGS=${_net_args}"
                 "-DWORK=${CMAKE_BINARY_DIR}/nc_${_vold_name}_${_mode}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
       set_tests_properties(${_net_test} PROPERTIES TIMEOUT 90)
       math(EXPR _net_port "${_net_port} + 2")
     endforeach()
+    math(EXPR _protocol_port "${_net_port} + 500")
+    add_protocol_refusal_tests(${_vold_name} "${_vold_data}" ${_protocol_port})
     set(_net_n 0)
     foreach(_peer IN LISTS DUKE3D_NET_PEERS)
       string(REGEX REPLACE "=.*" "" _peer_exe "${_peer}")
@@ -687,7 +965,7 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
       math(EXPR _net_port "${_net_port} + 2")
       add_test(NAME net_refuse_${_vold_name}_${_net_n}
         COMMAND "${CMAKE_COMMAND}"
-                "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_vold_data}"
+                "-DA=$<TARGET_FILE:net_game>" "-DA_DATA=${_vold_data}"
                 "-DB=${_peer_exe}" "-DB_DATA=${_peer_data}"
                 -DPORT=${_net_port} -DMODE=refuse
                 "-DWORK=${CMAKE_BINARY_DIR}/nr_${_vold_name}_${_net_n}"
@@ -695,24 +973,29 @@ if(DUKE3D_VERSION MATCHES "^1\\.[01]$" AND DUKE3D_SHAREWARE AND Python3_Interpre
       set_tests_properties(net_refuse_${_vold_name}_${_net_n} PROPERTIES TIMEOUT 90)
     endforeach()
   endif()
-  # The edition check must refuse the 1.0 and 1.3D shareware as 1.1.
-  if(_vold_edition STREQUAL "sw11" AND DUKE3D_V10_SW_DATA_DIR AND DUKE3D_V13D_SW_DATA_DIR)
-    add_test(NAME v11_edition_mismatch
-      COMMAND "${CMAKE_COMMAND}" -DEDITION=sw11
-              "-DOTHERS=${DUKE3D_V10_SW_DATA_DIR}$<SEMICOLON>${DUKE3D_V13D_SW_DATA_DIR}"
-              -P "${CMAKE_CURRENT_SOURCE_DIR}/v13d_check.cmake")
-  endif()
-  # And the 1.1 and 1.3D shareware as 1.0.
-  if(_vold_edition STREQUAL "sw10" AND DUKE3D_V11_SW_DATA_DIR AND DUKE3D_V13D_SW_DATA_DIR)
-    add_test(NAME v10_edition_mismatch
-      COMMAND "${CMAKE_COMMAND}" -DEDITION=sw10
-              "-DOTHERS=${DUKE3D_V11_SW_DATA_DIR}$<SEMICOLON>${DUKE3D_V13D_SW_DATA_DIR}"
+  # Check every other folder that is available, even if only one is set.
+  set(_vold_other_dirs "")
+  foreach(_other "${DUKE3D_V11_SW_DATA_DIR}" "${DUKE3D_V10_SW_DATA_DIR}"
+                 "${DUKE3D_V13D_SW_DATA_DIR}" "${DUKE3D_V099_SW_DATA_DIR}")
+    if(_other AND NOT _other STREQUAL _vold_data)
+      if(_vold_other_dirs)
+        string(APPEND _vold_other_dirs "$<SEMICOLON>")
+      endif()
+      string(APPEND _vold_other_dirs "${_other}")
+    endif()
+  endforeach()
+  if(_vold_other_dirs)
+    string(REPLACE "_sw" "" _vold_short "${_vold_name}")
+    add_test(NAME ${_vold_short}_edition_mismatch
+      COMMAND "${CMAKE_COMMAND}" "-DEDITION=${_vold_edition}"
+              "-DOTHERS=${_vold_other_dirs}"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/v13d_check.cmake")
   endif()
 endif()
 
 # The editor build.cfg reader and writer; engine-free, so it runs everywhere.
-add_executable(build_cfg build_cfg.c "${PROJECT_SOURCE_DIR}/source/buildcfg.c")
+add_executable(build_cfg build_cfg.c "${PROJECT_SOURCE_DIR}/source/buildcfg.c"
+  "${PROJECT_SOURCE_DIR}/source/videoopts.c")
 target_include_directories(build_cfg PRIVATE "${PROJECT_SOURCE_DIR}/source")
 add_test(NAME build_cfg COMMAND build_cfg)
 
@@ -724,3 +1007,9 @@ add_test(NAME editor_mode COMMAND editor_mode)
 set_tests_properties(editor_mode PROPERTIES
   ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
   TIMEOUT 30)
+
+# The VIDEO page's resolution list, draw size, supersampling and save
+# tracking; engine-free.
+add_executable(video_opts video_opts.c "${PROJECT_SOURCE_DIR}/source/videoopts.c")
+target_include_directories(video_opts PRIVATE "${PROJECT_SOURCE_DIR}/source")
+add_test(NAME video_opts COMMAND video_opts)

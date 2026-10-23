@@ -12,6 +12,7 @@ typedef struct {
     unsigned char keys[BUILDCFG_NUMKEYS];
     int32_t gldrawpath, glinternalwidth, glinternalheight;  /* GLPATH_*; 0: the window's */
     double glcontrast, glsaturation;  /* the shader path's; 1: as it is */
+    int32_t supersampling, gltexturefilter;  /* SS_*, TEXFILTER_*: "off", "2k".. and "nearest".. in the file */
 } buildcfg_t;
 
 /* Fills c with the defaults; keys are build.c's buildkeys[] initializer. */

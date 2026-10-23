@@ -50,7 +50,9 @@ short callsound(short sn,short whatsprite)
 
             if(T1 == 0)
             {
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 if( (soundm[SLT]&16) == 0)
+#endif
                 {
                     if(SLT)
                     {
@@ -59,14 +61,20 @@ short callsound(short sn,short whatsprite)
                             stopsound(SHT);
                     }
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
                     if( (sector[SECT].lotag&0xff) != 22)
+#endif
                         T1 = 1;
                 }
             }
             else if(SHT < GAME_NUM_SOUNDS)
             {
                 if(SHT) spritesound(SHT,whatsprite);
+#if DUKE3D_GAMEVER < GAMEVER_10
+                if( (soundm[SLT]&1) || SHT )
+#else
                 if( (soundm[SLT]&1) || ( SHT && SHT != SLT ) )
+#endif
                     stopsound(SLT);
                 T1 = 0;
             }
@@ -311,8 +319,12 @@ void doanimations(void)
                 if(animateptr[i] == &sector[animatesect[i]].ceilingz)
                     continue;
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+            callsound(animatesect[i],-1);
+#else
            if( (sector[dasect].lotag&0xff) != 22 )
                 callsound(dasect,-1);
+#endif
 
             continue;
         }
@@ -466,7 +478,11 @@ void animatewalls(void)
                 case SCREENBREAK7:
                 case SCREENBREAK8:
 
-                    if(animwall[p].tag >= 0 && wall[i].extra != FEMPIC2 && wall[i].extra != FEMPIC3 )
+                    if(animwall[p].tag >= 0
+#if DUKE3D_GAMEVER < GAMEVER_10
+                       && wall[i].extra != FEMPIC1
+#endif
+                       && wall[i].extra != FEMPIC2 && wall[i].extra != FEMPIC3 )
                         wall[i].picnum = animwall[p].tag;
                     else
                     {
@@ -752,6 +768,15 @@ void operatesectors(short sn,short ii)
                 }
                 callsound(sn,ii);
             }
+#if DUKE3D_GAMEVER < GAMEVER_10
+            else
+            {
+                q = nextsectorneighborz(sn,sptr->floorz,1,animatevel[i] < 0 ? 1 : -1);
+                if(q == -1) return;
+                setanimation(sn,&sptr->floorz,sector[q].floorz,sptr->extra);
+                callsound(sn,ii);
+            }
+#endif
 
             return;
 
@@ -772,6 +797,20 @@ void operatesectors(short sn,short ii)
                 setanimation(sn,&sptr->ceilingz,j+l,q);
                 callsound(sn,ii);
             }
+#if DUKE3D_GAMEVER < GAMEVER_10
+            else
+            {
+                q = nextsectorneighborz(sn,sptr->floorz,1,animatevel[i] < 0 ? 1 : -1);
+                if(q == -1) return;
+                j = sector[q].floorz;
+                l = sptr->ceilingz-sptr->floorz;
+                setanimation(sn,&sptr->floorz,j,sptr->extra);
+                setanimation(sn,&sptr->ceilingz,j+l,sptr->extra);
+                // The beta calls once here and again through its common tail (0x47312/0x47a21).
+                callsound(sn,ii);
+                callsound(sn,ii);
+            }
+#endif
             return;
 
         case 29:
@@ -890,7 +929,7 @@ void operatesectors(short sn,short ii)
 
             sptr->lotag ^= 0x8000;
 
-#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 opens split doors silently
+#if DUKE3D_GAMEVER < GAMEVER_10 || DUKE3D_GAMEVER >= GAMEVER_13D // 1.0/1.1 open split doors silently
             callsound(sn,ii);
 #endif
 
@@ -923,13 +962,18 @@ void operatesectors(short sn,short ii)
                     {
                         if(sector[SECT].lotag&0x8000) sector[SECT].lotag &= 0x7fff;
                         else sector[SECT].lotag |= 0x8000;
+#if DUKE3D_GAMEVER < GAMEVER_10
+                        callsound(sn,ii);
+#endif
                         T5 = 1;
                         T4 = -T4;
+#if DUKE3D_GAMEVER >= GAMEVER_10
                         if(q == 0)
                         {
                             callsound(sn,i);
                             q = 1;
                         }
+#endif
                     }
                     i = nextspritestat[i];
                 }
@@ -1028,7 +1072,11 @@ void operaterespawns(short low)
         if(SLT == low) switch(PN)
         {
             case RESPAWN:
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+                sprite[i].shade = 54;
+                j = spawn(i,TRANSPORTERSTAR);
+                sprite[j].z -= (32<<8);
+#elif DUKE3D_GAMEVER < GAMEVER_13D
                 // 1.1 shows the star only for monsters, and only with monsters on.
                 if( ud.monsters_off == 0 && badguypic(SHT) )
                 {
@@ -1042,7 +1090,9 @@ void operaterespawns(short low)
                 sprite[j].z -= (32<<8);
 #endif
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 sprite[i].extra = 66-12;   // Just a way to killit
+#endif
                 break;
         }
         i = nexti;
@@ -1053,6 +1103,9 @@ void operateactivators(short low,short snum)
 {
     short i, j, k, *p, nexti;
     walltype *wal;
+#if DUKE3D_GAMEVER < GAMEVER_10
+    snum = 0; // The beta's one-argument function quotes to the global player (single player).
+#endif
 
     for(i=numcyclers-1;i>=0;i--)
     {
@@ -1140,8 +1193,10 @@ void operateactivators(short low,short snum)
                     }
                 }
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 if( k == -1 && (sector[SECT].lotag&0xff) == 22 )
                     k = callsound(SECT,i);
+#endif
 
                 operatesectors(SECT,i);
             }
@@ -1684,7 +1739,9 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
             case HEAVYHBOMB:
             case RADIUSEXPLOSION:
             case RPG:
+#if DUKE3D_GAMEVER >= GAMEVER_10
             case HYDRENT:
+#endif
             case SEENINE:
 #if DUKE3D_GAMEVER >= GAMEVER_13D
             case OOZFILTER:
@@ -1754,7 +1811,13 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
                 int32_t ang = TRAND&2047, pn = SCRAP6+(TRAND&15);
 
                 EGS(sprite[spr].sectnum,sprite[spr].x,sprite[spr].y,sprite[spr].z-(12<<8),
-                    pn,-8,48,48,ang,vel,zv,spr,5);
+                    pn,-8,48,48,ang,vel,zv,
+#if DUKE3D_GAMEVER < GAMEVER_10
+                    j,
+#else
+                    spr,
+#endif
+                    5);
             }
 #else
             wal->overpicnum = FANSPRITEBROKE;
@@ -1776,7 +1839,15 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
             wal->cstat = 0;
 
             if(wal->nextwall >= 0)
+#if DUKE3D_GAMEVER < GAMEVER_10
+            {
+                /* Beta uses wal, rather than wall, as the second wall's base. */
+                int other = dawallnum + wal->nextwall;
+                if(other < MAXWALLS) wall[other].cstat = 0;
+            }
+#else
                 wall[wal->nextwall].cstat = 0;
+#endif
 
             i = EGS(sn,x,y,z,SECTOREFFECTOR,0,0,0,ps[0].ang,0,0,spr,3);
             SLT = 128; T2 = 5; T3 = dawallnum;
@@ -1839,8 +1910,16 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
 #endif
 
                 lotsofglass(spr,dawallnum,30);
+#if DUKE3D_GAMEVER < GAMEVER_10
+                if(wal->picnum == FEMPIC2 || wal->picnum == FEMPIC3)
+                    wal->picnum = VIEWSCREENBROKE;
+                else
+#endif
                 wal->picnum=W_SCREENBREAK+(TRAND%3);
                 spritesound(GLASS_HEAVYBREAK,spr);
+#if DUKE3D_GAMEVER < GAMEVER_10
+                lotsofglass(spr,dawallnum,10);
+#endif
                 return;
 
 #if DUKE3D_GAMEVER < GAMEVER_14
@@ -1983,11 +2062,19 @@ void checkplayerhurt(struct player_struct *p,short j)
                     sprite[p->i].extra -= 5;
 
                     p->hurt_delay = 16;
+#if DUKE3D_GAMEVER < GAMEVER_10
+                    p->pals_time = totalclock+32;
+#else
                     p->pals_time = 32;
+#endif
                     p->pals[0] = 32;
                     p->pals[1] = 0;
                     p->pals[2] = 0;
+#if DUKE3D_GAMEVER < GAMEVER_10
+                    spritesound(204,p->i);
+#else
                     spritesound(DUKE_LONGTERM_PAIN,p->i);
+#endif
                 }
                 break;
         }
@@ -2010,14 +2097,22 @@ void checkplayerhurt(struct player_struct *p,short j)
              sprite[p->i].extra -= 5;
 
              p->hurt_delay = 16;
+#if DUKE3D_GAMEVER < GAMEVER_10
+             p->pals_time = totalclock+32;
+#else
              p->pals_time = 32;
+#endif
              p->pals[0] = 32;
              p->pals[1] = 0;
              p->pals[2] = 0;
 
              p->posxv = -(sintable[(p->ang+512)&2047]<<8);
              p->posyv = -(sintable[(p->ang)&2047]<<8);
+#if DUKE3D_GAMEVER < GAMEVER_10
+             spritesound(204,p->i);
+#else
              spritesound(DUKE_LONGTERM_PAIN,p->i);
+#endif
 
              checkhitwall(p->i,j,
                  p->posx+(sintable[(p->ang+512)&2047]>>9),
@@ -2150,9 +2245,17 @@ void checkhitsprite(short i,short sn)
             }
             else
             {
+#if DUKE3D_GAMEVER < GAMEVER_10
+                if(sprite[sn].picnum == KNEE || (TRAND&3))
+#else
                 if( TRAND&3 )
+#endif
                 {
+#if DUKE3D_GAMEVER < GAMEVER_10
+                    sprite[i].xvel = 128;
+#else
                     sprite[i].xvel = 164;
+#endif
                     sprite[i].ang = sprite[sn].ang;
                 }
                 else
@@ -2399,7 +2502,11 @@ void checkhitsprite(short i,short sn)
             guts(&sprite[i],JIBS2,2,-1);
             guts(&sprite[i],JIBS3,3,-1);
             guts(&sprite[i],JIBS4,4,-1);
+#if DUKE3D_GAMEVER < GAMEVER_10
+            guts(&sprite[i],JIBS5,7,-1);
+#else
             guts(&sprite[i],JIBS5,1,-1);
+#endif
             guts(&sprite[i],JIBS3,6,-1);
             deletesprite(i);
             break;
@@ -2438,11 +2545,15 @@ void checkhitsprite(short i,short sn)
 
         // The strippers take damage, scream and die here (G11-S10).
         case NAKED1:
+#if DUKE3D_GAMEVER >= GAMEVER_10
         case PODFEM1:
+#endif
         case FEM1:
         case FEM2:
         case FEM3:
+#if DUKE3D_GAMEVER >= GAMEVER_10
         case FEM4:
+#endif
             sprite[i].extra -= sprite[sn].extra;
             if(ud.lockout == 0)
                 spritesound(LADY_SCREAM,i);
@@ -2524,9 +2635,15 @@ void checkhitsprite(short i,short sn)
             {
                 if( badguy(&sprite[i]) == 1)
                 {
+#if DUKE3D_GAMEVER >= GAMEVER_10
                     if(sprite[sn].picnum == RPG) sprite[sn].extra <<= 1;
+#endif
 
-                    if( (PN < GREENSLIME || PN > GREENSLIME+7) && PN != ROTATEGUN )
+                    if( (PN < GREENSLIME || PN > GREENSLIME+7)
+#if DUKE3D_GAMEVER >= GAMEVER_10
+                        && PN != ROTATEGUN
+#endif
+                      )
                     {
                         j = spawn(sn,JIBS6);
                         sprite[j].z += (4<<8);
@@ -2537,16 +2654,35 @@ void checkhitsprite(short i,short sn)
 
                     j = sprite[sn].owner;
 
-                    if( j >= 0 && sprite[j].picnum == APLAYER && PN != ROTATEGUN )
+                    if( j >= 0 && sprite[j].picnum == APLAYER
+#if DUKE3D_GAMEVER >= GAMEVER_10
+                        && PN != ROTATEGUN
+#endif
+                      )
                         if( ps[sprite[j].yvel].curr_weapon == SHOTGUN_WEAPON )
                     {
+#if DUKE3D_GAMEVER < GAMEVER_10
+                        shoot(i,BLOODSPLAT1);
+                        shoot(i,BLOODSPLAT2);
+                        shoot(i,BLOODSPLAT3);
+                        shoot(i,BLOODSPLAT4);
+                        shoot(i,BLOODSPLAT1);
+                        shoot(i,BLOODSPLAT2);
+                        shoot(i,BLOODSPLAT3);
+                        shoot(i,BLOODSPLAT4);
+#else
                         shoot(i,BLOODSPLAT3);
                         shoot(i,BLOODSPLAT1);
                         shoot(i,BLOODSPLAT2);
                         shoot(i,BLOODSPLAT4);
+#endif
                     }
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+                    if( PN != RECON )
+#else
                     if( PN != BOSS1 && PN != BOSS2 && PN != RECON && PN != ROTATEGUN )
+#endif
                     {
                         SA = (sprite[sn].ang+1024)&2047;
                         if(sprite[i].xvel > 0) sprite[i].xvel = 0;
@@ -2568,6 +2704,21 @@ void checkhitsprite(short i,short sn)
                     }
                 }
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+                else if(sprite[i].statnum == 10)
+                {
+                    p = sprite[i].yvel;
+                    ps[p].newowner = -1;
+                    ps[p].posx = ps[p].oposx;
+                    ps[p].posy = ps[p].oposy;
+                    ps[p].posz = ps[p].oposz;
+                    ps[p].ang = ps[p].oang;
+                    for(j=headspritestat[1];j>=0;j=nextspritestat[j])
+                        if(sprite[j].picnum == CAMERA1) sprite[j].yvel = 0;
+                    if(RX < 48 && sprite[sn].picnum == SHRINKSPARK) return;
+                }
+#endif
+
                 if( sprite[i].statnum != 2 )
                 {
                     hittype[i].picnum = sprite[sn].picnum;
@@ -2576,6 +2727,7 @@ void checkhitsprite(short i,short sn)
                     hittype[i].owner = sprite[sn].owner;
                 }
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 if(sprite[i].statnum == 10)
                 {
                     p = sprite[i].yvel;
@@ -2603,6 +2755,7 @@ void checkhitsprite(short i,short sn)
                             if(ud.player_skill >= 3)
                                 sprite[sn].extra += (sprite[sn].extra>>1);
                 }
+#endif
 
             }
             break;
@@ -3153,7 +3306,11 @@ void cheatkeys(short snum)
     sb_snum = sync[snum].bits;
     p = &ps[snum];
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+    if(p->cheat_phase != 0) return;
+#else
     if(p->cheat_phase == 1) return;
+#endif
 
 #if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no aim mode (G10-S06)
     if( sb_snum&(1<<23) )
@@ -3320,7 +3477,11 @@ void cheatkeys(short snum)
         }
     }
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+    if(p->show_empty_weapon == 0 && p->quick_kick == 0 && p->access_incs == 0 && p->knee_incs == 0)
+#else
     if(p->last_pissed_time <= (26*218) && p->show_empty_weapon == 0 && p->kickback_pic == 0 && p->quick_kick == 0 && sprite[p->i].xrepeat > 32 && p->access_incs == 0 && p->knee_incs == 0 )
+#endif
     {
         if(  ( p->weapon_pos == 0 || ( p->holster_weapon && p->weapon_pos == -9 ) ) )
         {
@@ -3329,6 +3490,7 @@ void cheatkeys(short snum)
             // 1.1 leaves k at 0 unless it looks for a live pipe bomb.
             k = 0;
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
             if( j == HANDBOMB_WEAPON && p->ammo_amount[HANDBOMB_WEAPON] == 0 )
             {
                 k = headspritestat[1];
@@ -3344,12 +3506,17 @@ void cheatkeys(short snum)
                 }
             }
 
+#endif
             if(p->holster_weapon)
             {
                 sb_snum |= 1<<19;
                 p->weapon_pos = -9;
             }
-            else if( p->gotweapon[j] && p->curr_weapon != j ) switch(j)
+            else if(
+#if DUKE3D_GAMEVER < GAMEVER_10
+                j >= 0 && j <= TRIPBOMB_WEAPON &&
+#endif
+                p->gotweapon[j] && p->curr_weapon != j ) switch(j)
             {
                 case KNEE_WEAPON:
                     addweapon( p, KNEE_WEAPON );
@@ -3367,6 +3534,7 @@ void cheatkeys(short snum)
                     }
                     addweapon( p, j );
                     break;
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 case HANDREMOTE_WEAPON:
                     if(k >= 0) // Found in list of [1]'s
                     {
@@ -3375,6 +3543,7 @@ void cheatkeys(short snum)
                         p->weapon_pos = 10;
                     }
                     break;
+#endif
                 case HANDBOMB_WEAPON:
                     if( p->ammo_amount[HANDBOMB_WEAPON] > 0 && p->gotweapon[HANDBOMB_WEAPON] )
                         addweapon( p, HANDBOMB_WEAPON );
@@ -3386,8 +3555,15 @@ void cheatkeys(short snum)
             }
         }
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+    }
+#endif
         // The quick kick swaps to the boot; doincrements swaps back.
+#if DUKE3D_GAMEVER < GAMEVER_10
+        if( (sb_snum&(1<<22)) && p->quick_kick == 0 && p->kickback_pic == 0 )
+#else
         if( sb_snum&(1<<22) )
+#endif
         {
             if(p->holster_weapon == 0)
             {
@@ -3397,7 +3573,9 @@ void cheatkeys(short snum)
                 {
                     p->last_full_weapon = p->curr_weapon;
                     p->quick_kick = 24;
+#if DUKE3D_GAMEVER >= GAMEVER_10
                     FTA(80,p);
+#endif
                     addweapon( p, KNEE_WEAPON );
                 }
             }
@@ -3423,7 +3601,9 @@ void cheatkeys(short snum)
                 FTA(74,p);
             }
         }
+#if DUKE3D_GAMEVER >= GAMEVER_10
     }
+#endif
 
 #if DUKE3D_GAMEVER < GAMEVER_11
     if( sb_snum&(1<<17) ) // 1.0's per-player AutoRun (G10-S06)
@@ -3489,7 +3669,11 @@ void cheatkeys(short snum)
             {
                 sprite[p->i].extra += p->firstaid_amount;
                 p->firstaid_amount = 0;
+#if DUKE3D_GAMEVER < GAMEVER_10
+                p->inven_icon = 0;
+#else
                 checkavailinven(p);
+#endif
             }
             spritesound(DUKE_USEMEDKIT,p->i);
         }
@@ -4156,6 +4340,7 @@ void checksectors(short snum)
         p->toggle_key_flag = 1;
         hitscanwall = -1;
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
         i = hitawall(p,&hitscanwall);
 
 #if DUKE3D_GAMEVER < GAMEVER_14
@@ -4168,6 +4353,7 @@ void checksectors(short snum)
             spritesound(wall[hitscanwall].lotag,p->i);
             return;
         }
+#endif
 
 #if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 lets the use action reach past masked walls
         if(hitscanwall >= 0 && (wall[hitscanwall].cstat&16) )
@@ -4251,6 +4437,15 @@ void checksectors(short snum)
                     {
                         if(ud.lockout == 0) spritesound(DUKE_URINATE,p->i);
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+                        p->last_pissed_time = 26*60;
+                        p->transporter_hold = 29*2;
+                        if(p->holster_weapon) return;
+                        p->holster_weapon = 1;
+                        if(sprite[p->i].extra <= max_player_health-max_player_health/10)
+                            sprite[p->i].extra += max_player_health/10;
+                        p->weapon_pos = -1;
+#else
                         p->last_pissed_time = 26*220;
                         p->transporter_hold = 29*2;
                         if(p->holster_weapon == 0)
@@ -4265,9 +4460,18 @@ void checksectors(short snum)
                         }
                         else if(sprite[p->i].extra < max_player_health )
                              sprite[p->i].extra = max_player_health;
+#endif
                     }
+#if DUKE3D_GAMEVER < GAMEVER_10
+                    else
+                    {
+                        spritesound(FLUSH_TOILET,p->i);
+                        p->last_pissed_time = 26;
+                    }
+#else
                     else if(Sound[FLUSH_TOILET].num == 0)
                         spritesound(FLUSH_TOILET,p->i);
+#endif
                     return;
 
                 case NUKEBUTTON:
@@ -4308,9 +4512,14 @@ void checksectors(short snum)
                     p->pals[0] = 48;
                     p->pals[1] = 48;
                     p->pals[2] = 64;
+#if DUKE3D_GAMEVER < GAMEVER_10
+                    p->pals_time = totalclock+32;
+#else
                     p->pals_time = 32;
+#endif
                     break;
 #if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 case PODFEM1:
 #if DUKE3D_GAMEVER < GAMEVER_11
                     if(Sound[KILLME].num == 0) // 1.0: no lockout test (G10-S05)
@@ -4319,11 +4528,14 @@ void checksectors(short snum)
 #endif
                         spritesound(KILLME,neartagsprite);
                     break;
+#endif
                 // 1.1 lets the player tip the strippers (G11-S15).
                 case FEM1:
                 case FEM2:
                 case FEM3:
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 case FEM4:
+#endif
                     if(p->tipincs == 0)
                     {
                         p->tipincs = 26;
@@ -4346,7 +4558,9 @@ void checksectors(short snum)
                             if( PN == CAMERA1 && SP == 0 && sprite[neartagsprite].hitag == SLT )
                             {
                                 SP = 1; //Using this camera
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+                                spritesound(MONITOR_ACTIVE,i);
+#elif DUKE3D_GAMEVER < GAMEVER_13D
                                 spritesound(MONITOR_ACTIVE,p->i);
 #else
                                 spritesound(MONITOR_ACTIVE,neartagsprite);
@@ -4358,7 +4572,9 @@ void checksectors(short snum)
 
                                 j = p->cursectnum;
                                 p->cursectnum = SECT;
+#if DUKE3D_GAMEVER >= GAMEVER_10
                                 setpal(p);
+#endif
                                 p->cursectnum = j;
 
                                 // parallaxtype = 2;
@@ -4382,7 +4598,9 @@ void checksectors(short snum)
 #if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 keeps the cursectnum it had
                         updatesector(p->posx,p->posy,&p->cursectnum);
 #endif
+#if DUKE3D_GAMEVER >= GAMEVER_10
                         setpal(p);
+#endif
 
 
                         i = headspritestat[1];

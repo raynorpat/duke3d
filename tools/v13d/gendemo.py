@@ -3,14 +3,14 @@ and switches weapons. Both the DOS executable and our 1.3D build can play it, so
 it can test code the original demos never reach. Blocks are stored raw
 (strtot 0), which the 1996 LZW reader accepts.
 
-usage: gendemo.py [sw11|sw10] <out.dmo> <volume> <level> <skill> <tics> <seed> [weapon 1-10]
+usage: gendemo.py [sw11|sw10|sw099] <out.dmo> <volume> <level> <skill> <tics> <seed> [weapon 1-10]
 
-With a weapon number, the walk keeps selecting that weapon. With sw11 or sw10 the
+With a weapon number, the walk keeps selecting that weapon. With sw11, sw10 or sw099 the
 demo is for that shareware release instead (docs/v10-v11/reference.md, "Demo
-file"): a 9-byte header, and in 1.0 a record of fvel, svel and avel (all s16) and
+file"; beta: docs/v099/reference.md): a 9-byte header, and in 1.0/0.99 a record of fvel, svel and avel (all s16) and
 bits, with no horz."""
 import struct, sys, random
-edition = sys.argv.pop(1) if sys.argv[1] in ('sw11', 'sw10') else None
+edition = sys.argv.pop(1) if sys.argv[1] in ('sw11', 'sw10', 'sw099') else None
 out, vol, lev, skill, tics, seed = sys.argv[1], *map(int, sys.argv[2:7])
 force = int(sys.argv[7]) if len(sys.argv) > 7 else 0   # weapon number to keep selecting (1-10)
 rng = random.Random(seed)
@@ -28,7 +28,7 @@ for t in range(tics):
     elif weap and left % 30 == 0: bits |= (weap & 15) << 8
     if rng.random() < 0.02: bits |= 1          # jump
     if rng.random() < 0.03: bits |= 1 << 29     # open/use
-    if edition == 'sw10': recs.append(struct.pack("<hhhI", fv, sv, av, bits))
+    if edition in ('sw10', 'sw099'): recs.append(struct.pack("<hhhI", fv, sv, av, bits))
     else: recs.append(struct.pack("<bbhhI", av, 0, fv, sv, bits))
 if edition: hdr = struct.pack("<iBBBh", tics, vol, lev, skill, 1)   # reccnt, volume, level, skill, multimode
 else: hdr = struct.pack("<iBBBBhhiii", tics, vol, lev, skill, 0, 1, 0, 0, 0, 0)

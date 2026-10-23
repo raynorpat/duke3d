@@ -41,6 +41,7 @@ extern int stricmp(const char *x, const char *y);
 */
 
 volatile byte  KB_KeyDown[ MAXKEYBOARDSCAN ];   // Keyboard state array
+volatile byte  KB_GamepadKeyDown[ MAXKEYBOARDSCAN ];
 volatile kb_scancode KB_LastScan;
 
 static volatile boolean keyIsWaiting = 0;
@@ -112,7 +113,15 @@ void KB_KeyEvent( int scancode, boolean keypressed )
 boolean KB_KeyWaiting( void )
 {
     _handle_events();
+    GAMEPAD_Poll();
     return keyIsWaiting;
+}
+
+void KB_QueueGamepadKey(int scan)
+{
+    KB_GamepadKeyDown[scan] = true;
+    KB_LastScan = scan;
+    keyIsWaiting = true;
 }
 
 char KB_Getch( void )
@@ -144,6 +153,7 @@ void KB_FlushKeyboardQueue( void )
 void KB_ClearKeysDown( void )
 {
     memset((void *) KB_KeyDown, '\0', sizeof (KB_KeyDown));
+    memset((void *) KB_GamepadKeyDown, '\0', sizeof (KB_GamepadKeyDown));
 	keyIsWaiting = false;
 }
 

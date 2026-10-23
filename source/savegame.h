@@ -1,6 +1,6 @@
 /*
  * Save files use the DOS layout of the build's version (1.5, 1.3D in 1.3D
- * builds, 1.1 or 1.0 in those builds): every record packed to 1 byte, every
+ * builds, 1.1, 1.0 or 0.99 in those builds): every record packed to 1 byte, every
  * value little-endian, written with the same dfwrite calls (element size and
  * count) the DOS game made, so the LZW blocks come out the same.
  */
@@ -13,7 +13,11 @@
 #define SG_SECTOR_SIZE      40
 #define SG_SPRITE_SIZE      44
 #if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+#define SG_PLAYER_SIZE      0x33f   /* the 0.99 beta player_struct */
+#else
 #define SG_PLAYER_SIZE      0x34e   /* the 1.1 and 1.0 player_struct */
+#endif
 #define SG_DOS_MAXHITTYPES  2048    /* as in 1.3D */
 #define SG_DOS_MAXPLAYERS   8       /* 1.1 and 1.0 save ps[] and po[] for 8 players */
 /* They write ps[] and po[] as 8 elements each, both in one block. */
@@ -87,28 +91,46 @@ void sg_read32s(int32_t fil, int32_t *a, int32_t dasizeof, int32_t count);
 void sg_writerecs(FILE *fil, void *recs, size_t stride, sg_rec fn, int32_t n, int32_t dasizeof, int32_t count);
 void sg_readrecs(int32_t fil, void *recs, size_t stride, sg_rec fn, int32_t n, int32_t dasizeof, int32_t count);
 
+/* Resolve wall offsets independently of native linker placement. dos is true
+   when any script pointer bitmap entry is set; otherwise ambiguous offsets
+   are refused. Returns the byte offset within wall[], or -1. */
+int32_t sg_walloffset(int32_t offset, int64_t nativebase, int32_t dos);
+/* Resolve a live animation pointer with the same provenance. */
+int32_t *sg_animptr(int32_t offset, int32_t dos);
+
 /* LZW blocks dfwrite emits for one call. */
 int32_t sg_dfblocks(int32_t dasizeof, int32_t count);
 
 #if DUKE3D_GAMEVER < GAMEVER_11
-/* 1.0 saves store script addresses (actorscrptr[] minus script's address,
+/* 0.99 and 1.0 saves store script addresses (actorscrptr[] minus script's address,
    hittype temp_data raw) as the DOS game had them. Its script was at this
    address in the DOSBox reference saves; we write saves as if it were. */
+#if DUKE3D_GAMEVER < GAMEVER_10
+#define SG_DOS10_SCRIPTBASE 0x2be018
+#else
 #define SG_DOS10_SCRIPTBASE 0x2d5f08
+#endif
 
-/* Checks that the whole file, from fil's position, has the 1.0 save layout
+/* Checks that the whole file, from fil's position, has this build's unversioned save layout
    (docs/v10-v11/reference.md, "Save file") and that its script addresses all
    point into the script. Leaves fil where it was. Returns the address the
-   save's script was at, or -1 if it isn't a sound 1.0 save. */
+   save's script was at, or -1 if it isn't a sound save of this build's version. */
 int32_t sg_check10(int32_t fil);
 
 /* The hittype temp_data slots that hold script addresses: 1, 4 and 5. */
 extern const int32_t sg_scriptslots10[3];
 #endif
 
+#if DUKE3D_GAMEVER >= GAMEVER_11
+/* Check every compressed call, actor script table, flagged script/hittype
+   offsets and live animation offsets, starting just after the version block.
+   Leaves fil where it was. */
+int32_t sg_checksave(int32_t fil);
+
 /* Uncompressed size of the first ps[] block, found without loading anything.
    fil must be just past the version block, and is left there. Returns -1
    if the file ends first. */
 int32_t sg_playerblocksize(int32_t fil);
+#endif
 
 #endif

@@ -31,6 +31,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "animlib.h"
 #include "glext.h"
 #include "displaymode.h"
+#include "videoopts.h"
 
 /* this should be a proper prototype included from a header file */
 #if PLATFORM_UNIX
@@ -213,6 +214,8 @@ int loadplayer(signed char spot)
      char mpfn[] = "gameA_00.sav";
      char fullname[MAX_PATH];
 
+     video_flushpending();  // shows frames of its own
+
      if(spot < 0)
      {
 #if DUKE3D_GAMEVER < GAMEVER_14
@@ -258,7 +261,7 @@ int loadplayerfile(char *fnptr, signed char spot)
 {
      short k,music_changed;
      char scriptptrs[MAXSCRIPTSIZE];
-     int32_t fil, bv, i, j, x, animoffs[MAXANIMATES];
+     int32_t fil, bv, i, j, x, dos = 0, animoffs[MAXANIMATES];
      int32 nump;
 
      if ((fil = kopen4load(fnptr,0)) == -1) return(-1);
@@ -271,7 +274,11 @@ int loadplayerfile(char *fnptr, signed char spot)
      bv = sg_check10(fil);
      if(bv < 0)
      {
+#if DUKE3D_GAMEVER < GAMEVER_10
+        printf("%s is not a DOS 0.99 save.\n",fnptr);
+#else
         printf("%s is not a DOS 1.0 save.\n",fnptr);
+#endif
         FTA(114,&ps[myconnectindex]);
         kclose(fil);
         ototalclock = totalclock;
@@ -301,6 +308,15 @@ int loadplayerfile(char *fnptr, signed char spot)
 #else
         printf("%s is not a DOS 1.5 save (player block is %d bytes).\n",fnptr,i);
 #endif
+        FTA(114,&ps[myconnectindex]);
+        kclose(fil);
+        ototalclock = totalclock;
+        ready2send = 1;
+        return 1;
+     }
+     if(!sg_checksave(fil))
+     {
+        printf("%s has an invalid or truncated save layout.\n",fnptr);
         FTA(114,&ps[myconnectindex]);
         kclose(fil);
         ototalclock = totalclock;
@@ -381,6 +397,10 @@ int loadplayerfile(char *fnptr, signed char spot)
      sg_read16s(fil,nextspritestat,2,MAXSPRITES);
      numcyclers = clampcount(sg_read16(fil),MAXCYCLERS);
      sg_read16s(fil,&cyclers[0][0],12,MAXCYCLERS);
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     memset(&ps[SG_DOS_MAXPLAYERS],0,sizeof(ps)-SG_DOS_MAXPLAYERS*sizeof(ps[0]));
+     memset(&po[SG_DOS_MAXPLAYERS],0,sizeof(po)-SG_DOS_MAXPLAYERS*sizeof(po[0]));
+#endif
      sg_readrecs(fil,ps,sizeof(struct player_struct),sg_player,SG_DOS_MAXPLAYERS,SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT);
      for(i=0;i<MAXPLAYERS;i++) ps[i].palette = (char *) &palette[0];
      sg_readrecs(fil,po,sizeof(struct player_orig),sg_playerorig,SG_DOS_MAXPLAYERS,SG_PLAYERORIG_DFSIZE,SG_PLAYERORIG_DFCOUNT);
@@ -407,7 +427,11 @@ int loadplayerfile(char *fnptr, signed char spot)
      mirrorcnt = clampcount(sg_read16(fil),64);
      sg_read16s(fil,mirrorwall,2,64);
      sg_read16s(fil,mirrorsector,2,64);
+#if DUKE3D_GAMEVER >= GAMEVER_10
      kdfread(&show2dsector[0],sizeof(char),MAXSECTORS>>3,fil);
+#else
+     memset(show2dsector,0,sizeof(show2dsector));
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D saves no actortype, boardfilename or clouds
      clearbufbyte(actortype,MAXTILES,0L);
      kdfread(&actortype[0],sizeof(char),SG_DOS_MAXTILES,fil);
@@ -420,6 +444,8 @@ int loadplayerfile(char *fnptr, signed char spot)
 #endif
 
      kdfread(&scriptptrs[0],1,SG_DOS_MAXSCRIPT,fil);
+     for(i=0;i<SG_DOS_MAXSCRIPT;i++)
+         if(scriptptrs[i]) { dos = 1; break; }
      sg_read32s(fil,script,4,SG_DOS_MAXSCRIPT);
 
      clearbuf(actorscrptr,MAXTILES,0L);
@@ -452,13 +478,17 @@ int loadplayerfile(char *fnptr, signed char spot)
      animatecnt = clampcount(sg_read32(fil),MAXANIMATES);
      sg_read16s(fil,animatesect,2,MAXANIMATES);
      sg_read32s(fil,animoffs,4,MAXANIMATES);
-     for(i = animatecnt-1;i>=0;i--) animateptr[i] = (int32_t *)((char *)&sector[0]+animoffs[i]);
+     for(i = animatecnt-1;i>=0;i--) animateptr[i] = sg_animptr(animoffs[i],dos);
      sg_read32s(fil,animategoal,4,MAXANIMATES);
      sg_read32s(fil,animatevel,4,MAXANIMATES);
 
      earthquaketime = sg_read8(fil);
      ud.from_bonus = sg_read16(fil);
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+     ud.respawn_monsters = (uint16_t)sg_read16(fil);
+     ud.m_respawn_monsters = ud.respawn_monsters;
+     ud.respawn_items = ud.m_respawn_items = 0;
+#elif DUKE3D_GAMEVER < GAMEVER_13D
      // 1.1 ends with 7 scalars; auto_run and crosshair are bytes. 1.0 ends
      // with the first 4.
      ud.respawn_monsters = sg_read32(fil);
@@ -672,6 +702,10 @@ int saveplayerfile(char *fnptr, signed char spot)
      char scriptptrs[MAXSCRIPTSIZE];
      FILE *fil;
 
+#if DUKE3D_GAMEVER < GAMEVER_13D
+     if(script[0] > SG_DOS_MAXSCRIPT*4)
+         printf("Warning: DOS saves store only %d script longs; this CON uses %d.\n",SG_DOS_MAXSCRIPT,script[0]/4);
+#endif
      if ((fil = fopen(fnptr,"wb")) == 0) return(-1);
 
      ready2send = 0;
@@ -715,7 +749,10 @@ int saveplayerfile(char *fnptr, signed char spot)
 #if DUKE3D_GAMEVER < GAMEVER_11
      // 1.0 saves hittype[] here, raw: an actor's script offsets in
      // temp_data[1], [4] and [5] go out as DOS addresses (F10-003), and
-     // scriptptrs marks them to undo after.
+     // scriptptrs marks them to undo after. Native slots have no type tags:
+     // a numeric value equal to an aligned script offset is ambiguous here.
+     // Correctly distinguishing it requires tracking slot types at assignment,
+     // including native actor code; the DOS save format has no such metadata.
      for(i=0;i<SG_DOS_MAXHITTYPES;i++)
          for(j=0;j<3;j++)
          {
@@ -743,7 +780,9 @@ int saveplayerfile(char *fnptr, signed char spot)
      sg_write16(fil,mirrorcnt);
      sg_write16s(fil,mirrorwall,2,64);
      sg_write16s(fil,mirrorsector,2,64);
+#if DUKE3D_GAMEVER >= GAMEVER_10
      dfwrite(&show2dsector[0],sizeof(char),MAXSECTORS>>3,fil);
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D saves no actortype, boardfilename or clouds
      dfwrite(&actortype[0],sizeof(char),SG_DOS_MAXTILES,fil);
      dfwrite(&boardfilename[0],sizeof(boardfilename),1,fil);
@@ -794,7 +833,9 @@ int saveplayerfile(char *fnptr, signed char spot)
 
      sg_write8(fil,earthquaketime);
      sg_write16(fil,ud.from_bonus);
-#if DUKE3D_GAMEVER < GAMEVER_13D
+#if DUKE3D_GAMEVER < GAMEVER_10
+     sg_write16(fil,ud.respawn_monsters);
+#elif DUKE3D_GAMEVER < GAMEVER_13D
      sg_write32(fil,ud.respawn_monsters);
      sg_write32(fil,ud.respawn_items);
 #if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 ends here
@@ -1295,6 +1336,92 @@ void bar(int x,int y,short *p,short dainc,char damodify,short s, short pa)
 // ((x==X)?1:2)
 #define MWIN(X) rotatesprite( 320<<15,200<<15,X,0,MENUSCREEN,-16,0,10+64,0,0,xdim-1,ydim-1)
 #define MWINXY(X,OX,OY) rotatesprite( ( 320+(OX) )<<15, ( 200+(OY) )<<15,X,0,MENUSCREEN,-16,0,10+64,0,0,xdim-1,ydim-1)
+
+// The VIDEO page's RESOLUTION row: the size picked with the arrows, not yet
+// applied (videopage_browse).
+#define VIDEOPAGE_MAXMODES 256
+#define VIDEOPAGE_MAXRES 64
+static int32 videopage_browse, videopage_bw, videopage_bh;
+
+// The next of count choices from cur in direction dir that avail allows,
+// round and round; cur when there's no other.
+static int videopage_next(int cur, int dir, int count, const int *avail)
+{
+    int i, c = cur;
+
+    for(i=1;i<count;i++)
+    {
+        c = (c+dir+count)%count;
+        if(avail[c]) return c;
+    }
+    return cur;
+}
+
+// The RESOLUTION row's sizes in display mode display, smallest first
+// (videoopts_buildreslist, from the main display's modes); windowed, with
+// the run's size w by h (if not 0).
+static int videopage_reslist(int display, int32_t w, int32_t h, vmode_t *res)
+{
+    static int32_t mw[VIDEOPAGE_MAXMODES], mh[VIDEOPAGE_MAXMODES];
+    static vmode_t modes[VIDEOPAGE_MAXMODES];
+    int32_t dw, dh;
+    int i, n = getvideomodelist(mw,mh,VIDEOPAGE_MAXMODES,&dw,&dh);
+
+    for(i=0;i<n;i++)
+    {
+        modes[i].w = mw[i];
+        modes[i].h = mh[i];
+    }
+    n = videoopts_buildreslist(modes,n,dw,dh,display,res,VIDEOPAGE_MAXRES);
+    if(display == DISPLAY_WINDOWED && w > 0 && n < VIDEOPAGE_MAXRES)
+    {
+        for(i=0;i<n && (res[i].w < w || (res[i].w == w && res[i].h < h));i++);
+        if(i == n || res[i].w != w || res[i].h != h)
+        {
+            memmove(&res[i+1],&res[i],(n-i)*sizeof(res[0]));
+            res[i].w = w;
+            res[i].h = h;
+            n++;
+        }
+    }
+    return n;
+}
+
+// The size one step in direction dir from w by h among res's n (not in it:
+// the nearest that way); its index.
+static int videopage_resstep(const vmode_t *res, int n, int32_t w, int32_t h, int dir)
+{
+    int i;
+
+    for(i=0;i<n && (res[i].w < w || (res[i].w == w && res[i].h < h));i++);
+    if(i < n && res[i].w == w && res[i].h == h) i += dir;
+    else if(dir < 0) i--;
+    if(i < 0) i = 0;
+    if(i >= n) i = n-1;
+    return i;
+}
+
+// The size w by h keeps going to display mode display: in fullscreen one of
+// the main display's modes (this one, else the desktop's, else the
+// largest); windowed, this one if it fits the desktop, else the largest
+// that does.
+static void videopage_modesize(int display, int32_t *w, int32_t *h)
+{
+    vmode_t res[VIDEOPAGE_MAXRES];
+    int32_t dw, dh;
+    int i, n = videopage_reslist(display,0,0,res);
+
+    getvideomodelist(NULL,NULL,0,&dw,&dh);
+    if(n == 0 || display == DISPLAY_BORDERLESS) return;
+    if(display == DISPLAY_WINDOWED && *w <= dw && *h <= dh) return;
+    for(i=0;i<n;i++)
+        if(res[i].w == *w && res[i].h == *h) return;
+    for(i=0;i<n;i++)
+        if(res[i].w == dw && res[i].h == dh) break;
+    if(i == n) i = n-1;
+    *w = res[i].w;
+    *h = res[i].h;
+}
 
 
 int32 volnum,levnum,plrskl,numplr;
@@ -1847,6 +1974,51 @@ static void non3dr_menus(void)
 #if DUKE3D_GAMEVER < GAMEVER_11
 // 1.0's credits: six pages, with no hardware page, as its menus() draws them
 // (page, y, line) (G10-G08).
+#if DUKE3D_GAMEVER < GAMEVER_10
+static const struct { short page, y; const char *text; } credits099[] =
+{
+    { 0, 50, "ORIGINAL CONCEPT BY" },
+    { 0, 59, "TODD J REPLOGLE" },
+    { 0, 68, "ALLEN H BLUM III" },
+    { 0, 90, "PRODUCED & DIRECTED BY" },
+    { 0, 99, "GREG MALONE" },
+    { 0, 121, "EXECUTIVE PRODUCER" },
+    { 0, 130, "GEORGE BROUSSARD" },
+    { 1, 50, "GAME PROGRAMMED BY" },
+    { 1, 59, "TODD REPLOGLE" },
+    { 1, 80, "BUILD 3D ENGINE" },
+    { 1, 89, "KEN SILVERMAN" },
+    { 1, 111, "SUPPORT PROGRAMMING" },
+    { 1, 120, "MARK DOCHTERMANN" },
+    { 1, 129, "JIM DOSE" },
+    { 2, 50, "MAP DEVELOPMENT" },
+    { 2, 59, "ALLEN H BLUM III" },
+    { 2, 68, "RICHARD GRAY" },
+    { 2, 90, "3D ACTOR MODELING" },
+    { 2, 99, "CHUCK JONES" },
+    { 2, 108, "MIKE TIDWELL" },
+    { 2, 117, "MARCUS FISHER" },
+    { 3, 40, "PIXEL ART" },
+    { 3, 49, "DIRK JONES" },
+    { 3, 58, "STEPHEN HORNBACK" },
+    { 3, 67, "JAMES STOREY" },
+    { 3, 89, "SOUND & MUSIC DEVELOPMENT" },
+    { 3, 98, "ROBERT PRINCE" },
+    { 3, 107, "LEE JACKSON" },
+    { 3, 129, "VOICE DEVELOPMENT" },
+    { 3, 138, "LANI MINELLA" },
+    { 3, 147, "DUKE NUKEM" },
+    { 4, 50, "SPECIAL THANKS TO" },
+    { 4, 68, "STEVEN BLACKBURN" },
+    { 4, 77, "JOE SIEGLER" },
+    { 4, 86, "TERRY NAGY" },
+    { 5, 100, "MADE IN DALLAS, TEXAS USA" },
+    { 6, 94, "DUKE NUKEM IS A TRADEMARK OF" },
+    { 6, 103, "3D REALMS ENTERTAINMENT" },
+    { 6, 116, "DUKE NUKEM 3D" },
+    { 6, 125, "(C) 1996 3D REALMS ENTERTAINMENT" },
+};
+#endif
 static const struct { short page, y; const char *text; } credits10[] =
 {
     { 0, 50, "ORIGINAL CONCEPT" },
@@ -2039,6 +2211,14 @@ static const struct { short page, y; const char *text; } credits13[] =
 };
 #endif
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+#define MAIN_MENU_TOP 55
+#define GAME_MENU_TOP 55
+#else
+#define MAIN_MENU_TOP 67-3
+#define GAME_MENU_TOP 67
+#endif
+
 void menus(void)
 {
     int count;
@@ -2049,6 +2229,7 @@ void menus(void)
 //  int tenerr;
 // CTW END - REMOVED
 
+    GAMEPAD_Poll();
     getpackets();
 
     if(ControllerType == 1 && CONTROL_MousePresent)
@@ -2103,6 +2284,24 @@ void menus(void)
 
         case 20000:
             x = probe(326,190,0,0);
+#if DUKE3D_GAMEVER < GAMEVER_10
+            gametext(160,10,"YOU ARE PLAYING THE SHAREWARE",0,2+8+16);
+            gametext(160,19,"VERSION OF DUKE NUKEM 3D.  THIS",0,2+8+16);
+            gametext(160,28,"VERSION CONTAINS EPISODE 1 OF",0,2+8+16);
+            gametext(160,37,"THE 3-EPISODE COMPLETE",0,2+8+16);
+            gametext(160,46,"REGISTERED VERSION",0,2+8+16);
+            gametext(28,64,"* 18 ADDITIONAL LEVELS",0,2+8+16);
+            gametext(28,73,"* SEVERAL NEW MONSTERS",0,2+8+16);
+            gametext(28,82,"* 3 ADDITIONAL SUPER-COOL WEAPONS",0,2+8+16);
+            gametext(28,91,"* UP TO 8 SIMULTANEOUS",0,2+8+16);
+            gametext(28,100,"    NETWORK PLAYERS",0,2+8+16);
+            gametext(28,109,"* LOTS MORE WILD SUPRISES",0,2+8+16);
+            gametext(28,118,"    AND HOT ACTION!",0,2+8+16);
+            gametext(160,134,"IF YOU WISH TO UPGRADE TO THE",0,2+8+16);
+            gametext(160,143,"REGISTERED VERSION OF DUKE NUKEM 3D,",0,2+8+16);
+            gametext(160,152,"CALL US AT 1-800-GAME123 OR SEE YOUR,",0,2+8+16);
+            gametext(160,161,"LOCAL SOFTWARE DEALER.",0,2+8+16);
+#else
             gametext(160,50-8,"YOU ARE PLAYING THE SHAREWARE",0,2+8+16);
             gametext(160,59-8,"VERSION OF DUKE NUKEM 3D.  WHILE",0,2+8+16);
             gametext(160,68-8,"THIS VERSION IS REALLY COOL, YOU",0,2+8+16);
@@ -2120,6 +2319,7 @@ void menus(void)
             gametext(160,149+16,"PRESS ANY KEY...",0,2+8+16);
 #endif
 
+#endif
             if( x >= -1 ) cmenu(100);
             break;
 // CTW - REMOVED
@@ -2168,7 +2368,11 @@ void menus(void)
 
             if( KB_KeyPressed(sc_Escape) || KB_KeyPressed(sc_N) || RMB)
             {
+#if DUKE3D_GAMEVER < GAMEVER_10
+                if(current_menu == 15000 && KB_KeyPressed(sc_N))
+#else
                 if(sprite[ps[myconnectindex].i].extra <= 0)
+#endif
                 {
                     enterlevel(MODE_GAME);
                     return;
@@ -2212,12 +2416,24 @@ void menus(void)
 
             c = 60;
             rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
-            menutext(160,24,0,0,"ADULT MODE");
+            menutext(160,24,0,0,
+#if DUKE3D_GAMEVER < GAMEVER_10
+                "PARENTAL LOCK"
+#else
+                "ADULT MODE"
+#endif
+);
 
             x = probe(60,50+16,16,2);
             if(x == -1) { cmenu(200); break; }
 
-            menutext(c,50+16,SHX(-2),PHX(-2),"ADULT MODE");
+            menutext(c,50+16,SHX(-2),PHX(-2),
+#if DUKE3D_GAMEVER < GAMEVER_10
+                "PARENTAL LOCK"
+#else
+                "ADULT MODE"
+#endif
+);
             menutext(c,50+16+16,SHX(-3),PHX(-3),"ENTER PASSWORD");
 
             if(ud.lockout) menutext(c+160+40,50+16,0,0,"OFF");
@@ -2238,9 +2454,11 @@ void menus(void)
                         buf[0] = 0;
 
                         for(x=0;x<numanimwalls;x++)
+#if DUKE3D_GAMEVER >= GAMEVER_10
                             if( wall[animwall[x].wallnum].picnum != W_SCREENBREAK &&
                                 wall[animwall[x].wallnum].picnum != W_SCREENBREAK+1 &&
                                 wall[animwall[x].wallnum].picnum != W_SCREENBREAK+2 )
+#endif
                                     if( wall[animwall[x].wallnum].extra >= 0 )
                                         wall[animwall[x].wallnum].picnum = wall[animwall[x].wallnum].extra;
 
@@ -2260,12 +2478,16 @@ void menus(void)
                         if(ud.pwlockout[0] == 0)
                         {
                             ud.lockout = 0;
+#if DUKE3D_GAMEVER >= GAMEVER_10
                             for(x=0;x<numanimwalls;x++)
+#if DUKE3D_GAMEVER >= GAMEVER_10
                             if( wall[animwall[x].wallnum].picnum != W_SCREENBREAK &&
                                 wall[animwall[x].wallnum].picnum != W_SCREENBREAK+1 &&
                                 wall[animwall[x].wallnum].picnum != W_SCREENBREAK+2 )
+#endif
                                     if( wall[animwall[x].wallnum].extra >= 0 )
                                         wall[animwall[x].wallnum].picnum = wall[animwall[x].wallnum].extra;
+#endif
                         }
                         else
                         {
@@ -2283,11 +2505,17 @@ void menus(void)
                             switch(wall[animwall[x].wallnum].picnum)
                             {
                                 case FEMPIC1:
+#if DUKE3D_GAMEVER >= GAMEVER_10
                                     wall[animwall[x].wallnum].picnum = BLANKSCREEN;
                                     break;
+#endif
                                 case FEMPIC2:
                                 case FEMPIC3:
+#if DUKE3D_GAMEVER < GAMEVER_10
+                                    wall[animwall[x].wallnum].picnum = BLANKSCREEN;
+#else
                                     wall[animwall[x].wallnum].picnum = SCREENBREAK6;
+#endif
                                     break;
                             }
                     }
@@ -2322,10 +2550,16 @@ void menus(void)
 
             dispnames();
 
+#if DUKE3D_GAMEVER >= GAMEVER_10
             sprintf(tempbuf,"PLAYERS: %-2d                      ",numplr);
             gametext(160,158,tempbuf,0,2+8+16);
+#endif
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+            sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+volnum,1+levnum,plrskl+1);
+#else
             sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+volnum,1+levnum,plrskl);
+#endif
             gametext(160,170,tempbuf,0,2+8+16);
 
             gametext(160,90,"LOAD game:",0,2+8+16);
@@ -2439,10 +2673,16 @@ void menus(void)
             menutext(160,24,0,0,"SAVE GAME");
 
             rotatesprite(101<<16,97<<16,65536L,512,MAXTILES-3,-32,0,4+10+64,0,0,xdim-1,ydim-1);
+#if DUKE3D_GAMEVER >= GAMEVER_10
             sprintf(tempbuf,"PLAYERS: %-2d                      ",ud.multimode);
             gametext(160,158,tempbuf,0,2+8+16);
+#endif
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+            sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill+1);
+#else
             sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill);
+#endif
             gametext(160,170,tempbuf,0,2+8+16);
 
             dispnames();
@@ -2480,6 +2720,22 @@ void menus(void)
         case 995:
         case 996:
         case 997:
+#if DUKE3D_GAMEVER < GAMEVER_10
+            rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
+            menutext(160,24,0,0,"CREDITS");
+            x=probe(190,184,0,0);
+            if(x == -1) { cmenu(0); break; }
+            if(x >= 0 || KB_KeyPressed(sc_Space))
+            {
+                KB_ClearKeyDown(sc_Space);
+                cmenu(current_menu == 996 ? 0 : current_menu+1);
+            }
+            for(l=0;l<(int)(sizeof(credits099)/sizeof(credits099[0]));l++)
+                if(credits099[l].page == current_menu-990)
+                    gametext(160,credits099[l].y,(char *)credits099[l].text,0,2+8+16);
+            break;
+#else
+
 
 //            rotatesprite(c<<16,200<<15,65536L,0,MENUSCREEN,16,0,10+64,0,0,xdim-1,ydim-1);
 //            rotatesprite(c<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
@@ -2574,6 +2830,8 @@ void menus(void)
 #endif
             break;
 
+#endif
+
         case 0:
             c = (320>>1);
             rotatesprite(c<<16,(28<<16)-5,65536L,0,INGAMEDUKETHREEDEE,0,0,10,0,0,xdim-1,ydim-1);
@@ -2581,12 +2839,12 @@ void menus(void)
             rotatesprite((c+100)<<16,(36<<16)-5,65536L,0,PLUTOPAKSPRITE+2,(sintable[(totalclock<<4)&2047]>>11),0,2+8,0,0,xdim-1,ydim-1);
 #endif
 // CTW - MODIFICATION
-//          x = probe(c,67-3,16,7);
+//          x = probe(c,MAIN_MENU_TOP,16,7);
             count = 6;
-#if NET_MENU
+#if NET_MENU && DUKE3D_GAMEVER >= GAMEVER_10
             count++;
 #endif
-            x = probe(c,67-3,16,count);
+            x = probe(c,MAIN_MENU_TOP,16,count);
 // CTW END - MODIFICATION
             if(x >= 0)
             {
@@ -2647,7 +2905,7 @@ void menus(void)
                             break;
                         case 3: KB_FlushKeyboardQueue();cmenu(400);break;
                         case 4: cmenu(990);break;
-#if NET_MENU
+#if NET_MENU && DUKE3D_GAMEVER >= GAMEVER_10
                         case 5: cmenu(30000);break;
                         case 6: cmenu(500);break;
 #else
@@ -2674,41 +2932,41 @@ void menus(void)
             if(movesperpacket == 4)
             {
                 if( myconnectindex == connecthead )
-                    menutext(c,67-3,SHX(-2),PHX(-2),"NEW GAME");
+                    menutext(c,MAIN_MENU_TOP,SHX(-2),PHX(-2),"NEW GAME");
                 else
-                    menutext(c,67-3,SHX(-2),1,"NEW GAME");
+                    menutext(c,MAIN_MENU_TOP,SHX(-2),1,"NEW GAME");
             }
             else
-                menutext(c,67-3,SHX(-2),PHX(-2),"NEW GAME");
+                menutext(c,MAIN_MENU_TOP,SHX(-2),PHX(-2),"NEW GAME");
 
 // CTW - REMOVED
 /*          if(movesperpacket != 4 && numplayers < 2)
-                menutext(c,67-3+16,SHX(-3),PHX(-3),"PLAY ON TEN");
+                menutext(c,MAIN_MENU_TOP+16,SHX(-3),PHX(-3),"PLAY ON TEN");
             else
-                menutext(c,67-3+16,SHX(-3),1,"PLAY ON TEN");*/
+                menutext(c,MAIN_MENU_TOP+16,SHX(-3),1,"PLAY ON TEN");*/
 // CTW END - REMOVED
 
 // CTW - MODIFICATION - Not going to comment out the exact old code here.
 // I shifted up every menu option by 16.
 // I shifted up every menu result by 1.
-            menutext(c,67-3+16,SHX(-3),PHX(-3),"OPTIONS");
+            menutext(c,MAIN_MENU_TOP+16,SHX(-3),PHX(-3),"OPTIONS");
 
             if(movesperpacket == 4 && connecthead != myconnectindex)
-                menutext(c,67-3+16+16,SHX(-4),1,"LOAD GAME");
-            else menutext(c,67-3+16+16,SHX(-4),PHX(-4),"LOAD GAME");
+                menutext(c,MAIN_MENU_TOP+16+16,SHX(-4),1,"LOAD GAME");
+            else menutext(c,MAIN_MENU_TOP+16+16,SHX(-4),PHX(-4),"LOAD GAME");
 
 #ifndef VOLUMEALL
-            menutext(c,67-3+16+16+16,SHX(-5),PHX(-5),"HOW TO ORDER");
+            menutext(c,MAIN_MENU_TOP+16+16+16,SHX(-5),PHX(-5),"HOW TO ORDER");
 #else
-            menutext(c,67-3+16+16+16,SHX(-5),PHX(-5),"HELP");
+            menutext(c,MAIN_MENU_TOP+16+16+16,SHX(-5),PHX(-5),"HELP");
 #endif
-            menutext(c,67-3+16+16+16+16,SHX(-6),PHX(-6),"CREDITS");
+            menutext(c,MAIN_MENU_TOP+16+16+16+16,SHX(-6),PHX(-6),"CREDITS");
 
-#if NET_MENU
-            menutext(c,67-3+16+16+16+16+16,SHX(-7),PHX(-7),"NETWORK GAME");
-            menutext(c,67-3+16+16+16+16+16+16,SHX(-8),PHX(-8),"QUIT");
+#if NET_MENU && DUKE3D_GAMEVER >= GAMEVER_10
+            menutext(c,MAIN_MENU_TOP+16+16+16+16+16,SHX(-7),PHX(-7),"NETWORK GAME");
+            menutext(c,MAIN_MENU_TOP+16+16+16+16+16+16,SHX(-8),PHX(-8),"QUIT");
 #else
-            menutext(c,67-3+16+16+16+16+16,SHX(-7),PHX(-7),"QUIT");
+            menutext(c,MAIN_MENU_TOP+16+16+16+16+16,SHX(-7),PHX(-7),"QUIT");
 #endif
 
             break;
@@ -2720,7 +2978,7 @@ void menus(void)
 #if DUKE3D_GAMEVER >= GAMEVER_14 // no Plutonium Pak logo in 1.3D's menus
             rotatesprite((c+100)<<16,36<<16,65536L,0,PLUTOPAKSPRITE+2,(sintable[(totalclock<<4)&2047]>>11),0,2+8,0,0,xdim-1,ydim-1);
 #endif
-            x = probe(c,67,16,7);
+            x = probe(c,GAME_MENU_TOP,16,7);
             switch(x)
             {
                 case 0:
@@ -2785,33 +3043,36 @@ void menus(void)
 
             if(movesperpacket == 4 && connecthead != myconnectindex)
             {
-                menutext(c,67                  ,SHX(-2),1,"NEW GAME");
-                menutext(c,67+16               ,SHX(-3),1,"SAVE GAME");
-                menutext(c,67+16+16            ,SHX(-4),1,"LOAD GAME");
+                menutext(c,GAME_MENU_TOP                  ,SHX(-2),1,"NEW GAME");
+                menutext(c,GAME_MENU_TOP+16               ,SHX(-3),1,"SAVE GAME");
+                menutext(c,GAME_MENU_TOP+16+16            ,SHX(-4),1,"LOAD GAME");
             }
             else
             {
-                menutext(c,67                  ,SHX(-2),PHX(-2),"NEW GAME");
-                menutext(c,67+16               ,SHX(-3),PHX(-3),"SAVE GAME");
-                menutext(c,67+16+16            ,SHX(-4),PHX(-4),"LOAD GAME");
+                menutext(c,GAME_MENU_TOP                  ,SHX(-2),PHX(-2),"NEW GAME");
+                menutext(c,GAME_MENU_TOP+16               ,SHX(-3),PHX(-3),"SAVE GAME");
+                menutext(c,GAME_MENU_TOP+16+16            ,SHX(-4),PHX(-4),"LOAD GAME");
             }
 
-            menutext(c,67+16+16+16         ,SHX(-5),PHX(-5),"OPTIONS");
+            menutext(c,GAME_MENU_TOP+16+16+16         ,SHX(-5),PHX(-5),"OPTIONS");
 #ifndef VOLUMEALL
-            menutext(c,67+16+16+16+16      ,SHX(-6),PHX(-6),"HOW TO ORDER");
+            menutext(c,GAME_MENU_TOP+16+16+16+16      ,SHX(-6),PHX(-6),"HOW TO ORDER");
 #else
-            menutext(c,67+16+16+16+16      ,SHX(-6),PHX(-6)," HELP");
+            menutext(c,GAME_MENU_TOP+16+16+16+16      ,SHX(-6),PHX(-6)," HELP");
 #endif
             if(numplayers > 1)
-                menutext(c,67+16+16+16+16+16   ,SHX(-7),1,"QUIT TO TITLE");
-            else menutext(c,67+16+16+16+16+16   ,SHX(-7),PHX(-7),"QUIT TO TITLE");
-            menutext(c,67+16+16+16+16+16+16,SHX(-8),PHX(-8),"QUIT GAME");
+                menutext(c,GAME_MENU_TOP+16+16+16+16+16   ,SHX(-7),1,"QUIT TO TITLE");
+            else menutext(c,GAME_MENU_TOP+16+16+16+16+16   ,SHX(-7),PHX(-7),"QUIT TO TITLE");
+            menutext(c,GAME_MENU_TOP+16+16+16+16+16+16,
+                SHX(-8),PHX(-8),"QUIT GAME");
             break;
 
         case 100:
             rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
             menutext(160,24,0,0,"SELECT AN EPISODE");
-#ifdef PLUTOPAK
+#if DUKE3D_GAMEVER < GAMEVER_10
+            x = probe(160,60,20,3);
+#elif defined PLUTOPAK
             if(boardfilename[0])
                 x = probe(160,60,20,5);
             else x = probe(160,60,20,4);
@@ -2898,6 +3159,20 @@ void menus(void)
             c = (320>>1);
             rotatesprite(c<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
             menutext(c,24,0,0,"SELECT SKILL");
+#if DUKE3D_GAMEVER < GAMEVER_10
+            x=probe(c,50,16,5);
+            if(x >= 0)
+            {
+                ud.m_player_skill=x;
+                if(x == 4) ud.m_respawn_monsters=1;
+                else ud.respawn_monsters=0;
+                newgame(ud.m_volume_number,ud.m_level_number,x);
+                enterlevel(MODE_GAME);
+            }
+            else if(x == -1) cmenu(100);
+            for(l=0;l<5;l++) menutext(c,50+16*l,SHX(-l-2),PHX(-l-2),skill_names[l]);
+            break;
+#else
             x = probe(c,70,19,4);
             if(x >= 0)
             {
@@ -2945,15 +3220,66 @@ void menus(void)
             menutext(c,70+19+19+19,SHX(-5),PHX(-5),skill_names[3]);
             break;
 
+#endif
+
         case 200:
+#if DUKE3D_GAMEVER < GAMEVER_10
+            {
+                static char *labels[]={"DETAIL","SHADOWS","SCREEN TILTING","SCREEN SIZE",
+                    "BRIGHTNESS","MOUSE SENSITIVITY","SOUNDS","PARENTAL LOCK"};
+                short value;
+                rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
+                menutext(160,24,0,0,"OPTIONS");
+                count=9;
+#if CONTROLS_CONFIG_MENU
+                count++;
+#endif
+                onbar=(probey>=3 && probey<=5);
+                x=probe(40,50,16,count);
+                if(x == -1) { cmenu((ps[myconnectindex].gm&MODE_GAME)?50:0); break; }
+                if(!onbar) switch(x)
+                {
+                    case 0: ud.detail=1-ud.detail; break;
+                    case 1: ud.shadows=1-ud.shadows; break;
+                    case 2: ud.screen_tilting=1-ud.screen_tilting; break;
+                    case 6: if(FXDevice != 13) cmenu(700); break;
+                    case 7: cmenu(10000); break;
+#if CONTROLS_CONFIG_MENU
+                    case 8: cmenu(MENU_CONTROLS); break;
+#endif
+                    default:
+                        if(x == count-1)
+                        {
+                            video_pagebegin();
+                            cmenu(710);
+                        }
+                        break;
+                }
+                for(l=0;l<8;l++) menutext(40,50+16*l,SHX(-l-2),PHX(-l-2),labels[l]);
+                menutext(240,50,0,0,ud.detail?"HIGH":"LOW");
+                menutext(240,66,0,0,ud.shadows?"ON":"OFF");
+                menutext(240,82,0,0,ud.screen_tilting?"ON":"OFF");
+                value=ud.screen_size; bar(247,98,&value,-4,x==3,0,0); ud.screen_size=value;
+                value=ud.brightness; bar(247,114,&value,8,x==4,0,0); ud.brightness=value;
+                if(x==4) setbrightness(ud.brightness>>2,ps[myconnectindex].palette);
+                value=CONTROL_GetMouseSensitivity()>>10;
+                bar(247,130,&value,4,x==5,0,0); CONTROL_SetMouseSensitivity(value<<10);
+#if CONTROLS_CONFIG_MENU
+                menutext(40,178,SHX(-10),PHX(-10),"CONTROLS...");
+#endif
+                menutext(40,50+16*(count-1),SHX(-11),PHX(-11),"VIDEO...");
+            }
+            break;
+#else
+
 
             rotatesprite(320<<15,10<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
             menutext(320>>1,15,0,0,"OPTIONS");
 
             c = (320>>1)-120;
 
-            onbar = (probey == 3 || probey == 4 || probey == 5);
-            count = 10;
+            onbar = (probey == 3 || probey == 4);
+            count = 9;
 #if CONTROLS_CONFIG_MENU
             count++;
 #endif
@@ -2974,19 +3300,19 @@ void menus(void)
                 case 2:
                     ud.screen_tilting = 1-ud.screen_tilting;
                     break;
-                case 6:
+                case 5:
                     if ( ControllerType == controltype_keyboardandmouse )
                         ud.mouseflip = 1-ud.mouseflip;
                     break;
-                case 7:
+                case 6:
                     cmenu(700);
                     break;
-                case 8:
+                case 7:
 #ifndef AUSTRALIA
                     cmenu(10000);
 #endif
                     break;
-                case 9:
+                case 8:
                     if( (ps[myconnectindex].gm&MODE_GAME) )
                     {
                         closedemowrite();
@@ -2995,12 +3321,16 @@ void menus(void)
                     ud.m_recstat = !ud.m_recstat;
                     break;
 #if CONTROLS_CONFIG_MENU
-                case 10:
+                case 9:
                     cmenu(MENU_CONTROLS);
                     break;
 #endif
                 default:
-                    if(x == count-1) cmenu(710);
+                    if(x == count-1)
+                    {
+                        video_pagebegin();
+                        cmenu(710);
+                    }
                     break;
             }
 
@@ -3025,24 +3355,19 @@ void menus(void)
                 bar(c+167+40,31+15+15+15,(short *)&shorttmp,-4,x==3,SHX(-5),PHX(-5));
                 ud.screen_size = (int32) shorttmp;
 
-            menutext(c,31+15+15+15+15,SHX(-6),PHX(-6),"BRIGHTNESS");
-                shorttmp = (short) ud.brightness;
-                bar(c+167+40,31+15+15+15+15,(short *)&shorttmp,8,x==4,SHX(-6),PHX(-6));
-                ud.brightness = (int32) shorttmp;
-                if(x==4) setbrightness(ud.brightness>>2,&ps[myconnectindex].palette[0]);
-
+            // BRIGHTNESS is on the VIDEO page.
             if ( ControllerType == controltype_keyboardandmouse )
             {
                 short sense;
                 sense = CONTROL_GetMouseSensitivity()>>10;
 
-                menutext(c,31+15+15+15+15+15,SHX(-7),PHX(-7),"MOUSE SENSITIVITY");
-                bar(c+167+40,31+15+15+15+15+15,&sense,4,x==5,SHX(-7),PHX(-7));
+                menutext(c,31+15+15+15+15,SHX(-7),PHX(-7),"MOUSE SENSITIVITY");
+                bar(c+167+40,31+15+15+15+15,&sense,4,x==4,SHX(-7),PHX(-7));
                 CONTROL_SetMouseSensitivity( sense<<10 );
-                menutext(c,31+15+15+15+15+15+15,SHX(-7),PHX(-7),"MOUSE AIMING FLIP");
+                menutext(c,31+15+15+15+15+15,SHX(-7),PHX(-7),"MOUSE AIMING FLIP");
 
-                if(ud.mouseflip) menutext(c+160+40,31+15+15+15+15+15+15,SHX(-7),PHX(-7),"ON");
-                else menutext(c+160+40,31+15+15+15+15+15+15,SHX(-7),PHX(-7),"OFF");
+                if(ud.mouseflip) menutext(c+160+40,31+15+15+15+15+15,SHX(-7),PHX(-7),"ON");
+                else menutext(c+160+40,31+15+15+15+15+15,SHX(-7),PHX(-7),"OFF");
 
             }
             else
@@ -3050,103 +3375,267 @@ void menus(void)
                 short sense;
                 sense = CONTROL_GetMouseSensitivity()>>10;
 
-                menutext(c,31+15+15+15+15+15,SHX(-7),1,"MOUSE SENSITIVITY");
-                bar(c+167+40,31+15+15+15+15+15,&sense,4,x==99,SHX(-7),1);
-                menutext(c,31+15+15+15+15+15+15,SHX(-7),1,"MOUSE AIMING FLIP");
+                menutext(c,31+15+15+15+15,SHX(-7),1,"MOUSE SENSITIVITY");
+                bar(c+167+40,31+15+15+15+15,&sense,4,x==99,SHX(-7),1);
+                menutext(c,31+15+15+15+15+15,SHX(-7),1,"MOUSE AIMING FLIP");
 
-                if(ud.mouseflip) menutext(c+160+40,31+15+15+15+15+15+15,SHX(-7),1,"ON");
-                else menutext(c+160+40,31+15+15+15+15+15+15,SHX(-7),1,"OFF");
+                if(ud.mouseflip) menutext(c+160+40,31+15+15+15+15+15,SHX(-7),1,"ON");
+                else menutext(c+160+40,31+15+15+15+15+15,SHX(-7),1,"OFF");
             }
 
-            menutext(c,31+15+15+15+15+15+15+15,SHX(-8),PHX(-8),"SOUNDS");
+            menutext(c,31+15+15+15+15+15+15,SHX(-8),PHX(-8),"SOUNDS");
 #ifndef AUSTRALIA
-            menutext(c,31+15+15+15+15+15+15+15+15,SHX(-9),PHX(-9),"PARENTAL LOCK");
+            menutext(c,31+15+15+15+15+15+15+15,SHX(-9),PHX(-9),"PARENTAL LOCK");
 #else
-            menutext(c,31+15+15+15+15+15+15+15+15,SHX(-9),1,"PARENTAL LOCK");
+            menutext(c,31+15+15+15+15+15+15+15,SHX(-9),1,"PARENTAL LOCK");
 #endif
             if( (ps[myconnectindex].gm&MODE_GAME) && ud.m_recstat != 1 )
             {
-                menutext(c,31+15+15+15+15+15+15+15+15+15,SHX(-10),1,"RECORD");
-                menutext(c+160+40,31+15+15+15+15+15+15+15+15+15,SHX(-10),1,"OFF");
+                menutext(c,31+15+15+15+15+15+15+15+15,SHX(-10),1,"RECORD");
+                menutext(c+160+40,31+15+15+15+15+15+15+15+15,SHX(-10),1,"OFF");
             }
             else
             {
-                menutext(c,31+15+15+15+15+15+15+15+15+15,SHX(-10),PHX(-10),"RECORD");
+                menutext(c,31+15+15+15+15+15+15+15+15,SHX(-10),PHX(-10),"RECORD");
 
                 if(ud.m_recstat == 1)
-                    menutext(c+160+40,31+15+15+15+15+15+15+15+15+15,SHX(-10),PHX(-10),"ON");
-                else menutext(c+160+40,31+15+15+15+15+15+15+15+15+15,SHX(-10),PHX(-10),"OFF");
+                    menutext(c+160+40,31+15+15+15+15+15+15+15+15,SHX(-10),PHX(-10),"ON");
+                else menutext(c+160+40,31+15+15+15+15+15+15+15+15,SHX(-10),PHX(-10),"OFF");
             }
 
 #if CONTROLS_CONFIG_MENU
-            menutext(c,31+15+15+15+15+15+15+15+15+15+15,SHX(-11),PHX(-11),"CONTROLS...");
+            menutext(c,31+15+15+15+15+15+15+15+15+15,SHX(-11),PHX(-11),"CONTROLS...");
 #endif
             menutext(c,31+15*(count-1),SHX(-12),PHX(-12),"VIDEO...");
             break;
 
-        case 710:
-            // VIDEO: the look of renderer 3's GL 2.1 shader path (greyed
-            // elsewhere), then the display mode and vsync, which change at
-            // once. Rows from y 50, 16 apart, as SOUNDS.
-            {
-                int32 shader = 0;
-                short was;
-#ifdef USE_OPENGL
-                shader = (getrendermode() == 3) && (gldrawpath == GLPATH_SHADER);
 #endif
-                c = (320>>1)-120;
-                rotatesprite(320<<15,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
-                menutext(320>>1,24,0,0,"VIDEO");
-                onbar = ( probey == 0 || probey == 1 );
 
-                x = probe(c,50,16,4);
-                if(x == -1) cmenu(200);
-                else if(x == 2)
+        case 710:
+            // VIDEO: every live video setting, rows from y 31, 15 apart, as
+            // OPTIONS. A change fades out, is made at black and fades back in
+            // (game.c video_request*), so the rows that ask for one only
+            // take a new one once the last is made, and only on a real
+            // change; RESOLUTION's arrows only pick a size, Enter applies it.
+            // A row changed is saved (video_pagetouch), the others aren't.
+            {
+                static const char *const renderernames[4] = { "CLASSIC", "POLY SOLID", "POLY SOFT", "OPENGL" };
+                static const char *const displaynames[DISPLAY_COUNT] = { "WINDOWED", "BORDERLESS", "FULLSCREEN" };
+                static const char *const ssnames[SS_COUNT] = { "OFF", "2K", "4K", "8K" };
+                static const char *const filternames[TEXFILTER_COUNT] = { "NEAREST", "BILINEAR", "TRILINEAR" };
+                int32 shader = 0, internal = 0, busy = video_pending(), enter, dir = 0;
+                int32 renderer = getrendermode(), display = getvideodisplaymode();
+                int32 ss = 0, filter = 0, i, vx;
+                int32_t gw, gh;
+                int rendavail[4] = { 1, 0, 0, 0 }, displayavail[DISPLAY_COUNT] = { 1, 1, 1 };
+                int ssavail[SS_COUNT], filteravail[TEXFILTER_COUNT], ssgrey, filtergrey;
+                vmode_t res[VIDEOPAGE_MAXRES];
+                int nres;
+                char buf[32];
+                short was;
+                const char *note = NULL;
+
+#ifdef POLYMOST
+                rendavail[1] = rendavail[2] = 1;
+#ifdef USE_OPENGL
+                rendavail[3] = !video_glunavailable;
+#endif
+#endif
+#ifdef USE_OPENGL
+                shader = (renderer == 3) && (gldrawpath == GLPATH_SHADER);
+                internal = (glinternalwidth != 0) && (glinternalheight != 0);
+                ss = glsupersample;
+                filter = gltexturefilter;
+#endif
+                for(i=0;i<SS_COUNT;i++) ssavail[i] = videosupersampleavailable(i);
+                for(i=0;i<TEXFILTER_COUNT;i++) filteravail[i] = videotexfilteravailable(i);
+                // greyed with only off (nearest) to offer, showing the level kept
+                ssgrey = !(ssavail[SS_2K] || ssavail[SS_4K] || ssavail[SS_8K]);
+                filtergrey = !(filteravail[TEXFILTER_BILINEAR] || filteravail[TEXFILTER_TRILINEAR]);
+                video_getmode(&gw,&gh);
+                nres = videopage_reslist(display,gw,gh,res);
+                c = 46;  // labels (the cursor all on screen at 4:3); values from vx
+                vx = c+144;
+
+                rotatesprite(320<<15,10<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
+                menutext(320>>1,15,0,0,"VIDEO");
+                onbar = ( probey == 4 || probey == 5 || probey == 6 );
+
+                x = probe(c,31,15,9);
+                enter = (x >= 0) && !onbar;  // Enter, Space or a click
+                if(!onbar && x < -1)
                 {
-                    DisplayMode = (DisplayMode+1)%DISPLAY_COUNT;
-                    setvideodisplaymode(DisplayMode);
+                    if( KB_KeyPressed( sc_LeftArrow ) || KB_KeyPressed( sc_kpad_4 ) ) dir = -1;
+                    else if( KB_KeyPressed( sc_RightArrow ) || KB_KeyPressed( sc_kpad_6 ) ) dir = 1;
+                    KB_ClearKeyDown( sc_LeftArrow );
+                    KB_ClearKeyDown( sc_kpad_4 );
+                    KB_ClearKeyDown( sc_RightArrow );
+                    KB_ClearKeyDown( sc_kpad_6 );
+                    if(dir) sound(KICK_HIT);
                 }
-                else if(x == 3)
+                if(probey != 2) videopage_browse = 0;  // the size picked only stays on its row
+
+                if(x == -1)
                 {
-                    VSync = !VSync;
-                    setvideovsync(VSync);
+                    videopage_browse = 0;
+                    cmenu(200);
+                }
+                else if(probey == 2)  // RESOLUTION: arrows pick, Enter applies
+                {
+                    if(dir && nres > 0 && display != DISPLAY_BORDERLESS)
+                    {
+                        if(!videopage_browse) { videopage_bw = gw; videopage_bh = gh; }
+                        i = videopage_resstep(res,nres,videopage_bw,videopage_bh,dir);
+                        videopage_bw = res[i].w;
+                        videopage_bh = res[i].h;
+                        videopage_browse = 1;
+                    }
+                    if(enter && videopage_browse && !busy)
+                    {
+                        if(videopage_bw != gw || videopage_bh != gh)
+                        {
+                            video_requestmode(display,videopage_bw,videopage_bh);
+                            video_pagetouch(VROW_RESOLUTION);
+                        }
+                        videopage_browse = 0;
+                    }
+                }
+                else
+                {
+                    if(enter) dir = 1;
+                    if(dir && !busy) switch(probey)
+                    {
+                        case 0:
+                            i = videopage_next(renderer,dir,4,rendavail);
+                            if(i != renderer)
+                            {
+                                video_requestrenderer(i);
+                                video_pagetouch(VROW_RENDERER);
+                            }
+                            break;
+                        case 1:
+                            // from the last choice, which a fallback (from
+                            // fullscreen, or BUILD_WINDOWED) doesn't change
+                            i = videopage_next(video_pagegetdisplay(),dir,DISPLAY_COUNT,displayavail);
+                            if(i != video_pagegetdisplay())
+                            {
+                                int32 w = gw, h = gh;
+
+                                videopage_modesize(i,&w,&h);
+                                video_requestmode(i,w,h);
+                                video_pagesetdisplay(i);
+                                if(w != gw || h != gh)
+                                    video_pagetouch(VROW_RESOLUTION);
+                            }
+                            break;
+                        case 3:
+                            setvideovsync(!getvideovsync());
+                            video_pagetouch(VROW_VSYNC);
+                            break;
+                        case 7:
+                            i = videopage_next(ss,dir,SS_COUNT,ssavail);
+                            if(i != ss && (!ssgrey || i == SS_OFF))  // greyed, a level kept can still go off
+                            {
+                                video_requestsupersample(i);
+                                video_pagetouch(VROW_SUPERSAMPLING);
+                            }
+                            break;
+                        case 8:
+                            i = videopage_next(filter,dir,TEXFILTER_COUNT,filteravail);
+                            if(i != filter && !filtergrey)
+                            {
+                                video_requesttexfilter(i);
+                                video_pagetouch(VROW_TEXFILTER);
+                            }
+                            break;
+                    }
+                }
+
+                i = videopage_next(renderer,1,4,rendavail) == renderer;
+                menutext(c,31,0,i,"RENDERER");
+                menutext(vx,31,0,i,(char *)renderernames[renderer&3]);
+
+                menutext(c,31+15,0,0,"DISPLAY");
+                menutext(vx,31+15,0,0,(char *)displaynames[display]);
+
+                menutext(c,31+15*2,0,display == DISPLAY_BORDERLESS || nres == 0,"RESOLUTION");
+                if(display == DISPLAY_BORDERLESS)
+                    strcpy(buf,"DESKTOP");
+                else if(videopage_browse)
+                    sprintf(buf,"%dX%d",(int)videopage_bw,(int)videopage_bh);
+                else sprintf(buf,"%dX%d",(int)gw,(int)gh);
+                menutext(vx,31+15*2,0,display == DISPLAY_BORDERLESS,buf);
+
+                menutext(c,31+15*3,0,0,"VSYNC");
+                menutext(vx,31+15*3,0,0,getvideovsync() ? "ON" : "OFF");
+
+                menutext(c,31+15*4,0,0,"BRIGHTNESS");
+                was = shorttmp = (short) ud.brightness;
+                bar(vx+18,31+15*4,(short *)&shorttmp,8,x==4,0,0);
+                if(shorttmp != was)
+                {
+                    ud.brightness = (int32) shorttmp;
+                    setbrightness(ud.brightness>>2,(unsigned char *)gameviewpalette());
+                    video_pagetouch(VROW_BRIGHTNESS);
                 }
 
                 // Slider positions 0..60, 1.0 at 30: contrast 0.5..1.5 in
                 // steps of 0.1, saturation 0..2 in steps of 0.1. The setting
                 // changes only when its slider moves.
-                menutext(c,50,SHX(-2),!shader,"CONTRAST");
+                menutext(c,31+15*5,0,!shader,"CONTRAST");
                 was = shorttmp = (short) ((GLContrast-GL_CONTRAST_MIN)*60.0+0.5);
-                bar(c+167+40,50,(short *)&shorttmp,6,shader && x==0,SHX(-2),!shader);
+                bar(vx+18,31+15*5,(short *)&shorttmp,6,shader && x==5,0,!shader);
                 if(shorttmp != was)
+                {
                     GLContrast = GL_CONTRAST_MIN+min(shorttmp,60)/60.0;
+                    video_pagetouch(VROW_CONTRAST);
+                }
 
-                menutext(c,50+16,SHX(-3),!shader,"SATURATION");
+                menutext(c,31+15*6,0,!shader,"SATURATION");
                 was = shorttmp = (short) (GLSaturation*30.0+0.5);
-                bar(c+167+40,50+16,(short *)&shorttmp,3,shader && x==1,SHX(-3),!shader);
+                bar(vx+18,31+15*6,(short *)&shorttmp,3,shader && x==6,0,!shader);
                 if(shorttmp != was)
+                {
                     GLSaturation = min(shorttmp,60)/30.0;
+                    video_pagetouch(VROW_SATURATION);
+                }
 
 #ifdef USE_OPENGL
                 glcontrast = GLContrast;
                 glsaturation = GLSaturation;
 #endif
 
-                menutext(c,50+16+16,SHX(-4),PHX(-4),"DISPLAY");
-                switch(DisplayMode)
-                {
-                    case DISPLAY_WINDOWED: menutext(c+110,50+16+16,0,0,"WINDOWED");break;
-                    case DISPLAY_BORDERLESS: menutext(c+110,50+16+16,0,0,"BORDERLESS");break;
-                    default: menutext(c+110,50+16+16,0,0,"EXCLUSIVE");break;
-                }
+                menutext(c,31+15*7,0,ssgrey,"SUPERSAMPLE");
+                menutext(vx,31+15*7,0,ssgrey,(char *)ssnames[ss&3]);
 
-                menutext(c,50+16+16+16,SHX(-5),PHX(-5),"VSYNC");
-                menutext(c+110,50+16+16+16,0,0,VSync ? "ON" : "OFF");
-                if(!shader)
+                menutext(c,31+15*8,0,filtergrey,"FILTERING");
+                menutext(vx,31+15*8,0,filtergrey,(char *)filternames[filter%TEXFILTER_COUNT]);
+
+                // A note on the row under the cursor; OpenGL's failure on any.
+                switch(probey)
                 {
-                    gametext(160,170,"CONTRAST AND SATURATION NEED",0,2+8+16);
-                    gametext(160,170+9,"THE OPENGL 2.1 SHADER PATH",0,2+8+16);
+                    case 2:
+                        if(display == DISPLAY_BORDERLESS) note = "BORDERLESS FILLS THE SCREEN";
+                        else if(videopage_browse) note = "PRESS ENTER TO USE THIS SIZE";
+                        break;
+                    case 5: case 6:
+                        if(!shader) note = "NEEDS THE OPENGL 2.1 SHADER PATH";
+                        break;
+                    case 7:
+                        if(!ssgrey) break;
+                        if(!shader) note = "NEEDS THE OPENGL 2.1 SHADER PATH";
+                        else if(internal) note = "OFF WHILE AN INTERNAL SIZE IS SET";
+                        else note = "NOT LARGER THAN THIS WINDOW";
+                        break;
+                    case 8:
+                        if(filtergrey)
+                            note = (renderer == 3) ? "UNAVAILABLE ON THIS DRIVER" : "NEEDS THE OPENGL RENDERER";
+                        break;
                 }
+                if(video_glunavailable)
+                    gametext(160,159,"OPENGL COULD NOT START",0,2+8+16);
+                if(note)
+                    gametext(160,168,(char *)note,0,2+8+16);
             }
             break;
 
@@ -3311,9 +3800,15 @@ void menus(void)
 
             if(current_menu >= 360 && current_menu <= 369 )
             {
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 sprintf(tempbuf,"PLAYERS: %-2d                      ",ud.multimode);
                 gametext(160,158,tempbuf,0,2+8+16);
+#endif
+#if DUKE3D_GAMEVER < GAMEVER_10
+                sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill+1);
+#else
                 sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill);
+#endif
                 gametext(160,170,tempbuf,0,2+8+16);
 
                 x = strget((320>>1),184,&ud.savegame[current_menu-360][0],19, 999 );
@@ -3376,9 +3871,15 @@ void menus(void)
                   }
 
                   rotatesprite(101<<16,97<<16,65536L,512,MAXTILES-3,-32,0,4+10+64,0,0,xdim-1,ydim-1);
+#if DUKE3D_GAMEVER >= GAMEVER_10
                   sprintf(tempbuf,"PLAYERS: %-2d                      ",numplr);
                   gametext(160,158,tempbuf,0,2+8+16);
+#endif
+#if DUKE3D_GAMEVER < GAMEVER_10
+                  sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+volnum,1+levnum,plrskl+1);
+#else
                   sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+volnum,1+levnum,plrskl);
+#endif
                   gametext(160,170,tempbuf,0,2+8+16);
               }
               else menutext(69,70,0,0,"EMPTY");
@@ -3393,9 +3894,15 @@ void menus(void)
                   rotatesprite(101<<16,97<<16,65536L,512,MAXTILES-3,-32,0,4+10+64,0,0,xdim-1,ydim-1);
               }
               else menutext(69,70,0,0,"EMPTY");
+#if DUKE3D_GAMEVER >= GAMEVER_10
               sprintf(tempbuf,"PLAYERS: %-2d                      ",ud.multimode);
               gametext(160,158,tempbuf,0,2+8+16);
+#endif
+#if DUKE3D_GAMEVER < GAMEVER_10
+              sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill+1);
+#else
               sprintf(tempbuf,"EPISODE: %-2d / LEVEL: %-2d / SKILL: %-2d",1+ud.volume_number,1+ud.level_number,ud.player_skill);
+#endif
               gametext(160,170,tempbuf,0,2+8+16);
           }
 
@@ -3464,6 +3971,17 @@ void menus(void)
 
             c = 320>>1;
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+            if(KB_KeyPressed(sc_Escape))
+            { cmenu((ps[myconnectindex].gm&MODE_GAME)?50:0); return; }
+            if(KB_KeyWaiting())
+            {
+                KB_Getch();
+                current_menu++;
+                if(current_menu > 403)
+                { cmenu((ps[myconnectindex].gm&MODE_GAME)?50:0); return; }
+            }
+#else
             if( KB_KeyPressed( sc_LeftArrow ) ||
                 KB_KeyPressed( sc_kpad_4 ) ||
                 KB_KeyPressed( sc_UpArrow ) ||
@@ -3513,6 +4031,7 @@ void menus(void)
                 return;
             }
 
+#endif
             flushperms();
             if (widescreen) clearallviews(0L);
             rotatesprite(0,0,65536L,0,ORDERING+current_menu-400,0,0,10+16+64,0,0,xdim-1,ydim-1);
@@ -3646,8 +4165,10 @@ void menus(void)
             {
                 KB_FlushKeyboardQueue();
                 ps[myconnectindex].gm = MODE_DEMO;
+#if DUKE3D_GAMEVER >= GAMEVER_10
                 if(ud.recstat == 1)
                     closedemowrite();
+#endif
                 cmenu(0);
             }
 
@@ -4004,6 +4525,20 @@ void menus(void)
 static char *glgamepalette;
 static int32_t glgamebrightness;
 
+/* The player palette on screen: in a game or demo the viewed player's
+   (screenpeek), elsewhere myconnectindex's (see glsetgamepalette). */
+char *gameviewpalette(void)
+{
+    return ps[((ps[myconnectindex].gm&(MODE_GAME|MODE_DEMO)) &&
+               !(ps[myconnectindex].gm&MODE_EOL)) ? screenpeek : myconnectindex].palette;
+}
+
+/* After a mode set, which resets the palette: glsetgamepalette applies it again. */
+void glresetgamepalette(void)
+{
+    glgamepalette = NULL;
+}
+
 /*
  * Renderer 3 bakes the palette into textures as it draws, so a new player
  *  palette must reach the engine before the next draw, not at the next
@@ -4017,8 +4552,7 @@ void glsetgamepalette(void)
 #ifdef POLYMOST
     palette_t fadergb;
     unsigned char fadedelta;
-    char *pal = ps[((ps[myconnectindex].gm&(MODE_GAME|MODE_DEMO)) &&
-                    !(ps[myconnectindex].gm&MODE_EOL)) ? screenpeek : myconnectindex].palette;
+    char *pal = gameviewpalette();
 #ifdef USE_OPENGL
     /* Lights glow in the game's palettes, not in the title, ending or 3DR ones. */
     int32_t fullbright = (pal == (char *)palette || pal == waterpal || pal == slimepal) ? 240 : 256;
@@ -4518,6 +5052,7 @@ void playanm(char *fn,char t)
     int32_t i, j, k, length=0, numframes=0;
     int32 handle=-1;
 
+    video_flushpending();  // shows frames of its own
 //    return;
 
     if(t != 7 && t != 9 && t != 10 && t != 11)

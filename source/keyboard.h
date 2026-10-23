@@ -191,6 +191,8 @@ typedef uint8 kb_scancode;
 */
 
 extern volatile byte  KB_KeyDown[ MAXKEYBOARDSCAN ];   // Keyboard state array
+extern volatile byte  KB_GamepadKeyDown[ MAXKEYBOARDSCAN ];
+void KB_QueueGamepadKey(int scan);
 extern volatile kb_scancode KB_LastScan;
 
 
@@ -208,9 +210,9 @@ extern volatile kb_scancode KB_LastScan;
 
 #define KB_ClearLastScanCode() { KB_SetLastScanCode( sc_None ); }
 
-#define KB_KeyPressed( scan )  ( KB_KeyDown[ ( scan ) ] != 0 )
+#define KB_KeyPressed( scan )  ( (KB_KeyDown[ ( scan ) ] | KB_GamepadKeyDown[ ( scan ) ]) != 0 )
 
-#define KB_ClearKeyDown( scan ) { KB_KeyDown[ ( scan ) ] = false; }
+#define KB_ClearKeyDown( scan ) { KB_KeyDown[ ( scan ) ] = KB_GamepadKeyDown[ ( scan ) ] = false; }
 
 
 /*

@@ -6,6 +6,7 @@ add_library(duke3d_game OBJECT
   config.c
   control.c
   gamedef.c
+  gamepad.c
   global.c
   keyboard.c
   menues.c
@@ -16,6 +17,11 @@ add_library(duke3d_game OBJECT
   scriplib.c
   sector.c
   sounds.c)
+
+if(DUKE3D_ROUTEBOT)
+  target_sources(duke3d_game PRIVATE routebot.c)
+  target_compile_definitions(duke3d_game PUBLIC DUKE3D_ROUTEBOT=1)
+endif()
 
 # "build/engine.h" etc. resolve against this directory.
 target_include_directories(duke3d_game PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

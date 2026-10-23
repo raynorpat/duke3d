@@ -46,11 +46,13 @@ extern "C" {
 #define MaxJoys             2
 #define MAXGAMEBUTTONS      64
 
+#include "gamepad.h"
+
 #define BUTTON(x) \
     ( \
     ((x)>31) ? \
-    ((CONTROL_ButtonState2>>( (x) - 32) ) & 1) :\
-    ((CONTROL_ButtonState1>> (x) ) & 1)          \
+    (((CONTROL_ButtonState2|GAMEPAD_ButtonState2)>>( (x) - 32) ) & 1) :\
+    (((CONTROL_ButtonState1|GAMEPAD_ButtonState1)>> (x) ) & 1)          \
     )
 #define BUTTONHELD(x) \
     ( \

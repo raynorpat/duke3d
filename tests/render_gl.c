@@ -110,10 +110,28 @@
 #include "SDL_opengl.h"
 #include "glext.h"
 #include "glsubmit.h"
+#include "videoopts.h"
 
 /* The game is linked in (for render_gl_game.c), so it provides the
  * engine's callbacks. */
 int glgamepalette_check(void);  /* render_gl_game.c */
+void videoswitch_setup(void);  /* render_gl_game.c */
+int videoswitch_palette_check(void);  /* render_gl_game.c */
+int video_setrenderer(int r);  /* game.c */
+int video_setmode(int displaymode, int w, int h);  /* game.c */
+void video_requestrenderer(int r);  /* game.c */
+void video_requestmode(int displaymode, int w, int h);  /* game.c */
+void video_getmode(int32_t *w, int32_t *h);  /* game.c */
+void video_applypending(void);  /* game.c */
+void video_flushpending(void);  /* game.c */
+int video_setsupersample(int level);  /* game.c */
+void video_requestsupersample(int level);  /* game.c */
+int video_settexfilter(int filter);  /* game.c */
+void video_requesttexfilter(int filter);  /* game.c */
+extern int32_t GLDrawPath;  /* config.c */
+extern int32_t GLInternalWidth, GLInternalHeight;  /* config.c */
+extern double GLContrast, GLSaturation;  /* config.c */
+extern int32_t video_glunavailable;  /* game.c */
 extern SDL_Surface *surface;  /* sdl_driver.c: the 8-bit frame */
 
 #define APLAYER 1405  /* names.h: a player start */
@@ -1769,6 +1787,1093 @@ static int present8_check(void)
     return ok;
 }
 
+/* A white frame in the renderer in effect, shown. */
+static void fade_frame(void)
+{
+    if (getrendermode() == 3)
+        clearallviews(31);
+    else
+        memset((void *) frameplace, 31, (size_t) bytesperline * ydim);
+    nextpage();
+}
+
+static double shown_mean(const unsigned char *shown, int w, int h)
+{
+    double sum = 0;
+    long i;
+
+    for (i = 0; i < (long) w * h * 3; i++)
+        sum += shown[i];
+    return sum / ((double) w * h * 3);
+}
+
+/*
+ * The VIDEO page's fade around a change (game.c video_request*): a request
+ *  for the renderer in effect (the fade alone), drawn and read for 1.5 s of
+ *  real time, over a game fade (63, 0, 0, 16). Each frame read is the
+ *  white frame darkened by the driver's getvideofade()/256; it goes to
+ *  black and back through the levels between, and ends the picture it was.
+ *  The game's fade, curpalette and the 8-bit palette are the same at black
+ *  and after. midw: a mode (windowed midw by midh) asked for 100 ms in,
+ *  made at black with the first. sdl: read through the SDL renderer (whose
+ *  read can lag a frame, so a looser match). 1: pass.
+ */
+static int video_fade_run(SDL_Window *win, int sdl, int midw, int midh, const char *what)
+{
+    unsigned char *before, *shown, fadedelta = 0;
+    palette_t pal[256], fadergb;
+    SDL_Color spal[256];
+    int ow, oh, bw, bh, ok = 1, r = getrendermode(), asked = 0, black = 0, out = 0, in = 0, n = 0;
+    int32_t w0, h0, w1, h1, madeat = -1;
+    double base, ratio, err, worst = 0, least = 1;
+    Uint32 t0;
+
+    setpalettefade(63, 0, 0, 16);
+    fade_frame();
+    before = present8_read(win, sdl, &bw, &bh);
+    base = shown_mean(before, bw, bh);
+    fadergb = palfadergb;
+    fadedelta = palfadedelta;
+    memcpy(pal, curpalette, sizeof (pal));
+    if (r != 3) memcpy(spal, surface->format->palette->colors, sizeof (spal));
+
+    video_requestrenderer(r);
+    for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < 1500; n++)
+    {
+        if ((midw) && (!asked) && (SDL_GetTicks() - t0 >= 100))
+            { video_requestmode(DISPLAY_WINDOWED, midw, midh); asked = 1; }
+        fade_frame();
+        video_getmode(&w0, &h0);
+        if (getvideofade() == 256)  /* the game's state as it was, under the black */
+        {
+            black++;
+            if ((palfadedelta != fadedelta) || (memcmp(&palfadergb, &fadergb, sizeof (fadergb)) != 0) ||
+                (memcmp(curpalette, pal, sizeof (pal)) != 0))
+                { fprintf(stderr, "FAIL: %s: the game's palette or fade changed during the fade\n", what); ok = 0; }
+        }
+        video_applypending();
+        video_getmode(&w1, &h1);
+        if ((w1 != w0) || (h1 != h0)) madeat = getvideofade();
+        shown = present8_read(win, sdl, &ow, &oh);
+        ratio = shown_mean(shown, ow, oh) / base;
+        free(shown);
+        err = fabs(ratio - (double) (256 - getvideofade()) / 256.0);
+        if (err > worst) worst = err;
+        if (ratio < least) least = ratio;
+        if ((ratio > 0.2) && (ratio < 0.8)) { if (black) in++; else out++; }
+    }
+    if ((midw) && ((w1 != midw) || (h1 != midh) || (madeat != 256)))
+        { fprintf(stderr, "FAIL: %s: the mode asked for during the fade: %dx%d, made at darkness %d\n",
+                  what, (int) w1, (int) h1, (int) madeat); ok = 0; }
+
+    fade_frame();
+    shown = present8_read(win, sdl, &ow, &oh);
+    printf("%s: %d frames, %d black, %d fading out and %d in between 0.2 and 0.8, darkest %.3f, "
+           "worst |shown - darkness| %.3f, fading %d after\n", what, n, black, out, in, least, worst, videofading());
+    if ((!black) || (!out) || (!in) || (least > 0.02) || (worst > (sdl ? 0.07 : 0.02)) || (videofading()))
+        { fprintf(stderr, "FAIL: %s: the frame didn't fade to black and back with the darkness\n", what); ok = 0; }
+    if ((!midw) && ((ow != bw) || (oh != bh) || (memcmp(shown, before, (size_t) bw * bh * 3) != 0)))
+        { fprintf(stderr, "FAIL: %s: the picture after the fade isn't the one before\n", what); ok = 0; }
+    if ((palfadedelta != fadedelta) || (memcmp(&palfadergb, &fadergb, sizeof (fadergb)) != 0) ||
+        ((!midw) && (memcmp(curpalette, pal, sizeof (pal)) != 0)) ||
+        ((r != 3) && (!midw) && (memcmp(spal, surface->format->palette->colors, sizeof (spal)) != 0)))
+        { fprintf(stderr, "FAIL: %s: the game's palette or fade changed\n", what); ok = 0; }
+    free(shown);
+    free(before);
+    setpalettefade(0, 0, 0, 0);
+    return ok;
+}
+
+/* Frames shown for ms with no video_applypending, as a loop of the game's
+ *  own (dobonus, playanm, ...) shows them: the last one's darkness. */
+static int frames_unapplied(Uint32 ms)
+{
+    Uint32 t0;
+
+    for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < ms; )
+        fade_frame();
+    return getvideofade();
+}
+
+/*
+ * A change asked for just before the game goes into a loop that shows
+ *  frames without making it (the level's end to dobonus, a new game's
+ *  cutscenes): that loop's video_flushpending makes it at once and the
+ *  screen fades back in; a loop without one gets the screen back after
+ *  2 * VIDEOFADE_MS held black, and the change is faded out for and made
+ *  when video_applypending runs again. 1: pass.
+ */
+static int video_flush_check(void)
+{
+    int32_t w, h;
+    int d, ok = 1;
+
+    video_requestmode(DISPLAY_WINDOWED, 640, 480);
+    d = frames_unapplied(VIDEOFADE_MS + 100);
+    video_flushpending();  /* dobonus's */
+    video_getmode(&w, &h);
+    printf("flushed at darkness %d: %dx%d\n", d, (int) w, (int) h);
+    if ((d != 256) || (w != 640) || (h != 480))
+        { fprintf(stderr, "FAIL: video_flushpending didn't make the change\n"); ok = 0; }
+    d = frames_unapplied(VIDEOFADE_MS + 100);
+    printf("then %d, fading %d\n", d, videofading());
+    if ((d != 0) || (videofading()))
+        { fprintf(stderr, "FAIL: the screen stayed dark after video_flushpending\n"); ok = 0; }
+
+    video_requestmode(DISPLAY_WINDOWED, 800, 600);
+    d = frames_unapplied(5 * VIDEOFADE_MS);  /* a loop with no flush */
+    video_getmode(&w, &h);
+    printf("a loop with no flush: darkness %d after %d ms, fading %d, %dx%d\n", d, 5 * VIDEOFADE_MS,
+           videofading(), (int) w, (int) h);
+    if ((d != 0) || (videofading()) || (w != 640))
+        { fprintf(stderr, "FAIL: the screen stayed black through a loop that doesn't make the change\n"); ok = 0; }
+    video_applypending();  /* back in the game loop: faded out for again */
+    if (!videofading())
+        { fprintf(stderr, "FAIL: the change wasn't faded out for again\n"); ok = 0; }
+    for (d = 0; (d < 1000) && ((w != 800) || (videofading())); d++)
+    {
+        fade_frame();
+        video_applypending();
+        video_getmode(&w, &h);
+    }
+    printf("then made: %dx%d, fading %d\n", (int) w, (int) h, videofading());
+    if ((w != 800) || (h != 600) || (videofading()))
+        { fprintf(stderr, "FAIL: the change wasn't made after the loop\n"); ok = 0; }
+    return ok;
+}
+
+/*
+ * The VIDEO page's renderer switch (game.c video_setrenderer) in a run that
+ *  starts in renderers 0-2, so in its own process (render_gl_video). OpenGL
+ *  failing (gl_forcefail 4) keeps the renderer, the SDL renderer's window
+ *  and its picture, and isn't tried again; then 3 -> 0 -> 3 -> 0 -> 3 makes
+ *  the GL window once, keeping it and the context; the player's palette and
+ *  fade survive each switch. 1: pass, 0: fail, 77: no OpenGL.
+ */
+static int video_switch_check(void)
+{
+    static const int seq[] = { 0, 3, 0, 3 };
+    SDL_Window *win = NULL;
+    SDL_GLContext ctx;
+    Uint32 id, winid;
+    unsigned char *shown, *want;
+    int ow, oh, i, r, ok = 1;
+    long bars;
+    double d;
+
+    videoswitch_setup();
+    if (video_setmode(DISPLAY_WINDOWED, 320, 200) != 0) { fprintf(stderr, "FAIL: video_setmode(320x200)\n"); return 0; }
+    if (video_setrenderer(2) != 2) { fprintf(stderr, "FAIL: renderer 2\n"); return 0; }
+    for (id = 1; (id < 1000) && (win == NULL); id++)
+        win = SDL_GetWindowFromID(id);
+    winid = SDL_GetWindowID(win);
+
+    gl_forcefail = 4;  /* asked for as the VIDEO page does: faded out, failed, faded back in */
+    video_requestrenderer(3);
+    for (id = SDL_GetTicks(); (videofading()) && (SDL_GetTicks() - id < 3000); )
+    {
+        present8_frame(0);
+        video_applypending();
+    }
+    gl_forcefail = 0;
+    r = getrendermode();
+    printf("renderer 2 -> 3, OpenGL failing: renderer %d, OpenGL greyed %d, faded back in %d\n", r,
+           (int) video_glunavailable, (!videofading()) && (getvideofade() == 0));
+    if ((r != 2) || (!video_glunavailable))
+        { fprintf(stderr, "FAIL: OpenGL failing didn't keep renderer 2 and grey OpenGL\n"); ok = 0; }
+    if ((videofading()) || (getvideofade() != 0))
+        { fprintf(stderr, "FAIL: OpenGL failing didn't fade back in\n"); ok = 0; }
+    if ((SDL_GetWindowFromID(winid) != win) || (SDL_GetRenderer(win) == NULL))
+        { fprintf(stderr, "FAIL: OpenGL failing lost the window or its SDL renderer\n"); return 0; }
+    for (id = SDL_GetTicks(); SDL_GetTicks() - id < 300; SDL_Delay(10))
+        _handle_events();
+    present8_frame(0);
+    want = present8_expected();
+    shown = present8_read(win, 1, &ow, &oh);
+    d = shown_diff(shown, ow, oh, want, xdim, ydim, &bars);
+    printf("after the failure, %dx%d window: mean |diff| %.3f, %ld bar pixels not black\n", ow, oh, d, bars);
+    if ((d > 0.5) || (bars != 0))
+        { fprintf(stderr, "FAIL: after OpenGL failed the 8-bit picture isn't shown\n"); ok = 0; }
+    free(shown);
+    free(want);
+    if (video_setrenderer(0) != 0) { fprintf(stderr, "FAIL: renderer 0\n"); return 0; }
+    if (!video_fade_run(win, 1, 0, 0, "fade, renderer 0 through the SDL renderer")) ok = 0;
+    video_setrenderer(2);
+    if (video_setrenderer(3) != 2)
+        { fprintf(stderr, "FAIL: OpenGL tried again after it failed\n"); ok = 0; }
+
+    video_glunavailable = 0;  /* as on a machine that has it */
+    if (video_setrenderer(3) != 3)
+    {
+        printf("SKIP: no OpenGL (%s)\n", SDL_GetError());
+        return 77;
+    }
+    ctx = SDL_GL_GetCurrentContext();
+    win = SDL_GL_GetCurrentWindow();
+    winid = SDL_GetWindowID(win);
+    if ((ctx == NULL) || (SDL_GetRenderer(win) != NULL))
+        { fprintf(stderr, "FAIL: renderer 3 isn't in a GL window\n"); return 0; }
+    for (i = 0; i < (int) (sizeof (seq) / sizeof (seq[0])); i++)
+    {
+        r = video_setrenderer(seq[i]);
+        if ((r != seq[i]) || (getrendermode() != seq[i]))
+            { fprintf(stderr, "FAIL: switch to renderer %d gave %d\n", seq[i], r); ok = 0; }
+        if ((SDL_GL_GetCurrentContext() != ctx) || (SDL_GetWindowFromID(winid) == NULL) ||
+            (SDL_GL_GetCurrentWindow() != SDL_GetWindowFromID(winid)))
+            { fprintf(stderr, "FAIL: switch to renderer %d made a new window or context\n", seq[i]); ok = 0; }
+    }
+    printf("renderer 3 -> 0 -> 3 -> 0 -> 3: window %u, context %p kept: %s\n", (unsigned) winid, ctx,
+           ok ? "yes" : "no");
+    if (!videoswitch_palette_check()) ok = 0;
+    return ok;
+}
+
+/* BUILD_WINDOWED set or not, portably. */
+static void set_build_windowed(int on)
+{
+#if PLATFORM_WIN32
+    _putenv_s(BUILD_WINDOWED, on ? "1" : "");
+#else
+    if (on)
+        setenv(BUILD_WINDOWED, "1", 1);
+    else
+        unsetenv(BUILD_WINDOWED);
+#endif
+}
+
+/*
+ * The VIDEO page's resolution and display mode (game.c video_setmode) in
+ *  renderer 3: each keeps the window and the context, xdim/ydim follow the
+ *  drawable, and a frame fills it (no black left after clearing to white).
+ *  In renderer 0 the 8-bit frame is drawn at the size asked for (borderless:
+ *  the desktop's), shown through the same context, filling it too. A mode
+ *  set at the same size leaves the window where it is. 1: pass, 0: fail.
+ */
+static int video_mode_check(void)
+{
+    static const struct { int mode, w, h, r; } seq[] = {
+        { DISPLAY_WINDOWED, 800, 600, 3 }, { DISPLAY_WINDOWED, 1024, 576, 3 },
+        { DISPLAY_BORDERLESS, 640, 480, 3 }, { DISPLAY_WINDOWED, 640, 400, 3 },
+        { DISPLAY_WINDOWED, 800, 600, 0 }, { DISPLAY_BORDERLESS, 640, 480, 0 },
+        { DISPLAY_WINDOWED, 1024, 576, 3 }, { DISPLAY_WINDOWED, 1024, 576, 0 },
+        { DISPLAY_WINDOWED, 1024, 576, 3 }
+    };
+    SDL_GLContext ctx = SDL_GL_GetCurrentContext();
+    SDL_Window *win = SDL_GL_GetCurrentWindow();
+    Uint32 id, winid = SDL_GetWindowID(win);
+    unsigned char *shown;
+    int i, k, ok = 1, dw, dh, ww, wh, x, y, x2, y2, same, white = 31;
+    long dark;
+
+    set_build_windowed(0);  /* so borderless is */
+    for (i = 0; i < (int) (sizeof (seq) / sizeof (seq[0])); i++)
+    {
+        same = ((i > 0) && (seq[i].mode == DISPLAY_WINDOWED) && (seq[i - 1].mode == DISPLAY_WINDOWED) &&
+                (seq[i].w == seq[i - 1].w) && (seq[i].h == seq[i - 1].h));
+        if (same)  /* moved by the player */
+        {
+            SDL_SetWindowPosition(win, 60, 80);
+            for (id = SDL_GetTicks(); SDL_GetTicks() - id < 300; SDL_Delay(10))
+                _handle_events();
+        }
+        SDL_GetWindowPosition(win, &x, &y);
+        if (video_setrenderer(seq[i].r) != seq[i].r)
+            { fprintf(stderr, "FAIL: renderer %d\n", seq[i].r); ok = 0; }
+        if (video_setmode(seq[i].mode, seq[i].w, seq[i].h) != 0)
+            { fprintf(stderr, "FAIL: video_setmode(%d, %dx%d)\n", seq[i].mode, seq[i].w, seq[i].h); return 0; }
+        for (id = SDL_GetTicks(); SDL_GetTicks() - id < 1500; SDL_Delay(10))  /* the new size shown */
+            _handle_events();
+        if ((getrendermode() != seq[i].r) || (SDL_GL_GetCurrentContext() != ctx) ||
+            (SDL_GetWindowFromID(winid) != win) || (SDL_GL_GetCurrentWindow() != win))
+            { fprintf(stderr, "FAIL: %s %dx%d made a new window or context\n",
+                      display_modename(seq[i].mode), seq[i].w, seq[i].h); ok = 0; }
+        if (getvideodisplaymode() != seq[i].mode)
+            { fprintf(stderr, "FAIL: display %d, not %d\n", getvideodisplaymode(), seq[i].mode); ok = 0; }
+        SDL_GetWindowSize(win, &ww, &wh);
+        SDL_GL_GetDrawableSize(win, &dw, &dh);
+        if ((seq[i].mode == DISPLAY_WINDOWED) && ((ww != seq[i].w) || (wh != seq[i].h)))
+            { fprintf(stderr, "FAIL: window %dx%d, not %dx%d\n", ww, wh, seq[i].w, seq[i].h); ok = 0; }
+        if ((seq[i].r == 3) && ((xdim != min(dw, MAXXDIM)) || (ydim != min(dh, MAXYDIM))))
+            { fprintf(stderr, "FAIL: drawn at %dx%d in a %dx%d drawable\n", (int) xdim, (int) ydim, dw, dh); ok = 0; }
+        if ((seq[i].r == 0) && (seq[i].mode == DISPLAY_WINDOWED) && ((xdim != seq[i].w) || (ydim != seq[i].h)))
+            { fprintf(stderr, "FAIL: renderer 0 drawn at %dx%d, not %dx%d\n", (int) xdim, (int) ydim, seq[i].w, seq[i].h); ok = 0; }
+        if (same)
+        {
+            SDL_GetWindowPosition(win, &x2, &y2);
+            printf("window at %d,%d before the renderer switch and mode set, %d,%d after\n", x, y, x2, y2);
+            if ((x2 != x) || (y2 != y))
+                { fprintf(stderr, "FAIL: the window moved from %d,%d to %d,%d\n", x, y, x2, y2); ok = 0; }
+        }
+
+        for (k = 0; k < 2; k++)  /* the front buffer: the frame drawn */
+        {
+            if (getrendermode() == 3)
+                clearallviews(white);
+            else  /* classic's clears to colour 0 */
+                memset((void *) frameplace, white, (size_t) bytesperline * ydim);
+            nextpage();
+        }
+        shown = read_shown(&dw, &dh);
+        for (dark = 0, k = 0; k < dw * dh; k++)
+            if ((shown[k * 3] | shown[k * 3 + 1] | shown[k * 3 + 2]) == 0)
+                dark++;
+        free(shown);
+        printf("renderer %d, %s %dx%d: window %dx%d, drawable %dx%d, drawn at %dx%d, %ld black pixels\n",
+               seq[i].r, display_modename(getvideodisplaymode()), seq[i].w, seq[i].h, ww, wh, dw, dh,
+               (int) xdim, (int) ydim, dark);
+        if (dark != 0)
+            { fprintf(stderr, "FAIL: the frame doesn't fill the window\n"); ok = 0; }
+    }
+
+    printf("renderer 3 draws on the %s path\n", gl_pathname(gldrawpath));
+    if (!video_fade_run(win, 0, 800, 600, "fade, renderer 3, 800x600 asked for during it")) ok = 0;
+    GLDrawPath = GLPATH_VBO;  /* the fixed function tiers' fade quad */
+    video_setmode(DISPLAY_WINDOWED, 800, 600);
+    printf("renderer 3 draws on the %s path\n", gl_pathname(gldrawpath));
+    if (!video_fade_run(win, 0, 0, 0, "fade, renderer 3 (vbo)")) ok = 0;
+    GLDrawPath = GLPATH_AUTO;
+    video_setrenderer(0);
+    if (!video_fade_run(win, 0, 0, 0, "fade, renderer 0 through OpenGL")) ok = 0;
+    if (!video_flush_check()) ok = 0;
+    set_build_windowed(1);
+    return ok;
+}
+
+/* gl_fitrect's part r of the window's frame (bottom-up, dw wide), top-down. */
+static unsigned char *shown_part(const unsigned char *shown, int dw, const int32_t *r)
+{
+    unsigned char *out = malloc((size_t) r[2] * r[3] * 3);
+    int y;
+
+    for (y = 0; y < r[3]; y++)
+        memcpy(out + (size_t) y * r[2] * 3, shown + ((size_t) (r[1] + r[3] - 1 - y) * dw + r[0]) * 3,
+               (size_t) r[2] * 3);
+    return out;
+}
+
+/* A top-down RGB frame (w by h) scaled down to ow by oh: each pixel the mean
+ *  of the texels it covers, each weighted by how much of it is covered. */
+static unsigned char *box_down(const unsigned char *src, int w, int h, int ow, int oh)
+{
+    unsigned char *out = malloc((size_t) ow * oh * 3);
+    double sx = (double) w / ow, sy = (double) h / oh, a, b, c, d, wy, wx, sum[3];
+    int ox, oy, x, y, i;
+
+    for (oy = 0; oy < oh; oy++)
+    {
+        a = oy * sy; b = a + sy;
+        for (ox = 0; ox < ow; ox++)
+        {
+            c = ox * sx; d = c + sx;
+            sum[0] = sum[1] = sum[2] = 0;
+            for (y = (int) floor(a); (y < b) && (y < h); y++)
+            {
+                wy = fmin(y + 1.0, b) - fmax((double) y, a);
+                for (x = (int) floor(c); (x < d) && (x < w); x++)
+                {
+                    wx = fmin(x + 1.0, d) - fmax((double) x, c);
+                    for (i = 0; i < 3; i++)
+                        sum[i] += wx * wy * src[((size_t) y * w + x) * 3 + i];
+                }
+            }
+            for (i = 0; i < 3; i++)
+                out[((size_t) oy * ow + ox) * 3 + i] = (unsigned char) (sum[i] / (sx * sy) + 0.5);
+        }
+    }
+    return out;
+}
+
+/* The largest |a - b| in a channel of two RGB frames of n pixels; *mean the mean. */
+static int max_diff(const unsigned char *a, const unsigned char *b, long n, double *mean)
+{
+    long i, sum = 0;
+    int d, most = 0;
+
+    for (i = 0; i < n * 3; i++)
+    {
+        d = abs((int) a[i] - (int) b[i]);
+        sum += d;
+        if (d > most) most = d;
+    }
+    *mean = (double) sum / ((double) n * 3);
+    return most;
+}
+
+/* Hard steps: neighbouring pixels (right and below) of a top-down RGB frame
+ *  differing by more than 48 in a channel, per thousand pairs. */
+static double hard_steps(const unsigned char *p, int w, int h)
+{
+    long n = 0, hard = 0;
+    int x, y, i, dx, dy;
+    const unsigned char *q;
+
+    for (y = 0; y < h - 1; y++)
+        for (x = 0; x < w - 1; x++)
+        {
+            q = &p[((size_t) y * w + x) * 3];
+            for (dx = 0, dy = 0, i = 0; i < 3; i++)
+            {
+                dx = max(dx, abs((int) q[i] - (int) q[3 + i]));
+                dy = max(dy, abs((int) q[i] - (int) q[(size_t) w * 3 + i]));
+            }
+            hard += (dx > 48) + (dy > 48);
+            n += 2;
+        }
+    return 1000.0 * hard / n;
+}
+
+/* The supersampling frame, shown: a view with the HUD's gun and the status
+ *  bar (hud), or the view alone. */
+static void ss_frame(int hud)
+{
+    int k;
+
+    for (k = 0; k < 2; k++)
+    {
+        cmp_draw(0);
+        if (hud)
+        {
+            rotatesprite(160<<16, 130<<16, 65536, 0, FIRSTGUN, 0, 0, 2, 0, 0, xdim-1, ydim-1);
+            rotatesprite(0, (200 - tilesizy[BOTTOMSTATUSBAR])<<16, 65536, 0, BOTTOMSTATUSBAR, 4, 0,
+                         2+8+16+64, 0, 0, xdim-1, ydim-1);
+        }
+        nextpage();
+    }
+}
+
+/* Sets the window to w by h (points) and waits for the drawable to change. */
+static void ss_resize(int w, int h)
+{
+    int dw, dh, oldw, oldh;
+    Uint32 t0;
+
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &oldw, &oldh);
+    SDL_SetWindowSize(SDL_GL_GetCurrentWindow(), w, h);
+    for (t0 = SDL_GetTicks(), dw = oldw, dh = oldh; (dw == oldw) && (dh == oldh) && (SDL_GetTicks() - t0 < 3000);
+         SDL_Delay(10))
+    {
+        _handle_events();
+        SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    }
+    _handle_events();
+}
+
+/*
+ * The frame shown as it is now (what: its name): the window's part of it is
+ *  the frame drawn (polymost_capture_shader, xdim by ydim) scaled down by
+ *  box_down, within 1, and a screenshot is the same, at the window's part's
+ *  size. *steps (if steps): hard_steps of the frame shown; *keep (if keep):
+ *  the frame shown. 1: pass.
+ */
+static int ss_shown(const char *dir, const char *what, int hud, double *steps, unsigned char **keep)
+{
+    unsigned char *cap, *shown, *part, *want, *rows;
+    int dw, dh, most, smost = 999, ok = 1, sw = 0, sh = 0;
+    int32_t r[4];
+    double mean, smean = 0, st;
+    char path[1024];
+    SDL_Surface *s, *s24 = NULL;
+    long i;
+
+    ss_frame(hud);
+    shown = read_shown(&dw, &dh);
+    gl_fitrect(xdim, ydim, dw, dh, r);
+    part = shown_part(shown, dw, r);
+    cap = polymost_capture_shader();
+    want = box_down(cap, xdim, ydim, r[2], r[3]);
+    most = max_diff(part, want, (long) r[2] * r[3], &mean);
+    st = hard_steps(part, r[2], r[3]);
+    if (steps) *steps = st;
+    snprintf(path, sizeof (path), "%s/ss_%s0000.bmp", dir, what);
+    remove(path);
+    snprintf(path, sizeof (path), "%s/ss_%sxxxx.bmp", dir, what);
+    i = screencapture(path, 0);
+    snprintf(path, sizeof (path), "%s/ss_%s0000.bmp", dir, what);
+    s = (i == 0) ? SDL_LoadBMP(path) : NULL;
+    if (s) { s24 = SDL_ConvertSurfaceFormat(s, SDL_PIXELFORMAT_RGB24, 0); sw = s->w; sh = s->h; }
+    if ((s24) && (s24->w == r[2]) && (s24->h == r[3]))
+    {
+        rows = malloc((size_t) r[2] * r[3] * 3);
+        for (i = 0; i < r[3]; i++)
+            memcpy(rows + (size_t) i * r[2] * 3, (unsigned char *) s24->pixels + (size_t) i * s24->pitch,
+                   (size_t) r[2] * 3);
+        smost = max_diff(rows, want, (long) r[2] * r[3], &smean);
+        free(rows);
+    }
+    printf("%s: drawn at %dx%d, shown at %d,%d %dx%d of %dx%d: |shown - box(frame)| most %d mean %.3f; "
+           "screenshot %dx%d, most %d mean %.3f; hard steps %.1f per 1000\n", what, (int) xdim, (int) ydim,
+           (int) r[0], (int) r[1], (int) r[2], (int) r[3], dw, dh, most, mean, sw, sh, smost, smean, st);
+    if (most > 1) { fprintf(stderr, "FAIL: %s: the frame shown isn't the frame drawn scaled down\n", what); ok = 0; }
+    if (smost > 1) { fprintf(stderr, "FAIL: %s: the screenshot isn't the frame shown\n", what); ok = 0; }
+    SDL_FreeSurface(s24);
+    SDL_FreeSurface(s);
+    free(cap);
+    free(want);
+    free(shown);
+    if (keep) *keep = part;
+    else free(part);
+    return ok;
+}
+
+/* Sets supersampling level now (game.c video_setsupersample); 1 if it then
+ *  draws at the size want (0: the drawable's) and is offered (offered). */
+static int ss_set(int level, int wantw, int wanth, int offered, const char *what)
+{
+    int dw, dh, ok;
+
+    video_setsupersample(level);
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    if (!wantw) { wantw = min(dw, MAXXDIM); wanth = min(dh, MAXYDIM); }
+    ok = (xdim == wantw) && (ydim == wanth) && (videosupersampleavailable(level) == offered);
+    printf("supersampling %s, %s: drawn at %dx%d (drawable %dx%d), offered %d, path %s\n", videoopts_ssname(level),
+           what, (int) xdim, (int) ydim, dw, dh, videosupersampleavailable(level), gl_pathname(gldrawpath));
+    if (!ok) fprintf(stderr, "FAIL: supersampling %s, %s: not drawn at %dx%d or offered %d\n",
+                     videoopts_ssname(level), what, wantw, wanth, offered);
+    return ok;
+}
+
+/* Sets the mode again (windowed 640x400), as a VIDEO change does; 1 if it
+ *  then draws at the drawable's size, and supersampling isn't offered. */
+static int ss_mode(const char *what)
+{
+    int dw, dh, ok;
+
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    ok = (xdim == min(dw, MAXXDIM)) && (ydim == min(dh, MAXYDIM)) && (!videosupersampleavailable(SS_4K));
+    printf("supersampling 4k, %s: path %s, drawn at %dx%d (drawable %dx%d), offered %d\n", what,
+           gl_pathname(gldrawpath), (int) xdim, (int) ydim, dw, dh, videosupersampleavailable(SS_4K));
+    if (!ok) fprintf(stderr, "FAIL: supersampling with %s\n", what);
+    return ok;
+}
+
+/*
+ * Supersampling (renderer 3's shader path; game.c video_setsupersample,
+ *  video_requestsupersample) in a 640x400 window. 4k, asked for as the VIDEO
+ *  page asks, is drawn 2160 high at the drawable's aspect, and the frame
+ *  shown is that frame box-filtered down (ss_shown), with fewer hard steps
+ *  than off; a resize works out the size and whether it is offered again;
+ *  off again shows what it showed before, byte for byte. Over the largest
+ *  frame buffer (gl_maxfbtest) it's clamped with a message (gl_ssclamps);
+ *  when that isn't larger than the window it isn't offered and draws at the
+ *  window's size. An internal size
+ *  wins; the vbo path, and the shader path when its framebuffer fails, draw
+ *  at the window's size. 1: pass, 0: fail, 77: no shader path.
+ */
+static int ss_check(const char *dir)
+{
+    unsigned char *off, *again;
+    int dw, dh, ok = 1, w, h, maxfb, most, bw, bh, i, avail;
+    double offsteps, sssteps, mean;
+    uint32_t clamps;
+    Uint32 t0;
+    GLenum err;
+
+    videoswitch_setup();
+    GLContrast = GLSaturation = 1.0;  /* duke3d.cfg's defaults: the palette as it is */
+    if (video_setmode(DISPLAY_WINDOWED, 640, 400) != 0) { fprintf(stderr, "FAIL: video_setmode(640x400)\n"); return 0; }
+    if ((video_setrenderer(3) != 3) || (gldrawpath != GLPATH_SHADER))
+    {
+        printf("SKIP: no shader path (%s)\n", SDL_GetError());
+        return 77;
+    }
+    setbrightness(0, palette);
+    polymosttexfullbright = 240;
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    ok &= ss_set(SS_OFF, 0, 0, 1, "at the start");
+    ok &= ss_shown(dir, "off", 1, NULL, &off);
+    ok &= ss_shown(dir, "off_view", 0, &offsteps, NULL);
+
+    video_requestsupersample(SS_4K);  /* faded out, made, faded back in */
+    for (t0 = SDL_GetTicks(); (videofading()) && (SDL_GetTicks() - t0 < 3000); )
+    {
+        fade_frame();
+        video_applypending();
+    }
+    videoopts_sssize(SS_4K, dw, dh, 0, &w, &h);
+    printf("4k asked for: drawn at %dx%d (want %dx%d), fading %d, darkness %d\n", (int) xdim, (int) ydim, w, h,
+           videofading(), getvideofade());
+    if ((xdim != w) || (ydim != h) || (h != 2160) || (videofading()) || (getvideofade() != 0))
+        { fprintf(stderr, "FAIL: supersampling 4k asked for isn't drawn at %dx%d\n", w, h); ok = 0; }
+    ok &= ss_shown(dir, "4k", 1, NULL, NULL);
+    ok &= ss_shown(dir, "4k_view", 0, &sssteps, NULL);
+    printf("hard steps in the view: off %.1f, 4k %.1f per 1000\n", offsteps, sssteps);
+    if (sssteps > offsteps * 0.75) { fprintf(stderr, "FAIL: 4k's edges aren't smoother than off's\n"); ok = 0; }
+
+    ss_resize(800, 450);  /* recomputed at the new drawable's aspect */
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    videoopts_sssize(SS_4K, dw, dh, 0, &w, &h);
+    printf("4k after a resize to %dx%d: drawn at %dx%d (want %dx%d)\n", dw, dh, (int) xdim, (int) ydim, w, h);
+    if ((xdim != w) || (ydim != h)) { fprintf(stderr, "FAIL: a resize at 4k\n"); ok = 0; }
+    ok &= ss_shown(dir, "4k_resized", 1, NULL, NULL);
+    videoopts_sssize(SS_2K, dw, dh, 0, &w, &h);
+    ok &= ss_set(SS_2K, w, h, 1, "after the resize");
+    ok &= ss_shown(dir, "2k", 1, NULL, NULL);
+
+    ss_resize(640, 400);  /* off again: as before */
+    ok &= ss_set(SS_OFF, 0, 0, 1, "again");
+    ok &= ss_shown(dir, "off_again", 1, NULL, &again);
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+    most = max_diff(off, again, (long) dw * dh, &mean);
+    printf("off again: most |shown - shown before| %d\n", most);
+    if (most != 0) { fprintf(stderr, "FAIL: off after supersampling isn't the frame before\n"); ok = 0; }
+    free(off);
+    free(again);
+
+    /* a resize turns it off and back on: the largest frame between the two drawables' widths */
+    ss_resize(800, 450);
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &bw, &bh);
+    ss_resize(640, 400);
+    gl_maxfbtest = (dw + bw) / 2;
+    for (i = 0; i < 3; i++)
+    {
+        if (i == 1) ss_resize(800, 450);
+        if (i == 2) ss_resize(640, 400);
+        SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &w, &h);
+        avail = videoopts_ssavailable(SS_4K, w, h, gl_maxfbtest, 1, 0);
+        if (avail) videoopts_sssize(SS_4K, w, h, gl_maxfbtest, &w, &h);
+        if (i == 0) ok &= ss_set(SS_4K, w, h, avail, "largest frame between the windows");
+        printf("4k, largest frame %d, drawable %dx%d: drawn at %dx%d, offered %d (want %dx%d, %d)\n",
+               (int) gl_maxfbtest, (i == 1) ? bw : dw, (i == 1) ? bh : dh, (int) xdim, (int) ydim,
+               videosupersampleavailable(SS_4K), w, h, avail);
+        if ((xdim != w) || (ydim != h) || (videosupersampleavailable(SS_4K) != avail) || (avail != (i != 1)))
+            { fprintf(stderr, "FAIL: a resize didn't turn supersampling %s\n", (i == 1) ? "off" : "on"); ok = 0; }
+    }
+    gl_maxfbtest = 0;
+
+    maxfb = dw * 3 / 2;  /* clamped, still larger than the window */
+    gl_maxfbtest = maxfb;
+    clamps = gl_ssclamps;
+    videoopts_sssize(SS_8K, dw, dh, maxfb, &w, &h);
+    ok &= ss_set(SS_8K, w, h, 1, "over the largest frame buffer");
+    printf("clamp messages: %u\n", (unsigned) (gl_ssclamps - clamps));
+    if ((gl_ssclamps != clamps + 1) || (max(w, h) != maxfb)) { fprintf(stderr, "FAIL: 8k wasn't clamped with a message\n"); ok = 0; }
+    ok &= ss_shown(dir, "8k_clamped", 1, NULL, NULL);
+    gl_maxfbtest = dw;  /* clamped to the window's size: not offered */
+    ok &= ss_set(SS_4K, 0, 0, 0, "clamped to the window");
+    gl_maxfbtest = 0;
+
+    ok &= ss_set(SS_OFF, 0, 0, 1, "before the other settings");
+    video_setsupersample(SS_4K);
+    GLInternalWidth = 320; GLInternalHeight = 200;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    printf("supersampling 4k, internal size 320x200: drawn at %dx%d, offered %d\n", (int) xdim, (int) ydim,
+           videosupersampleavailable(SS_4K));
+    if ((xdim != 320) || (ydim != 200) || (videosupersampleavailable(SS_4K)))
+        { fprintf(stderr, "FAIL: an internal size doesn't win over supersampling\n"); ok = 0; }
+    GLInternalWidth = GLInternalHeight = 0;
+    GLDrawPath = GLPATH_VBO;
+    ok &= ss_mode("vbo");
+    GLDrawPath = GLPATH_AUTO;
+    gl_forcefail = 3;  /* no framebuffer at any size: the vbo path, and supersampling turned off */
+    ok &= ss_mode("an incomplete framebuffer");
+    if (glsupersample != SS_OFF) { fprintf(stderr, "FAIL: supersampling kept after its framebuffer failed\n"); ok = 0; }
+    gl_forcefail = 0;
+    video_setsupersample(SS_4K);
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    videoopts_sssize(SS_4K, dw, dh, 0, &w, &h);
+    printf("supersampling 4k, shader path again: drawn at %dx%d\n", (int) xdim, (int) ydim);
+    if ((xdim != w) || (ydim != h)) { fprintf(stderr, "FAIL: supersampling not back on the shader path\n"); ok = 0; }
+
+    /* the supersampled framebuffer alone failing (out of video memory, say),
+     * asked for on the page and at a mode set: only supersampling is lost,
+     * off (so the page shows and saves off), and the shader path draws at
+     * the window's size; 4k works again after */
+    gl_forcefail = 9;
+    for (i = 0; i < 2; i++)
+    {
+        if (i == 0)
+        {
+            video_setsupersample(SS_OFF);
+            video_setsupersample(SS_4K);
+        }
+        else
+        {
+            glsupersample = SS_4K;
+            video_setmode(DISPLAY_WINDOWED, 640, 400);
+        }
+        printf("supersampling 4k, its framebuffer failing (%s): path %s, level %s, drawn at %dx%d, offered %d\n",
+               (i == 0) ? "asked for" : "a mode set", gl_pathname(gldrawpath), videoopts_ssname(glsupersample),
+               (int) xdim, (int) ydim, videosupersampleavailable(SS_4K));
+        if ((gldrawpath != GLPATH_SHADER) || (glsupersample != SS_OFF) || (xdim != dw) || (ydim != dh) ||
+            (!videosupersampleavailable(SS_4K)))
+            { fprintf(stderr, "FAIL: supersampling's framebuffer failing lost more than supersampling\n"); ok = 0; }
+    }
+    ok &= ss_shown(dir, "4k_nofbo", 1, NULL, NULL);
+    gl_forcefail = 0;
+    video_setsupersample(SS_4K);
+    if ((xdim != w) || (ydim != h) || (gldrawpath != GLPATH_SHADER))
+        { fprintf(stderr, "FAIL: supersampling not back after its framebuffer\n"); ok = 0; }
+
+    gl_forcefail = 5;  /* supersampling's shader doesn't compile: the shader path stays, without it */
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    printf("supersampling 4k, its shader failing: path %s, drawn at %dx%d, offered %d\n", gl_pathname(gldrawpath),
+           (int) xdim, (int) ydim, videosupersampleavailable(SS_4K));
+    if ((gldrawpath != GLPATH_SHADER) || (xdim != dw) || (ydim != dh) || (videosupersampleavailable(SS_4K)) ||
+        (!videosupersampleavailable(SS_OFF)))
+        { fprintf(stderr, "FAIL: supersampling's shader failing didn't keep the shader path and grey it\n"); ok = 0; }
+    ok &= ss_shown(dir, "4k_noshader", 1, NULL, NULL);
+    gl_forcefail = 0;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    if ((xdim != w) || (ydim != h)) { fprintf(stderr, "FAIL: supersampling not back after its shader\n"); ok = 0; }
+
+    /* a small window: at most GLSHDOWNMAXSCALE texels to a pixel */
+    ok &= ss_set(SS_OFF, 0, 0, 1, "before a small window");
+    ss_resize(200, 120);
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &bw, &bh);
+    videoopts_sssize(SS_8K, bw, bh, GLSHDOWNMAXSCALE * max(bw, bh), &w, &h);
+    ok &= ss_set(SS_8K, w, h, 1, "a small window");
+    if ((w > GLSHDOWNMAXSCALE * bw) || (h > GLSHDOWNMAXSCALE * bh) || (h >= 4320))
+        { fprintf(stderr, "FAIL: 8k in a small window isn't held to %d texels a pixel\n", GLSHDOWNMAXSCALE); ok = 0; }
+    ok &= ss_shown(dir, "8k_small", 1, NULL, NULL);
+    ss_resize(640, 400);
+    ok &= ss_set(SS_OFF, 0, 0, 1, "at the end");
+    if ((err = glGetError()) != GL_NO_ERROR) { fprintf(stderr, "FAIL: GL error 0x%x\n", (unsigned) err); ok = 0; }
+    polymosttexfullbright = 256;
+    return ok;
+}
+
+/* The texture filtering frames: comparison views (the far street, the
+ *  back room behind the Pig Cop, translucent sprites, the web) and
+ *  shader_frame's HUD, fade, camera and map view. */
+#define FLFRAMES 8
+static const char *const flframename[FLFRAMES] = {
+    "distance", "sprites", "transprites", "translucent", "hud", "fade", "camera", "map"
+};
+static int32_t flx, fly, flz;  /* the start view, for shader_frame */
+static short fla, flsect;
+
+/* Draws filtering frame f and shows it; buf gets it (read_front). A
+ *  screenshot of the HUD and fade frames is taken as <dir>/flcap_<what>. */
+static int fl_frame(int f, unsigned char *buf, const char *dir, const char *what)
+{
+    static const int view[4] = { 0, 3, TRANSPRITEVIEW, 6 };
+    char path[1024];
+    SDL_Surface *b, *s;
+    int y, x, i, most = 0;
+
+    setbrightness(0, palette);
+    if (f < 4)
+    {
+        cmp_draw(view[f]);
+        nextpage();
+    }
+    else
+        shader_frame((f == 4) ? 0 : (f == 5) ? 2 : (f == 6) ? 3 : 4, flx, fly, flz, fla, flsect);
+    read_front(buf);
+    if ((f == 4) || (f == 5))  /* a screenshot is the screen, within 1 */
+    {
+        snprintf(path, sizeof (path), "%s/flcap_%s_%s0000.bmp", dir, what, flframename[f]);
+        remove(path);
+        snprintf(path, sizeof (path), "%s/flcap_%s_%sxxxx.bmp", dir, what, flframename[f]);
+        i = screencapture(path, 0);
+        snprintf(path, sizeof (path), "%s/flcap_%s_%s0000.bmp", dir, what, flframename[f]);
+        b = (i == 0) ? SDL_LoadBMP(path) : NULL;
+        s = (b != NULL) ? SDL_ConvertSurfaceFormat(b, SDL_PIXELFORMAT_RGB24, 0) : NULL;
+        if ((s == NULL) || (s->w != xdim) || (s->h != ydim))
+            most = 999;
+        for (y = 0; (most < 999) && (y < ydim); y++)  /* GL rows are bottom-up */
+            for (x = 0; x < xdim * 3; x++)
+                most = max(most, abs((int) ((unsigned char *) s->pixels)[y * s->pitch + x] -
+                                     (int) buf[(ydim - 1 - y) * xdim * 3 + x]));
+        SDL_FreeSurface(s);
+        SDL_FreeSurface(b);
+    }
+    if (f == 5) setpalettefade(0, 0, 0, 0);
+    return most;
+}
+
+/* Mean |a - b| per channel of two read_front frames over a box given in
+ *  640x480 terms (top-down). */
+static double fl_boxdiff(const unsigned char *a, const unsigned char *b, int x0, int y0, int x1, int y1)
+{
+    long x, y, i, j, d = 0, n = 0;
+
+    for (y = y0 * ydim / CMPH; y < y1 * ydim / CMPH; y++)
+        for (x = x0 * xdim / CMPW; x < x1 * xdim / CMPW; x++, n++)
+            for (i = 0, j = ((ydim - 1 - y) * xdim + x) * 3; i < 3; i++)
+                d += abs((int) a[j + i] - (int) b[j + i]);
+    return (double) d / ((double) n * 3);
+}
+
+/*
+ * Texture filtering (gltexturefilter; game.c video_settexfilter,
+ *  video_requesttexfilter) in a 640x400 window, on the shader, vbo and
+ *  immediate paths. Bilinear and trilinear draw the 3D views differently
+ *  from nearest but close to it: every frame within 8, the far street's
+ *  and back room's means (classic's distance darkening) within 3 of
+ *  nearest's; translucent sprites and the fade still show (at least half
+ *  the change nearest shows); screenshots are the screen within 1; on the
+ *  shader path no RGB textures are made. Nearest again draws every frame
+ *  as before, byte for byte. With supersampling 4k the frame shown is the
+ *  filtered frame box-filtered down and differs from nearest's. A filtering
+ *  shader that doesn't link (gl_forcefail 6) leaves the shader path drawing
+ *  as nearest, filtering not offered; asked for as the VIDEO page asks, it
+ *  is set after the fade; renderer 0 doesn't offer it. 1: pass, 0: fail,
+ *  77: no shader path.
+ */
+static int fl_check(const char *dir)
+{
+    static const struct { int32_t path; const char *name; } flpath[] = {
+        { GLPATH_SHADER, "shader" }, { GLPATH_VBO, "vbo" }, { GLPATH_IMMEDIATE, "immediate" },
+    };
+    unsigned char *near[FLFRAMES], *buf, *ssnear, *ssfilt, *bil0 = NULL;
+    char what[64];
+    int p, f, i, ok = 1, most, filt;
+    double d, m0, m1, trans0, trans1, fade0, fade1;
+    uint32_t loads;
+    long n;
+    Uint32 t0;
+    GLenum err;
+
+    videoswitch_setup();
+    GLContrast = GLSaturation = 1.0;
+    polymosttexfullbright = 240;
+    memset(show2dsector, 0xff, sizeof (show2dsector));  /* the map view shows every sector */
+    for (p = 0; p < (int) (sizeof (flpath) / sizeof (flpath[0])); p++)
+    {
+        GLDrawPath = flpath[p].path;
+        video_settexfilter(TEXFILTER_NEAREST);
+        if (video_setmode(DISPLAY_WINDOWED, 640, 400) != 0) { fprintf(stderr, "FAIL: video_setmode(640x400)\n"); return 0; }
+        if (video_setrenderer(3) != 3) { printf("SKIP: no OpenGL (%s)\n", SDL_GetError()); return 77; }
+        if (gldrawpath != flpath[p].path)
+        {
+            if (p == 0) { printf("SKIP: no shader path\n"); return 77; }
+            printf("filtering, %s: not on this driver, skipped\n", flpath[p].name);
+            continue;
+        }
+        n = (long) xdim * ydim;
+        buf = malloc((size_t) n * 3);
+        for (f = 0; f < FLFRAMES; f++)
+        {
+            near[f] = malloc((size_t) n * 3);
+            snprintf(what, sizeof (what), "%s_nearest", flpath[p].name);
+            fl_frame(f, near[f], dir, what);
+        }
+        trans0 = fl_boxdiff(near[2], near[0], cmpbox[1].x0, cmpbox[1].y0, cmpbox[1].x1, cmpbox[1].y1);
+        fade0 = front_diff(near[5], near[4]);
+        for (filt = TEXFILTER_BILINEAR; filt <= TEXFILTER_TRILINEAR; filt++)
+        {
+            int was = ok;  /* (each filter's own failure said) */
+
+            ok = 1;
+            i = video_settexfilter(filt);
+            printf("filtering, %s %s: offered %d (nearest %d)\n", flpath[p].name, videoopts_filtername(filt), i,
+                   videotexfilteravailable(TEXFILTER_NEAREST));
+            if (!i) { fprintf(stderr, "FAIL: filtering %s not offered\n", videoopts_filtername(filt)); ok = 0; }
+            loads = gl_rgbtexloads;
+            snprintf(what, sizeof (what), "%s_%s", flpath[p].name, videoopts_filtername(filt));
+            for (f = 0; f < FLFRAMES; f++)
+            {
+                double rs, gs;
+                char path[1024];
+
+                most = fl_frame(f, buf, dir, what);
+                snprintf(path, sizeof (path), "%s/fl_%s_%s.bmp", dir, what, flframename[f]);
+                if (f == 5)  /* (faded again for the picture) */
+                {
+                    setpalettefade(63, 0, 0, 32);
+                    save_front(path, &rs, &gs);
+                    setpalettefade(0, 0, 0, 0);
+                }
+                else
+                    save_front(path, &rs, &gs);
+                d = front_diff(buf, near[f]);
+                printf("filtering, %s: %s mean |%s - nearest| %.2f (most 8)%s", flpath[p].name, flframename[f],
+                       videoopts_filtername(filt), d, (f < 4) ? " (must differ)" : "");
+                if ((d > 8) || ((f < 4) && (memcmp(buf, near[f], (size_t) n * 3) == 0))) ok = 0;
+                if ((f == 0) && (flpath[p].path == GLPATH_SHADER) && (filt == TEXFILTER_BILINEAR))
+                    bil0 = memcpy(malloc((size_t) n * 3), buf, (size_t) n * 3);
+                else if ((f == 0) && (bil0 != NULL))  /* trilinear's mip levels are used */
+                {
+                    printf("; |trilinear - bilinear| %.2f (must differ)", front_diff(buf, bil0));
+                    if (memcmp(buf, bil0, (size_t) n * 3) == 0) ok = 0;
+                    free(bil0);
+                    bil0 = NULL;
+                }
+                if ((f == 4) || (f == 5))
+                {
+                    printf("; screenshot most %d from the screen", most);
+                    if (most > 1) ok = 0;
+                }
+                printf("\n");
+                for (i = 0; i < NCMPREGIONS; i++)
+                {
+                    if (cmpregion[i].view != ((f == 0) ? 0 : (f == 1) ? 3 : -1)) continue;
+                    m0 = cmp_mean(near[f], xdim, ydim, 1, cmpregion[i].x0, cmpregion[i].y0, cmpregion[i].x1, cmpregion[i].y1);
+                    m1 = cmp_mean(buf, xdim, ydim, 1, cmpregion[i].x0, cmpregion[i].y0, cmpregion[i].x1, cmpregion[i].y1);
+                    printf("filtering, %s: %s mean nearest %.1f, %s %.1f (most apart 3)\n", flpath[p].name,
+                           cmpregion[i].name, m0, videoopts_filtername(filt), m1);
+                    if (fabs(m1 - m0) > 3) ok = 0;
+                }
+                if (f == 2)
+                {
+                    trans1 = fl_boxdiff(buf, near[0], cmpbox[1].x0, cmpbox[1].y0, cmpbox[1].x1, cmpbox[1].y1);
+                    d = fl_boxdiff(buf, near[2], cmpbox[1].x0, cmpbox[1].y0, cmpbox[1].x1, cmpbox[1].y1);
+                    printf("filtering, %s: translucent sprites change their box by %.2f (nearest %.2f), "
+                           "%.2f from nearest's\n", flpath[p].name, trans1, trans0, d);
+                    if ((trans1 < trans0 * 0.5) || (d > 8)) ok = 0;
+                }
+                if (f == 3)
+                {
+                    d = fl_boxdiff(buf, near[3], cmpbox[0].x0, cmpbox[0].y0, cmpbox[0].x1, cmpbox[0].y1);
+                    printf("filtering, %s: the web %.2f from nearest's (most 8)\n", flpath[p].name, d);
+                    if (d > 8) ok = 0;
+                }
+                if (f == 5)
+                {
+                    unsigned char *hud = malloc((size_t) n * 3);
+                    fl_frame(4, hud, dir, what);
+                    fade1 = front_diff(buf, hud);
+                    free(hud);
+                    printf("filtering, %s: the fade changes the frame by %.2f (nearest %.2f)\n", flpath[p].name,
+                           fade1, fade0);
+                    if (fade1 < fade0 * 0.5) ok = 0;
+                }
+            }
+            if ((flpath[p].path == GLPATH_SHADER) && (gl_rgbtexloads != loads))
+                { fprintf(stderr, "FAIL: filtering on the shader path made %u RGB textures\n",
+                          (unsigned) (gl_rgbtexloads - loads)); ok = 0; }
+            if (!ok) fprintf(stderr, "FAIL: filtering %s on the %s path\n", videoopts_filtername(filt), flpath[p].name);
+            ok &= was;
+        }
+        video_settexfilter(TEXFILTER_NEAREST);
+        for (f = 0; f < FLFRAMES; f++)
+        {
+            snprintf(what, sizeof (what), "%s_nearest2", flpath[p].name);
+            fl_frame(f, buf, dir, what);
+            if (memcmp(buf, near[f], (size_t) n * 3))
+            {
+                fprintf(stderr, "FAIL: %s, %s: nearest after filtering isn't nearest before (mean %.2f)\n",
+                        flpath[p].name, flframename[f], front_diff(buf, near[f]));
+                ok = 0;
+            }
+            free(near[f]);
+        }
+        free(buf);
+        if ((err = glGetError()) != GL_NO_ERROR) { fprintf(stderr, "FAIL: GL error 0x%x\n", (unsigned) err); ok = 0; }
+    }
+    GLDrawPath = GLPATH_AUTO;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+
+    /* With supersampling: the frame shown is the frame drawn scaled down */
+    video_setsupersample(SS_4K);
+    ok &= ss_shown(dir, "4k_nearest", 1, NULL, &ssnear);
+    for (filt = TEXFILTER_BILINEAR; filt <= TEXFILTER_TRILINEAR; filt++)
+    {
+        int dw, dh;
+
+        video_settexfilter(filt);
+        snprintf(what, sizeof (what), "4k_%s", videoopts_filtername(filt));
+        ok &= ss_shown(dir, what, 1, NULL, &ssfilt);
+        SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+        most = max_diff(ssnear, ssfilt, (long) dw * dh, &d);  /* (the part shown is the window: no bars) */
+        printf("4k %s: mean |shown - 4k nearest's| %.2f\n", videoopts_filtername(filt), d);
+        if (d == 0) { fprintf(stderr, "FAIL: 4k %s is 4k nearest\n", videoopts_filtername(filt)); ok = 0; }
+        free(ssfilt);
+    }
+    free(ssnear);
+    video_settexfilter(TEXFILTER_NEAREST);
+    video_setsupersample(SS_OFF);
+
+    /* Its shader failing: the shader path stays, drawing as nearest */
+    n = (long) xdim * ydim;
+    near[0] = malloc((size_t) n * 3);
+    buf = malloc((size_t) n * 3);
+    fl_frame(0, near[0], dir, "fail");
+    gl_forcefail = 6;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    i = video_settexfilter(TEXFILTER_BILINEAR);
+    fl_frame(0, buf, dir, "fail");
+    printf("filtering, its shader failing: path %s, bilinear offered %d (set %d), nearest %d, frame %s nearest's\n",
+           gl_pathname(gldrawpath), videotexfilteravailable(TEXFILTER_BILINEAR), i,
+           videotexfilteravailable(TEXFILTER_NEAREST), memcmp(buf, near[0], (size_t) n * 3) ? "NOT" : "is");
+    if ((gldrawpath != GLPATH_SHADER) || i || videotexfilteravailable(TEXFILTER_BILINEAR) ||
+        videotexfilteravailable(TEXFILTER_TRILINEAR) || !videotexfilteravailable(TEXFILTER_NEAREST) ||
+        memcmp(buf, near[0], (size_t) n * 3))
+        { fprintf(stderr, "FAIL: a filtering shader failing didn't keep the shader path at nearest\n"); ok = 0; }
+    gl_forcefail = 0;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    fl_frame(0, buf, dir, "fail");
+    printf("filtering, its shader back: bilinear offered %d, frame %s nearest's\n",
+           videotexfilteravailable(TEXFILTER_BILINEAR), memcmp(buf, near[0], (size_t) n * 3) ? "not" : "IS");
+    if (!videotexfilteravailable(TEXFILTER_BILINEAR) || !memcmp(buf, near[0], (size_t) n * 3))
+        { fprintf(stderr, "FAIL: filtering not back after its shader\n"); ok = 0; }
+
+    /* Trilinear's shader failing (asked about first): bilinear stays */
+    video_settexfilter(TEXFILTER_NEAREST);
+    gl_forcefail = 7;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    i = videotexfilteravailable(TEXFILTER_TRILINEAR);
+    filt = video_settexfilter(TEXFILTER_BILINEAR);
+    fl_frame(0, buf, dir, "trifail");
+    printf("filtering, trilinear's shader failing: trilinear offered %d, bilinear %d (set %d), frame %s nearest's\n",
+           i, videotexfilteravailable(TEXFILTER_BILINEAR), filt, memcmp(buf, near[0], (size_t) n * 3) ? "not" : "IS");
+    if (i || videotexfilteravailable(TEXFILTER_TRILINEAR) || !filt || !videotexfilteravailable(TEXFILTER_BILINEAR) ||
+        !memcmp(buf, near[0], (size_t) n * 3) || (gldrawpath != GLPATH_SHADER))
+        { fprintf(stderr, "FAIL: trilinear's shader failing took bilinear with it\n"); ok = 0; }
+    gl_forcefail = 0;
+    video_settexfilter(TEXFILTER_NEAREST);
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    if (!videotexfilteravailable(TEXFILTER_TRILINEAR)) { fprintf(stderr, "FAIL: trilinear not back\n"); ok = 0; }
+
+    /* The supersampled colour present failing: supersampling stays at
+     * nearest; filtering isn't offered while supersampled */
+    gl_forcefail = 8;
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    video_setsupersample(SS_4K);
+    i = videosupersampleavailable(SS_4K);
+    ok &= ss_shown(dir, "4k_nocolordown", 1, NULL, &ssnear);
+    filt = video_settexfilter(TEXFILTER_BILINEAR);
+    ok &= ss_shown(dir, "4k_nocolordown_bilinear", 1, NULL, &ssfilt);
+    {
+        int dw, dh, w, h;
+
+        SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &dw, &dh);
+        videoopts_sssize(SS_4K, dw, dh, 0, &w, &h);
+        printf("filtering, the supersampled colour present failing: 4k offered %d, drawn at %dx%d (want %dx%d); "
+               "bilinear set %d, offered %d, shown %s 4k nearest's\n", i, (int) xdim, (int) ydim, w, h, filt,
+               videotexfilteravailable(TEXFILTER_BILINEAR), memcmp(ssnear, ssfilt, (size_t) dw * dh * 3) ? "NOT" : "is");
+        if (!i || (xdim != w) || (ydim != h) || filt || videotexfilteravailable(TEXFILTER_BILINEAR) ||
+            memcmp(ssnear, ssfilt, (size_t) dw * dh * 3))
+            { fprintf(stderr, "FAIL: the supersampled colour present failing took supersampling or drew filtered\n"); ok = 0; }
+    }
+    free(ssnear);
+    free(ssfilt);
+    video_setsupersample(SS_OFF);
+    i = videotexfilteravailable(TEXFILTER_BILINEAR);
+    printf("filtering, the supersampled colour present failing, supersampling off: bilinear offered %d\n", i);
+    if (!i) { fprintf(stderr, "FAIL: bilinear not offered without supersampling\n"); ok = 0; }
+    gl_forcefail = 0;
+    video_settexfilter(TEXFILTER_NEAREST);
+    video_setmode(DISPLAY_WINDOWED, 640, 400);
+    free(near[0]);
+    free(buf);
+
+    /* Asked for as the VIDEO page asks: made after the fade out */
+    video_requesttexfilter(TEXFILTER_TRILINEAR);
+    for (t0 = SDL_GetTicks(); (videofading()) && (SDL_GetTicks() - t0 < 3000); )
+    {
+        fade_frame();
+        video_applypending();
+    }
+    printf("trilinear asked for: filter %s, fading %d, darkness %d\n", videoopts_filtername(gltexturefilter),
+           videofading(), getvideofade());
+    if ((gltexturefilter != TEXFILTER_TRILINEAR) || videofading() || getvideofade())
+        { fprintf(stderr, "FAIL: trilinear asked for isn't set\n"); ok = 0; }
+
+    video_setrenderer(0);
+    printf("renderer 0: bilinear offered %d, nearest %d\n", videotexfilteravailable(TEXFILTER_BILINEAR),
+           videotexfilteravailable(TEXFILTER_NEAREST));
+    if (videotexfilteravailable(TEXFILTER_BILINEAR) || !videotexfilteravailable(TEXFILTER_NEAREST))
+        { fprintf(stderr, "FAIL: renderer 0 offers filtering\n"); ok = 0; }
+    video_setrenderer(3);
+    video_settexfilter(TEXFILTER_NEAREST);
+    if ((err = glGetError()) != GL_NO_ERROR) { fprintf(stderr, "FAIL: GL error 0x%x\n", (unsigned) err); ok = 0; }
+    polymosttexfullbright = 256;
+    return ok;
+}
+
 int main(int argc, char **argv)
 {
     int32_t posx, posy, posz;
@@ -1822,7 +2927,7 @@ int main(int argc, char **argv)
 
     if (argc < 3)
     {
-        fprintf(stderr, "usage: %s <DUKE3D.GRP> <dir>\n", argv[0]);
+        fprintf(stderr, "usage: %s <DUKE3D.GRP> <dir> [video|supersample|filter]\n", argv[0]);
         return 2;
     }
 
@@ -1842,6 +2947,23 @@ int main(int argc, char **argv)
     setup_la_backdrop();
 
     _platform_init(argc, argv, "render_gl", "render");
+    if ((argc > 3) && (strcmp(argv[3], "video") == 0))
+    {
+        i = video_switch_check();
+        if (i == 1) i = video_mode_check();
+        return (i == 1) ? 0 : (i == 77) ? 77 : 1;
+    }
+    if ((argc > 3) && (strcmp(argv[3], "supersample") == 0))
+    {
+        i = ss_check(argv[2]);
+        return (i == 1) ? 0 : (i == 77) ? 77 : 1;
+    }
+    if ((argc > 3) && (strcmp(argv[3], "filter") == 0))
+    {
+        flx = posx; fly = posy; flz = posz; fla = ang; flsect = sectnum;
+        i = fl_check(argv[2]);
+        return (i == 1) ? 0 : (i == 77) ? 77 : 1;
+    }
     i = present8_check();
     if (i != 1) return (i == 77) ? 77 : 1;
     i = classic_compare(argv[2]);

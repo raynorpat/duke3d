@@ -93,6 +93,9 @@ BUILDLIC.TXT LICENSE.md
 - `engine.c`: version-guarded 1.1 and 1.0 engine logic, on `BUILD_ENGINEREV`:
   the early `inside`, which compares the two products and keeps a one-byte
   count (see ledger E11-001)
+- `engine.c`: `inside` computes coordinate differences, products and determinants
+  as unsigned 32-bit arithmetic, preserving each revision's DOS wraparound
+  without C signed overflow (E11-001, E-004).
 - `engine.c`: version-guarded 1.0 engine logic, on `BUILD_ENGINEREV <
   19960220L`: `cansee`'s side test and `lintersect`; `hitscan` without a
   cliptype (always `CLIPMASK1`) that resets only `*hitsect`; `clipmove`
@@ -405,9 +408,35 @@ Ported from later JFBuild commits, retyped as above:
   high-DPI display, bigger) drawable's pixels. `getmousearea` (ours, for
   the editor's cursor) is the window's size, or at an internal size the
   frame's part of it.
-- `_setgamemode` (8-bit) still clamps modes over 1600x1200 to 1600x1200,
-  now with literals, so the larger `MAXXDIM`/`MAXYDIM` only reach GL. The
-  size asked for is kept for renderer 3's window.
+- `_setgamemode` sizes the window (or exclusive's display mode) as asked.
+  8-bit modes draw at that size, over 1600x1200 clamped to it (the
+  editor), or with `setvideodrawfit(1)` (the game) at that size or in
+  borderless at the window's (the desktop), capped to 1600x1200 keeping
+  the aspect (`videoopts_drawsize`, so `videoopts.c` is in this library);
+  shown scaled. The larger `MAXXDIM`/`MAXYDIM` only reach GL. The 8-bit
+  surface has its own pixels with rows exactly its width apart, so any
+  width works (SDL pads its own to 4). `setvideodisplaymodenext` gives the
+  next mode set a display mode, so a new mode and size change the screen
+  once. A mode set leaves the window's size, position and display mode
+  alone when they haven't changed (a moved window stays put, also when the
+  first GL window replaces it); a new windowed size is given only while
+  windowed (in full screen it waits for the return) and centred on the
+  bounds of the display the window was on. Exclusive takes the main
+  display's mode exactly the size asked for (the closest only when there's
+  none), and full screen moves a window on another display to the main one
+  first (untested with two displays). `getvideomodelist` gives the main
+  display's modes and desktop size (the VIDEO page's RESOLUTION list).
+  `setvideotogglehook` hands Alt+Enter's display mode to the game (a mode
+  set) instead of changing it at once; `setvideodisplaymodenext` keeps a
+  full-screen style for Alt+Enter, not windowed.
+- `setvideofadeout`/`setvideofadein` (the VIDEO page's fade around a
+  change): a darkness applied at every present, in real time, over the
+  game's palette and fade without touching them. The SDL renderer's texture
+  colour mod, `gl_present8`'s colour, a black quad after the fixed function
+  tiers' fade quad, and on the shader tier the palette
+  `polymost_present_shader` shows through (its new `dark` argument).
+  Black held over 2 * `VIDEOFADE_MS` with no `setvideofadein` fades back
+  in by itself. Captures leave it out, except a front-buffer read.
 - `glext.c`/`glext.h` (ours, not JFBuild's): renderer 3's draw paths
   (`GLPATH_AUTO`, `IMMEDIATE`, `VBO`, `SHADER`) and their setting names,
   the pure `gl_choosepath`, and the GL entry points past 1.1 as `bgl…`
@@ -421,7 +450,7 @@ Ported from later JFBuild commits, retyped as above:
   from `gldrawpathrequest` (the game's `GLDrawPath`, the editor's
   `gldrawpath`) and prints it. `gl_forcefail` (a test hook): 1 makes GLSL
   and FBOs unavailable, 2 breaks the shader path's shader, 3 leaves its
-  framebuffer incomplete. `glinternalwidth`/`glinternalheight` (the game's
+  framebuffer incomplete (5 and 6: below). `glinternalwidth`/`glinternalheight` (the game's
   `GLInternalWidth`/`Height`, the editor's `glinternalwidth`/`height`) set
   the shader path's internal size: `gl_internalsize` takes both or neither
   (one alone is the window's size) and at least 320x200, and
@@ -432,7 +461,59 @@ Ported from later JFBuild commits, retyped as above:
   game lays out as classic does at it; `polymost_present_shader` draws the
   frame into `gl_fitrect`'s rectangle of the drawable (the largest scale
   that fits, square pixels, centred, nearest texel) with black bars around
-  it; screenshots are the internal-size frame.
+  it; screenshots are the internal-size frame. `glsupersample` (the
+  game's `Supersampling` through `setvideosupersample`, the editor's
+  `supersampling`) is the shader path's supersampling level: without an
+  internal size, `init_gl_res_vars` makes `xdim`/`ydim` `videoopts_sssize`'s
+  size for the drawable (1440/2160/4320 high at its aspect), clamped to
+  the largest frame (GL's texture, renderbuffer and viewport limits and
+  `MAXXDIM`; `gl_maxfbtest` and `gl_ssclamps` are test hooks) with a
+  message, or the drawable's size when that isn't larger than it.
+  `polymost_present_shader` then draws with `glshdownfrag`: each pixel the
+  mean of the texels it covers through the shown palette (fade, contrast,
+  saturation and the VIDEO fade included), weighted by coverage. That
+  program is linked on its own when first wanted
+  (`polymost_supersample_ready`): if it doesn't link, supersampling isn't
+  offered and the shader path stays (`gl_forcefail` 5 tests it). Its loop
+  takes at most 16 texels a side, so the size is also held to
+  `GLSHDOWNMAXSCALE` (14) texels to a pixel. An internal size larger than
+  the window still shows through `glshresolve`, nearest.
+  Screenshots are scaled down the same way on the CPU (`gl_boxdown`), at
+  the window's size. A resize, or `setvideosupersample` (`gl_remake`, the
+  resize's rebuild), works the size out again; if the framebuffer fails at
+  it, the vbo path draws at the window's size. No `lastframe` texture is
+  made at a supersampled size.
+  `gltexturefilter` (the game's `GLTextureFilter` through
+  `setvideotexfilter`, the editor's `gltexturefilter`) is renderer 3's
+  texture filter: nearest, bilinear or trilinear. The 1.1/1.5 paths map it
+  to `gltexfiltermode` (`GL_NEAREST`, `GL_LINEAR`,
+  `GL_LINEAR_MIPMAP_LINEAR`; their textures always have mipmaps) and
+  `gltexapplyprops` sets it on the textures made. On the shader path
+  nearest is the palette-index frame above, unchanged; bilinear and
+  trilinear draw colour into the same framebuffer instead (`glshcolor`):
+  each tap of a tile is its index looked up at the pixel's shade (as the
+  index program works it out) in `glshrgb`, the palette's colour of every
+  palookup row, so classic's shade tables stay exact, then blended. Masked
+  taps of 255 count as uncovered, and a pixel less than half covered is
+  discarded. Trilinear adds mip levels made per tile (`polymost_idxmip`):
+  four indices a texel, one for each texel of the level above it covers
+  (at level 1 the tile's own; deeper the one of that texel's four nearest
+  their mean colour), side by side in one texture and addressed in the
+  shader, which picks and blends two levels by the pixel's texel
+  footprint. Translucent draws blend at 0.66 and 0.33, and the present
+  (`glshcresfrag`, `glshcdownfrag` when supersampled) moves the colours
+  toward the fade's as `getfadedpalette` moves the palette, then applies
+  contrast, saturation and the VIDEO fade: approximations of classic's
+  `transluc` and faded palette. Lines, text and clears draw the palette's
+  colour. Screenshots read the colour and fade it the same way on the CPU.
+  A switch between nearest and the others clears the frame to black. The
+  colour programs link on their own when first wanted
+  (`polymost_clink`), each failing alone: bilinear or trilinear that
+  doesn't link isn't offered (the other still is), a colour present that
+  doesn't link takes both, and the shader path draws nearest; a
+  supersampled colour present (`glshcdownfrag`) that doesn't link takes
+  filtering only while supersampled, so supersampling keeps working at
+  nearest (`gl_forcefail` 6, 7 and 8 test them).
 - `glsubmit.c`/`glsubmit.h` (ours): renderer 3's vertex submission.
   `polymost.c`'s and `engine.c`'s `glBegin`/`glTexCoord`/`glColor`/
   `glVertex`/`glEnd` (drawpoly, `drawtrap`/`tessectrap`, the tile picker,
@@ -553,3 +634,11 @@ the surface's palette (the faded one on screen); the editor's 640-wide 2D
 mode uses the 16-colour `vgapal16` and still honours `inverseit`. `build.c`'s
 editor captures are named `captxxxx.png`. If there's no picture, the encoder
 fails or a write fails, it removes the file and returns -1.
+
+## 0.99 beta hitscan
+
+`BUILD_ENGINEREV < 19960129L` retains the beta's slope-plane intersections behind
+ray origins and halves signed height differences before taking their absolute value
+in all four plane range tests. E099-001/002, measured from the Jan4 DOS EXE; guarded
+branches in `engine.c:hitscan`, cases in `tests/engine_trace.c`. All later revisions
+retain their existing sign/range checks.

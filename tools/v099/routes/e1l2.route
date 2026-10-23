@@ -1,0 +1,188 @@
+# DEMOGOD
+# E1L2 normal skill; matching -demogod required (unprotected run died1829).
+# Native author reaches EOL1 at5293tics via yellow-unlocked transporter18→191.
+-11892 6390 wait 104 # allow spawn/fall/start lift to settle
+# switch sprite 98 sector 58 palette 0 tag 243
+-11776 6848 crouch # sector 297, portal wall 1881 to 296
+-11776 7136 crouch # sector 296, width 1024, rise -256, clear -192
+-11776 7072 # sector 296, portal wall 1879 to 301
+-11776 7360 # sector 301, width 1024, rise 0, clear 64
+-11776 7872 # sector 301, portal wall 1903 to 302
+-11776 8160 # sector 302, width 1024, rise 0, clear 64
+-11776 8096 # sector 302, portal wall 1909 to 255
+-11776 8384 # sector 255, width 1024, rise 0, clear 112
+-4096 19648 # sector 255, portal wall 1547 to 273
+-4096 19264 # sector 273, width 14336, rise -4, clear 1820
+6976 25088 # sector 273, portal wall 1690 to 269
+7360 25088 # sector 269, width 19456, rise 4, clear 1820
+-6592 11264 # sector 269, portal wall 1643 to 71
+-6208 11264 # sector 71, width 1024, rise 0, clear 64
+-6208 11264 # sector 71, portal wall 404 to 214
+-5824 11264 # sector 214, width 1024, rise 0, clear 64
+-5824 11264 use # open rotating bookshop door92 from outside swing arc
+-5824 11264 wait 52
+-5504 11584 # pass below opened horizontal door leaf
+-4672 11584
+-4288 11584 # round the east end of the open leaf
+-4288 11264 # sector 213
+-4288 11264 # sector 213, width 1024, rise 0, clear 64
+-3968 10688 # sector 213, portal wall 1204 to 58
+-3968 10304 # sector 58, width 1024, rise 0, clear 64
+-3072 10240 # turn around the shop entry concavity
+-3072 11392
+-896 11904 # face sprite 98
+-704 11904 # reach usable side before pulsing
+-704 11904 face 0
+-704 11904 use # switch; stand192 away from wall sprite
+-704 11904 wait 78 # allow access animation/door motion
+# switch sprite 100
+-896 12416 # face sprite 100
+-704 12416 # reach usable side before pulsing
+-704 12416 face 0
+-704 12416 use # switch; stand192 away from wall sprite
+-704 12416 wait 78 # allow access animation/door motion
+# key sprite 97 sector 51 palette 0 tag 0
+-704 13312 # sector 52, portal wall 294 to 67
+-416 13312 # sector 67, width 1024, rise 0, clear 64
+-480 13312 # sector 67, portal wall 382 to 66
+-480 13312 use # single pulse after reaching approach coordinate
+-480 13312 wait 52 # let door open before crossing
+-288 13312 # sector 66, width 1024, rise 0, clear 0
+-352 13312 # sector 66, portal wall 380 to 59
+-64 13312 # sector 59, width 1024, rise 0, clear 0
+120 13448 # sector 59, portal wall 347 to 60
+392 13176 # sector 60, width 1448, rise 0, clear 64
+888 13064 # sector 60, portal wall 350 to 61
+1160 12792 # sector 61, width 1448, rise 0, clear 64
+1656 12680 # sector 61, portal wall 354 to 62
+1928 12408 # sector 62, width 1448, rise 0, clear 64
+2424 12296 # sector 62, portal wall 358 to 63
+2696 12024 # sector 63, width 1448, rise 0, clear 64
+3704 11656 # sector 63, portal wall 362 to 64
+3976 11384 # sector 64, width 1448, rise 0, clear 64
+5034 11476 # sector 64, portal wall 366 to 252
+5206 11820 # sector 252, width 1717, rise 0, clear 64
+5696 11520 # sector 252, portal wall 1513 to 65
+6080 11520 # sector 65, width 512, rise 0, clear 64
+6400 11520 # stand on lift before triggering
+6400 11520 use # one pulse triggers lift
+6400 11520 wait 156 # allow lift to reach upper landing
+6400 11840 # sector 65, portal wall 377 to 68
+6400 12224 # sector 68, width 1024, rise 148, clear -84
+6400 12096 # sector 68, portal wall 386 to 70
+6400 12480 # sector 70, width 1024, rise 0, clear 64
+2496 13248 # sector 70, portal wall 401 to 206
+2112 13248 # sector 206, width 1920, rise 0, clear 96
+384 13248 # sector 206, portal wall 1170 to 51
+0 13248 # sector 51, width 1920, rise 0, clear 96
+-128 14016 # collect blue key
+-128 14016 wait 26
+# switch sprite 96 sector 263 palette 0 tag 315
+0 13248 # sector 51, portal wall 289 to 206
+384 13248 # sector 206, width 1920, rise 0, clear 96
+1120 14016 face 512
+1120 14016 fire 52 # break glass before jumping the raised window sill
+1120 14304 jump # sector 50, width 1856, rise 24, clear 64
+1120 14240 # sector 50, portal wall 287 to 269
+1120 14528 # sector 269, width 1856, rise -172, clear 64
+8768 33664 # sector 269, portal wall 1635 to 263
+8768 33664 wait 26 # stop approach drift before aiming
+8795 33779 face 1896
+8795 33779 crouch
+8795 33779 use # blue access control96 from its west/street side
+8795 33779 wait 156
+# Correct DIP pattern316: switches822 and824 ON,823 and825 OFF.
+8704 34048
+8704 34048 wait 26
+8704 34048 face 0
+8704 34048 crouch
+8704 34048 use
+8704 33280
+8704 33280 wait 26
+8704 33280 face 0
+8704 33280 crouch
+8704 33280 use
+8704 33280 wait 156
+8704 33280 face 211
+8704 33280 use # aim past the spent blue panel to demolition821
+8704 33280 wait 156
+# key sprite 772 sector 248 palette23
+12096 27840 jump # sector 269, portal wall 1651 to 207
+12480 27840 jump # sector 207, width 4480, rise 40, clear 1780
+16100 32528 jump # sector 207, portal wall 1178 to 248
+16412 32752 jump # sector 248, width 2202, rise 32, clear 1748
+18944 34304 # collect key palette 23; may be picked up from adjacent sector
+# switch sprite 550 sector 164 palette 23 tag 255
+16412 32752 # sector 248, portal wall 1483 to 207
+16100 32528 # sector 207, width 2202, rise -32, clear 1748
+12480 27840 # sector 207, portal wall 1181 to 269
+12096 27840 # sector 269, width 4480, rise -40, clear 1780
+7360 25088 # sector 269, portal wall 1637 to 273
+6976 25088 # sector 273, width 19456, rise -4, clear 1820
+3264 31232 # sector 273, portal wall 1683 to 164
+2880 31232 # sector 164, width 2560, rise 4, clear 96
+2433 30272 # face sprite 550
+2241 30272 # reach usable side before pulsing
+2241 30272 use # switch; stand192 away from wall sprite
+2241 30272 wait 78 # allow access animation/door motion
+2880 31232 # sector 164, portal wall 926 to 273
+3264 31232 # sector 273, width 2560, rise -4, clear 96
+6976 25088 # sector 273, portal wall 1690 to 269
+7360 25088 # sector 269, width 19456, rise 4, clear 1820
+-6592 11264 # sector 269, portal wall 1643 to 71
+-6208 11264 # sector 71, width 1024, rise 0, clear 64
+-6208 11264 # sector 71, portal wall 404 to 214
+-5824 11264 # sector 214, width 1024, rise 0, clear 64
+-5504 11584
+-4672 11584
+-4288 11584
+-4288 11264 # sector 213, width 1024, rise 0, clear 64
+-3968 10688 # sector 213, portal wall 1204 to 58
+-3968 10304 # sector 58, width 1024, rise 0, clear 64
+-3008 9792 # sector 58, portal wall 345 to 49
+-3008 9408 # sector 49, width 4992, rise 0, clear 96
+-1024 9216 # round the east end of bookshop counter14
+-1024 7680
+-1024 5760 # round counter15 along the same east aisle
+-3008 5568 # sector 237, portal wall 1433 to 53
+-3008 5184 # sector 53, width 4992, rise 0, clear 96
+-3072 4544 # sector 53, portal wall 304 to 54
+-3072 4160 # sector 54, width 1536, rise 0, clear 96
+-3072 4288 # sector 54, portal wall 313 to 57
+-3072 3904 # sector 57, width 1536, rise 0, clear 96
+-2056 3320 # sector 57, portal wall 330 to 55
+-1784 3592 # sector 55, width 1086, rise 0, clear 96
+-448 3456 # sector 55, portal wall 320 to 17
+-448 3456 face 0
+-448 3456 use # open embedded swingdoor155
+-448 3456 wait 52
+-64 3456 # sector 17, width 512, rise 0, clear 64
+-320 3456 # sector 17, portal wall 90 to 156
+64 3456 # sector 156, width 512, rise 0, clear 64
+960 1280 # sector 156, portal wall 868 to 19
+960 1280 face 0
+960 1280 use # single pulse after reaching approach coordinate
+960 1280 wait 52 # let door open before crossing
+1310 1280
+1360 1280 wait 1 # neutral tic carries momentum into transporter18 after completing this point
+-22016 25792 wait 26 # transporter destination 278
+-22016 25856 # sector 191, portal wall 1083 to 190
+-22016 25856 face 512
+-22016 25856 use # single pulse after reaching approach coordinate
+-22016 25856 wait 52 # let door open before crossing
+-22016 26240 # sector 190, width 512, rise 0, clear 0
+-22016 26304 # sector 285, width 512, rise 0, clear 0
+-21955 27722 # sector 285, portal wall 1825 to 284
+-22077 28086 # sector 284, width 1619, rise 0, clear 96
+-22592 26880 # sector 285, portal wall 1820 to 287
+-22976 26880 # sector 287, width 1536, rise 0, clear 96
+-24785 27334 # sector 287, portal wall 1836 to 281
+-24879 27706 # sector 281, width 3167, rise 0, clear 141
+-24832 33600 # sector 281, portal wall 1798 to 163
+-24832 33984 # sector 163, width 3072, rise 0, clear 141
+-23488 36864 jump
+-23040 36864 jump # clear64-wide deep gap158
+-22976 36864 # sector 160, portal wall 908 to 161
+-22592 36864 # sector 161, width 3072, rise 0, clear 88
+-21600 36864 # collect key palette 0; may be picked up from adjacent sector
+-21600 36864 wait 234 # lotag -2 exit countdown is208 tics

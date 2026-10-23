@@ -20,6 +20,7 @@ jobs:
           - { os: ubuntu-latest, version: '1.3D-sw' }
           - { os: ubuntu-latest, version: '1.1-sw' }
           - { os: ubuntu-latest, version: '1.0-sw' }
+          - { os: ubuntu-latest, version: '0.99-sw' }
 
     steps:
       - uses: actions/checkout@v4

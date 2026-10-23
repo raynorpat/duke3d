@@ -1,0 +1,461 @@
+# DEMOGOD
+# E1L3 normal skill; matching -demogod required (unprotected run died459).
+23802 50958 wait 26
+23802 50958 weapon 2
+23808 50368
+23808 49984
+24409 50207
+24743 50017
+25152 50752 jump
+25536 50752 jump #32-unit doorway256
+25792 50752 jump
+26624 50176
+25793 50176 face 1024
+25793 50176 use # switch320/tag54 opens initial SE20 door pair
+25793 50176 wait 78
+25792 50752
+25536 50752 jump
+25152 50752 crouch
+23744 48960
+23744 48960 face 1536
+23744 48960 fire 52
+23744 48448 jump
+23744 48320
+25792 46336
+26176 46336
+25920 46336
+26304 46336
+26880 46016 # sector 258, portal wall 1787 to 257
+26880 45632 # sector 257, width 1024, rise -8, clear 96
+26880 45504 # sector 257, portal wall 1777 to 243
+26880 45120 # sector 243, width 512, rise 0, clear 104
+26944 42368 # sector 243, portal wall 1685 to 244
+27328 42368 # sector 244, width 5888, rise 0, clear 120
+# sector sprite 151 sector 151 palette 0 tag 1
+27648 39616 # sector 244, portal wall 1693 to 246
+27648 39232 # sector 246, width 1024, rise 0, clear 88
+28480 37632 # sector 246, portal wall 1708 to 242
+28864 37632 # sector 242, width 2560, rise 0, clear 88
+28736 37632 # sector 242, portal wall 1682 to 41
+29120 37632 # sector 41, width 2560, rise 0, clear 112
+31040 37632 # sector 41, portal wall 253 to 40
+31424 37632 # sector 40, width 2560, rise 0, clear 112
+31296 37888 # sector 40, portal wall 249 to 274
+31680 37888 # sector 274, width 2048, rise 0, clear 104
+33088 37632 # sector 274, portal wall 1872 to 112
+33472 37632 # sector 112, width 2560, rise 0, clear 128
+33600 37632 # sector 112, portal wall 821 to 42
+33984 37632 # sector 42, width 2560, rise 0, clear 112
+33856 37632 # sector 42, portal wall 257 to 111
+34240 37632 # sector 111, width 2560, rise 0, clear 88
+34304 38720 # sector 111, portal wall 814 to 62
+34304 39008 # sector 62, width 512, rise 6, clear 54
+34016 38944 # sector 62, portal wall 347 to 472
+34016 39232 # sector 472, width 1088, rise -8, clear 47
+32706 40995 # sector 472, portal wall 3027 to 471
+33086 41053 # sector 471, width 1684, rise 0, clear 128
+34304 41792 # sector 471, portal wall 3007 to 66
+34304 42176 # sector 66, width 3072, rise -16, clear 128
+34208 43396 jump # sector 66, portal wall 477 to 63
+33952 43396 jump # sector 63, width 354, rise 56, clear 152
+33472 43456 # jump between circular platforms across water66
+35264 43392 jump # jump between circular platforms across water66
+35264 43392 # jump from platform64 onto guard-room ledge72
+36600 43584 jump # jump from platform64 onto guard-room ledge72
+36384 43584 # sector 72, portal wall 523 to 73
+36672 43584 # sector 73, width 1408, rise 0, clear 64
+36992 46336 # follow the outside of the U-shaped guard-room ledge
+35072 46336
+33984 45952 # collect blue key through low recess
+33984 45952 face 1024
+33984 45952 use # open key recess401
+33984 45952 wait 52
+# switch sprite 193 sector 240 palette 0 tag 67
+35072 46336
+35072 46336 face 0
+35072 46336 fire 78
+36992 46336
+36672 43584 # sector 73, portal wall 536 to 72
+36384 43584 # sector 72, width 1408, rise 0, clear 64
+36448 43520 # sector 72, portal wall 525 to 66
+36160 43520 # sector 66, width 1280, rise -144, clear 64
+34304 42176 # sector 66, portal wall 422 to 471
+34304 41792 # sector 471, width 3072, rise 16, clear 128
+33086 41053 # sector 471, portal wall 3001 to 472
+32706 40995 # sector 472, width 1684, rise 0, clear 128
+34016 39232 # sector 472, portal wall 3018 to 62
+34016 38944 # sector 62, width 1088, rise 8, clear 47
+34304 39008 # sector 62, portal wall 351 to 111
+34304 38720 # sector 111, width 512, rise -6, clear 54
+34624 37632 # sector 111, portal wall 812 to 241
+35008 37632 # sector 241, width 2560, rise 0, clear 88
+36928 37632 # sector 241, portal wall 1675 to 281
+37312 37632 # sector 281, width 2560, rise 0, clear 88
+38464 37632 # sector 281, portal wall 1902 to 239
+38848 37632 # sector 239, width 2560, rise 0, clear 128
+39936 36288 # sector 239, portal wall 1647 to 282
+39936 35904 # sector 282, width 2048, rise 0, clear 128
+39936 35264 # sector 282, portal wall 1907 to 240
+39936 34880 # sector 240, width 1536, rise 0, clear 96
+39553 34438 # face sprite 193
+39361 34438 # reach usable side before pulsing
+39361 34438 wait 26 # stop before aiming at the access control
+39333 34322 face 818
+39333 34322 use crouch
+39333 34322 wait 156
+39936 34304
+39936 34304 wait 26
+39936 34304 face 1536
+39936 34304 use # access193 unlocks swingdoor247; use opens it
+39936 34304 wait 52
+39936 32448 # sector 240, portal wall 1663 to 393
+39936 32064 # sector 393, width 2048, rise 0, clear 96
+39912 31551 # sector 393, portal wall 2563 to 394
+39960 31169 # sector 394, width 2064, rise 0, clear 128
+39960 29247 # sector 394, portal wall 2567 to 416
+39912 28865 # sector 416, width 2064, rise 0, clear 128
+39560 27528 # sector 416, portal wall 2717 to 55
+39288 27256 # sector 55, width 1448, rise 0, clear 128
+38280 26248 # sector 55, portal wall 318 to 56
+38008 25976 # sector 56, width 1448, rise 0, clear 220
+37256 25224 # sector 56, portal wall 322 to 58
+36984 24952 # sector 58, width 1448, rise 0, clear 192
+37000 24968 # sector 58, portal wall 332 to 57
+36728 24696 # sector 57, width 1448, rise 0, clear 184
+35976 23944 # sector 57, portal wall 328 to 54
+35704 23672 # sector 54, width 1448, rise 0, clear 156
+34952 22920 # sector 54, portal wall 314 to 286
+34680 22648 # sector 286, width 1448, rise 0, clear 128
+34108 22694 # sector 286, portal wall 1927 to 298
+33732 22618 # sector 298, width 1305, rise 0, clear 128
+34944 21120 # turn around sector298 entry concavity
+34944 21120 # go around inside corner of sector298
+35554 21565 # sector 298, portal wall 1995 to 199
+35934 21507 # sector 199, width 2136, rise 0, clear 128
+# key sprite 387 sector 113 palette 23 tag 0
+35934 21507 # sector 199, portal wall 1348 to 298
+35554 21565 # sector 298, width 2136, rise 0, clear 128
+33972 21954 # sector 298, portal wall 2000 to 46
+33612 21822 # sector 46, width 2996, rise 0, clear 128
+33599 22165 # sector 46, portal wall 279 to 409
+33217 22123 # sector 409, width 2318, rise 0, clear 128
+33024 22144 # sector 409, portal wall 2645 to 408
+32640 22144 # sector 408, width 2304, rise 0, clear 128
+31744 23104 # sector 408, portal wall 2641 to 302
+31744 23488 # sector 302, width 1792, rise 0, clear 112
+31744 24768 # sector 302, portal wall 2020 to 189
+31744 25152 # sector 189, width 1792, rise 0, clear 80
+32136 27096 # sector 189, portal wall 1298 to 113
+31864 27368 # sector 113, width 362, rise 0, clear 96
+31744 27648 # collect yellow key
+31744 27648 wait 26
+# switch sprite 405 sector 406 palette 23 tag 38
+31864 27368 # sector 113, portal wall 825 to 189
+32136 27096 # sector 189, width 362, rise 0, clear 96
+31744 25152 # sector 189, portal wall 1277 to 302
+31744 24768 # sector 302, width 1792, rise 0, clear 80
+31744 23488 # sector 302, portal wall 2018 to 408
+31744 23104 # sector 408, width 1792, rise 0, clear 112
+30848 22144 # sector 408, portal wall 2643 to 407
+30464 22144 # sector 407, width 2304, rise 0, clear 128
+30271 22123 # sector 407, portal wall 2637 to 45
+29889 22165 # sector 45, width 2318, rise 0, clear 128
+29876 21822 # sector 45, portal wall 274 to 299
+29516 21954 # sector 299, width 2996, rise 0, clear 128
+29756 22618 # sector 299, portal wall 2006 to 290
+29380 22694 # sector 290, width 1305, rise 0, clear 128
+28808 22648 # sector 290, portal wall 1943 to 50
+28536 22920 # sector 50, width 1448, rise 0, clear 128
+27784 23672 # sector 50, portal wall 294 to 51
+27512 23944 # sector 51, width 1448, rise 0, clear 156
+26760 24696 # sector 51, portal wall 298 to 53
+26488 24968 # sector 53, width 1448, rise 0, clear 184
+26504 24952 # sector 53, portal wall 308 to 52
+26232 25224 # sector 52, width 1448, rise 0, clear 192
+25480 25976 # sector 52, portal wall 304 to 49
+25208 26248 # sector 49, width 1448, rise 0, clear 220
+24200 27256 # sector 49, portal wall 290 to 404
+23928 27528 # sector 404, width 1448, rise 0, clear 128
+23576 28865 # sector 404, portal wall 2624 to 396
+23528 29247 # sector 396, width 2064, rise 0, clear 128
+24384 30208 # sector 396, portal wall 2579 to 5
+24512 30208 # sector 5, portal wall 25 to 8
+24512 30208 face 0
+24520 30340 use # single pulse after reaching approach coordinate
+24520 30340 wait 52 # let door open before crossing
+24896 30208 # sector 8, width 1024, rise 32, clear 0
+24768 30208 # sector 8, portal wall 43 to 6
+25152 30208 # sector 6, width 1024, rise -32, clear 0
+24896 30208 # sector 6, portal wall 34 to 413
+25280 30208 # sector 413, width 2048, rise 0, clear 64
+31744 28352 # sector 413, portal wall 2681 to 410
+31744 27968 # sector 410, width 1536, rise 0, clear 104
+31744 28320 # sector 410, portal wall 2650 to 411
+31744 27936 # sector 411, width 1536, rise 0, clear 104
+31744 27328 # sector 411, portal wall 2659 to 438
+31744 26944 # sector 438, width 2048, rise -64, clear 104
+31744 24768 # sector 438, portal wall 2811 to 406
+31744 24384 # sector 406, width 2048, rise 0, clear 64
+32384 23808 # face sprite 405
+32576 23808 # reach usable side before pulsing
+32576 23808 use # switch; stand192 away from wall sprite
+32576 23808 wait 78 # allow access animation/door motion
+# key sprite 3 sector 340 palette 21 tag 0
+31744 23744
+31744 23744 face 1536
+31744 23744 use # yellow38 unlocks door15; use opens it
+31744 23744 wait 52
+31744 22848
+32700 22144
+33400 22144
+33888 21440 wait 26 # RPG14 in unlocked lower barracks
+33888 22144
+32700 22144 jump
+31744 22848
+31744 21440
+31744 21440 face 1536
+31744 21440 use # open unlocked door21
+31744 21440 wait 52
+31744 20544
+31744 18624 # sector 291, portal wall 1948 to 340
+31744 18240 # sector 340, width 5120, rise 0, clear 204
+26000 17664 # remain in outdoor340 north of the inner complex
+22016 19456
+19200 23552
+19200 26368 # collect red key
+19200 26368 wait 26
+# switch sprite 266 sector 414 palette 21 tag 60
+19200 23552
+22016 19456
+26000 17664
+31744 18240 # sector 340, portal wall 2190 to 291
+31744 18624 # sector 291, width 5120, rise 0, clear 204
+31744 20544
+31744 20544 face 512
+31744 20544 use
+31744 20544 wait 52
+31744 21440
+31744 22848
+31744 22848 face 512
+31744 22848 use
+31744 22848 wait 52
+31744 23744
+31744 24384 # sector 406, portal wall 2630 to 438
+31744 24768 # sector 438, width 2048, rise 0, clear 64
+34112 25856 # sector 438, portal wall 2816 to 391
+34496 25856 # sector 391, width 1536, rise 0, clear 220
+35704 25976 # sector 391, portal wall 2543 to 48
+35976 26248 # sector 48, width 1448, rise 0, clear 384
+37752 28024 # sector 48, portal wall 288 to 413
+38024 28296 # sector 413, width 1448, rise 0, clear 320
+38144 30000 # stay on upper floor beyond ramp
+34000 30000
+30600 30000
+28400 31000
+26129 31634 # sector 413, portal wall 2668 to 414
+25967 31982 # sector 414, width 2119, rise 0, clear 64
+26432 31872 # face sprite 266
+26432 32064 # reach usable side before pulsing
+26432 32064 wait 26
+26432 32064 face 512
+26432 32064 use # switch; stand192 away from wall sprite
+26432 32064 wait 78 # allow access animation/door motion
+# switch sprite 675 sector 234 palette 0 tag 45
+25600 32192 # sector 414, portal wall 2702 to 306
+25600 32192 use # single pulse after reaching approach coordinate
+25600 32192 wait 52 # let door open before crossing
+25600 32576 # sector 306, width 1024, rise 0, clear 0
+25600 32448 # sector 306, portal wall 2034 to 305
+25600 32832 # sector 305, width 1024, rise 0, clear 0
+25600 32576 # sector 305, portal wall 2032 to 237
+25600 32960 # sector 237, width 1024, rise 0, clear 64
+26176 33536 # sector 237, portal wall 1630 to 238
+26560 33536 # sector 238, width 1536, rise 0, clear 96
+28992 33408 # sector 238, portal wall 1635 to 236
+28800 34176
+28800 34176 face 0
+28800 34176 use
+28800 34176 wait 156
+29376 33408 # sector 236, width 1280, rise 0, clear 144
+29600 34176
+29600 34176 face 1024
+29600 34176 use
+31744 33280 wait 156
+31744 35780
+30900 35700
+30600 35700 # cross to southwest control room below raised ring
+30008 35400 # sector 234, width 1629, rise 0, clear 112
+28545 35648 # face sprite 675
+28353 35648 # reach usable side before pulsing
+28353 35648 use # switch; stand192 away from wall sprite
+28353 35648 wait 78 # allow access animation/door motion
+28288 35000 wait 26 # collect pipebombs for the sewer cracks
+# sector sprite 199 sector 199 palette 0 tag 0
+30008 35400 # sector 234, portal wall 1576 to 236
+30600 35700
+31744 35780
+31744 35780 weapon 4
+31744 35780 face 1536
+31744 35780 fire 260
+32780 34600
+33000 33280
+32780 32000
+31744 31500 # bypass raised central desk
+31744 30912 # sector 236, portal wall 1603 to 300
+31744 30528 # sector 300, width 1536, rise 8, clear 80
+31744 30656 # sector 300, portal wall 2010 to 413
+31744 30272 # sector 413, width 1536, rise -104, clear 80
+38208 30208 # sector 413, portal wall 2692 to 0
+38300 30208 wait 26
+38300 30208 face 0
+38300 30208 use
+38300 30208 wait 52
+38720 30208 # sector 3, width 1024, rise 32, clear 0
+38592 30208 # sector 3, portal wall 19 to 1
+38976 30208 # sector 1, width 1024, rise -32, clear 0
+38720 30208 # sector 1, portal wall 10 to 394
+39104 30208 # sector 394, width 2048, rise 0, clear 64
+39960 29247 # sector 394, portal wall 2567 to 416
+39912 28865 # sector 416, width 2064, rise 0, clear 128
+39560 27528 # sector 416, portal wall 2717 to 55
+39288 27256 # sector 55, width 1448, rise 0, clear 128
+38280 26248 # sector 55, portal wall 318 to 56
+38008 25976 # sector 56, width 1448, rise 0, clear 220
+37256 25224 # sector 56, portal wall 322 to 58
+36984 24952 # sector 58, width 1448, rise 0, clear 192
+37000 24968 # sector 58, portal wall 332 to 57
+36728 24696 # sector 57, width 1448, rise 0, clear 184
+35976 23944 # sector 57, portal wall 328 to 54
+35704 23672 # sector 54, width 1448, rise 0, clear 156
+34952 22920 # sector 54, portal wall 314 to 286
+34680 22648 # sector 286, width 1448, rise 0, clear 128
+34108 22694 # sector 286, portal wall 1927 to 298
+33732 22618 # sector 298, width 1305, rise 0, clear 128
+34944 21120 # go around inside corner of sector298
+35554 21565 # sector 298, portal wall 1995 to 199
+35934 21507 # sector 199, width 2136, rise 0, clear 128
+36091 21733
+36080 22280 wait 26
+36080 22280 face 500
+36080 22280 use
+36080 22280 wait 26
+36080 22280 use
+36080 22280 wait 26
+36080 22280 use
+36080 22280 wait 78
+36472 21944 # sector 199, portal wall 1351 to 231
+36744 22216 # sector 231, width 1177, rise 0, clear 128
+36568 22040 # sector 231, portal wall 1567 to 283
+36840 22312 # sector 283, width 1177, rise 0, clear 80
+36536 22200 fire # sector 283, portal wall 1910 to 285
+36808 22472 fire # sector 285, width 1448, rise 0, clear 80
+36600 22264 # sector 285, portal wall 1920 to 284
+36872 22536 # sector 284, width 1448, rise 0, clear 80
+37322 22952 # sector 284, portal wall 1918 to 204
+37558 23256 # sector 204, width 1459, rise 0, clear 80
+37800 23498 # sector 204, portal wall 1377 to 202
+38104 23734 # sector 202, width 1459, rise 0, clear 80
+38602 24232 # sector 202, portal wall 1369 to 203
+38838 24536 # sector 203, width 1459, rise 0, clear 80
+39080 24778 # sector 203, portal wall 1373 to 201
+39384 25014 # sector 201, width 1459, rise 0, clear 80
+39754 25384 # sector 201, portal wall 1363 to 200
+39990 25688 # sector 200, width 1459, rise 0, clear 80
+40504 25416 # sector 200, portal wall 1356 to 206
+40536 25384 # sector 206, portal wall 1382 to 423
+40536 25384 use # single pulse after reaching approach coordinate
+40536 25384 wait 52 # let door open before crossing
+40808 25112 # sector 423, width 543, rise 0, clear 0
+40600 25320 # sector 423, portal wall 2744 to 422
+40872 25048 # sector 422, width 543, rise 0, clear 0
+40632 25288 # sector 422, portal wall 2742 to 31
+40904 25016 # sector 31, width 543, rise 0, clear 64
+42312 26424 # sector 31, portal wall 184 to 59
+42040 26696 # sector 59, width 543, rise 12, clear 40
+42184 26552 # sector 59, portal wall 335 to 318
+41912 26824 # sector 318, width 543, rise -4, clear 40
+41830 27396 # sector 318, portal wall 2086 to 319
+41754 27772 # sector 319, width 653, rise -7, clear 58
+42051 28234 # sector 319, portal wall 2091 to 320
+42173 28598 # sector 320, width 810, rise -8, clear 74
+42961 28658 # sector 320, portal wall 2095 to 322
+43311 28814 # sector 322, width 1261, rise -16, clear 93
+44714 27628 # sector 322, portal wall 2103 to 321
+44886 27284 # sector 321, width 859, rise -13, clear 111
+44800 26600 wait 26
+44800 26600 weapon 5
+44800 26600 face 1480
+44800 26600 fire 52
+44800 26600 wait 78
+44704 25597 # sector 321, portal wall 2099 to 325
+44640 25219 # sector 325, width 779, rise 10, clear 83
+44576 24829 # sector 325, portal wall 2117 to 328
+44512 24451 # sector 328, width 779, rise -3, clear 83
+45368 23112 # sector 328, portal wall 2132 to 334
+45368 23112 wait 26
+45368 23112 face 1792
+45368 23112 fire 52
+45368 23112 wait 78
+45640 22840 crouch # sector 334, width 905, rise 13, clear 46
+45496 22984 crouch # sector 334, portal wall 2158 to 333
+# LOW CLEARANCE: crouch support or alternate traversal required here
+45768 22712 crouch # sector 333, width 905, rise 1, clear 32
+45752 22728 crouch # sector 333, portal wall 2155 to 330
+# LOW CLEARANCE: crouch support or alternate traversal required here
+46024 22456 crouch # sector 330, width 905, rise 0, clear 32
+36168 12488 crouch # sector 330, portal wall 2144 to 494
+# LOW CLEARANCE: crouch support or alternate traversal required here
+35896 12216 crouch # sector 494, width 543, rise 0, clear 32
+36016 10624 crouch # sector 494, portal wall 3143 to 493
+# LOW CLEARANCE: crouch support or alternate traversal required here
+36016 10240 crouch # sector 493, width 736, rise 0, clear 32
+36032 9920 crouch # sector 493, portal wall 3139 to 338
+# LOW CLEARANCE: crouch support or alternate traversal required here
+36032 9536 crouch # sector 338, width 896, rise -40, clear 32
+35907 6260 # sector 338, portal wall 2175 to 151
+35773 5900 # sector 151, width 1094, rise -4, clear 404
+1536 3584 crouch # transporter destination 551
+5632 5312 # sector 170, portal wall 1149 to 161
+5632 4928 # sector 161, width 7168, rise 0, clear 176
+5696 5056 # sector 161, portal wall 1093 to 163
+5696 4672 # sector 163, width 7040, rise 0, clear 160
+5760 4544 # sector 163, portal wall 1101 to 153
+5760 4160 # sector 153, width 6912, rise 0, clear 144
+6720 3584 # sector 153, portal wall 1047 to 154
+6336 3584 # sector 154, width 512, rise 0, clear 144
+6000 3330
+5000 3330
+4096 3584 # transporter 380 tag 51 sector 154 to 172
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+4096 3584 jump
+-15360 3584 jump # surface transporter destination 381
+-14464 3264 # sector 172, portal wall 1170 to 182
+-14464 2880 # sector 182, width 2560, rise 8, clear 160
+-16000 3000
+-16000 4100
+-16900 4100
+-16960 3584 # sector 182, portal wall 1237 to 175
+-17344 3584 # sector 175, width 1536, rise 12, clear 148
+-17472 3584 wait 26
+-17472 3584 face 1024
+-17472 3584 fire 52
+-17503 3575 crouch
+-17503 3575 face 1024
+-17503 3575 use crouch
+-17503 3575 wait 208

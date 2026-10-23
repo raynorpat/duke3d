@@ -203,6 +203,125 @@ static int displaymode_setter(int argc, char **argv)
 }
 
 /*
+ * A game mode's sizes (the VIDEO page's RESOLUTION and DISPLAY): windowed,
+ *  a window the size asked for, drawn at that size up to 1600x1200 with the
+ *  aspect kept (width a multiple of 4), small modes in a bigger window;
+ *  borderless, drawn at the desktop's size (the dummy display is 1024x768);
+ *  exclusive, drawn at the size asked for. setvideodisplaymodenext takes
+ *  effect at the next mode set. A mode set at the same size leaves a moved
+ *  window where it is.
+ */
+#if !PLATFORM_WIN32
+static int smoke_mode(int mode, int w, int h, int wantmode, int xd, int yd, int ww, int wh)
+{
+    int gotw, goth;
+
+    if (mode >= 0)
+        setvideodisplaymodenext(mode);
+    if (_setgamemode(1, w, h) != 0)
+    {
+        fprintf(stderr, "FAIL: _setgamemode(%dx%d)\n", w, h);
+        return 0;
+    }
+    SDL_GetWindowSize(smoke_window(), &gotw, &goth);
+    if ((getvideodisplaymode() != wantmode) || (xdim != xd) || (ydim != yd) ||
+        ((ww > 0) && ((gotw != ww) || (goth != wh))))
+    {
+        fprintf(stderr, "FAIL: %dx%d in mode %d: mode %d, drawn at %ldx%ld, window %dx%d; "
+                        "want mode %d, %dx%d, window %dx%d\n", w, h, mode, getvideodisplaymode(),
+                (long) xdim, (long) ydim, gotw, goth, wantmode, xd, yd, ww, wh);
+        return 0;
+    }
+    memset((void *) frameplace, 7, xdim * ydim);
+    _nextpage();
+    printf("%dx%d, mode %d: drawn at %ldx%ld, window %dx%d\n", w, h, wantmode,
+           (long) xdim, (long) ydim, gotw, goth);
+    return 1;
+}
+
+/* The window is centred on the dummy display (1024x768). */
+static int smoke_centred(int w, int h)
+{
+    int x, y;
+
+    SDL_GetWindowPosition(smoke_window(), &x, &y);
+    if ((x != (1024 - w) / 2) || (y != (768 - h) / 2))
+    {
+        fprintf(stderr, "FAIL: a %dx%d window at %d,%d, not centred\n", w, h, x, y);
+        return 0;
+    }
+    printf("%dx%d window centred at %d,%d\n", w, h, x, y);
+    return 1;
+}
+#endif
+
+static int mode_sizes(int argc, char **argv)
+{
+#if !PLATFORM_WIN32
+    int x, y;
+
+    unsetenv(BUILD_WINDOWED);
+    setvideodisplaymode(DISPLAY_WINDOWED);
+    setvideodrawfit(1);  /* the game's rule */
+    _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
+    if (!smoke_mode(-1, 640, 480, DISPLAY_WINDOWED, 640, 480, 640, 480)) return 1;
+
+    SDL_SetWindowPosition(smoke_window(), 50, 60);
+    if (!smoke_mode(-1, 640, 480, DISPLAY_WINDOWED, 640, 480, 640, 480)) return 1;
+    SDL_GetWindowPosition(smoke_window(), &x, &y);
+    if ((x != 50) || (y != 60))
+    {
+        fprintf(stderr, "FAIL: a mode set at the same size moved the window to %d,%d\n", x, y);
+        return 1;
+    }
+    printf("a mode set at the same size kept the window at %d,%d\n", x, y);
+
+    if (!smoke_mode(-1, 2560, 1440, DISPLAY_WINDOWED, 1600, 900, 2560, 1440)) return 1;
+    if (!smoke_mode(-1, 1200, 1600, DISPLAY_WINDOWED, 900, 1200, 1200, 1600)) return 1;
+    if (!smoke_mode(-1, 1366, 768, DISPLAY_WINDOWED, 1366, 768, 1366, 768)) return 1;
+    if (!smoke_mode(-1, 320, 200, DISPLAY_WINDOWED, 320, 200, 640, 400)) return 1;
+
+    setvideodisplaymodenext(DISPLAY_BORDERLESS);
+    if (getvideodisplaymode() != DISPLAY_WINDOWED)
+    {
+        fprintf(stderr, "FAIL: setvideodisplaymodenext changed the window before the mode set\n");
+        return 1;
+    }
+    if (!smoke_mode(DISPLAY_BORDERLESS, 640, 480, DISPLAY_BORDERLESS, 1024, 768, 0, 0)) return 1;
+    if (smoke_fsflags() != SDL_WINDOW_FULLSCREEN_DESKTOP)
+        { fprintf(stderr, "FAIL: borderless flags 0x%x\n", (unsigned) smoke_fsflags()); return 1; }
+    if (!smoke_mode(DISPLAY_EXCLUSIVE, 800, 600, DISPLAY_EXCLUSIVE, 800, 600, 0, 0)) return 1;
+    if (!SMOKE_EXCLUSIVE())
+        { fprintf(stderr, "FAIL: exclusive flags 0x%x\n", (unsigned) smoke_fsflags()); return 1; }
+    if (!smoke_mode(DISPLAY_WINDOWED, 1024, 768, DISPLAY_WINDOWED, 1024, 768, 1024, 768)) return 1;
+    if (smoke_fsflags() != 0)
+        { fprintf(stderr, "FAIL: windowed flags 0x%x\n", (unsigned) smoke_fsflags()); return 1; }
+
+    /* A size set while full screen: the window is centred when windowed again. */
+    if (!smoke_mode(DISPLAY_WINDOWED, 320, 200, DISPLAY_WINDOWED, 320, 200, 640, 400)) return 1;
+    if (!smoke_mode(DISPLAY_EXCLUSIVE, 800, 600, DISPLAY_EXCLUSIVE, 800, 600, 0, 0)) return 1;
+    if (!smoke_mode(DISPLAY_WINDOWED, 800, 600, DISPLAY_WINDOWED, 800, 600, 800, 600)) return 1;
+    if (!smoke_centred(800, 600)) return 1;
+    if (!smoke_mode(DISPLAY_WINDOWED, 640, 480, DISPLAY_WINDOWED, 640, 480, 640, 480)) return 1;
+    if (!smoke_mode(DISPLAY_BORDERLESS, 1000, 700, DISPLAY_BORDERLESS, 1024, 768, 0, 0)) return 1;
+    if (!smoke_mode(DISPLAY_WINDOWED, 1000, 700, DISPLAY_WINDOWED, 1000, 700, 1000, 700)) return 1;
+    if (!smoke_centred(1000, 700)) return 1;
+
+    /* The editor's rule: over 1600x1200 clamped to it. */
+    setvideodrawfit(0);
+    if (!smoke_mode(-1, 1920, 1080, DISPLAY_WINDOWED, 1600, 1200, 1920, 1080)) return 1;
+    setvideodrawfit(1);
+
+    setenv(BUILD_WINDOWED, "1", 1);
+    if (!smoke_mode(DISPLAY_EXCLUSIVE, 800, 600, DISPLAY_WINDOWED, 800, 600, 800, 600)) return 1;
+
+    _uninitengine();
+#endif
+    printf("PASS: mode_sizes\n");
+    return 0;
+}
+
+/*
  * Outside renderer 3, setpalettefade blends the last setbrightness palette
  *  toward a colour exactly as the game's palto does, then applies the
  *  brightness table.
@@ -444,6 +563,109 @@ static int screencapture_formats(int argc, char **argv)
     return 0;
 }
 
+/* A frame shown with the fade timeline ms_a to ms_b (from t0) ago: its
+ *  darkness is between videofade_at at either end (out: a, b capped at the
+ *  hold), 1 if so. */
+static int fade_shown_between(Uint32 t0, int held, const char *what)
+{
+    Uint32 a = SDL_GetTicks() - t0, b;
+    int d, lo, hi;
+
+    _nextpage();
+    b = SDL_GetTicks() - t0;
+    d = getvideofade();
+    if (held) { a = (a > VIDEOFADE_MS) ? VIDEOFADE_MS : a; b = (b > VIDEOFADE_MS) ? VIDEOFADE_MS : b; }
+    lo = videofade_at(a); hi = videofade_at(b);
+    if (lo > hi) { int t = lo; lo = hi; hi = t; }
+    if ((d < lo) || (d > hi))
+    {
+        fprintf(stderr, "FAIL: %s: darkness %d %u-%u ms in, not %d-%d\n", what, d, (unsigned) a, (unsigned) b, lo, hi);
+        return 0;
+    }
+    return 1;
+}
+
+/*
+ * The VIDEO page's fade around a change: videofade_at (the darkness by ms
+ *  into it, 0 none to 256 black: out over VIDEOFADE_MS, then in), and the
+ *  driver's run of it in real time over the frames shown: held black until
+ *  setvideofadein, back from where it got to when asked out again mid-way,
+ *  and done after.
+ */
+static int video_fade(int argc, char **argv)
+{
+    static const struct { uint32_t ms; int want; } at[] = {
+        { 0, 0 }, { 125, 128 }, { 250, 256 }, { 375, 128 }, { 500, 0 }, { 5000, 0 }
+    };
+    Uint32 t0;
+    int i, d;
+
+    for (i = 0; i < (int) (sizeof (at) / sizeof (at[0])); i++)
+        if (videofade_at(at[i].ms) != at[i].want)
+            { fprintf(stderr, "FAIL: videofade_at(%u) %d, not %d\n", (unsigned) at[i].ms, videofade_at(at[i].ms), at[i].want); return 1; }
+    for (i = 1; i <= 2 * VIDEOFADE_MS; i++)
+        if ((i <= VIDEOFADE_MS) ? (videofade_at(i) < videofade_at(i - 1)) : (videofade_at(i) > videofade_at(i - 1)))
+            { fprintf(stderr, "FAIL: videofade_at isn't out then in at %d ms\n", i); return 1; }
+
+    _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
+    if (_setgamemode(1, 320, 200) != 0) { fprintf(stderr, "FAIL: _setgamemode(320x200)\n"); return 1; }
+    memset((void *) frameplace, 31, xdim * ydim);
+    _nextpage();
+    if ((getvideofade() != 0) || (videofading())) { fprintf(stderr, "FAIL: a fade before one was asked for\n"); return 1; }
+
+    setvideofadeout();
+    t0 = SDL_GetTicks();
+    while (SDL_GetTicks() - t0 < 2 * VIDEOFADE_MS)  /* out, then held */
+    {
+        if (!fade_shown_between(t0, 1, "out")) return 1;
+        SDL_Delay(5);
+    }
+    if ((getvideofade() != 256) || (!videofading())) { fprintf(stderr, "FAIL: not held black\n"); return 1; }
+    setvideofadeout();  /* asked again while black: stays */
+    _nextpage();
+    if (getvideofade() != 256) { fprintf(stderr, "FAIL: a second change undid the black\n"); return 1; }
+
+    t0 = SDL_GetTicks() - VIDEOFADE_MS;
+    setvideofadein();
+    while (SDL_GetTicks() - t0 < VIDEOFADE_MS + VIDEOFADE_MS / 2)  /* half way in */
+    {
+        if (!fade_shown_between(t0, 0, "in")) return 1;
+        SDL_Delay(5);
+    }
+    d = getvideofade();
+    setvideofadeout();  /* turned back from about half way */
+    _nextpage();
+    if (abs(getvideofade() - d) > 64)  /* some ms on, not from 0 or 256 */
+        { fprintf(stderr, "FAIL: turned back from %d to %d, not from where it was\n", d, getvideofade()); return 1; }
+    printf("turned back at darkness %d: %d\n", d, getvideofade());
+    for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < VIDEOFADE_MS; SDL_Delay(5))
+        _nextpage();
+    if (getvideofade() != 256) { fprintf(stderr, "FAIL: not black again: %d\n", getvideofade()); return 1; }
+
+    setvideofadein();
+    for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < VIDEOFADE_MS + 20; SDL_Delay(5))
+        _nextpage();
+    if ((getvideofade() != 0) || (videofading())) { fprintf(stderr, "FAIL: not done: %d\n", getvideofade()); return 1; }
+    setvideofadein();  /* with none under way: nothing */
+    _nextpage();
+    if ((getvideofade() != 0) || (videofading())) { fprintf(stderr, "FAIL: a fade-in with none under way\n"); return 1; }
+
+    /* No setvideofadein (frames shown by a loop that doesn't make the
+     *  change): black held 2 * VIDEOFADE_MS, then faded in by itself. */
+    setvideofadeout();
+    for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < 3 * VIDEOFADE_MS - 20; SDL_Delay(5))
+        _nextpage();
+    if (getvideofade() != 256) { fprintf(stderr, "FAIL: not held black: %d\n", getvideofade()); return 1; }
+    for (t0 = SDL_GetTicks(); SDL_GetTicks() - t0 < VIDEOFADE_MS + 60; SDL_Delay(5))
+        _nextpage();
+    printf("held black with no fade-in: %d after %d ms\n", getvideofade(), 4 * VIDEOFADE_MS + 40);
+    if ((getvideofade() != 0) || (videofading())) { fprintf(stderr, "FAIL: black held with no end\n"); return 1; }
+
+    _uninitengine();
+    printf("PASS: video_fade\n");
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     char pal[256 * 4];
@@ -455,10 +677,14 @@ int main(int argc, char **argv)
         return gl_fallback(argc, argv);
     if ((argc > 1) && (strcmp(argv[1], "displaymode_setter") == 0))
         return displaymode_setter(argc, argv);
+    if ((argc > 1) && (strcmp(argv[1], "mode_sizes") == 0))
+        return mode_sizes(argc, argv);
     if ((argc > 1) && (strcmp(argv[1], "palette_fade") == 0))
         return palette_fade(argc, argv);
     if ((argc > 1) && (strcmp(argv[1], "screencapture_formats") == 0))
         return screencapture_formats(argc, argv);
+    if ((argc > 1) && (strcmp(argv[1], "video_fade") == 0))
+        return video_fade(argc, argv);
 
     _platform_init(argc, argv, "sdl_driver_smoke", "smoke");
     if (_setgamemode(1, 320, 200) != 0)

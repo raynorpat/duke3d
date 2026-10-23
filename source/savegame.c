@@ -82,15 +82,26 @@ int32_t sg_sprite(unsigned char *b, void *rec, int write)
  * 1.1-only fields sit between ours. on_sector_effector, no_autoaim and
  * select_dir aren't carried: written as zeros, ignored on reading.
  * The 1.0 one ("player_struct (1.0)") is the same size: it has a byte at
- * 0x322 and a per-player auto_run, and no no_autoaim or aim_mode.
+ * 0x322 and a per-player auto_run, and no no_autoaim or aim_mode. The beta
+ * has 0x33f bytes (docs/v099/notes/0.99-player.md): the byte group precedes
+ * inventory shorts, several later fields are absent, and display flags
+ * are per-player. Only the active player's redraw/help fields map to the
+ * native globals; on_sector_effector is carried as a per-player byte.
  */
 int32_t sg_player(unsigned char *b, void *rec, int write)
 {
     struct player_struct *p = (struct player_struct *)rec;
     int32_t o = 0, k;
+#if DUKE3D_GAMEVER < GAMEVER_10
+    int32_t display;
+#endif
 
     if (!write)
     {
+#if DUKE3D_GAMEVER < GAMEVER_10
+        memset(p,0,sizeof(*p));
+        p->wackedbyactor = p->scream_voice = -1;
+#endif
         p->bobposx = p->bobposy = 0;
         p->subweapon = 0; p->wantweaponfire = 0;
         p->weapreccnt = 0;
@@ -103,16 +114,24 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
     F32(p->posx); F32(p->posy); F32(p->posz); F32(p->horiz); F32(p->ohoriz);
     F32(p->ohorizoff); F32(p->invdisptime);
     F32(p->oposx); F32(p->oposy); F32(p->oposz);
-    F32(p->pyoff); F32(p->opyoff);
+    F32(p->pyoff);
+#if DUKE3D_GAMEVER >= GAMEVER_10
+    F32(p->opyoff);
+#endif
     F32(p->posxv); F32(p->posyv); F32(p->poszv); F32(p->last_pissed_time);
+#if DUKE3D_GAMEVER >= GAMEVER_10
     F32(p->truefz); F32(p->truecz);
+#endif
     F32(p->player_par); F32(p->visibility);
     F32(p->bobcounter); F32(p->weapon_sway);
     F32(p->pals_time); F32(p->burn_time); F32(p->randomflamex); F32(p->crack_time);
 
     F16(p->ang); F16(p->oang); F16(p->angvel); F16(p->cursectnum); F16(p->look_ang);
     F16(p->last_extra);
-    A16(p->ammo_amount,10); F16(p->wackedbyactor);
+    A16(p->ammo_amount,10);
+#if DUKE3D_GAMEVER >= GAMEVER_10
+    F16(p->wackedbyactor);
+#endif
     F16(p->curr_weapon); F16(p->last_weapon); F16(p->tipincs); F16(p->horizoff);
     F16(p->holoduke_amount); F16(p->newowner); F16(p->hurt_delay); F16(p->hbomb_hold_delay);
     F16(p->jumping_counter); F16(p->airleft); F16(p->knee_incs); F16(p->access_incs);
@@ -124,6 +143,7 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
     F16(p->one_eighty_count); F16(p->cheat_phase);
     F16(p->dummyplayersprite); F16(p->extra_extra8); F16(p->quick_kick);
     F16(p->heat_amount); F16(p->actorsqu); F16(p->timebeforeexit); F16(p->customexitsound);
+#if DUKE3D_GAMEVER >= GAMEVER_10
     F16(p->rotscrnang); F16(p->dead_flag); F16(p->show_empty_weapon);
     F16(p->scuba_amount); F16(p->jetpack_amount); F16(p->steroids_amount); F16(p->shield_amount);
     F16(p->spacesuit_amount);
@@ -132,10 +152,15 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
 
     F32(p->scream_voice);
 
+#endif
     F8(p->gm); F8(p->on_warping_sector); F8(p->footprintcount);
     F8(p->hbomb_on); F8(p->jumping_toggle);
+#if DUKE3D_GAMEVER < GAMEVER_10
+    F8(p->on_sector_effector);
+#else
     if (write) b[o] = 0;    /* on_sector_effector */
     o++;
+#endif
     F8(p->rapid_fire_hold); F8(p->on_ground);
     A8(p->name,13); F8(p->inven_icon);
 #if DUKE3D_GAMEVER < GAMEVER_11
@@ -149,7 +174,10 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
 #endif
     F8(p->spacesuit_on); F8(p->scuba_on); F8(p->spacesuit_used);
     F8(p->footprintpal); F8(p->heat_on);
-    F8(p->holster_weapon); F8(p->falling_counter); F8(p->frag_ps);
+    F8(p->holster_weapon);
+#if DUKE3D_GAMEVER >= GAMEVER_10
+    F8(p->falling_counter); F8(p->frag_ps);
+#endif
 #if DUKE3D_GAMEVER >= GAMEVER_11
     F8(p->aim_mode);
 #endif
@@ -157,11 +185,27 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
     /* palette: a 32-bit DOS pointer. Written as zeros, never read back. */
     if (write) b[o] = b[o+1] = b[o+2] = b[o+3] = 0;
     o += 4;
+#if DUKE3D_GAMEVER < GAMEVER_10
+    F16(p->rotscrnang); F16(p->dead_flag); F16(p->show_empty_weapon);
+    F16(p->scuba_amount); F16(p->jetpack_amount); F16(p->steroids_amount); F16(p->shield_amount);
+    F16(p->spacesuit_amount);
+    F16(p->holoduke_on); F16(p->pycount); F16(p->weapon_pos);
+    display = p == &ps[myconnectindex] ? pus : 1; F16(display);
+    if (!write && p == &ps[myconnectindex]) pus = display;
+    display = p == &ps[myconnectindex] ? pub : 1; F16(display);
+    if (!write && p == &ps[myconnectindex]) pub = display;
+    F16(p->transporter_hold); F16(p->last_full_weapon); F16(p->footprintshade); F16(p->boot_amount);
+
+#endif
     F8(p->toggle_key_flag); F8(p->knuckle_incs);
     if (write) b[o] = 0;    /* select_dir */
     o++;
     F8(p->walking_snd_toggle); F8(p->interface_toggle_flag); F8(p->palookup); F8(p->hard_landing);
     F8(p->max_secret_rooms); F8(p->secret_rooms); A8(p->pals,3);
+#if DUKE3D_GAMEVER < GAMEVER_10
+    display = p == &ps[myconnectindex] ? ud.show_help : 0; F8(display);
+    if (!write && p == &ps[myconnectindex]) ud.show_help = display;
+#endif
     F8(p->max_actors_killed); F8(p->actors_killed);
 #if DUKE3D_GAMEVER < GAMEVER_11
     F8(p->auto_run);
@@ -409,20 +453,18 @@ int32_t sg_dfblocks(int32_t dasizeof, int32_t count)
     return n;
 }
 
-#if DUKE3D_GAMEVER < GAMEVER_11
 #define SG_LZWBLOCK (SG_LZWSIZE+(SG_LZWSIZE>>4))   /* the most a block may hold */
 
-const int32_t sg_scriptslots10[3] = { 1, 4, 5 };
-
-/* One 1.0 dfwrite call: each block must be there, inside the file, with the
+/* One DOS dfwrite call: each block must be there, inside the file, with the
    uncompressed size dfwrite gave it. With buf, the call is also decoded into
    buf. Leaves fil past the call. Returns 0 if it doesn't fit. */
-static int32_t sg_call10(int32_t fil, int32_t dasizeof, int32_t count, void *buf)
+static int32_t sg_call(int32_t fil, int32_t dasizeof, int32_t count, void *buf)
 {
     int32_t start = klseek(fil,0,SEEK_CUR), size = dasizeof, n = count, i, k = 0, end = start;
     short leng, uncompleng;
 
     if (size > SG_LZWSIZE) { n *= size; size = 1; }
+    if (n == 0) n = 1; /* dfwrite still emits its first element for count 0. */
     for (i = 0; i < n; i++)
     {
         k += size;
@@ -442,14 +484,151 @@ static int32_t sg_call10(int32_t fil, int32_t dasizeof, int32_t count, void *buf
     return 1;
 }
 
-static int32_t sg_calls10(int32_t fil, const int32_t (*calls)[2], int32_t n)
+static int32_t sg_calls(int32_t fil, const int32_t (*calls)[2], int32_t n)
 {
     int32_t i;
 
     for (i = 0; i < n; i++)
-        if (!sg_call10(fil,calls[i][0],calls[i][1],NULL)) return 0;
+        if (!sg_call(fil,calls[i][0],calls[i][1],NULL)) return 0;
     return 1;
 }
+
+/* A set script pointer flag proves DOS provenance. With no flags, accept
+   a wall offset only when the possible native/DOS interpretations agree. */
+int32_t sg_walloffset(int32_t offset, int64_t nativebase, int32_t dos)
+{
+    int64_t n = (int64_t)offset-nativebase, d = -1;
+    int32_t nv, dv;
+
+#if DUKE3D_GAMEVER < GAMEVER_14
+    d = (int64_t)offset+0x4b300;
+#elif DUKE3D_GAMEVER >= GAMEVER_15
+    d = (int64_t)offset+0x4b800; /* DOS 1.5: 0x251aa4 - 0x29d2a4. */
+#endif
+    nv = n >= 0 && n < SG_WALL_SIZE*MAXWALLS && (n%SG_WALL_SIZE == 0 || n%SG_WALL_SIZE == 4);
+    dv = d >= 0 && d < SG_WALL_SIZE*MAXWALLS && (d%SG_WALL_SIZE == 0 || d%SG_WALL_SIZE == 4);
+    if (dos) return dv ? (int32_t)d : -1;
+    if (!nv) return dv ? (int32_t)d : -1;
+    if (dv && n != d) return -1;
+    return (int32_t)n;
+}
+
+/* Only fields animated by setanimation may become live pointers.
+   DOS bases and the unverified 1.4 layout: docs/savegame-offsets.md. */
+int32_t *sg_animptr(int32_t offset, int32_t dos)
+{
+    int32_t w;
+
+    if (offset >= 0 && offset < (int32_t)sizeof(sector) &&
+        (offset%sizeof(sectortype) == offsetof(sectortype,ceilingz) ||
+         offset%sizeof(sectortype) == offsetof(sectortype,floorz)))
+        return (int32_t *)((char *)sector+offset);
+    w = sg_walloffset(offset,(int64_t)(intptr_t)wall-(int64_t)(intptr_t)sector,dos);
+    return w < 0 ? NULL : (int32_t *)((char *)wall+w);
+}
+
+#if DUKE3D_GAMEVER >= GAMEVER_11
+int32_t sg_checksave(int32_t fil)
+{
+    static const int32_t head[][2] =
+    {
+#if DUKE3D_GAMEVER >= GAMEVER_14
+        {4,1},
+#endif
+        {19,1}, {4,1}, {4,1}, {4,1}, {160,100},
+        {2,1}, {SG_WALL_SIZE,MAXWALLS}, {2,1}, {SG_SECTOR_SIZE,MAXSECTORS},
+        {SG_SPRITE_SIZE,MAXSPRITES},
+        {2,MAXSECTORS+1}, {2,MAXSPRITES}, {2,MAXSPRITES},
+        {2,MAXSTATUS+1}, {2,MAXSPRITES}, {2,MAXSPRITES},
+        {2,1}, {12,MAXCYCLERS},
+        {SG_PLAYER_DFSIZE,SG_PLAYER_DFCOUNT}, {SG_PLAYERORIG_DFSIZE,SG_PLAYERORIG_DFCOUNT},
+        {2,1}, {SG_ANIMWALL_SIZE*MAXANIMWALLS,1}, {4,2048}, {4,2048}, {2,1}
+    };
+    static const int32_t mid[][2] =
+    {
+        {2,1}, {2,64}, {2,64}, {1,MAXSECTORS>>3},
+#if DUKE3D_GAMEVER >= GAMEVER_14
+        {1,SG_DOS_MAXTILES}, {sizeof(boardfilename),1},
+        {2,1}, {256,1}, {256,1}, {256,1},
+#endif
+    };
+    static const int32_t tail[][2] =
+    {
+        {4,MAXANIMATES}, {4,MAXANIMATES}, {1,1}, {2,1},
+#if DUKE3D_GAMEVER < GAMEVER_13D
+        {4,1}, {4,1}, {1,1}, {1,1}, {1,1}
+#else
+        {2,1}, {4,1}, {4,1}, {4,1}, {1,1}, {4,1}, {4,1}, {4,1}, {2,1}, {1,1},
+#if DUKE3D_GAMEVER >= GAMEVER_14
+        {4,1}, {4,1}, {4,1}, {2,1}, {2,1}, {sizeof(connectpoint2),1},
+        {1,1}, {sizeof(frags),1}, {4,1}, {2,1}, {4,1},
+#endif
+#endif
+    };
+    static unsigned char flags[MAXSCRIPTSIZE];
+    static const int32_t slots[3] = { 1, 4, 5 }, bytes[3] = { 8, 20, 12 }; /* move, action, AI */
+    unsigned char b[4];
+    int32_t start = klseek(fil,0,SEEK_CUR), ok = 0, dos = 0, i, j, n, v;
+
+#define CALL(size,count,buf) do { if (!sg_call(fil,size,count,buf)) goto done; } while (0)
+    if (!sg_calls(fil,head,sizeof(head)/sizeof(head[0]))) goto done;
+#if DUKE3D_GAMEVER >= GAMEVER_14
+    CALL(2,1,b);
+    n = get16(b);
+    if (n < 0 || n > 1024) goto done;
+    CALL(2,n,NULL);
+#else
+    CALL(2,64,NULL);
+#endif
+    if (!sg_calls(fil,mid,sizeof(mid)/sizeof(mid[0]))) goto done;
+    CALL(1,SG_DOS_MAXSCRIPT,flags);
+    CALL(4,SG_DOS_MAXSCRIPT,sgbuf);
+    for (i = 0; i < SG_DOS_MAXSCRIPT; i++)
+        if (flags[i])
+        {
+            dos = 1;
+            v = get32(sgbuf+i*4);
+            if (v < 0 || v > SG_DOS_MAXSCRIPT*4-(i == 0 ? 0 : 4) || (v&3)) goto done;
+        }
+    CALL(4,SG_DOS_MAXTILES,sgbuf);
+    for (i = 0; i < SG_DOS_MAXTILES; i++)
+    {
+        v = get32(sgbuf+i*4);
+        if (v < 0 || v > SG_DOS_MAXSCRIPT*4-20 || (v&3)) goto done;
+    }
+#if DUKE3D_GAMEVER < GAMEVER_14
+    n = SG_DOS_MAXHITTYPES;
+#else
+    n = MAXSPRITES;
+#endif
+    CALL(1,n,flags);
+    CALL(SG_WEAPONHIT_SIZE,n,sgbuf);
+    for (i = 0; i < n; i++)
+        for (j = 0; j < 3; j++)
+            if (flags[i]&(1<<j))
+            {
+                v = get32(sgbuf+i*SG_WEAPONHIT_SIZE+SG_WEAPONHIT_TEMPDATA+slots[j]*4);
+                if (v < 0 || v > SG_DOS_MAXSCRIPT*4-bytes[j] || (v&3)) goto done;
+            }
+    CALL(4,1,NULL); CALL(2,1,NULL); CALL(2,MAXPSKYTILES,NULL);
+    CALL(4,1,b);
+    n = get32(b);
+    if (n < 0 || n > MAXANIMATES) goto done;
+    CALL(2,MAXANIMATES,NULL);
+    CALL(4,MAXANIMATES,sgbuf);
+    for (i = 0; i < n; i++)
+        if (sg_animptr(get32(sgbuf+i*4),dos) == NULL) goto done;
+    if (!sg_calls(fil,tail,sizeof(tail)/sizeof(tail[0]))) goto done;
+    ok = klseek(fil,0,SEEK_CUR) == kfilelength(fil);
+done:
+    klseek(fil,start,SEEK_SET);
+    return ok;
+#undef CALL
+}
+#endif
+
+#if DUKE3D_GAMEVER < GAMEVER_11
+const int32_t sg_scriptslots10[3] = { 1, 4, 5 };
 
 int32_t sg_check10(int32_t fil)
 {
@@ -465,35 +644,58 @@ int32_t sg_check10(int32_t fil)
     static const int32_t mid[][2] =
     {
         {2,1}, {SG_ANIMWALL_SIZE*MAXANIMWALLS,1}, {4,2048}, {4,2048},
-        {2,1}, {2,64}, {2,1}, {2,64}, {2,64}, {1,MAXSECTORS>>3},
-        {1,SG_DOS_MAXSCRIPT}, {4,SG_DOS_MAXSCRIPT}
+        {2,1}, {2,64}, {2,1}, {2,64}, {2,64},
+#if DUKE3D_GAMEVER >= GAMEVER_10
+        {1,MAXSECTORS>>3},
+#endif
     };
     static const int32_t tail[][2] =
     {
         {4,1}, {2,1}, {2,MAXPSKYTILES},
         {4,1}, {2,MAXANIMATES}, {4,MAXANIMATES}, {4,MAXANIMATES}, {4,MAXANIMATES},
-        {1,1}, {2,1}, {4,1}, {4,1}
+        {1,1}, {2,1},
+#if DUKE3D_GAMEVER < GAMEVER_10
+        {2,1}
+#else
+        {4,1}, {4,1}
+#endif
     };
+    static const int32_t bytes[3] = { 8, 20, 12 };
     static short picnum[SG_DOS_MAXHITTYPES];
     static unsigned char actors[SG_DOS_MAXTILES*4];
-    unsigned char b[2];
-    int32_t start = klseek(fil,0,SEEK_CUR), base = -1, n, i, k, v;
+    static unsigned char flags[SG_DOS_MAXSCRIPT], savedscript[SG_DOS_MAXSCRIPT*4];
+    unsigned char b[4], anim[4*MAXANIMATES];
+    int32_t start = klseek(fil,0,SEEK_CUR), base = -1, dos = 0, n, i, k, v;
 
-    if (!sg_calls10(fil,head,5)) goto done;
-    if (!sg_call10(fil,2,1,b)) goto done;
+    if (!sg_calls(fil,head,5)) goto done;
+    if (!sg_call(fil,2,1,b)) goto done;
     n = get16(b);
-    if (n < 1 || n > MAXWALLS || !sg_call10(fil,SG_WALL_SIZE,n,NULL)) goto done;
-    if (!sg_call10(fil,2,1,b)) goto done;
+    if (n < 1 || n > MAXWALLS || !sg_call(fil,SG_WALL_SIZE,n,NULL)) goto done;
+    if (!sg_call(fil,2,1,b)) goto done;
     n = get16(b);
-    if (n < 1 || n > MAXSECTORS || !sg_call10(fil,SG_SECTOR_SIZE,n,NULL)) goto done;
-    if (!sg_call10(fil,SG_SPRITE_SIZE,MAXSPRITES,sgbuf)) goto done;
+    if (n < 1 || n > MAXSECTORS || !sg_call(fil,SG_SECTOR_SIZE,n,NULL)) goto done;
+    if (!sg_call(fil,SG_SPRITE_SIZE,MAXSPRITES,sgbuf)) goto done;
     for (i = 0; i < SG_DOS_MAXHITTYPES; i++) picnum[i] = (short)get16(sgbuf+i*SG_SPRITE_SIZE+14);
-    if (!sg_calls10(fil,lists,10)) goto done;
+    if (!sg_calls(fil,lists,10)) goto done;
     /* hittype[] comes raw, straight after po[] */
-    if (!sg_call10(fil,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES,sgbuf)) goto done;
-    if (!sg_calls10(fil,mid,12)) goto done;
-    if (!sg_call10(fil,4,SG_DOS_MAXTILES,actors)) goto done;
-    if (!sg_calls10(fil,tail,12)) goto done;
+    if (!sg_call(fil,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES,sgbuf)) goto done;
+    if (!sg_calls(fil,mid,sizeof(mid)/sizeof(mid[0]))) goto done;
+    if (!sg_call(fil,1,SG_DOS_MAXSCRIPT,flags) ||
+        !sg_call(fil,4,SG_DOS_MAXSCRIPT,savedscript)) goto done;
+    for (i = 0; i < SG_DOS_MAXSCRIPT; i++)
+        if (flags[i])
+        {
+            dos = 1;
+            v = get32(savedscript+i*4);
+            if (v < 0 || v > SG_DOS_MAXSCRIPT*4-(i == 0 ? 0 : 4) || (v&3)) goto done;
+        }
+    if (!sg_call(fil,4,SG_DOS_MAXTILES,actors)) goto done;
+    for (i = 0; i < (int32_t)(sizeof(tail)/sizeof(tail[0])); i++)
+        if (!sg_call(fil,tail[i][0],tail[i][1],i == 3 ? b : (i == 5 ? anim : NULL))) goto done;
+    n = get32(b);
+    if (n < 0 || n > MAXANIMATES) goto done;
+    for (i = 0; i < n; i++)
+        if (sg_animptr(get32(anim+i*4),dos) == NULL) goto done;
     if (klseek(fil,0,SEEK_CUR) != kfilelength(fil)) goto done;
 
     /* actorscrptr[]: every entry is stored minus script's address, so the
@@ -507,7 +709,7 @@ int32_t sg_check10(int32_t fil)
             if (v < -0x7fff0000 || (n != 0 && v != -n)) goto done;
             n = -v;
         }
-        else if (v == 0 || v >= SG_DOS_MAXSCRIPT*4 || (v&3)) goto done;
+        else if (v == 0 || v > SG_DOS_MAXSCRIPT*4-20 || (v&3)) goto done;
     }
     if (n == 0) goto done;
 
@@ -520,7 +722,7 @@ int32_t sg_check10(int32_t fil)
         for (k = 0; k < 3; k++)
         {
             v = get32(sgbuf+i*SG_WEAPONHIT_SIZE+SG_WEAPONHIT_TEMPDATA+sg_scriptslots10[k]*4);
-            if (v >= n && (v-n >= SG_DOS_MAXSCRIPT*4 || ((v-n)&3))) goto done;
+            if (v >= n && (v-n > SG_DOS_MAXSCRIPT*4-bytes[k] || ((v-n)&3))) goto done;
         }
     }
     base = n;
@@ -531,6 +733,7 @@ done:
 }
 #endif
 
+#if DUKE3D_GAMEVER >= GAMEVER_11
 int32_t sg_playerblocksize(int32_t fil)
 {
     /* The dfwrite calls between the version block and ps[]. */
@@ -561,3 +764,5 @@ int32_t sg_playerblocksize(int32_t fil)
     klseek(fil,start,SEEK_SET);
     return size;
 }
+
+#endif
