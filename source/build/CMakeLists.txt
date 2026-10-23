@@ -5,6 +5,7 @@ add_library(buildengine STATIC
   cache.c
   filesystem.c
   engine.c
+  tiles.c
   glext.c
   glsubmit.c
   network.c

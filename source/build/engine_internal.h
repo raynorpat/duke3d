@@ -12,4 +12,20 @@ extern short radarang[1280];
 extern int32_t pow2long[32];
 extern char britable[16][64];
 
+int animateoffs(short tilenum, short fakevar);
+void engine_tiles_uninit(void);
+#if defined(USE_I386_ASM)
+int setgotpic(int32_t value);
+#else
+void setgotpic(uint32_t value);
+#endif
+extern char picsiz[MAXTILES];
+extern int32_t totalclocklock;
+#ifdef SUPERBUILD
+#define MAXVOXELS 512
+#define MAXVOXMIPS 5
+extern intptr_t voxoff[MAXVOXELS][MAXVOXMIPS];
+extern int32_t voxlock[MAXVOXELS][MAXVOXMIPS];
+#endif
+
 #endif

@@ -65,7 +65,6 @@ Low priority:
 
 **************************************************************************************************/
 
-static int32_t animateoffs(short tilenum, short fakevar);
 
 #include <stdint.h>
 #include <math.h> //<-important!

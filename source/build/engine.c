@@ -9,9 +9,6 @@
 
 #define ENGINE
 
-/* set this to something non-zero to get loadtile() debugging info on stderr. */
-#define BUILD_CACHEDEBUG 0
-
 #include <stdint.h>
 #include <string.h>
 
@@ -50,7 +47,6 @@ volatile char oa1, o3c2, ortca, ortcb, overtbits, laststereoint;
 
 #define MAXCLIPNUM 512
 #define MAXPERMS 512
-#define MAXTILEFILES 256
 #define MAXYSAVES ((MAXXDIM*MAXSPRITES)>>7)
 #define MAXNODESPERLINE 42   /* Warning: This depends on MAXYSAVES & MAXYDIM! */
 #define MAXWALLSB 2048
@@ -96,10 +92,6 @@ void kloadvoxel(int32_t voxindex);
 #define MAXXSIZ 128
 #define MAXYSIZ 128
 #define MAXZSIZ 200
-#define MAXVOXELS 512
-#define MAXVOXMIPS 5
-intptr_t voxoff[MAXVOXELS][MAXVOXMIPS];
-int32_t voxlock[MAXVOXELS][MAXVOXMIPS];
 static int32_t ggxinc[MAXXSIZ+1], ggyinc[MAXXSIZ+1];
 static int32_t lowrecip[1024], nytooclose, nytoofar;
 static uint32_t distrecip[16384];
@@ -130,13 +122,8 @@ intptr_t slopalookup[16384];
  * !!! can be made static again.  --ryan.
  */
 unsigned char permanentlock = 255;
-int32_t artversion, mapversion;
-char *pic = NULL;
-char picsiz[MAXTILES], tilefilenum[MAXTILES];
+int32_t mapversion;
 int32_t lastageclock;
-int32_t tilefileoffs[MAXTILES];
-
-int32_t artsize = 0, cachesize = 0;
 
 static short radarang2[MAXXDIM+1];
 
@@ -147,14 +134,8 @@ int has_altivec = 0;  /* PowerPC-specific. */
 
 /* rcg02132001 Cygwin support. */
 #if (defined C_IDENTIFIERS_UNDERSCORED)
-#define SYM_walock     "_walock"
-#define SYM_pow2char   "_pow2char"
-#define SYM_gotpic     "_gotpic"
 #define SYM_dmval      "_dmval"
 #else
-#define SYM_walock     "walock"
-#define SYM_pow2char   "pow2char"
-#define SYM_gotpic     "gotpic"
 #define SYM_dmval      "dmval"
 #endif
 
@@ -264,9 +245,6 @@ short searchit;
 int32_t searchx = -1, searchy;                     /* search input  */
 short searchsector, searchwall, searchstat;     /* search output */
 
-static char artfilename[20];
-static int32_t numtilefiles, artfil = -1, artfilnum, artfilplc;
-
 static char inpreparemirror = 0;
 static int32_t mirrorsx1, mirrorsy1, mirrorsx2, mirrorsy2;
 
@@ -366,84 +344,6 @@ extern int32_t drawslab(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
 #else
 #include "a.h"
 #endif
-
-
-#if (defined USE_I386_ASM)
-
-    #if (defined __WATCOMC__)
-        int setgotpic(int32_t param);
-        #pragma aux setgotpic =\
-        "mov ebx, eax",\
-        "cmp byte ptr walock[eax], 200",\
-        "jae skipit",\
-        "mov byte ptr walock[eax], 199",\
-        "skipit: shr eax, 3",\
-        "and ebx, 7",\
-        "mov dl, byte ptr gotpic[eax]",\
-        "mov bl, byte ptr pow2char[ebx]",\
-        "or dl, bl",\
-        "mov byte ptr gotpic[eax], dl",\
-        parm [eax]\
-        modify exact [eax ebx ecx edx]\
-
-    #elif (defined __GNUC__) || (defined __ICC)
-
-        int __attribute__((noinline)) setgotpic(int32_t i1)
-        {
-            int retval = 0;
-            __asm__ __volatile__ (
-                "\n\t"
-                "movl %%eax, %%ebx\n\t"
-            	"cmpb $200, " SYM_walock "(%%eax)\n\t"
-            	"jae setgotpic_skipit\n\t"
-            	"movb $199, " SYM_walock "(%%eax)\n\t"
-            	"setgotpic_skipit: shrl $3, %%eax\n\t"
-            	"andl $7, %%ebx\n\t"
-            	"movb " SYM_gotpic "(%%eax), %%dl\n\t"
-            	"movb " SYM_pow2char "(%%ebx), %%bl\n\t"
-            	"orb %%bl, %%dl\n\t"
-            	"movb %%dl, (" SYM_gotpic ")(%%eax)\n\t"
-            : "=a" (retval) : "a" (i1) : "ebx", "ecx", "edx", "cc", "memory");
-            return(retval);
-        } /* setgotpic */
-
-    #elif (defined _MSC_VER)
-        int setgotpic(int32_t param)
-        {
-            __asm
-            {
-                mov eax, param
-                mov ebx, eax
-                cmp byte ptr walock[eax], 200
-                jae skipit
-                mov byte ptr walock[eax], 199
-                skipit: shr eax, 3
-                and ebx, 7
-                mov dl, byte ptr gotpic[eax]
-                mov bl, byte ptr pow2char[ebx]
-                or dl, bl
-                mov byte ptr gotpic[eax], dl
-                mov param, eax
-            } /* asm */
-            return(param);
-        } /* setgotpic */
-
-    #else
-        #error Please write Assembly for your platform!
-    #endif
-
-#else   /* !defined USE_I386_ASM */
-        void setgotpic(uint32_t param)
-        {
-	    unsigned char *gotpic_a = (unsigned char*)gotpic;
-	    unsigned char *walock_a = (unsigned char*)walock;
-	    unsigned char *pow2char_a = (unsigned char*)pow2char;
-	    
-	    if (walock_a[param] < 200) walock_a[param] = 199;
-
-	    gotpic_a[param>>3] |= pow2char_a[param&7];
-        }
-#endif /* defined USE_I386_ASM */
 
 
 static void scansector (short sectnum)
@@ -703,32 +603,6 @@ static void slowhline (int32_t xr, int32_t yp)
 }
 
 
-static int animateoffs(short tilenum, short fakevar)
-{
-	int32_t i, k, offs;
-
-	offs = 0;
-	i = (totalclocklock>>((picanm[tilenum]>>24)&15));
-	if ((picanm[tilenum]&63) > 0)
-	{
-		switch(picanm[tilenum]&192)
-		{
-			case 64:
-				k = (i%((picanm[tilenum]&63)<<1));
-				if (k < (picanm[tilenum]&63))
-					offs = k;
-				else
-					offs = (((picanm[tilenum]&63)<<1)-k);
-				break;
-			case 128:
-				offs = (i%((picanm[tilenum]&63)+1));
-					break;
-			case 192:
-				offs = -(i%((picanm[tilenum]&63)+1));
-		}
-	}
-	return(offs);
-}
 
 
 /* renders non-parallaxed ceilings. --ryan. */
@@ -3103,8 +2977,7 @@ void initengine(void)
 void uninitengine(void)
 {
 	if (transluc != NULL) { kkfree(transluc); transluc = NULL; }
-	if (pic != NULL) { kkfree(pic); pic = NULL; }
-	if (artfil != -1) kclose(artfil);
+	engine_tiles_uninit();
     _uninitengine(); /* video driver specific. */
 }
 
@@ -3649,195 +3522,6 @@ void nextpage(void)
 }
 
 
-void loadtile(short tilenume)
-{
-	char *ptr;
-	int32_t i, dasiz;
-
-	if ((unsigned)tilenume >= (unsigned)MAXTILES) return;
-	dasiz = tilesizx[tilenume]*tilesizy[tilenume];
-	if (dasiz <= 0) return;
-
-	i = tilefilenum[tilenume];
-	if (i != artfilnum)
-	{
-		if (artfil != -1) kclose(artfil);
-		artfilnum = i;
-		artfilplc = 0L;
-
-		artfilename[7] = (i%10)+48;
-		artfilename[6] = ((i/10)%10)+48;
-		artfilename[5] = ((i/100)%10)+48;
-		artfil = kopen4load(artfilename,0);
-		faketimerhandler();
-	}
-
-	#if BUILD_CACHEDEBUG
-        fprintf(stderr, "BUILDCACHE: Tile:%d\n", tilenume);
-    #endif
-
-	if (waloff[tilenume] == 0)
-	{
-		walock[tilenume] = 199;
-		allocache(&waloff[tilenume],dasiz,(unsigned char *) &walock[tilenume]);
-	}
-
-	if (artfilplc != tilefileoffs[tilenume])
-	{
-		klseek(artfil,tilefileoffs[tilenume]-artfilplc,SEEK_CUR);
-		faketimerhandler();
-	}
-	ptr = (char *)waloff[tilenume];
-	kread(artfil,ptr,dasiz);
-	faketimerhandler();
-	artfilplc = tilefileoffs[tilenume]+dasiz;
-}
-
-
-intptr_t allocatepermanenttile(short tilenume, int32_t xsiz, int32_t ysiz)
-{
-	int32_t j, dasiz;
-
-	if ((xsiz <= 0) || (ysiz <= 0) || ((unsigned)tilenume >= (unsigned)MAXTILES))
-		return(0);
-
-	dasiz = xsiz*ysiz;
-
-	walock[tilenume] = 255;
-	allocache(&waloff[tilenume],dasiz,(unsigned char *) &walock[tilenume]);
-
-	tilesizx[tilenume] = xsiz;
-	tilesizy[tilenume] = ysiz;
-	picanm[tilenume] = 0;
-
-	j = 15; while ((j > 1) && (pow2long[j] > xsiz)) j--;
-	picsiz[tilenume] = ((char)j);
-	j = 15; while ((j > 1) && (pow2long[j] > ysiz)) j--;
-	picsiz[tilenume] += ((char)(j<<4));
-
-	return(waloff[tilenume]);
-}
-
-
-int loadpics(char *filename)
-{
-	int32_t offscount, localtilestart, localtileend, dasiz;
-	short fil, i, j, k;
-
-	strcpy(artfilename,filename);
-
-	for(i=0;i<MAXTILES;i++)
-	{
-		tilesizx[i] = 0;
-		tilesizy[i] = 0;
-		picanm[i] = 0L;
-	}
-
-	artsize = 0L;
-
-	numtilefiles = 0;
-	do
-	{
-		k = numtilefiles;
-
-		artfilename[7] = (k%10)+48;
-		artfilename[6] = ((k/10)%10)+48;
-		artfilename[5] = ((k/100)%10)+48;
-		if ((fil = kopen4load(artfilename,0)) != -1)
-		{
-			kread32(fil,&artversion);
-			if (artversion != 1) return(-1);
-
-			kread32(fil,&numtiles);
-			kread32(fil,&localtilestart);
-			kread32(fil,&localtileend);
-
-			/*kread(fil,&tilesizx[localtilestart],(localtileend-localtilestart+1)<<1);*/
-			for (i = localtilestart; i <= localtileend; i++)
-				kread16(fil,&tilesizx[i]);
-
-			/*kread(fil,&tilesizy[localtilestart],(localtileend-localtilestart+1)<<1);*/
-			for (i = localtilestart; i <= localtileend; i++)
-			    kread16(fil,&tilesizy[i]);
-
-			/*kread(fil,&picanm[localtilestart],(localtileend-localtilestart+1)<<2);*/
-			for (i = localtilestart; i <= localtileend; i++)
-			    kread32(fil,&picanm[i]);
-
-			offscount = 4+4+4+4+((localtileend-localtilestart+1)<<3);
-			for(i=localtilestart;i<=localtileend;i++)
-			{
-				tilefilenum[i] = k;
-				tilefileoffs[i] = offscount;
-				dasiz = (int32_t)(tilesizx[i]*tilesizy[i]);
-				offscount += dasiz;
-				artsize += ((dasiz+15)&0xfffffff0);
-			}
-			kclose(fil);
-
-			numtilefiles++;
-		}
-	}
-	while (k != numtilefiles);
-
-	clearbuf(&gotpic[0],(int32_t)((MAXTILES+31)>>5),0L);
-
-	/* try dpmi_DETERMINEMAXREALALLOC! */
-
-	cachesize = max(artsize,1048576);
-	while ((pic = (char *)kkmalloc(cachesize)) == NULL)
-	{
-		cachesize -= 65536L;
-		if (cachesize < 65536) return(-1);
-	}
-	initcache((FP_OFF(pic)+15)&~(intptr_t)15,(cachesize-(int32_t)((-FP_OFF(pic))&15))&0xfffffff0);
-
-	for(i=0;i<MAXTILES;i++)
-	{
-		j = 15;
-		while ((j > 1) && (pow2long[j] > tilesizx[i])) j--;
-		picsiz[i] = ((char)j);
-		j = 15;
-		while ((j > 1) && (pow2long[j] > tilesizy[i])) j--;
-		picsiz[i] += ((char)(j<<4));
-	}
-
-	artfil = -1;
-	artfilnum = -1;
-	artfilplc = 0L;
-
-	return(0);
-}
-
-#ifdef SUPERBUILD
-void qloadkvx(int32_t voxindex, char *filename)
-{
-	int32_t i, fil, dasiz, lengcnt, lengtot;
-	char *ptr;
-
-	if ((fil = kopen4load(filename,0)) == -1) return;
-
-	lengcnt = 0;
-	lengtot = kfilelength(fil);
-
-	for(i=0;i<MAXVOXMIPS;i++)
-	{
-		kread32(fil,&dasiz);
-
-			/* Must store filenames to use cacheing system :( */
-		voxlock[voxindex][i] = BUILDSWAP_INTEL32(200);
-		allocache(&voxoff[voxindex][i],dasiz,(unsigned char *)&voxlock[voxindex][i]);
-		ptr = (char *)voxoff[voxindex][i];
-		kread(fil,ptr,dasiz);
-
-		lengcnt += dasiz+4;
-		if (lengcnt >= lengtot-768) break;
-	}
-	kclose(fil);
-}
-#endif
-
-
 int clipinsidebox(int32_t x, int32_t y, short wallnum, int32_t walldist)
 {
 	walltype *wal;
@@ -4033,42 +3717,6 @@ int inside(int32_t x, int32_t y, short sectnum)
 
 
 
-void copytilepiece(int32_t tilenume1, int32_t sx1, int32_t sy1, int32_t xsiz, int32_t ysiz,
-                   int32_t tilenume2, int32_t sx2, int32_t sy2)
-{
-	unsigned char *ptr1, *ptr2, dat;
-	int32_t xsiz1, ysiz1, xsiz2, ysiz2, i, j, x1, y1, x2, y2;
-
-	xsiz1 = tilesizx[tilenume1]; ysiz1 = tilesizy[tilenume1];
-	xsiz2 = tilesizx[tilenume2]; ysiz2 = tilesizy[tilenume2];
-	if ((xsiz1 > 0) && (ysiz1 > 0) && (xsiz2 > 0) && (ysiz2 > 0))
-	{
-		if (waloff[tilenume1] == 0) loadtile((short) tilenume1);
-		if (waloff[tilenume2] == 0) loadtile((short) tilenume2);
-
-		x1 = sx1;
-		for(i=0;i<xsiz;i++)
-		{
-			y1 = sy1;
-			for(j=0;j<ysiz;j++)
-			{
-				x2 = sx2+i;
-				y2 = sy2+j;
-				if ((x2 >= 0) && (y2 >= 0) && (x2 < xsiz2) && (y2 < ysiz2))
-				{
-					ptr1 = (unsigned char *) (waloff[tilenume1] + x1*ysiz1 + y1);
-					ptr2 = (unsigned char *) (waloff[tilenume2] + x2*ysiz2 + y2);
-					dat = *ptr1;
-					if (dat != 255)
-						*ptr2 = *ptr1;
-				}
-
-				y1++; if (y1 >= ysiz1) y1 = 0;
-			}
-			x1++; if (x1 >= xsiz1) x1 = 0;
-		}
-	}
-}
 
 
 static void drawmaskwall(short damaskwallcnt)
@@ -5485,184 +5133,6 @@ void drawmasks(void)
 	}
 	while (spritesortcnt > 0) drawsprite(--spritesortcnt);
 	while (maskwallcnt > 0) drawmaskwall(--maskwallcnt);
-}
-
-
-int setsprite(short spritenum, int32_t newx, int32_t newy, int32_t newz)
-{
-	short tempsectnum;
-
-	sprite[spritenum].x = newx;
-	sprite[spritenum].y = newy;
-	sprite[spritenum].z = newz;
-
-	tempsectnum = sprite[spritenum].sectnum;
-	updatesector(newx,newy,&tempsectnum);
-	if (tempsectnum < 0)
-		return(-1);
-	if (tempsectnum != sprite[spritenum].sectnum)
-		changespritesect(spritenum,tempsectnum);
-
-	return(0);
-}
-
-
-void initspritelists(void)
-{
-	int32_t i;
-
-	for (i=0;i<MAXSECTORS;i++)     /* Init doubly-linked sprite sector lists */
-		headspritesect[i] = -1;
-	headspritesect[MAXSECTORS] = 0;
-	for(i=0;i<MAXSPRITES;i++)
-	{
-		prevspritesect[i] = i-1;
-		nextspritesect[i] = i+1;
-		sprite[i].sectnum = MAXSECTORS;
-	}
-	prevspritesect[0] = -1;
-	nextspritesect[MAXSPRITES-1] = -1;
-
-
-	for(i=0;i<MAXSTATUS;i++)      /* Init doubly-linked sprite status lists */
-		headspritestat[i] = -1;
-	headspritestat[MAXSTATUS] = 0;
-	for(i=0;i<MAXSPRITES;i++)
-	{
-		prevspritestat[i] = i-1;
-		nextspritestat[i] = i+1;
-		sprite[i].statnum = MAXSTATUS;
-	}
-	prevspritestat[0] = -1;
-	nextspritestat[MAXSPRITES-1] = -1;
-}
-
-
-int insertsprite(short sectnum, short statnum)
-{
-	insertspritestat(statnum);
-	return(insertspritesect(sectnum));
-}
-
-
-int insertspritesect(short sectnum)
-{
-	short blanktouse;
-
-	if ((sectnum >= MAXSECTORS) || (headspritesect[MAXSECTORS] == -1))
-		return(-1);  /* list full */
-
-	blanktouse = headspritesect[MAXSECTORS];
-
-	headspritesect[MAXSECTORS] = nextspritesect[blanktouse];
-	if (headspritesect[MAXSECTORS] >= 0)
-		prevspritesect[headspritesect[MAXSECTORS]] = -1;
-
-	prevspritesect[blanktouse] = -1;
-	nextspritesect[blanktouse] = headspritesect[sectnum];
-	if (headspritesect[sectnum] >= 0)
-		prevspritesect[headspritesect[sectnum]] = blanktouse;
-	headspritesect[sectnum] = blanktouse;
-
-	sprite[blanktouse].sectnum = sectnum;
-
-	return(blanktouse);
-}
-
-
-int insertspritestat(short statnum)
-{
-	short blanktouse;
-
-	if ((statnum >= MAXSTATUS) || (headspritestat[MAXSTATUS] == -1))
-		return(-1);  /* list full */
-
-	blanktouse = headspritestat[MAXSTATUS];
-
-	headspritestat[MAXSTATUS] = nextspritestat[blanktouse];
-	if (headspritestat[MAXSTATUS] >= 0)
-		prevspritestat[headspritestat[MAXSTATUS]] = -1;
-
-	prevspritestat[blanktouse] = -1;
-	nextspritestat[blanktouse] = headspritestat[statnum];
-	if (headspritestat[statnum] >= 0)
-		prevspritestat[headspritestat[statnum]] = blanktouse;
-	headspritestat[statnum] = blanktouse;
-
-	sprite[blanktouse].statnum = statnum;
-
-	return(blanktouse);
-}
-
-
-int deletesprite(short spritenum)
-{
-	deletespritestat(spritenum);
-	return(deletespritesect(spritenum));
-}
-
-
-int deletespritesect(short deleteme)
-{
-	if (sprite[deleteme].sectnum == MAXSECTORS)
-		return(-1);
-
-	if (headspritesect[sprite[deleteme].sectnum] == deleteme)
-		headspritesect[sprite[deleteme].sectnum] = nextspritesect[deleteme];
-
-	if (prevspritesect[deleteme] >= 0) nextspritesect[prevspritesect[deleteme]] = nextspritesect[deleteme];
-	if (nextspritesect[deleteme] >= 0) prevspritesect[nextspritesect[deleteme]] = prevspritesect[deleteme];
-
-	if (headspritesect[MAXSECTORS] >= 0) prevspritesect[headspritesect[MAXSECTORS]] = deleteme;
-	prevspritesect[deleteme] = -1;
-	nextspritesect[deleteme] = headspritesect[MAXSECTORS];
-	headspritesect[MAXSECTORS] = deleteme;
-
-	sprite[deleteme].sectnum = MAXSECTORS;
-	return(0);
-}
-
-
-int deletespritestat(short deleteme)
-{
-	if (sprite[deleteme].statnum == MAXSTATUS)
-		return(-1);
-
-	if (headspritestat[sprite[deleteme].statnum] == deleteme)
-		headspritestat[sprite[deleteme].statnum] = nextspritestat[deleteme];
-
-	if (prevspritestat[deleteme] >= 0) nextspritestat[prevspritestat[deleteme]] = nextspritestat[deleteme];
-	if (nextspritestat[deleteme] >= 0) prevspritestat[nextspritestat[deleteme]] = prevspritestat[deleteme];
-
-	if (headspritestat[MAXSTATUS] >= 0) prevspritestat[headspritestat[MAXSTATUS]] = deleteme;
-	prevspritestat[deleteme] = -1;
-	nextspritestat[deleteme] = headspritestat[MAXSTATUS];
-	headspritestat[MAXSTATUS] = deleteme;
-
-	sprite[deleteme].statnum = MAXSTATUS;
-	return(0);
-}
-
-
-int changespritesect(short spritenum, short newsectnum)
-{
-	if ((newsectnum < 0) || (newsectnum > MAXSECTORS)) return(-1);
-	if (sprite[spritenum].sectnum == newsectnum) return(0);
-	if (sprite[spritenum].sectnum == MAXSECTORS) return(-1);
-	if (deletespritesect(spritenum) < 0) return(-1);
-	insertspritesect(newsectnum);
-	return(0);
-}
-
-
-int changespritestat(short spritenum, short newstatnum)
-{
-	if ((newstatnum < 0) || (newstatnum > MAXSTATUS)) return(-1);
-	if (sprite[spritenum].statnum == newstatnum) return(0);
-	if (sprite[spritenum].statnum == MAXSTATUS) return(-1);
-	if (deletespritestat(spritenum) < 0) return(-1);
-	insertspritestat(newstatnum);
-	return(0);
 }
 
 
@@ -8673,27 +8143,6 @@ void setviewback(void)
 }
 
 
-void squarerotatetile(short tilenume)
-{
-	int32_t i, j, k, xsiz, ysiz;
-	unsigned char *ptr1, *ptr2;
-
-	xsiz = tilesizx[tilenume]; ysiz = tilesizy[tilenume];
-
-		/* supports square tiles only for rotation part */
-	if (xsiz == ysiz)
-	{
-		k = (xsiz<<1);
-		for(i=xsiz-1;i>=0;i--)
-		{
-			ptr1 = (unsigned char *) (waloff[tilenume]+i*(xsiz+1));
-            ptr2 = ptr1;
-			if ((i&1) != 0) { ptr1--; ptr2 -= xsiz; swapchar(ptr1,ptr2); }
-			for(j=(i>>1)-1;j>=0;j--)
-				{ ptr1 -= 2; ptr2 -= k; swapchar2(ptr1,ptr2,xsiz); }
-		}
-	}
-}
 
 
 void preparemirror(int32_t dax, int32_t day, int32_t daz,
