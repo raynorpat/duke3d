@@ -1496,36 +1496,7 @@ int getfilenames(char kind[6])
 int getfilenames(char kind[6])
 {
 /* !!! FIXME: Visual C? */
-#if (defined __WATCOMC__)
-	short type;
-	struct find_t fileinfo;
-
-	if (strcmp(kind,"SUBD") == 0)
-	{
-		strcpy(kind,"*.*");
-		if (_dos_findfirst(kind,_A_SUBDIR,&fileinfo) != 0)
-			return(-1);
-		type = 1;
-	}
-	else
-	{
-		if (_dos_findfirst(kind,_A_NORMAL,&fileinfo) != 0)
-			return(-1);
-		type = 0;
-	}
-	do
-	{
-		if ((type == 0) || ((fileinfo.attrib&16) > 0))
-			if ((fileinfo.name[0] != '.') || (fileinfo.name[1] != 0))
-			{
-				strcpy(menuname[menunamecnt],fileinfo.name);
-				menuname[menunamecnt][16] = type;
-				menunamecnt++;
-			}
-	}
-	while (_dos_findnext(&fileinfo) == 0);
-
-#elif (defined PLATFORM_UNIX)
+#if   (defined PLATFORM_UNIX)
 
     DIR *dir;
     struct dirent *dent;
@@ -5075,7 +5046,7 @@ void playanm(char *fn,char t)
 #endif
         allocache((intptr_t *)&anim,length+sizeof(anim_t),&walock[MAXTILES-3-t]);
 
-    animbuf = (char *)(FP_OFF(anim)+sizeof(anim_t));
+    animbuf = (char *)(((intptr_t)(anim))+sizeof(anim_t));
 
 #if DUKE3D_GAMEVER >= GAMEVER_15
     lastanimhack = (MAXTILES-3-t);
@@ -5128,7 +5099,7 @@ void playanm(char *fn,char t)
        else if(ud.volume_number == 1) ototalclock += 18;
        else                           ototalclock += 10;
 
-       waloff[MAXTILES-3-t] = FP_OFF(ANIM_DrawFrame(i));
+       waloff[MAXTILES-3-t] = ((intptr_t)(ANIM_DrawFrame(i)));
        invalidatetile(MAXTILES-3-t, -1, -1);  /* renderer 3: upload the new frame. */
        if (widescreen) clearallviews(0L);
        rotatesprite(0<<16,0<<16,65536L,512,MAXTILES-3-t,0,0,2+4+8+16+64, 0,0,xdim-1,ydim-1);

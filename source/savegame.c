@@ -4,7 +4,7 @@
 #include "duke3d.h"
 #include "savegame.h"
 
-#define SG_LZWSIZE 16384    /* LZWSIZE in build/cache1d.c */
+#define SG_LZWSIZE 16384    /* LZWSIZE in build/filesystem.c */
 
 static unsigned char sgbuf[MAXSPRITES*SG_WEAPONHIT_SIZE];   /* the largest block */
 
@@ -436,7 +436,7 @@ void sg_readrecs(int32_t fil, void *recs, size_t stride, sg_rec fn, int32_t n, i
     for (i = 0; i < n; i++) o += fn(sgbuf+o,(char *)recs+i*stride,0);
 }
 
-/* Mirrors dfwrite's chunking in build/cache1d.c. */
+/* Mirrors dfwrite's chunking in build/filesystem.c. */
 int32_t sg_dfblocks(int32_t dasizeof, int32_t count)
 {
     int32_t i, k, n = 0;

@@ -86,12 +86,13 @@ extern void faketimerhandler(void);
 extern void waitforeverybody(void);
 #endif
 
-/* cache1d.c */
+/* cache.c */
 extern void initcache(intptr_t dacachestart, int32_t dacachesize);
 extern void allocache(intptr_t *newhandle, int32_t newbytes, unsigned char *newlockptr);
 extern void suckcache(int32_t *suckptr);
 extern void agecache(void);
 extern void reportandexit(char *errormessage);
+/* filesystem.c */
 extern int32_t initgroupfile(const char *filename);
 extern void uninitgroupfile(void);
 extern int32_t kopen4load(const char *filename, char searchfirst);
@@ -120,8 +121,6 @@ extern int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf);
 /* sdl_driver.c */
 extern void _handle_events(void);
 extern unsigned char _readlastkeyhit(void);
-extern int mprotect_align(const void *addr, size_t len, int prot);
-extern void unprotect_ASM_pages(void);
 extern void _platform_init(int argc, char **argv, const char *title, const char *icon);
 extern int setvesa(int32_t x, int32_t y);
 extern int screencapture(char *filename, char inverseit);
@@ -178,7 +177,7 @@ extern void set16color_palette(void);
 extern void restore256_palette(void);
 extern uint32_t getticks(void);
 
-/* mmulti.c */
+/* network.c */
 extern void callcommit(void);
 extern void initcrc(void);
 extern int32_t getcrc(char *buffer, short bufleng);
@@ -194,7 +193,7 @@ extern short getpacket(short *other, char *bufptr);
 extern void flushpackets(void);
 extern void genericmultifunction(int32_t other, char *bufptr, int32_t messleng, int32_t command);
 
-/* engine.c */
+/* engine.c, display.c, math.c and tiles.c */
 extern int setgotpic(int32_t i1);
 extern int32_t getclipmask(int i1, int i2, int i3, int i4);
 extern int wallfront(int32_t l1, int32_t l2);

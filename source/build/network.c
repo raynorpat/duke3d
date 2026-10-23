@@ -502,36 +502,6 @@ void callcommit(void)
 {
 }
 
-#elif (defined PLATFORM_DOS)
-gcomtype *init_network_transport(char **ARGV, int argpos)
-{
-    /*
-     * How to talk to COMMIT is passed as a pointer to a block of memory
-     *  that COMMIT.EXE configures...
-     */
-	return((gcomtype *)atol(ARGV[argpos]));  /* UGH!  --ryan. */
-} /* init_network_transport */
-
-static union REGS regs;
-
-#pragma aux longcall =\
-	"call eax",\
-	parm [eax]
-
-void callcommit(void)
-{
-	if (gcom->intnum&0xff00)
-		longcall(gcom->longcalladdress);
-	else
-		int386(gcom->intnum,&regs,&regs);
-}
-
-void deinit_network_transport(gcomtype *gcom)
-{
-    /* no-op, apparently. */
-}
-
-
 #elif UDP_NETWORKING
 
 #if PLATFORM_WIN32
@@ -1543,5 +1513,5 @@ void callcommit(void)
 #error Please define a network transport for your platform.
 #endif
 
-/* end of mmulti.c ... */
+/* end of network.c ... */
 

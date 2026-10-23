@@ -225,26 +225,16 @@ void keytimerstuff(void)
 }
 
 
-void __interrupt __far timerhandler(void)
+void timerhandler(void)
 {
 	totalclock++;
 	keytimerstuff();
 
-    #ifdef PLATFORM_DOS
-    	outp(0x20,0x20);
-    #endif
 }
 
 
-void __interrupt __far keyhandler(void)
+void keyhandler(void)
 {
-        /*
-         * ryan sez: End Of Interrupt call on DOS. This seems like a
-         *  dangerous place to put it, if you ask me, but oh well.  --ryan.
-         */
-    #ifdef PLATFORM_DOS
-    	koutp(0x20,0x20);
-    #endif
 
 	oldreadch = readch; readch = _readlastkeyhit();
 
@@ -252,17 +242,7 @@ void __interrupt __far keyhandler(void)
         printf("keyhandler() got a (0x%X) ... \n", readch);
     #endif
 
-        /*
-         * ryan sez: these inp/outp calls read the keyboard state,
-         *  reset the keyboard, and put the original state back in.
-         *  This is apparently needed on some XTs, but not newer boxes, and
-         *  obviously never on Linux.  --ryan.
-         */
-    #ifdef PLATFORM_DOS
-    	keytemp = kinp(0x61); koutp(0x61,keytemp|128); koutp(0x61,keytemp&127);
-    #else
         keytemp = readch;
-    #endif
 
 	if ((readch|1) == 0xe1) { extended = 128; return; }
 	if (oldreadch != readch)
@@ -790,12 +770,6 @@ void AutoAlignWalls(int32_t nWall0, int32_t ply)
 }
 
 
-#if (defined PLATFORM_DOS)
-
-#define statusbar_printext16 printext16
-#define statusbar_printext16_noupdate printext16
-
-#else
 void statusbar_printext16(int32_t xpos, int32_t ypos, short col, short backcol, char name[82], char fontsize)
 {
     printext256(xpos, ypos + 336, col, backcol, name, fontsize);
@@ -805,7 +779,6 @@ void statusbar_printext16_noupdate(int32_t xpos, int32_t ypos, short col, short 
 {
     printext256_noupdate(xpos, ypos + 336, col, backcol, name, fontsize);
 }
-#endif
 
 
 void printmessage16(char name[82])
@@ -954,36 +927,7 @@ void updatenumsprites(void)
 int getfilenames(char kind[6])
 {
 /* !!! Visual C? */
-#if (defined __WATCOMC__)
-	short type;
-	struct find_t fileinfo;
-
-	if (strcmp(kind,"SUBD") == 0)
-	{
-		strcpy(kind,"*.*");
-		if (_dos_findfirst(kind,_A_SUBDIR,&fileinfo) != 0)
-			return(-1);
-		type = 1;
-	}
-	else
-	{
-		if (_dos_findfirst(kind,_A_NORMAL,&fileinfo) != 0)
-			return(-1);
-		type = 0;
-	}
-	do
-	{
-		if ((type == 0) || ((fileinfo.attrib&16) > 0))
-			if ((fileinfo.name[0] != '.') || (fileinfo.name[1] != 0))
-			{
-				strcpy(menuname[menunamecnt],fileinfo.name);
-				menuname[menunamecnt][BUILD_MAXPATH] = type;
-				menunamecnt++;
-			}
-	}
-	while (_dos_findnext(&fileinfo) == 0);
-
-#elif (defined PLATFORM_UNIX)
+#if   (defined PLATFORM_UNIX)
 
     DIR *dir;
     struct dirent *dent;
@@ -1079,11 +1023,7 @@ int menuselect(void)
 		return(-2);
 
 	printmessage16("Select .MAP file with arrows&enter.");
-#ifdef PLATFORM_DOS
-	fillscreen16((399360-pageoffset)>>3,0L,640L*336L);
-#else
 	fillscreen16(0,0L,640L*336L);
-#endif
 	if (menuhighlight < 0) menuhighlight = 0;
 	if (menuhighlight >= menunamecnt) menuhighlight = menunamecnt-1;
 
@@ -1122,19 +1062,11 @@ int menuselect(void)
 			{
 				if (menuname[i][BUILD_MAXPATH] == 1)
 				{
-                    #ifdef PLATFORM_DOS
-           				printext16(0L,((i-topplc)<<3)+16L+((399360-pageoffset)/640),4,0,buffer,0);
-                    #else
     					printext16(0L,((i-topplc)<<3)+16L,4,0,buffer,0);
-                    #endif
 				}
 				else
 				{
-                    #ifdef PLATFORM_DOS
-           				printext16(0L,((i-topplc)<<3)+16L+((399360-pageoffset)/640),7,0,buffer,0);
-                    #else
 	    				printext16(0L,((i-topplc)<<3)+16L,7,0,buffer,0);
-                    #endif
 				}
 			}
 		}
@@ -1181,7 +1113,7 @@ int menuselect(void)
 			}
 			else if (strlen(menupath)+1+strlen(menuname[newhighlight]) < sizeof(menupath))
 			{
-                #if ((defined PLATFORM_DOS) || (defined PLATFORM_WIN32))
+                #if (defined PLATFORM_WIN32)
     				strcat(menupath,"\\");
                 #elif PLATFORM_UNIX
     				strcat(menupath,"/");
@@ -1197,11 +1129,7 @@ int menuselect(void)
 			sortfilenames();
 			newhighlight = 0;
 			ch = 0;
-#ifdef PLATFORM_DOS
-			fillscreen16((399360-pageoffset)>>3,0L,640L*336L);
-#else
 			fillscreen16(0, 0L,640L*336L);
-#endif
 		}
 	}
 	while ((ch != 13) && (ch != 27));
@@ -2219,10 +2147,6 @@ void overheadeditor(void)
 	pageoffset = 92160; ydim16 = 336;
 
     /* rcg08312000 whoops. Missed this one. */
-    #ifdef PLATFORM_DOS
-    	outpw(0x3d4,0x000c);
-    	outpw(0x3d4,0x000d);
-    #endif
 
 	pag = 0;
 	highlightcnt = -1;
@@ -2378,11 +2302,7 @@ void overheadeditor(void)
 					y2 = y1 + 7;
 					if ((x1 >= 0) && (x2 < 640) && (y1 >= 0) && (y2 < ydim16))
                     {
-                        #ifdef PLATFORM_DOS
-    						printext16(x1,y1+(pageoffset/640),0,7,dabuffer,1);
-                        #else
     						printext16(x1,y1,0,7,dabuffer,1);
-                        #endif
                     } /* if */
 				}
 			}
@@ -2410,11 +2330,7 @@ void overheadeditor(void)
 						y2 = y1 + 7;
 						if ((x1 >= 0) && (x2 < 640) && (y1 >= 0) && (y2 < ydim16))
                         {
-                            #ifdef PLATFORM_DOS
-    							printext16(x1,y1+(pageoffset/640),0,4,dabuffer,1);
-                            #else
 	    						printext16(x1,y1,0,4,dabuffer,1);
-                            #endif
                         } /* if */
 					}
 				}
@@ -2443,11 +2359,7 @@ void overheadeditor(void)
 						{
 							if ((sprite[i].cstat&1) == 0) col = 3; else col = 5;
                             {
-                                #ifdef PLATFORM_DOS
-    	    						printext16(x1,y1+(pageoffset/640),0,col,dabuffer,1);
-                                #else
         							printext16(x1,y1,0,col,dabuffer,1);
-                                #endif
                             } /* if */
 						}
 					}
@@ -2489,8 +2401,6 @@ void overheadeditor(void)
 			keystatus[88] = 0;
 			i = pageoffset; pageoffset = 92160;
 			j = ydim16; ydim16 = 480;
-			outpw(0x3d4,0x000c);
-			outpw(0x3d4,0x000d);
 			clear2dscreen();
 			draw2dgrid(posx,posy,ang,zoom,grid);
 			draw2dscreen(posx,posy,ang,zoom,grid);
@@ -3801,7 +3711,7 @@ void overheadeditor(void)
 				suckwall = -1;
 				split = 0;
 
-          		clearbufbyte((void *) FP_OFF(&wall[newnumwalls]),sizeof(walltype),0L);
+                        clearbufbyte((void *) ((intptr_t)(&wall[newnumwalls])),sizeof(walltype),0L);
 				wall[newnumwalls].extra = -1;
 
 				wall[newnumwalls].x = mousxplc;
@@ -3874,7 +3784,7 @@ void overheadeditor(void)
 
 						if (bad == 0)
 						{
-       						clearbufbyte((void *) FP_OFF(&wall[newnumwalls]),sizeof(walltype),0L);
+                                                clearbufbyte((void *) ((intptr_t)(&wall[newnumwalls])),sizeof(walltype),0L);
 							wall[newnumwalls].extra = -1;
 
 							wall[newnumwalls].x = mousxplc;
@@ -3910,7 +3820,7 @@ void overheadeditor(void)
 							if (clockdir(numwalls) == 1)
 								flipwalls(numwalls,newnumwalls);
 
-							clearbufbyte((void *) FP_OFF(&sector[numsectors]),sizeof(sectortype),0L);
+							clearbufbyte((void *) ((intptr_t)(&sector[numsectors])),sizeof(sectortype),0L);
 							sector[numsectors].extra = -1;
 
 							sector[numsectors].wallptr = numwalls;
@@ -3978,7 +3888,7 @@ void overheadeditor(void)
 						if (clockdir(numwalls) == 1)
 							flipwalls(numwalls,newnumwalls);
 
-						clearbufbyte((void *) FP_OFF(&sector[numsectors]),sizeof(sectortype),0L);
+						clearbufbyte((void *) ((intptr_t)(&sector[numsectors])),sizeof(sectortype),0L);
 						sector[numsectors].extra = -1;
 
 						sector[numsectors].wallptr = numwalls;

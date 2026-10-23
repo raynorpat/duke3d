@@ -14,15 +14,40 @@ sdl_driver.c unix_compat.c unix_compat.h win32_compat.h
 BUILDLIC.TXT LICENSE.md
 ```
 
+## Current source layout
+
+The import list above records the original filenames. The local module split
+moves their implementations as follows, retaining the original license notices
+and public header names:
+
+| Imported file | Current files |
+|---|---|
+| `a.c` | `draw.c` |
+| `mmulti.c` | `network.c` |
+| `cache1d.c` | `cache.c` (allocator/aging/diagnostics), `filesystem.c` (GRP, file I/O and LZW) |
+| `pragmas.c` | `math.c`, together with the math/table helpers extracted from `engine.c` |
+| `engine.c` | `engine.c` (world/renderer core), `display.c` (views, pixels/text and palette operations), `tiles.c` (tile/voxel resources and sprite bookkeeping), plus the helpers in `math.c` |
+
+`engine_internal.h` supplies only the declarations needed between these
+modules. `engine.c` still owns the `ENGINE` definitions from `build.h`, includes
+`polymost.c`, and bridges its private GL state for extracted display operations.
+The SDL backend and `../videoopts.c` keep their existing ownership. The split
+preserves the existing algorithms, release guards, public signatures, resource
+lifecycle and GL batch-flush behavior. Historical filenames below refer to
+those implementations before the split.
+
 ## Local changes
+
+- Removed the optional PhysicsFS backend, DOS platform/Watcom branches and
+  obsolete assembly dispatch. The portable C engine and native GRP/file I/O
+  are retained. The imported `doscmpat.h` has been removed; the original import
+  list above is historical provenance.
 
 - `VENDORED.md`: added (this file).
 - `CMakeLists.txt`: added (build glue).
-- `win32_compat.c`: added. Defines `hbits[]`, `_inp_handler()` and
-  `_kinp_handler()` for Windows; upstream only defines them in
+- `win32_compat.c`: added. Defines `hbits[]` for Windows; upstream only defines it in
   `unix_compat.c`, which refuses to build without `PLATFORM_UNIX`.
-- `win32_compat.h`: don't include `<dos.h>` under MSVC (it no longer ships
-  one); only map `snprintf` to `_snprintf` before VS2015; under MSVC, define
+- `win32_compat.h`: removed `<dos.h>` and the legacy port-I/O stubs; only map `snprintf` to `_snprintf` before VS2015; under MSVC, define
   `S_IRWXU`, `S_IRUSR`, `S_IWUSR`, `S_IRGRP`, `S_IWGRP` and `S_IROTH` (the
   game uses them for `mkdir` and `savetemp`).
 - `sdl_driver.c`: ported from SDL 1.2 to SDL2:
@@ -136,6 +161,20 @@ BUILDLIC.TXT LICENSE.md
 `DUKE3D_POLYMOST` CMake option, on by default, which also defines `USE_OPENGL`
 and links OpenGL). The first commit that adds it holds the upstream file
 unchanged.
+
+The local source is organized as `polymost.c` (scene traversal, projection and
+shared entry points), `polymost_soft.c` (software spans/debug rendering and its
+depth buffer), and `polymost_opengl.c` (GL state, textures, shaders/framebuffers,
+polygon submission and map tessellation). The shared file dispatches a projected
+polygon to its backend and uses private helpers for GL state transitions.
+Repeated sky/fog setup is shared within the OpenGL backend.
+
+`engine.c` still includes `polymost.c`, which includes the backend files in the
+same translation unit, with the GL include guarded by `USE_OPENGL`. CMake marks
+all three as `HEADER_FILE_ONLY`; they are not separate objects. This retains
+static engine/renderer state and public interfaces without exporting globals.
+Rasterization equations, frame bindings, batch-flush wrappers and call ordering
+are retained.
 
 ## Local changes
 

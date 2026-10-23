@@ -129,8 +129,6 @@ char *MUSIC_ErrorString(int ErrorNumber)
         case MUSIC_FMNotDetected:
             return("FM not detected error.");
 
-        case MUSIC_DPMI_Error:
-            return("DPMI error.");
 
         default:
             return("Unknown error.");
@@ -481,7 +479,7 @@ void MUSIC_StopFade(void)
 } // MUSIC_StopFade
 
 
-void MUSIC_RerouteMidiChannel(int channel, int cdecl (*function)( int event, int c1, int c2 ))
+void MUSIC_RerouteMidiChannel(int channel, int (*function)( int event, int c1, int c2 ))
 {
     uint32_t flags;
 

@@ -44,11 +44,6 @@
 #include "glsubmit.h"
 #endif
 
-/* need VirtualProtect() from win32 API... */
-#if ((defined PLATFORM_WIN32) && (defined USE_I386_ASM))
-#define WIN32_LEAN_AND_MEAN 1
-#include <windows.h>
-#endif
 
 typedef enum
 {
@@ -62,13 +57,7 @@ const char *renderer_name[RENDERER_TOTAL];
 
 static sdl_renderer_type renderer = RENDERER_SOFTWARE;
 
-/* !!! ugh. Clean this up. */
-#if (!defined __WATCOMC__)
 #include "a.h"
-#else
-extern int32_t setvlinebpl(int32_t);
-#pragma aux setvlinebpl parm [eax];
-#endif  /* __WATCOMC__ */
 
 #include "cache1d.h"
 
@@ -76,20 +65,6 @@ extern int32_t setvlinebpl(int32_t);
 #include "stb_image_write.h"
 
 
-/*
- * !!! I'd like this to be temporary. --ryan.
- * !!!  That is, the self-modifying part, so I can ditch the mprotect() stuff.
- */
-#if ((defined PLATFORM_UNIX) && (defined USE_I386_ASM))
-
-#include <sys/mman.h>
-#include <limits.h>
-
-#ifndef PAGESIZE
-#define PAGESIZE 4096
-#endif
-
-#endif
 
 #if (defined PLATFORM_WIN32)
 #include <malloc.h>  /* alloca() */
@@ -672,7 +647,7 @@ static void init_res_lookups(int davidoption, int framebuffer)
 
   	if (screen != NULL)
    	{
-       	if (screenalloctype == 0) kkfree((void *)screen);
+        if (screenalloctype == 0) free((void *)screen);
    	    if (screenalloctype == 1) suckcache((int32_t *)screen);
    		screen = NULL;
    	} /* if */
@@ -691,16 +666,16 @@ static void init_res_lookups(int davidoption, int framebuffer)
     	j = ydim*4*sizeof(int32_t);  /* Leave room for horizlookup&horizlookup2 */
 
     	screenalloctype = 0;
-	    if ((screen = (char *)kkmalloc(i+(j<<1))) == NULL)
+	    if ((screen = (char *)malloc(i+(j<<1))) == NULL)
     	{
 	    	 allocache((intptr_t *)&screen,i+(j<<1),&permanentlock);
     		 screenalloctype = 1;
     	}
 
         if (framebuffer)
-            frameplace = FP_OFF(screen);
-        horizlookup = (int32_t *)(FP_OFF(screen)+i);
-        horizlookup2 = (int32_t *)(FP_OFF(screen)+i+j);
+            frameplace = ((intptr_t)(screen));
+        horizlookup = (int32_t *)(((intptr_t)(screen))+i);
+        horizlookup2 = (int32_t *)(((intptr_t)(screen))+i+j);
     } /* if */
 
     calcpixelaspect();
@@ -2206,114 +2181,6 @@ unsigned char _readlastkeyhit(void)
 } /* _readlastkeyhit */
 
 
-/* !!! I'd like this to be temporary. --ryan. */
-#if (defined USE_I386_ASM)
-
-#  if (defined PLATFORM_UNIX)
-#    define PROT_R_W_X (PROT_READ | PROT_WRITE | PROT_EXEC)
-
-#  elif (defined PLATFORM_WIN32)
-#    ifndef PAGESIZE
-#      define PAGESIZE 4096
-#    endif
-#    define PROT_R_W_X PAGE_EXECUTE_READWRITE
-
-     static int mprotect(void *ptr, size_t len, int prot)
-     {
-         BOOL rc;
-         DWORD old = 0;
-         rc = VirtualProtect(ptr, len, prot, &old);
-         return(rc == 0);
-     }
-
-#endif
-
-#ifdef USE_I386_ASM
-int mprotect_align(const void *addr, size_t len, int prot)
-{
-    int retval;
-    uint32_t l = (uint32_t) addr;
-    l -= (l % PAGESIZE);
-    retval = mprotect((void *) l, len * 2, prot);
-    assert(retval == 0);
-    return(retval);
-} /* mprotect_align */
-
-
-void unprotect_ASM_pages(void)
-{
-    mprotect_align((const void *) asm_sethlinesizes, PAGESIZE, PROT_R_W_X);
-    mprotect_align((const void *) asm_setpalookupaddress, PAGESIZE, PROT_R_W_X);
-    mprotect_align((const void *) asm_setuphlineasm4, PAGESIZE, PROT_R_W_X);
-    mprotect_align((const void *) asm_hlineasm4, PAGESIZE, PROT_R_W_X);
-    mprotect_align((const void *) asm_setupvlineasm, PAGESIZE, PROT_R_W_X);
-    mprotect_align((const void *) asm_vlineasm4, PAGESIZE, PROT_R_W_X);
-    mprotect_align((const void *) asm_tvlineasm1, PAGESIZE, PROT_R_W_X);
-    mprotect_align((const void *) asm_tvlineasm2, PAGESIZE, PROT_R_W_X);
-    mprotect_align((const void *) asm_tspritevline, PAGESIZE, PROT_R_W_X);
-    mprotect_align((const void *) asm_thline, PAGESIZE, PROT_R_W_X);
-    mprotect_align((const void *) asm_prohlineasm4, PAGESIZE, PROT_R_W_X);
-    mprotect_align((const void *) asm_stretchhline, PAGESIZE, PROT_R_W_X);
-} /* unprotect_ASM_pages */
-#endif
-
-
-/*
-  global _sethlinesizes
-
-
-  global _prosethlinesizes
-  global _setvlinebpl
-  global _setpalookupaddress
-  global _prosetpalookupaddress
-  global _setuphlineasm4
-  global _hlineasm4
-  global _prohlineasm4
-  global _setupvlineasm
-  global _prosetupvlineasm
-  global _setupmvlineasm
-  global _setuptvlineasm
-  global _prevlineasm1
-  global _vlineasm1
-  global _mvlineasm1
-  global _fixtransluscence
-  global _settransnormal
-  global _settransreverse
-  global _tvlineasm1
-  global _vlineasm4
-  global _provlineasm4
-  global _mvlineasm4
-  global _setupspritevline
-  global _spritevline
-  global _msetupspritevline
-  global _mspritevline
-  global _tsetupspritevline
-  global _tspritevline
-  global _msethlineshift
-  global _mhline
-  global _mhlineskipmodify
-  global _tsethlineshift
-  global _thline
-  global _thlineskipmodify
-  global _setuptvlineasm2
-  global _tvlineasm2
-  global _setupslopevlin2
-  global _slopevlin2
-  global _setupslopevlin
-  global _slopevlin
-  global _setuprhlineasm4
-  global _rhlineasm4
-  global _setuprmhlineasm4
-  global _rmhlineasm4
-  global _setupqrhlineasm4
-  global _qrhlineasm4
-  global _setupdrawslab
-  global _drawslab
-  global _stretchhline
-  global _mmxoverlay
-*/
-
-#endif
 
 
 static __inline void init_debugging(void)
@@ -2469,9 +2336,6 @@ void _platform_init(int argc, char **argv, const char *title, const char *icon)
 
     init_debugging();
 
-    #if (defined USE_I386_ASM)
-        unprotect_ASM_pages();
-    #endif
 
     if (title == NULL)
         title = "BUILD";

@@ -14,8 +14,6 @@
 #if !defined(__SUNPRO_C)
 #include <endian.h>
 #endif
-#elif (defined PLATFORM_DOS)
-#include "doscmpat.h"
 #else
 #error Define your platform!
 #endif
@@ -44,9 +42,6 @@
 #error You need to define PLATFORM_TIMER_HZ for your platform.
 #endif
 
-#if (defined __WATCOMC__)
-#define snprintf _snprintf
-#endif
 
 #if (defined __SUNPRO_C)
 #define __inline inline

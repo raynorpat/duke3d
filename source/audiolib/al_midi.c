@@ -33,7 +33,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <stddef.h>
 #include <stdlib.h>
 //#include <math.h>
-#include "dpmi.h"
 #include "interrup.h"
 #include "sndcards.h"
 #include "oplemu.h"
@@ -153,7 +152,6 @@ static int AL_MaxMidiChannel = 16;
 **********************************************************************/
 
 
-#define AL_LockStart AL_SendOutputToPort
 
 
 /*---------------------------------------------------------------------
@@ -1235,19 +1233,7 @@ int AL_DetectFM
    }
 
 
-/*---------------------------------------------------------------------
-   Function: AL_LockEnd
 
-   Used for determining the length of the functions to lock in memory.
----------------------------------------------------------------------*/
-
-static void AL_LockEnd
-   (
-   void
-   )
-
-   {
-   }
 
 
 /*---------------------------------------------------------------------
@@ -1268,25 +1254,6 @@ void AL_Shutdown
    AL_ResetVoices();
    AL_Reset();
 
-   DPMI_UnlockMemoryRegion( AL_LockStart, AL_LockEnd );
-   DPMI_Unlock( slotVoice );
-   DPMI_Unlock( VoiceLevel );
-   DPMI_Unlock( VoiceKsl );
-   DPMI_Unlock( offsetSlot );
-   DPMI_Unlock( NotePitch );
-   DPMI_Unlock( OctavePitch );
-   DPMI_Unlock( NoteMod12 );
-   DPMI_Unlock( NoteDiv12 );
-   DPMI_Unlock( VoiceReserved );
-   DPMI_Unlock( Voice );
-   DPMI_Unlock( Voice_Pool );
-   DPMI_Unlock( Channel );
-   DPMI_Unlock( AL_LeftPort );
-   DPMI_Unlock( AL_RightPort );
-   DPMI_Unlock( AL_Stereo );
-   DPMI_Unlock( AL_SendStereo );
-   DPMI_Unlock( AL_OPL3 );
-   DPMI_Unlock( AL_MaxMidiChannel );
    }
 
 
@@ -1317,33 +1284,6 @@ int AL_Init
    )
 
    {
-   int status;
-
-   status  = DPMI_LockMemoryRegion( AL_LockStart, AL_LockEnd );
-   status |= DPMI_Lock( slotVoice );
-   status |= DPMI_Lock( VoiceLevel );
-   status |= DPMI_Lock( VoiceKsl );
-   status |= DPMI_Lock( offsetSlot );
-   status |= DPMI_Lock( NotePitch );
-   status |= DPMI_Lock( OctavePitch );
-   status |= DPMI_Lock( NoteMod12 );
-   status |= DPMI_Lock( NoteDiv12 );
-   status |= DPMI_Lock( VoiceReserved );
-   status |= DPMI_Lock( Voice );
-   status |= DPMI_Lock( Voice_Pool );
-   status |= DPMI_Lock( Channel );
-   status |= DPMI_Lock( AL_LeftPort );
-   status |= DPMI_Lock( AL_RightPort );
-   status |= DPMI_Lock( AL_Stereo );
-   status |= DPMI_Lock( AL_SendStereo );
-   status |= DPMI_Lock( AL_OPL3 );
-   status |= DPMI_Lock( AL_MaxMidiChannel );
-
-   if ( status != DPMI_Ok )
-      {
-      return( AL_Error );
-      }
-
    AL_Stereo = FALSE;
    AL_OPL3   = FALSE;
    AL_LeftPort = 0x388;

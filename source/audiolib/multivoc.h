@@ -53,8 +53,8 @@ enum MV_Errors
    MV_PasError,
    MV_SoundScapeError,
    MV_SoundSourceError,
-   MV_DPMI_Error,
-   MV_InvalidVOCFile,
+
+   MV_InvalidVOCFile = 11,
    MV_InvalidWAVFile,
    MV_InvalidMixMode,
    MV_SoundSourceFailure,
@@ -118,7 +118,5 @@ int   MV_GetReverseStereo( void );
 int   MV_Init( int soundcard, int MixRate, int Voices, int numchannels,
          int samplebits );
 int   MV_Shutdown( void );
-void  MV_UnlockMemory( void );
-int   MV_LockMemory( void );
 
 #endif

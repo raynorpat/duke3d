@@ -29,42 +29,6 @@
 #define BUILD_SDLJOYSTICK    "BUILD_SDLJOYSTICK"
 
 /* This part sucks. */
-#if (defined __WATCOMC__)
-#pragma aux (__cdecl) SDL_Init;
-#pragma aux (__cdecl) SDL_PumpEvents;
-#pragma aux (__cdecl) SDL_PollEvent;
-#pragma aux (__cdecl) SDL_GetMouseState;
-#pragma aux (__cdecl) SDL_WM_GrabInput;
-#pragma aux (__cdecl) SDL_GetError;
-#pragma aux (__cdecl) SDL_SetEventFilter;
-#pragma aux (__cdecl) SDL_WM_SetCaption;
-#pragma aux (__cdecl) SDL_ClearError;
-#pragma aux (__cdecl) SDL_SetVideoMode;
-#pragma aux (__cdecl) SDL_ClearError;
-#pragma aux (__cdecl) SDL_Quit;
-#pragma aux (__cdecl) SDL_QuitSubSystem;
-#pragma aux (__cdecl) SDL_GetTicks;
-#pragma aux (__cdecl) SDL_GetVideoInfo;
-#pragma aux (__cdecl) SDL_ListModes;
-#pragma aux (__cdecl) SDL_SetColors;
-#pragma aux (__cdecl) SDL_ShowCursor;
-#pragma aux (__cdecl) SDL_LockSurface;
-#pragma aux (__cdecl) SDL_UnlockSurface;
-#pragma aux (__cdecl) SDL_FillRect;
-#pragma aux (__cdecl) SDL_Delay;
-#pragma aux (__cdecl) SDL_AddTimer;
-#pragma aux (__cdecl) SDL_RemoveTimer;
-#pragma aux (__cdecl) SDL_Flip;
-#pragma aux (__cdecl) SDL_UpdateRect;
-#pragma aux (__cdecl) SDL_GetVideoSurface;
-#pragma aux (__cdecl) SDL_VideoDriverName;
-#pragma aux (__cdecl) SDL_SetPalette;
-#pragma aux (__cdecl) SDL_VideoModeOK;
-#pragma aux (__cdecl) SDL_GetClipRect;
-#pragma aux (__cdecl) SDL_SetClipRect;
-#pragma aux (__cdecl) SDL_WM_ToggleFullScreen;
-#pragma aux (__cdecl) SDL_Linked_Version;
-#endif  /* defined __WATCOMC__ */
 
 #endif  /* defined PLATFORM_SUPPORTS_SDL */
 
@@ -148,7 +112,7 @@ int setupmouse(void);
 void getmousearea(int *w, int *h);
 void readmousexy(short *x, short *y);
 void readmousebstatus(short *bstatus);
-void __interrupt __far keyhandler(void);
+void keyhandler(void);
 unsigned char _readlastkeyhit(void);
 
 /* timer krap. */
@@ -156,7 +120,7 @@ void inittimer(void);
 void uninittimer(void);
 
 /* this is implemented in the game, and your driver calls it. */
-void __interrupt __far timerhandler(void);
+void timerhandler(void);
 
 /* resolution inits. sdl_driver.c ... */
 int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim);

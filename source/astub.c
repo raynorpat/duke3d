@@ -63,10 +63,6 @@ Duke Lookup Table
 ********************************************************
 */
 
-#if PLATFORM_DOS
-#include <stdint.h>
-#include <io.h>
-#endif
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -133,7 +129,6 @@ static char buildcfgpath[1024];  /* found once: the load menu changes the cwd */
 
 
 
-//extern void __interrupt __far timerhandler(void);
 
 int32_t xoldtimerhandler;
 

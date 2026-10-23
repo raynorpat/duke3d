@@ -9,9 +9,6 @@
 
 #define ENGINE
 
-/* set this to something non-zero to get loadtile() debugging info on stderr. */
-#define BUILD_CACHEDEBUG 0
-
 #include <stdint.h>
 #include <string.h>
 
@@ -38,6 +35,9 @@
 #include "cache1d.h"
 
 #include "engine.h"
+#include "engine_internal.h"
+
+#define LOGICSQRT(x) ksqrt(x)
 
 int32_t stereowidth = 23040, stereopixelwidth = 28, ostereopixelwidth = -1;
 volatile int32_t stereomode = 0, visualpage, activepage, whiteband, blackband;
@@ -47,31 +47,13 @@ volatile char oa1, o3c2, ortca, ortcb, overtbits, laststereoint;
 
 #define MAXCLIPNUM 512
 #define MAXPERMS 512
-#define MAXTILEFILES 256
 #define MAXYSAVES ((MAXXDIM*MAXSPRITES)>>7)
 #define MAXNODESPERLINE 42   /* Warning: This depends on MAXYSAVES & MAXYDIM! */
 #define MAXWALLSB 2048
 #define MAXCLIPDIST 1024
 
-#ifdef PLATFORM_DOS
-	/* MUST CALL MALLOC THIS WAY TO FORCE CALLS TO KMALLOC! */
-void *kmalloc(size_t size) { return(malloc(size)); }
-void *kkmalloc(size_t size);
-#pragma aux kkmalloc =\
-	"call kmalloc",\
-	parm [eax]\
-
-	/* MUST CALL FREE THIS WAY TO FORCE CALLS TO KFREE! */
-void kfree(void *buffer) { free(buffer); }
-void kkfree(void *buffer);
-#pragma aux kkfree =\
-	"call kfree",\
-	parm [eax]\
-
-#endif
 
 #ifdef SUPERBUILD
-	/* MUST CALL LOADVOXEL THIS WAY BECAUSE WATCOM STINKS! */
 
 /* !!! wtf does this do?! --ryan. */
 static void loadvoxel(int32_t voxindex)
@@ -79,24 +61,12 @@ static void loadvoxel(int32_t voxindex)
     voxindex = 0;  /* prevent compiler whining. */
 }
 
-#if ((defined __WATCOMC__) && (defined PLATFORM_DOS))
-void kloadvoxel(int32_t voxindex);
-#pragma aux kloadvoxel =\
-	"call loadvoxel",\
-	parm [eax]\
-
-#else
 #define kloadvoxel(a) (loadvoxel(a))
-#endif
 
 	/* These variables need to be copied into BUILD */
 #define MAXXSIZ 128
 #define MAXYSIZ 128
 #define MAXZSIZ 200
-#define MAXVOXELS 512
-#define MAXVOXMIPS 5
-intptr_t voxoff[MAXVOXELS][MAXVOXMIPS];
-int32_t voxlock[MAXVOXELS][MAXVOXMIPS];
 static int32_t ggxinc[MAXXSIZ+1], ggyinc[MAXXSIZ+1];
 static int32_t lowrecip[1024], nytooclose, nytoofar;
 static uint32_t distrecip[16384];
@@ -110,8 +80,6 @@ int32_t transarea = 0, totalarea = 0, beforedrawrooms = 1;
 /* used to be static. --ryan. */
 int32_t oxdimen = -1, oviewingrange = -1, oxyaspect = -1;
 
-/* used to be static. --ryan. */
-int32_t curbrightness = 0;
 
 	/* Textured Map variables */
 static char globalpolytype;
@@ -127,54 +95,17 @@ intptr_t slopalookup[16384];
  * !!! can be made static again.  --ryan.
  */
 unsigned char permanentlock = 255;
-int32_t artversion, mapversion;
-char *pic = NULL;
-char picsiz[MAXTILES], tilefilenum[MAXTILES];
+int32_t mapversion;
 int32_t lastageclock;
-int32_t tilefileoffs[MAXTILES];
 
-int32_t artsize = 0, cachesize = 0;
-
-static short radarang[1280], radarang2[MAXXDIM+1];
-static unsigned short sqrtable[4096], shlookup[4096+256];
-char pow2char[8] = {1,2,4,8,16,32,64,-128};
-int32_t pow2long[32] =
-{
-	1L,2L,4L,8L,
-	16L,32L,64L,128L,
-	256L,512L,1024L,2048L,
-	4096L,8192L,16384L,32768L,
-	65536L,131072L,262144L,524288L,
-	1048576L,2097152L,4194304L,8388608L,
-	16777216L,33554432L,67108864L,134217728L,
-	268435456L,536870912L,1073741824L,2147483647L,
-};
-int32_t reciptable[2048], fpuasm;
+static short radarang2[MAXXDIM+1];
 
 char kensmessage[128];
 
 int has_altivec = 0;  /* PowerPC-specific. */
 
 
-/* rcg02132001 Cygwin support. */
-#if (defined C_IDENTIFIERS_UNDERSCORED)
-#define SYM_sqrtable   "_sqrtable"
-#define SYM_walock     "_walock"
-#define SYM_shlookup   "_shlookup"
-#define SYM_pow2char   "_pow2char"
-#define SYM_gotpic     "_gotpic"
-#define SYM_dmval      "_dmval"
-#else
-#define SYM_sqrtable   "sqrtable"
-#define SYM_walock     "walock"
-#define SYM_shlookup   "shlookup"
-#define SYM_pow2char   "pow2char"
-#define SYM_gotpic     "gotpic"
-#define SYM_dmval      "dmval"
-#endif
 
-char britable[16][64];
-char textfont[1024], smalltextfont[1024];
 
 static int32_t xb1[MAXWALLSB], yb1[MAXWALLSB], xb2[MAXWALLSB], yb2[MAXWALLSB];
 static int32_t rx1[MAXWALLSB], ry1[MAXWALLSB], rx2[MAXWALLSB], ry2[MAXWALLSB];
@@ -194,7 +125,6 @@ static int32_t spritesz[MAXSPRITESONSCREEN];
 static spritetype *tspriteptr[MAXSPRITESONSCREEN];
 
 short umost[MAXXDIM+1], dmost[MAXXDIM+1];
-static short bakumost[MAXXDIM+1], bakdmost[MAXXDIM+1];
 short uplc[MAXXDIM+1], dplc[MAXXDIM+1];
 static short uwall[MAXXDIM+1], dwall[MAXXDIM+1];
 static int32_t swplc[MAXXDIM+1], lplc[MAXXDIM+1];
@@ -236,21 +166,12 @@ int32_t globalx1, globaly1, globalx2, globaly2, globalx3, globaly3, globalzx;
 int32_t globalx, globaly, globalz;
 
 static short sectorborder[256], sectorbordercnt;
-static char tablesloaded = 0;
+
 int32_t pageoffset, ydim16, qsetmode = 0;
 int32_t startposx, startposy, startposz;
 short startang, startsectnum;
 short pointhighlight, linehighlight, highlightcnt;
 static int32_t lastx[MAXYDIM];
-char *transluc = NULL, paletteloaded = 0;
-
-#define FASTPALGRIDSIZ 8
-static int32_t rdist[129], gdist[129], bdist[129];
-static char colhere[((FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2))>>3];
-static char colhead[(FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2)*(FASTPALGRIDSIZ+2)];
-static int32_t colnext[256];
-static char coldist[8] = {0,1,2,3,4,3,2,1};
-static int32_t colscan[27];
 
 static short clipnum, hitwalls[4];
 int32_t hitscangoalx = (1<<29)-1, hitscangoaly = (1<<29)-1;
@@ -279,9 +200,6 @@ short searchit;
 int32_t searchx = -1, searchy;                     /* search input  */
 short searchsector, searchwall, searchstat;     /* search output */
 
-static char artfilename[20];
-static int32_t numtilefiles, artfil = -1, artfilnum, artfilplc;
-
 static char inpreparemirror = 0;
 static int32_t mirrorsx1, mirrorsy1, mirrorsx2, mirrorsy2;
 
@@ -293,468 +211,8 @@ int32_t totalclocklock;
 
 
 /* !!! can we move this somewhere?   --ryan. */
-#if ((defined USE_I386_ASM) && (defined __WATCOMC__))
-extern int32_t mmxoverlay();
-#pragma aux mmxoverlay modify [eax ebx ecx edx];
-extern int32_t sethlinesizes(int32_t,int32_t,int32_t);
-#pragma aux sethlinesizes parm [eax][ebx][ecx];
-extern int32_t setpalookupaddress(char *);
-#pragma aux setpalookupaddress parm [eax];
-extern int32_t setuphlineasm4(int32_t,int32_t);
-#pragma aux setuphlineasm4 parm [eax][ebx];
-extern int32_t hlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux hlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setuprhlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux setuprhlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t rhlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux rhlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setuprmhlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux setuprmhlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t rmhlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux rmhlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setupqrhlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux setupqrhlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t qrhlineasm4(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux qrhlineasm4 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setvlinebpl(int32_t);
-#pragma aux setvlinebpl parm [eax];
-extern int32_t fixtransluscence(int32_t);
-#pragma aux fixtransluscence parm [eax];
-extern int32_t prevlineasm1(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux prevlineasm1 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t vlineasm1(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux vlineasm1 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setuptvlineasm(int32_t);
-#pragma aux setuptvlineasm parm [eax];
-extern int32_t tvlineasm1(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux tvlineasm1 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setuptvlineasm2(int32_t,int32_t,int32_t);
-#pragma aux setuptvlineasm2 parm [eax][ebx][ecx];
-extern int32_t tvlineasm2(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux tvlineasm2 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t mvlineasm1(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux mvlineasm1 parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t setupvlineasm(int32_t);
-#pragma aux setupvlineasm parm [eax];
-extern int32_t vlineasm4(int32_t,int32_t);
-#pragma aux vlineasm4 parm [ecx][edi] modify [eax ebx ecx edx esi edi];
-extern int32_t setupmvlineasm(int32_t);
-#pragma aux setupmvlineasm parm [eax];
-extern int32_t mvlineasm4(int32_t,int32_t);
-#pragma aux mvlineasm4 parm [ecx][edi] modify [eax ebx ecx edx esi edi];
-extern void setupspritevline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux setupspritevline parm [eax][ebx][ecx][edx][esi][edi];
-extern void spritevline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux spritevline parm [eax][ebx][ecx][edx][esi][edi];
-extern void msetupspritevline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux msetupspritevline parm [eax][ebx][ecx][edx][esi][edi];
-extern void mspritevline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux mspritevline parm [eax][ebx][ecx][edx][esi][edi];
-extern void tsetupspritevline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux tsetupspritevline parm [eax][ebx][ecx][edx][esi][edi];
-extern void tspritevline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux tspritevline parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t mhline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux mhline parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t mhlineskipmodify(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux mhlineskipmodify parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t msethlineshift(int32_t,int32_t);
-#pragma aux msethlineshift parm [eax][ebx];
-extern int32_t thline(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux thline parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t thlineskipmodify(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux thlineskipmodify parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t tsethlineshift(int32_t,int32_t);
-#pragma aux tsethlineshift parm [eax][ebx];
-extern int32_t setupslopevlin(int32_t,int32_t,int32_t);
-#pragma aux setupslopevlin parm [eax][ebx][ecx] modify [edx];
-extern int32_t slopevlin(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux slopevlin parm [eax][ebx][ecx][edx][esi][edi];
-extern int32_t settransnormal();
-#pragma aux settransnormal parm;
-extern int32_t settransreverse();
-#pragma aux settransreverse parm;
-extern int32_t setupdrawslab(int32_t,int32_t);
-#pragma aux setupdrawslab parm [eax][ebx];
-extern int32_t drawslab(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
-#pragma aux drawslab parm [eax][ebx][ecx][edx][esi][edi];
-#else
 #include "a.h"
-#endif
 
-
-#if (defined USE_I386_ASM)
-    #if (defined __WATCOMC__)
-
-        int32_t nsqrtasm(int param);
-        #pragma aux nsqrtasm =\
-        "test eax, 0xff000000",\
-        "mov ebx, eax",\
-        "jnz short over24",\
-        "shr ebx, 12",\
-        "mov cx, word ptr shlookup[ebx*2]",\
-        "jmp short under24",\
-        "over24: shr ebx, 24",\
-        "mov cx, word ptr shlookup[ebx*2+8192]",\
-        "under24: shr eax, cl",\
-        "mov cl, ch",\
-        "mov ax, word ptr sqrtable[eax*2]",\
-        "shr eax, cl",\
-	    parm nomemory [eax]\
-	    modify exact [eax ebx ecx]\
-
-    #elif (defined __GNUC__) || (defined __ICC)
-        static __attribute__((noinline)) int32_t nsqrtasm(int i1)
-        {
-            int32_t retval;
-            __asm__ __volatile__ (
-                "\n\t"
-            	"testl $0xff000000, %%eax\n\t"
-	            "movl %%eax, %%ebx\n\t"
-    	        "jnz nsqrover24\n\t"
-        	    "shrl $12, %%ebx\n\t"
-            	"movw " SYM_shlookup "(, %%ebx, 2), %%cx\n\t"
-	            "jmp nsqrunder24\n\t"
-        	    "nsqrover24: shr $24, %%ebx\n\t"
-    	        "movw (" SYM_shlookup "+ 8192)(, %%ebx, 2), %%cx\n\t"
-        	    "nsqrunder24: shrl %%cl, %%eax\n\t"
-    	        "movb %%ch, %%cl\n\t"
-        	    "movw " SYM_sqrtable "(, %%eax, 2), %%ax\n\t"
-    	        "shrl %%cl, %%eax\n\t"
-            : "=a" (retval) : "a" (i1) : "ebx", "ecx", "cc");
-            return(retval);
-        } /* nsqrtasm */
-
-    #elif (defined _MSC_VER)
-        int32_t nsqrtasm(int param)
-		{
-            __asm
-            {
-                mov eax, param
-                test eax, 0xff000000
-                mov ebx, eax
-                jnz short over24
-                shr ebx, 12
-                mov cx, word ptr shlookup[ebx*2]
-                jmp short under24
-                over24: shr ebx, 24
-                mov cx, word ptr shlookup[ebx*2+8192]
-                under24: shr eax, cl
-                mov cl, ch
-                mov ax, word ptr sqrtable[eax*2]
-                shr eax, cl
-                mov param, eax
-            } /* asm */
-            return(param);
-        }
-    #else
-        #error Please write Assembly code for your platform!
-    #endif
-
-#else /* !defined USE_I386_ASM */
-        int32_t nsqrtasm(uint32_t param)
-	{
-	    unsigned short *shlookup_a = (unsigned short*)shlookup;
-	    unsigned short *sqrtable_a = (unsigned short*)sqrtable;
-	    unsigned short cx;
-
-	    if (param & 0xff000000)
-		    cx = shlookup_a[(param>>24)+4096];
-	    else
-		    cx = shlookup_a[param>>12];
-
-	    param = param >> (cx&0xff);
-	    param = ((param&0xffff0000)|sqrtable_a[param]);
-	    param = param >> ((cx&0xff00)>>8);
-
-	    return param;
-	}
-#endif /* defined USE_I386_ASM */
-
-
-#if (defined USE_I386_ASM)
-    #if (defined __WATCOMC__)
-        /* 0x007ff000 is (11<<13), 0x3f800000 is (127<<23) */
-        int32_t krecipasm(int32_t param);
-        #pragma aux krecipasm =\
-	    "mov fpuasm, eax",\
-	    "fild dword ptr fpuasm",\
-	    "add eax, eax",\
-	    "fstp dword ptr fpuasm",\
-	    "sbb ebx, ebx",\
-	    "mov eax, fpuasm",\
-	    "mov ecx, eax",\
-	    "and eax, 0x007ff000",\
-	    "shr eax, 10",\
-	    "sub ecx, 0x3f800000",\
-	    "shr ecx, 23",\
-	    "mov eax, dword ptr reciptable[eax]",\
-	    "sar eax, cl",\
-	    "xor eax, ebx",\
-	    parm [eax]\
-	    modify exact [eax ebx ecx]\
-
-    #elif (defined __GNUC__) || (defined __ICC)
-        static int32_t krecipasm(int32_t i1)
-        {
-            int32_t retval;
-            __asm__ __volatile__ (
-                "\n\t"
-                "call _asm_krecipasm\n\t"
-            : "=a" (retval) : "a" (i1)
-        	: "cc", "ebx", "ecx", "memory");
-            return(retval);
-        } /* krecipasm */
-
-    #elif (defined _MSC_VER)
-        /* 0x007ff000 is (11<<13), 0x3f800000 is (127<<23) */
-        int32_t krecipasm(int32_t param)
-        {
-            __asm
-            {
-                mov eax, param
-	            mov fpuasm, eax
-	            fild dword ptr fpuasm
-	            add eax, eax
-	            fstp dword ptr fpuasm
-	            sbb ebx, ebx
-	            mov eax, fpuasm
-	            mov ecx, eax
-	            and eax, 0x007ff000
-	            shr eax, 10
-	            sub ecx, 0x3f800000
-	            shr ecx, 23
-	            mov eax, dword ptr reciptable[eax]
-	            sar eax, cl
-	            xor eax, ebx
-                mov param,eax
-            } /* asm */
-            return(param);
-        } /* krecipasm */
-    #else
-        #error Please write Assembly for your platform!
-    #endif
-
-#else  /* USE_I386_ASM */
-
-        static int32_t krecipasm(int32_t param)
-        {
-		unsigned int xormask;
-		int mantissa;
-		int exponent;
-		int32_t recip;
-
-		union {
-		float f;
-		unsigned int i;
-		} fi;
-
-		fi.f = (float) param;
-
-		fpuasm = fi.i;
-
-		xormask = (param < 0) ? 0xffffffff : 0;
-
-		mantissa = (fi.i & 0x007ff000) >> 12;
-		exponent = (fi.i - 0x3f800000) >> 23;
-
-		recip = (reciptable[mantissa] >> exponent) ^ xormask;
-
-		return recip;
-        } /* krecipasm */
-/*
-    static long krecipasm(long x)
-    {
-        float xf;
-        int z;
-        int not;
-    
-        if (x & 0x80000000)
-            not = 0x0FFFFFFFF;
-        else
-            not = 0;
-  
-        xf = (float)x;
-    
-        
-        x = *((int*)(&xf));
-        z = x;
-      
-        x = x & 0x007FF000;
-        x = x >> 10;
-    
-        z = z - 0x03F800000;
-        z = z >> 23;
-    
-        x = shift_algebraic_right(reciptable[(x>>2)], z) ^ not;
-        return x;
-    } 
-    */
-#endif /* defined USE_I386_ASM */
-
-
-
-#if (defined USE_I386_ASM)
-
-    #if (defined __WATCOMC__)
-        int setgotpic(int32_t param);
-        #pragma aux setgotpic =\
-        "mov ebx, eax",\
-        "cmp byte ptr walock[eax], 200",\
-        "jae skipit",\
-        "mov byte ptr walock[eax], 199",\
-        "skipit: shr eax, 3",\
-        "and ebx, 7",\
-        "mov dl, byte ptr gotpic[eax]",\
-        "mov bl, byte ptr pow2char[ebx]",\
-        "or dl, bl",\
-        "mov byte ptr gotpic[eax], dl",\
-        parm [eax]\
-        modify exact [eax ebx ecx edx]\
-
-    #elif (defined __GNUC__) || (defined __ICC)
-
-        int __attribute__((noinline)) setgotpic(int32_t i1)
-        {
-            int retval = 0;
-            __asm__ __volatile__ (
-                "\n\t"
-                "movl %%eax, %%ebx\n\t"
-            	"cmpb $200, " SYM_walock "(%%eax)\n\t"
-            	"jae setgotpic_skipit\n\t"
-            	"movb $199, " SYM_walock "(%%eax)\n\t"
-            	"setgotpic_skipit: shrl $3, %%eax\n\t"
-            	"andl $7, %%ebx\n\t"
-            	"movb " SYM_gotpic "(%%eax), %%dl\n\t"
-            	"movb " SYM_pow2char "(%%ebx), %%bl\n\t"
-            	"orb %%bl, %%dl\n\t"
-            	"movb %%dl, (" SYM_gotpic ")(%%eax)\n\t"
-            : "=a" (retval) : "a" (i1) : "ebx", "ecx", "edx", "cc", "memory");
-            return(retval);
-        } /* setgotpic */
-
-    #elif (defined _MSC_VER)
-        int setgotpic(int32_t param)
-        {
-            __asm
-            {
-                mov eax, param
-                mov ebx, eax
-                cmp byte ptr walock[eax], 200
-                jae skipit
-                mov byte ptr walock[eax], 199
-                skipit: shr eax, 3
-                and ebx, 7
-                mov dl, byte ptr gotpic[eax]
-                mov bl, byte ptr pow2char[ebx]
-                or dl, bl
-                mov byte ptr gotpic[eax], dl
-                mov param, eax
-            } /* asm */
-            return(param);
-        } /* setgotpic */
-
-    #else
-        #error Please write Assembly for your platform!
-    #endif
-
-#else   /* !defined USE_I386_ASM */
-        void setgotpic(uint32_t param)
-        {
-	    unsigned char *gotpic_a = (unsigned char*)gotpic;
-	    unsigned char *walock_a = (unsigned char*)walock;
-	    unsigned char *pow2char_a = (unsigned char*)pow2char;
-	    
-	    if (walock_a[param] < 200) walock_a[param] = 199;
-
-	    gotpic_a[param>>3] |= pow2char_a[param&7];
-        }
-#endif /* defined USE_I386_ASM */
-
-
-#if (defined USE_I386_ASM)
-    #if (defined __WATCOMC__)
-        int32_t getclipmask(int i1, int i2, int i3, int i4);
-        #pragma aux getclipmask =\
-        "sar eax, 31",\
-        "add ebx, ebx",\
-        "adc eax, eax",\
-        "add ecx, ecx",\
-        "adc eax, eax",\
-        "add edx, edx",\
-        "adc eax, eax",\
-        "mov ebx, eax",\
-        "shl ebx, 4",\
-        "or al, 0xf0",\
-        "xor eax, ebx",\
-        parm [eax][ebx][ecx][edx]\
-        modify exact [eax ebx ecx edx]\
-
-  #elif (defined __GNUC__) || (defined __ICC)
-        int32_t getclipmask(int i1, int i2, int i3, int i4)
-        {
-            int retval;
-            __asm__ __volatile__ (
-        		"\n\t"
-                "sarl $31, %%eax\n\t"
-        		"addl %%ebx, %%ebx\n\t"
-        		"adcl %%eax, %%eax\n\t"
-        		"addl %%ecx, %%ecx\n\t"
-        		"adcl %%eax, %%eax\n\t"
-        		"addl %%edx, %%edx\n\t"
-        		"adcl %%eax, %%eax\n\t"
-        		"movl %%eax, %%ebx\n\t"
-        		"shll $4, %%ebx\n\t"
-        		"orb $0xf0, %%al\n\t"
-        		"xorl %%ebx, %%eax\n\t"
-        	: "=a" (retval) : "a" (i1), "b" (i2), "c" (i3), "d" (i4)
-        	: "cc", "memory");
-            return(retval);
-        } /* getclipmask */
-
-    #elif (defined _MSC_VER)
-        int32_t getclipmask(int i1, int i2, int i3, int i4)
-        {
-            __asm
-            {
-                mov eax, i1
-                mov ebx, i2
-                mov ecx, i3
-                mov edx, i4
-                sar eax, 31
-                add ebx, ebx
-                adc eax, eax
-                add ecx, ecx
-                adc eax, eax
-                add edx, edx
-                adc eax, eax
-                mov ebx, eax
-                shl ebx, 4
-                or al, 0xf0
-                xor eax, ebx
-                mov i1, eax
-            } /* asm */
-            return(i1);
-        } /* getclipmask */
-
-    #else
-        #error Please write Assembly for your platform!
-    #endif
-
-#else  /* !defined USE_I386_ASM */
-        int32_t getclipmask(int i1, int i2, int i3, int i4)
-        {
-	    uint32_t eax;
-	    eax = i1 >> 31;
-	    eax = eax << 1; i2 *= 2;
-	    if (i2&0x80000000) { eax++; }
-	    eax = eax << 1; i3 *= 2;
-	    if (i3&0x80000000) { eax++; }
-	    eax = eax << 1; i4 *= 2;
-	    if (i4&0x80000000) { eax++; }
-	    return ((eax<<4)^(eax|0xf0));
-        }
-#endif /* defined USE_I386_ASM */
 
 static void scansector (short sectnum)
 {
@@ -1013,32 +471,6 @@ static void slowhline (int32_t xr, int32_t yp)
 }
 
 
-static int animateoffs(short tilenum, short fakevar)
-{
-	int32_t i, k, offs;
-
-	offs = 0;
-	i = (totalclocklock>>((picanm[tilenum]>>24)&15));
-	if ((picanm[tilenum]&63) > 0)
-	{
-		switch(picanm[tilenum]&192)
-		{
-			case 64:
-				k = (i%((picanm[tilenum]&63)<<1));
-				if (k < (picanm[tilenum]&63))
-					offs = k;
-				else
-					offs = (((picanm[tilenum]&63)<<1)-k);
-				break;
-			case 128:
-				offs = (i%((picanm[tilenum]&63)+1));
-					break;
-			case 192:
-				offs = -(i%((picanm[tilenum]&63)+1));
-		}
-	}
-	return(offs);
-}
 
 
 /* renders non-parallaxed ceilings. --ryan. */
@@ -1083,7 +515,7 @@ static void ceilscan (int32_t x1, int32_t x2, int32_t sectnum)
 		j = sec->wallptr;
 		ox = wall[wall[j].point2].x - wall[j].x;
 		oy = wall[wall[j].point2].y - wall[j].y;
-		i = nsqrtasm(ox*ox+oy*oy); if (i == 0) i = 1024; else i = 1048576/i;
+		i = engine_render_sqrt(ox*ox+oy*oy); if (i == 0) i = 1024; else i = 1048576/i;
 		globalx1 = mulscale10(dmulscale10(ox,singlobalang,-oy,cosglobalang),i);
 		globaly1 = mulscale10(dmulscale10(ox,cosglobalang,oy,singlobalang),i);
 		globalx2 = -globalx1;
@@ -1251,7 +683,7 @@ static void florscan (int32_t x1, int32_t x2, int32_t sectnum)
 		j = sec->wallptr;
 		ox = wall[wall[j].point2].x - wall[j].x;
 		oy = wall[wall[j].point2].y - wall[j].y;
-		i = nsqrtasm(ox*ox+oy*oy); if (i == 0) i = 1024; else i = 1048576/i;
+		i = engine_render_sqrt(ox*ox+oy*oy); if (i == 0) i = 1024; else i = 1048576/i;
 		globalx1 = mulscale10(dmulscale10(ox,singlobalang,-oy,cosglobalang),i);
 		globaly1 = mulscale10(dmulscale10(ox,cosglobalang,oy,singlobalang),i);
 		globalx2 = -globalx1;
@@ -1424,7 +856,7 @@ static void wallscan(int32_t x1, int32_t x2,
 	ynice = (pow2long[picsiz[globalpicnum]>>4] == tsizy);
 	if (ynice) tsizy = (picsiz[globalpicnum]>>4);
 
-	fpalookup = FP_OFF(palookup[globalpal]);
+	fpalookup = ((intptr_t)(palookup[globalpal]));
 
 	setupvlineasm(globalshiftval);
 
@@ -1553,7 +985,7 @@ static void maskwallscan(int32_t x1, int32_t x2,
 	ynice = (pow2long[picsiz[globalpicnum]>>4] == tsizy);
 	if (ynice) tsizy = (picsiz[globalpicnum]>>4);
 
-	fpalookup = FP_OFF(palookup[globalpal]);
+	fpalookup = ((intptr_t)(palookup[globalpal]));
 
 	setupmvlineasm(globalshiftval);
 
@@ -1842,7 +1274,7 @@ static void grouscan (int32_t dax1, int32_t dax2, int32_t sectnum, char dastat)
 	wal = &wall[sec->wallptr];
 	wx = wall[wal->point2].x - wal->x;
 	wy = wall[wal->point2].y - wal->y;
-	dasqr = krecipasm(nsqrtasm(wx*wx+wy*wy));
+	dasqr = engine_recip(engine_render_sqrt(wx*wx+wy*wy));
 	i = mulscale21(daslope,dasqr);
 	wx *= i; wy *= i;
 
@@ -1862,7 +1294,7 @@ static void grouscan (int32_t dax1, int32_t dax2, int32_t sectnum, char dastat)
 		dx = mulscale14(wall[wal->point2].x-wal->x,dasqr);
 		dy = mulscale14(wall[wal->point2].y-wal->y,dasqr);
 
-		i = nsqrtasm(daslope*daslope+16777216);
+		i = engine_render_sqrt(daslope*daslope+16777216);
 
 		x = globalx; y = globaly;
 		globalx = dmulscale16(x,dx,y,dy);
@@ -1911,7 +1343,7 @@ static void grouscan (int32_t dax1, int32_t dax2, int32_t sectnum, char dastat)
 	if (sec->visibility != 0) globvis = mulscale4(globvis,(int32_t)((unsigned char)(sec->visibility+16)));
 	globvis = mulscale13(globvis,daz);
 	globvis = mulscale16(globvis,xdimscale);
-	fpalookup = FP_OFF(palookup[globalpal]);
+	fpalookup = ((intptr_t)(palookup[globalpal]));
 
 	setupslopevlin(((int32_t)(picsiz[globalpicnum]&15))+(((int32_t)(picsiz[globalpicnum]>>4))<<8),waloff[globalpicnum],-ylookup[1]);
 
@@ -1936,19 +1368,19 @@ static void grouscan (int32_t dax1, int32_t dax2, int32_t sectnum, char dastat)
 			nptr2 = &slopalookup[y2+(shoffs>>15)];
 			while (nptr1 <= mptr1)
 			{
-				*mptr1-- = fpalookup + (getpalookup((int32_t)mulscale24(krecipasm(m1),globvis),globalshade)<<8);
+				*mptr1-- = fpalookup + (getpalookup((int32_t)mulscale24(engine_recip(m1),globvis),globalshade)<<8);
 				m1 -= l;
 			}
 			while (nptr2 >= mptr2)
 			{
-				*mptr2++ = fpalookup + (getpalookup((int32_t)mulscale24(krecipasm(m2),globvis),globalshade)<<8);
+				*mptr2++ = fpalookup + (getpalookup((int32_t)mulscale24(engine_recip(m2),globvis),globalshade)<<8);
 				m2 += l;
 			}
 
 			globalx3 = (globalx2>>10);
 			globaly3 = (globaly2>>10);
 			asm3 = mulscale16(y2,globalzd) + (globalzx>>6);
-			slopevlin(ylookup[y2]+x+frameoffset,krecipasm((int32_t)asm3>>3),nptr2,y2-y1+1,globalx1,globaly1);
+			slopevlin(ylookup[y2]+x+frameoffset,engine_recip((int32_t)asm3>>3),nptr2,y2-y1+1,globalx1,globaly1);
 
 			if ((x&15) == 0) faketimerhandler();
 		}
@@ -2059,7 +1491,7 @@ static int wallmost(short *mostbuf, int32_t w, int32_t sectnum, char dastat)
 
 	fw = sector[sectnum].wallptr; i = wall[fw].point2;
 	dx = wall[i].x-wall[fw].x; dy = wall[i].y-wall[fw].y;
-	dasqr = krecipasm(nsqrtasm(dx*dx+dy*dy));
+	dasqr = engine_recip(engine_render_sqrt(dx*dx+dy*dy));
 
 	if (xb1[w] == 0)
 		{ xv = cosglobalang+sinviewingrangeglobalang; yv = singlobalang-cosviewingrangeglobalang; }
@@ -2643,6 +2075,29 @@ unsigned char palfadedelta = 0;
 #include "polymost.c"
 #endif
 
+#if defined(POLYMOST) && defined(USE_OPENGL)
+int engine_gl_indexedtarget(void)
+{
+	return polymost_shaderdraw(0) && !glshcolor;
+}
+
+void engine_gl_2dcolor(int32_t col)
+{
+	polymost_2dcolor(col);
+}
+
+void engine_gl_lookupchanged(void)
+{
+	glshlookupdirty = 1;
+}
+
+void engine_gl_resetview(void)
+{
+	glox1 = -1;
+}
+#endif
+
+
 
 void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
                short daang, int32_t dahoriz, short dacursectnum)
@@ -2700,7 +2155,7 @@ void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
 		}
 		globalposx += mulscale24(singlobalang,i);
 		globalposy -= mulscale24(cosglobalang,i);
-		if (vidoption == 6) frameplace = FP_OFF(screen)+(activepage&1)*65536;
+		if (vidoption == 6) frameplace = ((intptr_t)(screen))+(activepage&1)*65536;
 	}
 
 	if ((xyaspect != oxyaspect) || (xdimen != oxdimen) || (viewingrange != oviewingrange))
@@ -2737,7 +2192,7 @@ void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
  */
 #if 0
 	if (smostwallcnt < 0)
-		if (getkensmessagecrc(FP_OFF(kensmessage)) != 0x56c764d4)
+		if (getkensmessagecrc(((intptr_t)(kensmessage))) != 0x56c764d4)
 			{ setvmode(0x3); printf("Nice try.\n"); exit(0); }
 #endif
 
@@ -2853,7 +2308,7 @@ static void transmaskvline (int32_t x)
 	y2v--;
 	if (y2v < y1v) return;
 
-	palookupoffs = FP_OFF(palookup[globalpal]) + (getpalookup((int32_t)mulscale16(swall[x],globvis),globalshade)<<8);
+	palookupoffs = ((intptr_t)(palookup[globalpal])) + (getpalookup((int32_t)mulscale16(swall[x],globvis),globalshade)<<8);
 
 	vinc = swall[x]*globalyscale;
 	vplc = globalzd + vinc*(y1v-globalhoriz+1);
@@ -2887,8 +2342,8 @@ static void transmaskvline2 (int32_t x)
 	y2ve[1] = min(dwall[x2],startdmost[x2+windowx1]-windowy1)-1;
 	if (y2ve[1] < y1ve[1]) { transmaskvline(x); return; }
 
-	palookupoffse[0] = FP_OFF(palookup[globalpal]) + (getpalookup((int32_t)mulscale16(swall[x],globvis),globalshade)<<8);
-	palookupoffse[1] = FP_OFF(palookup[globalpal]) + (getpalookup((int32_t)mulscale16(swall[x2],globvis),globalshade)<<8);
+	palookupoffse[0] = ((intptr_t)(palookup[globalpal])) + (getpalookup((int32_t)mulscale16(swall[x],globvis),globalshade)<<8);
+	palookupoffse[1] = ((intptr_t)(palookup[globalpal])) + (getpalookup((int32_t)mulscale16(swall[x2],globvis),globalshade)<<8);
 
 	setuptvlineasm2(globalshiftval,palookupoffse[0],palookupoffse[1]);
 
@@ -3108,7 +2563,7 @@ int saveboard(char *filename, int32_t *daposx, int32_t *daposy,
     walltype *w;
     sectortype *sect;
 
-    #if ((defined PLATFORM_DOS) || (defined PLATFORM_WIN32))
+    #if (defined PLATFORM_WIN32)
         permissions = S_IWRITE;
     #elif (defined PLATFORM_UNIX)
         permissions = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
@@ -3230,212 +2685,6 @@ int saveboard(char *filename, int32_t *daposx, int32_t *daposy,
 }
 
 
-#if (BUILD_ENGINEREV < 19960427L)
-/* Before revision 19960427 the game logic took square roots with ksqrtasm
- * from a 2048-entry table built by Newton's method. Rendering keeps the
- * table above. */
-static unsigned short ksqrtable[2048];
-
-static void initksqrt1996(void)
-{
-	uint32_t i, root, num;
-	int32_t temp;
-
-	for(i=0;i<2048;i++)
-	{
-		root = 128;
-		num = i<<20;
-		do
-		{
-			temp = root;
-			root = (root+num/root)>>1;
-		} while((temp-root+1) > 2);
-		temp = root*root-num;
-		while (klabs(temp-2*root+1) < klabs(temp))
-		{
-			temp += -(2*root)+1;
-			root--;
-		}
-		while (klabs(temp+2*root+1) < klabs(temp))
-		{
-			temp += 2*root+1;
-			root++;
-		}
-		ksqrtable[i] = (unsigned short)root;
-	}
-}
-
-/* The 1996 ksqrtasm: below 2^11 a table lookup, above it the table at a
- * reduced precision, scaled back up. */
-static int32_t ksqrtasm(int32_t num)
-{
-	uint32_t a = (uint32_t)num;
-	int32_t b, r;
-
-	if (num < 0) a = 0u-a;
-	if (a < 2048) r = ksqrtable[a];
-	else
-	{
-		for(b=31;!(a>>b);b--);
-		b = (b-9)&~1;
-		r = ksqrtable[a>>b]<<(b>>1);
-	}
-	return(r>>10);
-}
-#define LOGICSQRT(x) ksqrtasm(x)
-#else
-#define LOGICSQRT(x) nsqrtasm(x)
-#endif
-
-static void initksqrt(void)
-{
-	int32_t i, j, k;
-
-	j = 1; k = 0;
-	for(i=0;i<4096;i++)
-	{
-		if (i >= j) { j <<= 2; k++; }
-		sqrtable[i] = (unsigned short)(msqrtasm((i<<18)+131072)<<1);
-		shlookup[i] = (k<<1)+((10-k)<<8);
-		if (i < 256) shlookup[i+4096] = ((k+6)<<1)+((10-(k+6))<<8);
-	}
-}
-
-
-static void loadtables(void)
-{
-	int32_t i, fil;
-
-	if (tablesloaded == 0)
-	{
-		initksqrt();
-#if (BUILD_ENGINEREV < 19960427L)
-		initksqrt1996();
-#endif
-
-		for(i=0;i<2048;i++) reciptable[i] = divscale30(2048L,i+2048);
-
-		if ((fil = kopen4load("tables.dat",0)) != -1)
-		{
-            for (i = 0; i < 2048; i++)
-				kread16(fil,&sintable[i]);
-
-            for (i = 0; i < 640; i++)
-				kread16(fil,&radarang[i]);
-
-			for(i=0;i<640;i++) radarang[1279-i] = -radarang[i];
-			kread(fil,textfont,1024);
-			kread(fil,smalltextfont,1024);
-			kread(fil,britable,1024);
-			kclose(fil);
-		}
-		tablesloaded = 1;
-	}
-}
-
-
-static void initfastcolorlookup(int32_t rscale, int32_t gscale, int32_t bscale)
-{
-	int32_t i, j, x, y, z;
-	char *pal1;
-
-	j = 0;
-	for(i=64;i>=0;i--)
-	{
-		/*j = (i-64)*(i-64);*/
-		rdist[i] = rdist[128-i] = j*rscale;
-		gdist[i] = gdist[128-i] = j*gscale;
-		bdist[i] = bdist[128-i] = j*bscale;
-		j += 129-(i<<1);
-	}
-
-	clearbufbyte((void *)FP_OFF(colhere),sizeof(colhere),0L);
-	clearbufbyte((void *)FP_OFF(colhead),sizeof(colhead),0L);
-
-	pal1 = (char *)&palette[768-3];
-	for(i=255;i>=0;i--,pal1-=3)
-	{
-		j = (pal1[0]>>3)*FASTPALGRIDSIZ*FASTPALGRIDSIZ+(pal1[1]>>3)*FASTPALGRIDSIZ+(pal1[2]>>3)+FASTPALGRIDSIZ*FASTPALGRIDSIZ+FASTPALGRIDSIZ+1;
-		if (colhere[j>>3]&pow2char[j&7]) colnext[i] = colhead[j]; else colnext[i] = -1;
-		colhead[j] = i;
-		colhere[j>>3] |= pow2char[j&7];
-	}
-
-	i = 0;
-	for(x=-FASTPALGRIDSIZ*FASTPALGRIDSIZ;x<=FASTPALGRIDSIZ*FASTPALGRIDSIZ;x+=FASTPALGRIDSIZ*FASTPALGRIDSIZ)
-		for(y=-FASTPALGRIDSIZ;y<=FASTPALGRIDSIZ;y+=FASTPALGRIDSIZ)
-			for(z=-1;z<=1;z++)
-				colscan[i++] = x+y+z;
-	i = colscan[13]; colscan[13] = colscan[26]; colscan[26] = i;
-}
-
-
-static void loadpalette(void)
-{
-	int32_t i, j, k, dist, fil;
-	char *ptr;
-
-	if (paletteloaded != 0) return;
-	if ((fil = kopen4load("palette.dat",0)) == -1) return;
-
-	kread(fil,palette,768);
-	kread16(fil,&numpalookups);
-
-	if ((palookup[0] = (char *)kkmalloc(numpalookups<<8)) == NULL)
-		allocache((intptr_t *)&palookup[0],numpalookups<<8,&permanentlock);
-	if ((transluc = (char *)kkmalloc(65536L)) == NULL)
-		allocache((intptr_t *)&transluc,65536,&permanentlock);
-
-	globalpalwritten = palookup[0]; globalpal = 0;
-	setpalookupaddress(globalpalwritten);
-
-	fixtransluscence(FP_OFF(transluc));
-
-	kread(fil,palookup[globalpal],numpalookups<<8);
-
-
-	/*kread(fil,transluc,65536);*/
-	for (k = 0; k < (65536 / 4); k++)
-	    kread32(fil, ((int32_t *) transluc) + k);
-
-	kclose(fil);
-
-	initfastcolorlookup(30L,59L,11L);
-
-	paletteloaded = 1;
-
-	if (vidoption == 6)
-	{
-		for(k=0;k<MAXPALOOKUPS;k++)
-			if (palookup[k] != NULL)
-				for(i=0;i<256;i++)
-				{
-					dist = palette[i*3]*3+palette[i*3+1]*5+palette[i*3+2]*2;
-					ptr = (char *)(FP_OFF(palookup[k])+i);
-					for(j=0;j<32;j++)
-						ptr[j<<8] = (char)min(max(mulscale10(dist,32-j),0),15);
-				}
-
-		if (transluc != NULL)
-		{
-			for(i=0;i<16;i++)
-				for(j=0;j<16;j++)
-					transluc[(i<<8)+j] = ((i+j+1)>>1);
-		}
-	}
-}
-
-
-
-int setgamemode(char davidoption, int32_t daxdim, int32_t daydim)
-{
-	strcpy(kensmessage,"!!!! BUILD engine&tools programmed by Ken Silverman of E.G. RI.  (c) Copyright 1995 Ken Silverman.  Summary:  BUILD = Ken. !!!!");
-	if (getkensmessagecrc(FP_OFF(kensmessage)) != 0x56c764d4)
-		{ setvmode(0x3); printf("Nice try.\n"); exit(0); }
-    return(_setgamemode(davidoption, daxdim, daydim));
-} /* setgamemode */
-
-
 static int dommxoverlay = 1;
 static int initengine_called = 0;
 
@@ -3468,7 +2717,7 @@ void initengine(void)
 	if (dommxoverlay)
         mmxoverlay();
 
-	loadtables();
+	engine_loadtables();
 
 	xyaspect = -1;
 
@@ -3510,15 +2759,14 @@ void initengine(void)
 	visibility = 512;
 	parallaxvisibility = 512;
 
-	loadpalette();
+	engine_loadpalette();
 }
 
 
 void uninitengine(void)
 {
-	if (transluc != NULL) { kkfree(transluc); transluc = NULL; }
-	if (pic != NULL) { kkfree(pic); pic = NULL; }
-	if (artfil != -1) kclose(artfil);
+	if (transluc != NULL) { free(transluc); transluc = NULL; }
+	engine_tiles_uninit();
     _uninitengine(); /* video driver specific. */
 }
 
@@ -3702,7 +2950,7 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 	setgotpic(picnum);
 	bufplc = waloff[picnum];
 
-	palookupoffs = FP_OFF(palookup[dapalnum]) + (getpalookup(0L,(int32_t)dashade)<<8);
+	palookupoffs = ((intptr_t)(palookup[dapalnum])) + (getpalookup(0L,(int32_t)dashade)<<8);
 
 	i = divscale32(1L,z);
 	xv = mulscale14(sinang,i);
@@ -4063,195 +3311,6 @@ void nextpage(void)
 }
 
 
-void loadtile(short tilenume)
-{
-	char *ptr;
-	int32_t i, dasiz;
-
-	if ((unsigned)tilenume >= (unsigned)MAXTILES) return;
-	dasiz = tilesizx[tilenume]*tilesizy[tilenume];
-	if (dasiz <= 0) return;
-
-	i = tilefilenum[tilenume];
-	if (i != artfilnum)
-	{
-		if (artfil != -1) kclose(artfil);
-		artfilnum = i;
-		artfilplc = 0L;
-
-		artfilename[7] = (i%10)+48;
-		artfilename[6] = ((i/10)%10)+48;
-		artfilename[5] = ((i/100)%10)+48;
-		artfil = kopen4load(artfilename,0);
-		faketimerhandler();
-	}
-
-	#if BUILD_CACHEDEBUG
-        fprintf(stderr, "BUILDCACHE: Tile:%d\n", tilenume);
-    #endif
-
-	if (waloff[tilenume] == 0)
-	{
-		walock[tilenume] = 199;
-		allocache(&waloff[tilenume],dasiz,(unsigned char *) &walock[tilenume]);
-	}
-
-	if (artfilplc != tilefileoffs[tilenume])
-	{
-		klseek(artfil,tilefileoffs[tilenume]-artfilplc,SEEK_CUR);
-		faketimerhandler();
-	}
-	ptr = (char *)waloff[tilenume];
-	kread(artfil,ptr,dasiz);
-	faketimerhandler();
-	artfilplc = tilefileoffs[tilenume]+dasiz;
-}
-
-
-intptr_t allocatepermanenttile(short tilenume, int32_t xsiz, int32_t ysiz)
-{
-	int32_t j, dasiz;
-
-	if ((xsiz <= 0) || (ysiz <= 0) || ((unsigned)tilenume >= (unsigned)MAXTILES))
-		return(0);
-
-	dasiz = xsiz*ysiz;
-
-	walock[tilenume] = 255;
-	allocache(&waloff[tilenume],dasiz,(unsigned char *) &walock[tilenume]);
-
-	tilesizx[tilenume] = xsiz;
-	tilesizy[tilenume] = ysiz;
-	picanm[tilenume] = 0;
-
-	j = 15; while ((j > 1) && (pow2long[j] > xsiz)) j--;
-	picsiz[tilenume] = ((char)j);
-	j = 15; while ((j > 1) && (pow2long[j] > ysiz)) j--;
-	picsiz[tilenume] += ((char)(j<<4));
-
-	return(waloff[tilenume]);
-}
-
-
-int loadpics(char *filename)
-{
-	int32_t offscount, localtilestart, localtileend, dasiz;
-	short fil, i, j, k;
-
-	strcpy(artfilename,filename);
-
-	for(i=0;i<MAXTILES;i++)
-	{
-		tilesizx[i] = 0;
-		tilesizy[i] = 0;
-		picanm[i] = 0L;
-	}
-
-	artsize = 0L;
-
-	numtilefiles = 0;
-	do
-	{
-		k = numtilefiles;
-
-		artfilename[7] = (k%10)+48;
-		artfilename[6] = ((k/10)%10)+48;
-		artfilename[5] = ((k/100)%10)+48;
-		if ((fil = kopen4load(artfilename,0)) != -1)
-		{
-			kread32(fil,&artversion);
-			if (artversion != 1) return(-1);
-
-			kread32(fil,&numtiles);
-			kread32(fil,&localtilestart);
-			kread32(fil,&localtileend);
-
-			/*kread(fil,&tilesizx[localtilestart],(localtileend-localtilestart+1)<<1);*/
-			for (i = localtilestart; i <= localtileend; i++)
-				kread16(fil,&tilesizx[i]);
-
-			/*kread(fil,&tilesizy[localtilestart],(localtileend-localtilestart+1)<<1);*/
-			for (i = localtilestart; i <= localtileend; i++)
-			    kread16(fil,&tilesizy[i]);
-
-			/*kread(fil,&picanm[localtilestart],(localtileend-localtilestart+1)<<2);*/
-			for (i = localtilestart; i <= localtileend; i++)
-			    kread32(fil,&picanm[i]);
-
-			offscount = 4+4+4+4+((localtileend-localtilestart+1)<<3);
-			for(i=localtilestart;i<=localtileend;i++)
-			{
-				tilefilenum[i] = k;
-				tilefileoffs[i] = offscount;
-				dasiz = (int32_t)(tilesizx[i]*tilesizy[i]);
-				offscount += dasiz;
-				artsize += ((dasiz+15)&0xfffffff0);
-			}
-			kclose(fil);
-
-			numtilefiles++;
-		}
-	}
-	while (k != numtilefiles);
-
-	clearbuf(&gotpic[0],(int32_t)((MAXTILES+31)>>5),0L);
-
-	/* try dpmi_DETERMINEMAXREALALLOC! */
-
-	cachesize = max(artsize,1048576);
-	while ((pic = (char *)kkmalloc(cachesize)) == NULL)
-	{
-		cachesize -= 65536L;
-		if (cachesize < 65536) return(-1);
-	}
-	initcache((FP_OFF(pic)+15)&~(intptr_t)15,(cachesize-(int32_t)((-FP_OFF(pic))&15))&0xfffffff0);
-
-	for(i=0;i<MAXTILES;i++)
-	{
-		j = 15;
-		while ((j > 1) && (pow2long[j] > tilesizx[i])) j--;
-		picsiz[i] = ((char)j);
-		j = 15;
-		while ((j > 1) && (pow2long[j] > tilesizy[i])) j--;
-		picsiz[i] += ((char)(j<<4));
-	}
-
-	artfil = -1;
-	artfilnum = -1;
-	artfilplc = 0L;
-
-	return(0);
-}
-
-#ifdef SUPERBUILD
-void qloadkvx(int32_t voxindex, char *filename)
-{
-	int32_t i, fil, dasiz, lengcnt, lengtot;
-	char *ptr;
-
-	if ((fil = kopen4load(filename,0)) == -1) return;
-
-	lengcnt = 0;
-	lengtot = kfilelength(fil);
-
-	for(i=0;i<MAXVOXMIPS;i++)
-	{
-		kread32(fil,&dasiz);
-
-			/* Must store filenames to use cacheing system :( */
-		voxlock[voxindex][i] = BUILDSWAP_INTEL32(200);
-		allocache(&voxoff[voxindex][i],dasiz,(unsigned char *)&voxlock[voxindex][i]);
-		ptr = (char *)voxoff[voxindex][i];
-		kread(fil,ptr,dasiz);
-
-		lengcnt += dasiz+4;
-		if (lengcnt >= lengtot-768) break;
-	}
-	kclose(fil);
-}
-#endif
-
-
 int clipinsidebox(int32_t x, int32_t y, short wallnum, int32_t walldist)
 {
 	walltype *wal;
@@ -4305,93 +3364,6 @@ int clipinsideboxline(int32_t x, int32_t y, int32_t x1, int32_t y1, int32_t x2, 
 }
 
 
-void drawline256 (int32_t x1, int32_t y1, int32_t x2, int32_t y2, unsigned char col)
-{
-	int32_t dx, dy, i, j, inc, plc, daend;
-	intptr_t p;
-
-	col = palookup[0][col];
-
-#if defined(POLYMOST) && defined(USE_OPENGL)
-	if (rendmode == 3)
-	{
-		setpolymost2dview();
-		glsub_begin(GL_LINES);
-		polymost_2dcolor(col);
-		glsub_vertex((float)x1/4096.0,(float)y1/4096.0,0);
-		glsub_vertex((float)x2/4096.0,(float)y2/4096.0,0);
-		glsub_end();
-		return;
-	}
-#endif
-
-	dx = x2-x1; dy = y2-y1;
-	if (dx >= 0)
-	{
-		if ((x1 >= wx2) || (x2 < wx1)) return;
-		if (x1 < wx1) y1 += scale(wx1-x1,dy,dx), x1 = wx1;
-		if (x2 > wx2) y2 += scale(wx2-x2,dy,dx), x2 = wx2;
-	}
-	else
-	{
-		if ((x2 >= wx2) || (x1 < wx1)) return;
-		if (x2 < wx1) y2 += scale(wx1-x2,dy,dx), x2 = wx1;
-		if (x1 > wx2) y1 += scale(wx2-x1,dy,dx), x1 = wx2;
-	}
-	if (dy >= 0)
-	{
-		if ((y1 >= wy2) || (y2 < wy1)) return;
-		if (y1 < wy1) x1 += scale(wy1-y1,dx,dy), y1 = wy1;
-		if (y2 > wy2) x2 += scale(wy2-y2,dx,dy), y2 = wy2;
-	}
-	else
-	{
-		if ((y2 >= wy2) || (y1 < wy1)) return;
-		if (y2 < wy1) x2 += scale(wy1-y2,dx,dy), y2 = wy1;
-		if (y1 > wy2) x1 += scale(wy2-y1,dx,dy), y1 = wy2;
-	}
-
-	if (klabs(dx) >= klabs(dy))
-	{
-		if (dx == 0) return;
-		if (dx < 0)
-		{
-			i = x1; x1 = x2; x2 = i;
-			i = y1; y1 = y2; y2 = i;
-		}
-
-		inc = divscale12(dy,dx);
-		plc = y1+mulscale12((2047-x1)&4095,inc);
-		i = ((x1+2048)>>12); daend = ((x2+2048)>>12);
-		for(;i<daend;i++)
-		{
-			j = (plc>>12);
-			if ((j >= startumost[i]) && (j < startdmost[i]))
-				drawpixel(ylookup[j]+i+frameplace,col);
-			plc += inc;
-		}
-	}
-	else
-	{
-		if (dy < 0)
-		{
-			i = x1; x1 = x2; x2 = i;
-			i = y1; y1 = y2; y2 = i;
-		}
-
-		inc = divscale12(dx,dy);
-		plc = x1+mulscale12((2047-y1)&4095,inc);
-		i = ((y1+2048)>>12); daend = ((y2+2048)>>12);
-		p = ylookup[i]+frameplace;
-		for(;i<daend;i++)
-		{
-			j = (plc>>12);
-			if ((i >= startumost[j]) && (i < startdmost[j]))
-				drawpixel(j+p,col);
-			plc += inc; p += ylookup[1];
-		}
-	}
-}
 
 
 int inside(int32_t x, int32_t y, short sectnum)
@@ -4443,61 +3415,10 @@ int inside(int32_t x, int32_t y, short sectnum)
 }
 
 
-int getangle(int32_t xvect, int32_t yvect)
-{
-	if ((xvect|yvect) == 0) return(0);
-	if (xvect == 0) return(512+((yvect<0)<<10));
-	if (yvect == 0) return(((xvect<0)<<10));
-	if (xvect == yvect) return(256+((xvect<0)<<10));
-	if (xvect == -yvect) return(768+((xvect>0)<<10));
-	if (klabs(xvect) > klabs(yvect))
-		return(((radarang[640+scale(160,yvect,xvect)]>>6)+((xvect<0)<<10))&2047);
-	return(((radarang[640-scale(160,xvect,yvect)]>>6)+512+((yvect<0)<<10))&2047);
-}
 
 
-int ksqrt(int32_t num)
-{
-	return(LOGICSQRT(num));
-}
 
 
-void copytilepiece(int32_t tilenume1, int32_t sx1, int32_t sy1, int32_t xsiz, int32_t ysiz,
-                   int32_t tilenume2, int32_t sx2, int32_t sy2)
-{
-	unsigned char *ptr1, *ptr2, dat;
-	int32_t xsiz1, ysiz1, xsiz2, ysiz2, i, j, x1, y1, x2, y2;
-
-	xsiz1 = tilesizx[tilenume1]; ysiz1 = tilesizy[tilenume1];
-	xsiz2 = tilesizx[tilenume2]; ysiz2 = tilesizy[tilenume2];
-	if ((xsiz1 > 0) && (ysiz1 > 0) && (xsiz2 > 0) && (ysiz2 > 0))
-	{
-		if (waloff[tilenume1] == 0) loadtile((short) tilenume1);
-		if (waloff[tilenume2] == 0) loadtile((short) tilenume2);
-
-		x1 = sx1;
-		for(i=0;i<xsiz;i++)
-		{
-			y1 = sy1;
-			for(j=0;j<ysiz;j++)
-			{
-				x2 = sx2+i;
-				y2 = sy2+j;
-				if ((x2 >= 0) && (y2 >= 0) && (x2 < xsiz2) && (y2 < ysiz2))
-				{
-					ptr1 = (unsigned char *) (waloff[tilenume1] + x1*ysiz1 + y1);
-					ptr2 = (unsigned char *) (waloff[tilenume2] + x2*ysiz2 + y2);
-					dat = *ptr1;
-					if (dat != 255)
-						*ptr2 = *ptr1;
-				}
-
-				y1++; if (y1 >= ysiz1) y1 = 0;
-			}
-			x1++; if (x1 >= xsiz1) x1 = 0;
-		}
-	}
-}
 
 
 static void drawmaskwall(short damaskwallcnt)
@@ -4615,7 +3536,7 @@ static void ceilspritehline (int32_t x2, int32_t y)
 	asm1 = mulscale14(globalx2,v);
 	asm2 = mulscale14(globaly2,v);
 
-	asm3 = FP_OFF(palookup[globalpal]) + (getpalookup((int32_t)mulscale28(klabs(v),globvis),globalshade)<<8);
+	asm3 = ((intptr_t)(palookup[globalpal])) + (getpalookup((int32_t)mulscale28(klabs(v),globvis),globalshade)<<8);
 
 	if ((globalorientation&2) == 0)
 		mhline(globalbufplc,bx,(x2-x1)<<16,0L,by,ylookup[y]+x1+frameoffset);
@@ -4685,7 +3606,7 @@ static void drawvox(int32_t dasprx, int32_t daspry, int32_t dasprz, int32_t dasp
 
 	i = klabs(dmulscale6(dasprx-globalposx,cosang,daspry-globalposy,sinang));
 	j = (int32_t)(getpalookup((int32_t)mulscale21(globvis,i),(int32_t)dashade)<<8);
-	setupdrawslab(ylookup[1],FP_OFF(palookup[dapal])+j);
+	setupdrawslab(ylookup[1],((intptr_t)(palookup[dapal]))+j);
 	j = 1310720;
 	j *= min(daxscale,dayscale); j >>= 6;  /* New hacks (for sized-down voxels) */
 	for(k=0;k<MAXVOXMIPS;k++)
@@ -5167,12 +4088,12 @@ static void drawsprite (int32_t snum)
 		bot = mulscale11(xp1-xp2,xdimen) + mulscale2(xb1[MAXWALLSB-1]-halfxdimen,botinc);
 
 		j = xb2[MAXWALLSB-1]+3;
-		z = mulscale20(top,krecipasm(bot));
+		z = mulscale20(top,engine_recip(bot));
 		lwall[xb1[MAXWALLSB-1]] = (z>>8);
 		for(x=xb1[MAXWALLSB-1]+4;x<=j;x+=4)
 		{
 			top += topinc; bot += botinc;
-			zz = z; z = mulscale20(top,krecipasm(bot));
+			zz = z; z = mulscale20(top,engine_recip(bot));
 			lwall[x] = (z>>8);
 			i = ((z+zz)>>1);
 			lwall[x-2] = (i>>8);
@@ -5231,7 +4152,7 @@ static void drawsprite (int32_t snum)
 		owallmost(uwall,(int32_t)(MAXWALLSB-1),z1-globalposz);
 		owallmost(dwall,(int32_t)(MAXWALLSB-1),z2-globalposz);
 		for(i=xb1[MAXWALLSB-1];i<=xb2[MAXWALLSB-1];i++)
-			{ swall[i] = (krecipasm(hplc)<<2); hplc += hinc; }
+			{ swall[i] = (engine_recip(hplc)<<2); hplc += hinc; }
 
 		for(i=smostwallcnt-1;i>=0;i--)
 		{
@@ -5914,184 +4835,6 @@ void drawmasks(void)
 	}
 	while (spritesortcnt > 0) drawsprite(--spritesortcnt);
 	while (maskwallcnt > 0) drawmaskwall(--maskwallcnt);
-}
-
-
-int setsprite(short spritenum, int32_t newx, int32_t newy, int32_t newz)
-{
-	short tempsectnum;
-
-	sprite[spritenum].x = newx;
-	sprite[spritenum].y = newy;
-	sprite[spritenum].z = newz;
-
-	tempsectnum = sprite[spritenum].sectnum;
-	updatesector(newx,newy,&tempsectnum);
-	if (tempsectnum < 0)
-		return(-1);
-	if (tempsectnum != sprite[spritenum].sectnum)
-		changespritesect(spritenum,tempsectnum);
-
-	return(0);
-}
-
-
-void initspritelists(void)
-{
-	int32_t i;
-
-	for (i=0;i<MAXSECTORS;i++)     /* Init doubly-linked sprite sector lists */
-		headspritesect[i] = -1;
-	headspritesect[MAXSECTORS] = 0;
-	for(i=0;i<MAXSPRITES;i++)
-	{
-		prevspritesect[i] = i-1;
-		nextspritesect[i] = i+1;
-		sprite[i].sectnum = MAXSECTORS;
-	}
-	prevspritesect[0] = -1;
-	nextspritesect[MAXSPRITES-1] = -1;
-
-
-	for(i=0;i<MAXSTATUS;i++)      /* Init doubly-linked sprite status lists */
-		headspritestat[i] = -1;
-	headspritestat[MAXSTATUS] = 0;
-	for(i=0;i<MAXSPRITES;i++)
-	{
-		prevspritestat[i] = i-1;
-		nextspritestat[i] = i+1;
-		sprite[i].statnum = MAXSTATUS;
-	}
-	prevspritestat[0] = -1;
-	nextspritestat[MAXSPRITES-1] = -1;
-}
-
-
-int insertsprite(short sectnum, short statnum)
-{
-	insertspritestat(statnum);
-	return(insertspritesect(sectnum));
-}
-
-
-int insertspritesect(short sectnum)
-{
-	short blanktouse;
-
-	if ((sectnum >= MAXSECTORS) || (headspritesect[MAXSECTORS] == -1))
-		return(-1);  /* list full */
-
-	blanktouse = headspritesect[MAXSECTORS];
-
-	headspritesect[MAXSECTORS] = nextspritesect[blanktouse];
-	if (headspritesect[MAXSECTORS] >= 0)
-		prevspritesect[headspritesect[MAXSECTORS]] = -1;
-
-	prevspritesect[blanktouse] = -1;
-	nextspritesect[blanktouse] = headspritesect[sectnum];
-	if (headspritesect[sectnum] >= 0)
-		prevspritesect[headspritesect[sectnum]] = blanktouse;
-	headspritesect[sectnum] = blanktouse;
-
-	sprite[blanktouse].sectnum = sectnum;
-
-	return(blanktouse);
-}
-
-
-int insertspritestat(short statnum)
-{
-	short blanktouse;
-
-	if ((statnum >= MAXSTATUS) || (headspritestat[MAXSTATUS] == -1))
-		return(-1);  /* list full */
-
-	blanktouse = headspritestat[MAXSTATUS];
-
-	headspritestat[MAXSTATUS] = nextspritestat[blanktouse];
-	if (headspritestat[MAXSTATUS] >= 0)
-		prevspritestat[headspritestat[MAXSTATUS]] = -1;
-
-	prevspritestat[blanktouse] = -1;
-	nextspritestat[blanktouse] = headspritestat[statnum];
-	if (headspritestat[statnum] >= 0)
-		prevspritestat[headspritestat[statnum]] = blanktouse;
-	headspritestat[statnum] = blanktouse;
-
-	sprite[blanktouse].statnum = statnum;
-
-	return(blanktouse);
-}
-
-
-int deletesprite(short spritenum)
-{
-	deletespritestat(spritenum);
-	return(deletespritesect(spritenum));
-}
-
-
-int deletespritesect(short deleteme)
-{
-	if (sprite[deleteme].sectnum == MAXSECTORS)
-		return(-1);
-
-	if (headspritesect[sprite[deleteme].sectnum] == deleteme)
-		headspritesect[sprite[deleteme].sectnum] = nextspritesect[deleteme];
-
-	if (prevspritesect[deleteme] >= 0) nextspritesect[prevspritesect[deleteme]] = nextspritesect[deleteme];
-	if (nextspritesect[deleteme] >= 0) prevspritesect[nextspritesect[deleteme]] = prevspritesect[deleteme];
-
-	if (headspritesect[MAXSECTORS] >= 0) prevspritesect[headspritesect[MAXSECTORS]] = deleteme;
-	prevspritesect[deleteme] = -1;
-	nextspritesect[deleteme] = headspritesect[MAXSECTORS];
-	headspritesect[MAXSECTORS] = deleteme;
-
-	sprite[deleteme].sectnum = MAXSECTORS;
-	return(0);
-}
-
-
-int deletespritestat(short deleteme)
-{
-	if (sprite[deleteme].statnum == MAXSTATUS)
-		return(-1);
-
-	if (headspritestat[sprite[deleteme].statnum] == deleteme)
-		headspritestat[sprite[deleteme].statnum] = nextspritestat[deleteme];
-
-	if (prevspritestat[deleteme] >= 0) nextspritestat[prevspritestat[deleteme]] = nextspritestat[deleteme];
-	if (nextspritestat[deleteme] >= 0) prevspritestat[nextspritestat[deleteme]] = prevspritestat[deleteme];
-
-	if (headspritestat[MAXSTATUS] >= 0) prevspritestat[headspritestat[MAXSTATUS]] = deleteme;
-	prevspritestat[deleteme] = -1;
-	nextspritestat[deleteme] = headspritestat[MAXSTATUS];
-	headspritestat[MAXSTATUS] = deleteme;
-
-	sprite[deleteme].statnum = MAXSTATUS;
-	return(0);
-}
-
-
-int changespritesect(short spritenum, short newsectnum)
-{
-	if ((newsectnum < 0) || (newsectnum > MAXSECTORS)) return(-1);
-	if (sprite[spritenum].sectnum == newsectnum) return(0);
-	if (sprite[spritenum].sectnum == MAXSECTORS) return(-1);
-	if (deletespritesect(spritenum) < 0) return(-1);
-	insertspritesect(newsectnum);
-	return(0);
-}
-
-
-int changespritestat(short spritenum, short newstatnum)
-{
-	if ((newstatnum < 0) || (newstatnum > MAXSTATUS)) return(-1);
-	if (sprite[spritenum].statnum == newstatnum) return(0);
-	if (sprite[spritenum].statnum == MAXSTATUS) return(-1);
-	if (deletespritestat(spritenum) < 0) return(-1);
-	insertspritestat(newstatnum);
-	return(0);
 }
 
 
@@ -7348,17 +6091,6 @@ void updatesector(int32_t x, int32_t y, short *sectnum)
 }
 
 
-void rotatepoint(int32_t xpivot, int32_t ypivot, int32_t x, int32_t y, short daang, int32_t *x2, int32_t *y2)
-{
-	int32_t dacos, dasin;
-
-	dacos = sintable[(daang+2560)&2047];
-	dasin = sintable[(daang+2048)&2047];
-	x -= xpivot;
-	y -= ypivot;
-	*x2 = dmulscale14(x,dacos,-y,dasin) + xpivot;
-	*y2 = dmulscale14(y,dacos,x,dasin) + ypivot;
-}
 
 
 int initmouse(void)
@@ -7390,9 +6122,6 @@ void draw2dgrid(int32_t posxe, int32_t posye, short ange, int32_t zoome, short g
 		if ((yp1 < ydim16) && (yp2 >= 0) && (yp2 >= yp1))
 		{
 			setcolor16(8);
-                        #ifdef PLATFORM_DOS
-			koutp(0x3ce,0x8);
-                        #endif
                         templong = ((yp1*640+pageoffset)>>3)+(intptr_t)_getVideoBase();
 			tempy = yp2-yp1+1;
 			mask = 0;
@@ -7407,18 +6136,7 @@ void draw2dgrid(int32_t posxe, int32_t posye, short ange, int32_t zoome, short g
 				if (xp1 >= 0)
 				{
 
-                    #if (defined PLATFORM_DOS)
-	    				if ((xp1|7) != (xp2|7))
-    					{
-		    				koutp(0x3cf,mask);
-			    			if (((xp2>>3) >= 0) && ((xp2>>3) < 80))
-				    			vlin16first(templong+(xp2>>3),tempy);
-					    	mask = 0;
-    					}
-    					mask |= pow2char[(xp1&7)^7];
-                    #else
 			drawline16(xp1, yp1, xp1, yp2, 8); // bdragon's fix
-                    #endif
 				}
 			}
 			if ((i >= 131072) && (xp1 < 640))
@@ -7426,12 +6144,7 @@ void draw2dgrid(int32_t posxe, int32_t posye, short ange, int32_t zoome, short g
 			if ((mask != 0) && ((xp2>>3) >= 0) && ((xp2>>3) < 80))
 			{
                 /* !!! Does this code ever get hit? Do something with this! */
-#ifdef PLATFORM_DOS
-				koutp(0x3cf,mask);
-				vlin16first(templong+(xp2>>3),tempy);
-#else
 				fprintf (stderr, "STUB: %s:%d\n",__FILE__,__LINE__);
-#endif
 			}
 		}
 
@@ -7532,11 +6245,7 @@ void draw2dscreen(int32_t posxe, int32_t posye, short ange, int32_t zoome, short
 							col += ((numframes&2)<<2);
 					}
 
-#ifdef PLATFORM_DOS
-					templong = (mul5(200+yp1)<<7)+(320+xp1)+pageoffset;
-#else
 					templong = (mul5(200+yp1)<<7)+(320+xp1);
-#endif
 
 					setcolor16((int32_t)col);
 
@@ -7586,11 +6295,7 @@ void draw2dscreen(int32_t posxe, int32_t posye, short ange, int32_t zoome, short
 					if (((320+xp1) >= 2) && ((320+xp1) <= 637))
 						if (((200+yp1) >= 2) && ((200+yp1) <= ydim16-3))
 						{
-#ifdef PLATFORM_DOS
-							templong = (mul5(200+yp1)<<7)+(320+xp1)+pageoffset;
-#else
 							templong = (mul5(200+yp1)<<7)+(320+xp1);
-#endif
 
 							setcolor16((int32_t)col);
 							drawpixel16(templong-1-1280);
@@ -7644,106 +6349,12 @@ void draw2dscreen(int32_t posxe, int32_t posye, short ange, int32_t zoome, short
 }
 
 
-/*
- * This is ryan's change. SDL requires me to call SDL_UpdateRect() to force
- *  vid updates without a SDL_Flip() call, but there's no such thing in the
- *  DOS version of this program, so text won't show up sometimes without
- *  my update call in Linux.  However, to get a nice shadow effect on some
- *  text, Ken draws a string at an offset and darker, and then on top of it
- *  draws the actual string. Two SDL_UpdateRect() calls in over top of each
- *  other cause flicker, so I have this function here so the shadow can
- *  be drawn with _noupdate, and the actual string is draw with an update.
- */
-static void __printext256(int32_t xpos, int32_t ypos, short col, short backcol, char name[82], char fontsize, int should_update)
-{
-	int32_t stx, i, x, y, charxsiz;
-	char *fontptr, *letptr, *ptr;
-
-	stx = xpos;
-
-	if (fontsize) { fontptr = smalltextfont; charxsiz = 4; }
-				else { fontptr = textfont; charxsiz = 8; }
-
-#if defined(POLYMOST) && defined(USE_OPENGL)
-	if (rendmode == 3)
-	{
-		int32_t xx, yy, lc = -1;
-
-		setpolymost2dview();
-		glsub_begin(GL_POINTS);
-		for(i=0;name[i];i++)
-		{
-			letptr = &fontptr[name[i]<<3];
-			xx = stx-fontsize;
-			yy = ypos+7;
-			for(y=7;y>=0;y--)
-			{
-				for(x=charxsiz-1;x>=0;x--)
-				{
-					if (letptr[y]&pow2char[7-fontsize-x])
-					{
-						if (lc != col)
-							polymost_2dcolor(col);
-						lc = col;
-						glsub_vertex((float)(xx+x)+0.5f,(float)yy+0.5f,0);
-					}
-					else if (backcol >= 0)
-					{
-						if (lc != backcol)
-							polymost_2dcolor(backcol);
-						lc = backcol;
-						glsub_vertex((float)(xx+x)+0.5f,(float)yy+0.5f,0);
-					}
-				}
-				yy--;
-			}
-			stx += charxsiz;
-		}
-		glsub_end();
-		return;
-	}
-#endif
-
-	for(i=0;name[i];i++)
-	{
-		letptr = &fontptr[name[i]<<3];
-		ptr = (char *)(ylookup[ypos+7]+(stx-fontsize)+frameplace);
-		for(y=7;y>=0;y--)
-		{
-			for(x=charxsiz-1;x>=0;x--)
-			{
-				if (letptr[y]&pow2char[7-fontsize-x])
-					ptr[x] = (char)col;
-				else if (backcol >= 0)
-					ptr[x] = (char)backcol;
-			}
-			ptr -= ylookup[1];
-		}
-		stx += charxsiz;
-	}
-
-    if (should_update)
-        _updateScreenRect(xpos, ypos, charxsiz * i, 8);
-}
 
 
-void printext256(int32_t xpos, int32_t ypos, short col, short backcol, char name[82], char fontsize)
-{
-    __printext256(xpos, ypos, col, backcol, name, fontsize, 1);
-}
 
 
-void printext256_noupdate(int32_t xpos, int32_t ypos, short col, short backcol, char name[82], char fontsize)
-{
-    __printext256(xpos, ypos, col, backcol, name, fontsize, 0);
-}
 
 
-int krand(void)
-{
-	randomseed = (randomseed*27584621)+1;
-	return(((uint32_t)randomseed)>>16);
-}
 
 
 void getzrange(int32_t x, int32_t y, int32_t z, short sectnum,
@@ -7941,82 +6552,6 @@ void getzrange(int32_t x, int32_t y, int32_t z, short sectnum,
 }
 
 
-/*
- * JFBuild: the pixel aspect of the mode. Build is built around the
- *  non-square pixels of Mode 13h, so to get things back square on VGA
- *  screens, things need to be "compressed" vertically a little. Modes
- *  wider than 4:3 are widescreen; taller ones (eg. 1280x1024) stretch
- *  the 2D elements vertically a little.
- */
-void calcpixelaspect(void)
-{
-	int32_t ratio;
-
-	widescreen = 0;
-	tallscreen = 0;
-	if ((xdim == 320 && ydim == 200) || (xdim == 640 && ydim == 400)) {
-		pixelaspect = 65536;
-	} else {
-		ratio = divscale16(ydim*320, xdim*240);
-		pixelaspect = divscale16(240*320L,320*200L);
-
-		if (ratio < 65536) {
-			widescreen = 1;
-		} else if (ratio > 65536) {
-			tallscreen = 1;
-			pixelaspect = divscale16(ydim*320L,xdim*200L);
-		}
-	}
-}
-
-
-void setview(int32_t x1, int32_t y1, int32_t x2, int32_t y2)
-{
-	int32_t i, xfov = 65536;
-
-	if (widescreen) xfov = divscale16(xdim*3, ydim*4);
-
-	windowx1 = x1; wx1 = (x1<<12);
-	windowy1 = y1; wy1 = (y1<<12);
-	windowx2 = x2; wx2 = ((x2+1)<<12);
-	windowy2 = y2; wy2 = ((y2+1)<<12);
-
-	xdimen = (x2-x1)+1; halfxdimen = (xdimen>>1);
-	xdimenrecip = divscale32(1L,xdimen);
-	ydimen = (y2-y1)+1;
-
-	setaspect(mulscale16(65536,xfov), pixelaspect);
-
-	for(i=0;i<windowx1;i++) { startumost[i] = 1, startdmost[i] = 0; }
-	for(i=windowx1;i<=windowx2;i++)
-		{ startumost[i] = windowy1, startdmost[i] = windowy2+1; }
-	for(i=windowx2+1;i<xdim;i++) { startumost[i] = 1, startdmost[i] = 0; }
-
-	viewoffset = windowy1*bytesperline + windowx1;
-
-	if ((stereomode) || (vidoption == 6))
-	{
-		ostereopixelwidth = stereopixelwidth;
-		xdimen = (windowx2-windowx1+1)+(stereopixelwidth<<1); halfxdimen = (xdimen>>1);
-		xdimenrecip = divscale32(1L,xdimen);
-		setaspect((int32_t)divscale16(xdimen,windowx2-windowx1+1),yxaspect);
-	}
-}
-
-
-void setaspect(int32_t daxrange, int32_t daaspect)
-{
-	viewingrange = daxrange;
-	viewingrangerecip = divscale32(1L,daxrange);
-
-	yxaspect = daaspect;
-	xyaspect = divscale32(1,yxaspect);
-	xdimenscale = scale(xdimen,yxaspect,320);
-	xdimscale = scale(320,xyaspect,xdimen);
-	ydimenscale = scale(ydimen,yxaspect,mulscale16(200,pixelaspect));
-}
-
-
 void flushperms(void)
 {
 	permhead = permtail = 0;
@@ -8094,230 +6629,6 @@ void rotatesprite(int32_t sx, int32_t sy, int32_t z, short a, short picnum,
 		permhead = ((permhead+1)&(MAXPERMS-1));
 	}
 }
-
-
-static int getclosestcol(int32_t r, int32_t g, int32_t b)
-{
-	int32_t i, j, k, dist, mindist, retcol;
-	char *pal1;
-
-	j = (r>>3)*FASTPALGRIDSIZ*FASTPALGRIDSIZ+(g>>3)*FASTPALGRIDSIZ+(b>>3)+FASTPALGRIDSIZ*FASTPALGRIDSIZ+FASTPALGRIDSIZ+1;
-	mindist = min(rdist[coldist[r&7]+64+8],gdist[coldist[g&7]+64+8]);
-	mindist = min(mindist,bdist[coldist[b&7]+64+8]);
-	mindist++;
-
-	r = 64-r; g = 64-g; b = 64-b;
-
-	retcol = -1;
-	for(k=26;k>=0;k--)
-	{
-		i = colscan[k]+j; if ((colhere[i>>3]&pow2char[i&7]) == 0) continue;
-		i = colhead[i];
-		do
-		{
-			pal1 = (char *)&palette[i*3];
-			dist = gdist[pal1[1]+g];
-			if (dist < mindist)
-			{
-				dist += rdist[pal1[0]+r];
-				if (dist < mindist)
-				{
-					dist += bdist[pal1[2]+b];
-					if (dist < mindist) { mindist = dist; retcol = i; }
-				}
-			}
-			i = colnext[i];
-		} while (i >= 0);
-	}
-	if (retcol >= 0) return(retcol);
-
-	mindist = 0x7fffffff;
-	pal1 = (char *)&palette[768-3];
-	for(i=255;i>=0;i--,pal1-=3)
-	{
-		dist = gdist[pal1[1]+g]; if (dist >= mindist) continue;
-		dist += rdist[pal1[0]+r]; if (dist >= mindist) continue;
-		dist += bdist[pal1[2]+b]; if (dist >= mindist) continue;
-		mindist = dist; retcol = i;
-	}
-	return(retcol);
-}
-
-
-void makepalookup(int32_t palnum, char *remapbuf, signed char r,
-                  signed char g, signed char b, char dastat)
-{
-	int32_t i, j, dist, palscale;
-	char *ptr, *ptr2;
-
-	if (paletteloaded == 0) return;
-
-	if (palookup[palnum] == NULL)
-	{
-			/* Allocate palookup buffer */
-		if ((palookup[palnum] = (char *)kkmalloc(numpalookups<<8)) == NULL)
-			allocache((intptr_t *)&palookup[palnum],numpalookups<<8,&permanentlock);
-	}
-
-#if defined(POLYMOST) && defined(USE_OPENGL)
-	glshlookupdirty = 1;  /* renderer 3's GL 2.1 tier uploads them again */
-#endif
-
-	if (dastat == 0) return;
-	if ((r|g|b|63) != 63) return;
-
-	if ((r|g|b) == 0)
-	{
-		for(i=0;i<256;i++)
-		{
-			ptr = (char *)(FP_OFF(palookup[0])+remapbuf[i]);
-			ptr2 = (char *)(FP_OFF(palookup[palnum])+i);
-			for(j=0;j<numpalookups;j++)
-				{ *ptr2 = *ptr; ptr += 256; ptr2 += 256; }
-		}
-	}
-	else
-	{
-		ptr2 = (char *)FP_OFF(palookup[palnum]);
-		for(i=0;i<numpalookups;i++)
-		{
-			palscale = divscale16(i,numpalookups);
-			for(j=0;j<256;j++)
-			{
-				ptr = (char *)&palette[remapbuf[j]*3];
-				*ptr2++ = getclosestcol((int32_t)ptr[0]+mulscale16(r-ptr[0],palscale),
-												(int32_t)ptr[1]+mulscale16(g-ptr[1],palscale),
-												(int32_t)ptr[2]+mulscale16(b-ptr[2],palscale));
-			}
-		}
-	}
-
-	if ((vidoption == 6) && (qsetmode == 200))
-	{
-		for(i=0;i<256;i++)
-		{
-			dist = palette[i*3]*3+palette[i*3+1]*5+palette[i*3+2]*2;
-			ptr = (char *)(FP_OFF(palookup[palnum])+i);
-			for(j=0;j<32;j++)
-				ptr[j<<8] = (char)min(max(mulscale10(dist,32-j),0),15);
-		}
-	}
-}
-
-
-	/* the last palette passed to setbrightness, which setpalettefade blends. */
-static unsigned char basepal[768];
-
-static void applybrightness(unsigned char *dapal)
-{
-	int32_t i, j, k;
-
-	k = 0;
-	if (vidoption == 6)
-	{
-		for(j=0;j<16;j++)
-			for(i=0;i<16;i++)
-			{
-				tempbuf[k++] = britable[curbrightness][j<<2];
-				tempbuf[k++] = 0;
-				tempbuf[k++] = britable[curbrightness][i<<2];
-				tempbuf[k++] = 0;
-			}
-	}
-	else
-	{
-		for(i=0;i<256;i++)
-		{
-			tempbuf[k++] = britable[curbrightness][dapal[i*3+2]];
-			tempbuf[k++] = britable[curbrightness][dapal[i*3+1]];
-			tempbuf[k++] = britable[curbrightness][dapal[i*3+0]];
-			tempbuf[k++] = 0;
-		}
-	}
-
-	VBE_setPalette(0, 256, (char *) tempbuf);
-}
-
-
-void setbrightness(char dabrightness, unsigned char *dapal)
-{
-	curbrightness = min(max((int32_t)dabrightness,0),15);
-	if (dapal != basepal) memcpy(basepal, dapal, sizeof(basepal));
-#ifdef POLYMOST
-	palfadergb.r = palfadergb.g = palfadergb.b = 0;
-	palfadedelta = 0;
-#endif
-	applybrightness(basepal);
-}
-
-
-/*
- * setpalettefade
- *  Fades toward (r,g,b), 0-63 each, by offset/64. Renderer 3 draws it as a
- *  quad over the frame; the others blend the palette as the game's palto does.
- */
-void setpalettefade(unsigned char r, unsigned char g, unsigned char b, unsigned char offset)
-{
-	unsigned char fadepal[768];
-	int32_t i;
-
-#ifdef POLYMOST
-	palfadergb.r = r<<2; palfadergb.g = g<<2; palfadergb.b = b<<2;
-	palfadedelta = (unsigned char)min(offset<<2,255);
-#ifdef USE_OPENGL
-	if (rendmode == 3) { _glpalettefade(); return; }
-#endif
-#endif
-
-	for(i=0;i<768;i+=3)
-	{
-		fadepal[i+0] = basepal[i+0]+((((int32_t)r-(int32_t)basepal[i+0])*(int32_t)offset)>>6);
-		fadepal[i+1] = basepal[i+1]+((((int32_t)g-(int32_t)basepal[i+1])*(int32_t)offset)>>6);
-		fadepal[i+2] = basepal[i+2]+((((int32_t)b-(int32_t)basepal[i+2])*(int32_t)offset)>>6);
-	}
-	applybrightness(fadepal);
-}
-
-
-#if defined(POLYMOST) && defined(USE_OPENGL)
-/* The palette setbrightness was last given (getfadedpalette fades it), for
-   renderer 3's resize to keep across the mode's setup, which resets it. */
-unsigned char *getbasepalette(void)
-{
-	return(basepal);
-}
-#endif
-
-
-#if defined(POLYMOST) && defined(USE_OPENGL)
-/*
- * getfadedpalette
- *  The palette renderer 3's GL 2.1 tier shows: curpalette, or with a fade,
- *  the base palette faded as the 8-bit one is above, made 8-bit as
- *  VBE_setPalette does. palfadedelta keeps offsets up to 64.
- */
-void getfadedpalette(palette_t *pal)
-{
-	int32_t i, offset;
-	unsigned char c[3];
-
-	if (!palfadedelta) { memcpy(pal,curpalette,sizeof(palette_t)*256); return; }
-	offset = (palfadedelta == 255) ? 64 : (palfadedelta>>2);
-	for(i=0;i<256;i++)
-	{
-		c[0] = basepal[i*3+0]+((((int32_t)(palfadergb.r>>2)-(int32_t)basepal[i*3+0])*offset)>>6);
-		c[1] = basepal[i*3+1]+((((int32_t)(palfadergb.g>>2)-(int32_t)basepal[i*3+1])*offset)>>6);
-		c[2] = basepal[i*3+2]+((((int32_t)(palfadergb.b>>2)-(int32_t)basepal[i*3+2])*offset)>>6);
-		c[0] = britable[curbrightness][c[0]&63];
-		c[1] = britable[curbrightness][c[1]&63];
-		c[2] = britable[curbrightness][c[2]&63];
-		pal[i].r = (c[0]<<2)|(c[0]>>4);
-		pal[i].g = (c[1]<<2)|(c[1]>>4);
-		pal[i].b = (c[2]<<2)|(c[2]>>4);
-		pal[i].f = 0;
-	}
-}
-#endif
 
 
 static void fillpolygon(int32_t npoints)
@@ -8754,7 +7065,7 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 			{
 				ox = wall[wall[startwall].point2].x - wall[startwall].x;
 				oy = wall[wall[startwall].point2].y - wall[startwall].y;
-				i = nsqrtasm(ox*ox+oy*oy); if (i == 0) continue;
+				i = engine_render_sqrt(ox*ox+oy*oy); if (i == 0) continue;
 				i = 1048576/i;
 				globalx1 = mulscale10(dmulscale10(ox,bakgxvect,oy,bakgyvect),i);
 				globaly1 = mulscale10(dmulscale10(ox,bakgyvect,-oy,bakgxvect),i);
@@ -8765,7 +7076,7 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 				globaly2 = -globaly1;
 
 				daslope = sector[s].floorheinum;
-				i = nsqrtasm(daslope*daslope+16777216);
+				i = engine_render_sqrt(daslope*daslope+16777216);
 				globalposy = mulscale12(globalposy,i);
 				globalx2 = mulscale12(globalx2,i);
 				globaly2 = mulscale12(globaly2,i);
@@ -8883,7 +7194,7 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 			else
 				globalshade = ((int32_t)sector[spr->sectnum].floorshade);
 			globalshade = max(min(globalshade+spr->shade+6,numpalookups-1),0);
-			asm3 = FP_OFF(palookup[spr->pal]+(globalshade<<8));
+			asm3 = ((intptr_t)(palookup[spr->pal]+(globalshade<<8)));
 			globvis = globalhisibility;
 			if (sec->visibility != 0) globvis = mulscale4(globvis,(int32_t)((unsigned char)(sec->visibility+16)));
 			globalpolytype = ((spr->cstat&2)>>1)+1;
@@ -8926,216 +7237,6 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 			if (rendmode == 3) globalpal = spr->pal;
 #endif
 			fillpolygon(npoints);
-		}
-	}
-}
-
-
-void clearview(int32_t dacol)
-{
-	int32_t y, dx;
-	intptr_t p;
-
-	if (qsetmode != 200) return;
-
-#if defined(POLYMOST) && defined(USE_OPENGL)
-	if (rendmode == 3)
-	{
-		if ((polymost_shaderdraw(0)) && (!glshcolor))  /* GL 2.1: the index (but for texture filtering's colour) */
-			glClearColor((float)dacol/255.f,0,0,0);
-		else
-			glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
-		/* only the view window, as below (JFBuild clears it all) */
-		glScissor(windowx1,yres-(windowy2+1),windowx2-windowx1+1,windowy2-windowy1+1);
-		glEnable(GL_SCISSOR_TEST);
-		glClear(GL_COLOR_BUFFER_BIT);
-		glDisable(GL_SCISSOR_TEST);
-		_glframedrawn();
-		return;
-	}
-#endif
-
-	dx = windowx2-windowx1+1;
-	dacol += (dacol<<8); dacol += (dacol<<16);
-	if (vidoption == 6)
-	{
-		p = FP_OFF(screen)+ylookup[windowy1]+windowx1;
-		for(y=windowy1;y<=windowy2;y++)
-		{
-			clearbufbyte((void *)p,dx,dacol);
-                        clearbufbyte((void *)(p+65536),dx,dacol);
-			p += ylookup[1];
-		}
-		faketimerhandler();
-		return;
-	}
-	p = frameplace+ylookup[windowy1]+windowx1;
-	for(y=windowy1;y<=windowy2;y++)
-		{ clearbufbyte((void *)p,dx,dacol); p += ylookup[1]; }
-	faketimerhandler();
-}
-
-
-void clearallviews(int32_t dacol)
-{
-	int32_t i;
-
-	if (qsetmode != 200) return;
-
-#if defined(POLYMOST) && defined(USE_OPENGL)
-	if (rendmode == 3)
-	{
-		if ((polymost_shaderdraw(0)) && (!glshcolor))  /* GL 2.1: the index (but for texture filtering's colour) */
-			glClearColor((float)dacol/255.f,0,0,0);
-		else
-			glClearColor(curpalette[dacol].r/255.0,curpalette[dacol].g/255.0,curpalette[dacol].b/255.0,0);
-		glViewport(0,0,xdim,ydim); glox1 = -1;
-		glClear(GL_COLOR_BUFFER_BIT);
-		_glframedrawn();
-		return;
-	}
-#endif
-
-	dacol += (dacol<<8); dacol += (dacol<<16);
-
-	switch(vidoption)
-	{
-		case 1:
-			for(i=0;i<numpages;i++)
-			{
-				setactivepage(i);
-				clearbufbyte((void *)frameplace,imageSize,0L);
-			}
-			setactivepage(activepage);
-		case 2:
-			clearbuf((void *)frameplace,(xdim*ydim)>>2,0L);
-			break;
-		case 6:
-			clearbuf(screen,128000L>>2,dacol);
-			break;
-	}
-	faketimerhandler();
-}
-
-
-void plotpixel(int32_t x, int32_t y, char col)
-{
-#if defined(POLYMOST) && defined(USE_OPENGL)
-	if (rendmode == 3)
-	{
-		setpolymost2dview();
-		glsub_begin(GL_POINTS);
-		polymost_2dcolor((unsigned char)col);
-		glsub_vertex((float)x+0.5f,(float)y+0.5f,0);
-		glsub_end();
-		return;
-	}
-#endif
-	drawpixel(ylookup[y]+x+frameplace,(int32_t)col);
-}
-
-
-unsigned char getpixel(int32_t x, int32_t y)
-{
-#if defined(POLYMOST) && defined(USE_OPENGL)
-	if (rendmode == 3) return 0;
-#endif
-	return(readpixel(ylookup[y]+x+frameplace));
-}
-
-	/* MUST USE RESTOREFORDRAWROOMS AFTER DRAWING */
-static int32_t setviewcnt = 0;
-static int32_t bakvidoption[4];
-static intptr_t bakframeplace[4];
-static int32_t bakxsiz[4], bakysiz[4];
-
-static int32_t bakwindowx1[4], bakwindowy1[4];
-static int32_t bakwindowx2[4], bakwindowy2[4];
-#ifdef POLYMOST
-static int32_t bakrendmode, baktile;
-#endif
-
-
-void setviewtotile(short tilenume, int32_t xsiz, int32_t ysiz)
-{
-	int32_t i, j;
-
-		/* DRAWROOMS TO TILE BACKUP&SET CODE */
-	tilesizx[tilenume] = xsiz; tilesizy[tilenume] = ysiz;
-		/* and its picsiz, as allocatepermanenttile, for Polymost */
-	j = 15; while ((j > 1) && (pow2long[j] > xsiz)) j--;
-	picsiz[tilenume] = ((char)j);
-	j = 15; while ((j > 1) && (pow2long[j] > ysiz)) j--;
-	picsiz[tilenume] += ((char)(j<<4));
-	bakxsiz[setviewcnt] = xsiz; bakysiz[setviewcnt] = ysiz;
-	bakvidoption[setviewcnt] = vidoption; vidoption = 2;
-	bakframeplace[setviewcnt] = frameplace; frameplace = waloff[tilenume];
-	bakwindowx1[setviewcnt] = windowx1; bakwindowy1[setviewcnt] = windowy1;
-	bakwindowx2[setviewcnt] = windowx2; bakwindowy2[setviewcnt] = windowy2;
-#ifdef POLYMOST
-	if (setviewcnt == 0) {
-		bakrendmode = rendmode;
-		baktile = tilenume;
-	}
-	rendmode = 0;
-#endif
-	copybufbyte(&startumost[windowx1],&bakumost[windowx1],(windowx2-windowx1+1)*sizeof(bakumost[0]));
-	copybufbyte(&startdmost[windowx1],&bakdmost[windowx1],(windowx2-windowx1+1)*sizeof(bakdmost[0]));
-	setview(0,0,ysiz-1,xsiz-1);
-	setaspect(65536,65536);
-	j = 0; for(i=0;i<=xsiz;i++) { ylookup[i] = j, j += ysiz; }
-	setvlinebpl(ysiz);
-	setviewcnt++;
-}
-
-
-void setviewback(void)
-{
-	int32_t i, j, k;
-
-	if (setviewcnt <= 0) return;
-	setviewcnt--;
-
-#ifdef POLYMOST
-	if (setviewcnt == 0) {
-		rendmode = bakrendmode;
-		invalidatetile(baktile,-1,-1);
-	}
-#endif
-
-	setview(bakwindowx1[setviewcnt],bakwindowy1[setviewcnt],
-			  bakwindowx2[setviewcnt],bakwindowy2[setviewcnt]);
-	copybufbyte(&bakumost[windowx1],&startumost[windowx1],(windowx2-windowx1+1)*sizeof(startumost[0]));
-	copybufbyte(&bakdmost[windowx1],&startdmost[windowx1],(windowx2-windowx1+1)*sizeof(startdmost[0]));
-	vidoption = bakvidoption[setviewcnt];
-	frameplace = bakframeplace[setviewcnt];
-	if (setviewcnt == 0)
-		k = bakxsiz[0];
-	else
-		k = max(bakxsiz[setviewcnt-1],bakxsiz[setviewcnt]);
-	j = 0; for(i=0;i<=k;i++) ylookup[i] = j, j += bytesperline;
-	setvlinebpl(bytesperline);
-}
-
-
-void squarerotatetile(short tilenume)
-{
-	int32_t i, j, k, xsiz, ysiz;
-	unsigned char *ptr1, *ptr2;
-
-	xsiz = tilesizx[tilenume]; ysiz = tilesizy[tilenume];
-
-		/* supports square tiles only for rotation part */
-	if (xsiz == ysiz)
-	{
-		k = (xsiz<<1);
-		for(i=xsiz-1;i>=0;i--)
-		{
-			ptr1 = (unsigned char *) (waloff[tilenume]+i*(xsiz+1));
-            ptr2 = ptr1;
-			if ((i&1) != 0) { ptr1--; ptr2 -= xsiz; swapchar(ptr1,ptr2); }
-			for(j=(i>>1)-1;j>=0;j--)
-				{ ptr1 -= 2; ptr2 -= k; swapchar2(ptr1,ptr2,xsiz); }
 		}
 	}
 }
@@ -9228,7 +7329,7 @@ int getceilzofslope(short sectnum, int32_t dax, int32_t day)
 #else
 	wal = &wall[sector[sectnum].wallptr];
 	dx = wall[wal->point2].x-wal->x; dy = wall[wal->point2].y-wal->y;
-	i = (nsqrtasm(dx*dx+dy*dy)<<5); if (i == 0) return(sector[sectnum].ceilingz);
+	i = (engine_render_sqrt(dx*dx+dy*dy)<<5); if (i == 0) return(sector[sectnum].ceilingz);
 	j = dmulscale3(dx,day-wal->y,-dy,dax-wal->x);
 	return(sector[sectnum].ceilingz+scale(sector[sectnum].ceilingheinum,j,i));
 #endif
@@ -9253,7 +7354,7 @@ int getflorzofslope(short sectnum, int32_t dax, int32_t day)
 #else
 	wal = &wall[sector[sectnum].wallptr];
 	dx = wall[wal->point2].x-wal->x; dy = wall[wal->point2].y-wal->y;
-	i = (nsqrtasm(dx*dx+dy*dy)<<5); if (i == 0) return(sector[sectnum].floorz);
+	i = (engine_render_sqrt(dx*dx+dy*dy)<<5); if (i == 0) return(sector[sectnum].floorz);
 	j = dmulscale3(dx,day-wal->y,-dy,dax-wal->x);
 	return(sector[sectnum].floorz+scale(sector[sectnum].floorheinum,j,i));
 #endif

@@ -51,13 +51,6 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
   #endif
 #endif
 
-#if PLATFORM_DOS
-#include <dos.h>
-#include <bios.h>
-#include <io.h>
-#define PATH_SEP_CHAR '\\'
-#define PATH_SEP_STR  "\\"
-#endif
 
 #if PLATFORM_UNIX
 #include "dukeunix.h"
@@ -530,9 +523,6 @@ extern struct player_orig po[MAXPLAYERS];
 extern struct user_defs ud;
 
 // ported build engine has this, too.  --ryan.
-#if PLATFORM_DOS
-extern short int moustat;
-#endif
 
 extern short int global_random;
 extern int32_t scaredfallz;

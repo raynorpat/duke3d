@@ -34,8 +34,6 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <stdint.h>
 #include "sndcards.h"
 
-#define cdecl
-
 extern int MUSIC_ErrorCode;
 
 enum MUSIC_ERRORS
@@ -50,7 +48,7 @@ enum MUSIC_ERRORS
    MUSIC_MidiError,
    MUSIC_TaskManError,
    MUSIC_FMNotDetected,
-   MUSIC_DPMI_Error
+
    };
 
 typedef struct
@@ -89,7 +87,7 @@ void  MUSIC_GetSongLength( songposition *pos );
 int   MUSIC_FadeVolume( int tovolume, int milliseconds );
 int   MUSIC_FadeActive( void );
 void  MUSIC_StopFade( void );
-void  MUSIC_RerouteMidiChannel( int channel, int cdecl ( *function )( int event, int c1, int c2 ) );
+void  MUSIC_RerouteMidiChannel( int channel, int ( *function )( int event, int c1, int c2 ) );
 void  MUSIC_RegisterTimbreBank( unsigned char *timbres );
 
 #endif

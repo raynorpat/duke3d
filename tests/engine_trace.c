@@ -43,6 +43,62 @@ static void square(int s, int w, int32_t x0)
     sector[s].ceilingstat = 0; sector[s].floorstat = 0;
 }
 
+/* A missing or reset table after extraction must not change these results. */
+static void math_contracts(void)
+{
+    int repeat;
+
+    for (repeat = 0; repeat < 2; repeat++) {
+        initengine();
+        check("sqrt zero", ksqrt(0), 0);
+        check("sqrt one", ksqrt(1), 1);
+        check("sqrt four", ksqrt(4), 2);
+        check("angle right", getangle(1, 0), 0);
+        check("angle down", getangle(0, 1), 512);
+        check("angle left", getangle(-1, 0), 1024);
+        check("angle up", getangle(0, -1), 1536);
+        randomseed = 0;
+        check("random seed zero", krand(), 0);
+        randomseed = 1;
+        check("random seed one", krand(), 420);
+    }
+}
+
+/* Moving sprite bookkeeping must preserve both lists and the sprite ID. */
+static void sprite_contracts(void)
+{
+    short a, b;
+
+    square(0, 0, 0);
+    square(1, 4, 1024);
+    numsectors = 2;
+    initspritelists();
+    a = insertsprite(0, 0);
+    b = insertsprite(0, 0);
+    check("sprite sector head", headspritesect[0], b);
+    check("sprite sector next", nextspritesect[b], a);
+    check("sprite sector previous", prevspritesect[a], b);
+    check("sprite status head", headspritestat[0], b);
+    check("sprite status next", nextspritestat[b], a);
+    check("sprite status previous", prevspritestat[a], b);
+    check("move sprite sector", changespritesect(a, 1), 0);
+    check("move sprite status", changespritestat(a, 3), 0);
+    check("moved sprite sector head", headspritesect[1], a);
+    check("moved sprite status head", headspritestat[3], a);
+    check("remaining sector sprite", headspritesect[0], b);
+    check("remaining sector tail", nextspritesect[b], -1);
+    check("remaining status sprite", headspritestat[0], b);
+    check("remaining status tail", nextspritestat[b], -1);
+    check("set moved sprite", setsprite(a, 1536, 512, 0), 0);
+    check("set sprite sector", sprite[a].sectnum, 1);
+    check("set sprite x", sprite[a].x, 1536);
+    check("set sprite y", sprite[a].y, 512);
+    check("delete moved sprite", deletesprite(a), 0);
+    check("deleted sector empty", headspritesect[1], -1);
+    check("deleted status empty", headspritestat[3], -1);
+    check("reuse deleted sprite", insertsprite(1, 3), a);
+}
+
 int main(void)
 {
     short hitsect, hitwall, hitsprite, sect;
@@ -50,6 +106,7 @@ int main(void)
     int i, r;
 
     initengine(); // initialize the 1996 square-root tables for the slope cases
+    math_contracts();
     square(0, 0, 0);
     square(1, 4, 1024);
     /* Wall 1 (sector 0's east side) and wall 7 (sector 1's west side) meet. */
@@ -159,6 +216,8 @@ int main(void)
         check("negative odd height boundary accepted",hitsect,0);
 #endif
     }
+
+    sprite_contracts();
 
     if (failures) return 1;
     printf("engine trace: ok\n");

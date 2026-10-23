@@ -16,220 +16,14 @@
 
 #include "platform.h"
 #include "build.h"  /* BUILD_ENGINEREV, which picks the LZW variant */
-#include "display.h"
 
 #include "pragmas.h"
 #include "cache1d.h"
-
-#if (defined USE_PHYSICSFS)
-#include "physfs.h"
-#endif
-
-/*
- *   This module keeps track of a standard linear cacheing system.
- *   To use this module, here's all you need to do:
- *
- *   Step 1: Allocate a nice BIG buffer, like from 1MB-4MB and
- *           Call initcache(long cachestart, long cachesize) where
- *
- *              cachestart = (long)(pointer to start of BIG buffer)
- *              cachesize = length of BIG buffer
- *
- *   Step 2: Call allocache(long *bufptr, long bufsiz, char *lockptr)
- *              whenever you need to allocate a buffer, where:
- *
- *              *bufptr = pointer to 4-byte pointer to buffer
- *                 Confused?  Using this method, cache2d can remove
- *                 previously allocated things from the cache safely by
- *                 setting the 4-byte pointer to 0.
- *              bufsiz = number of bytes to allocate
- *              *lockptr = pointer to locking char which tells whether
- *                 the region can be removed or not.  If *lockptr = 0 then
- *                 the region is not locked else its locked.
- *
- *   Step 3: If you need to remove everything from the cache, or every
- *           unlocked item from the cache, you can call uninitcache();
- *              Call uninitcache(0) to remove all unlocked items, or
- *              Call uninitcache(1) to remove everything.
- *           After calling uninitcache, it is still ok to call allocache
- *           without first calling initcache.
- */
-
-#define MAXCACHEOBJECTS 9216
-
-static int32_t cachesize = 0;
-int32_t cachecount = 0;
-unsigned char zerochar = 0;
-intptr_t cachestart = 0;
-int32_t cacnum = 0, agecount = 0;
-typedef struct { intptr_t *hand; int32_t leng; unsigned char *lock; } cactype;
-cactype cac[MAXCACHEOBJECTS];
-static int32_t lockrecip[200];
-
-void initcache(intptr_t dacachestart, int32_t dacachesize)
-{
-	int32_t i;
-
-	for(i=1;i<200;i++) lockrecip[i] = (1<<28)/(200-i);
-
-	cachestart = dacachestart;
-	cachesize = dacachesize;
-
-	cac[0].leng = cachesize;
-	cac[0].lock = &zerochar;
-	cacnum = 1;
-}
-
-void allocache (intptr_t *newhandle, int32_t newbytes, unsigned char *newlockptr)
-{
-	int32_t i, z, zz, bestz=0, daval, bestval, besto=0, o1, o2, sucklen, suckz;
-
-	newbytes = ((newbytes+15)&0xfffffff0);
-
-	if ((unsigned)newbytes > (unsigned)cachesize)
-	{
-		printf("Cachesize: %d\n",cachesize);
-		printf("*Newhandle: 0x%x, Newbytes: %d, *Newlock: %d\n",(unsigned int)(uintptr_t)newhandle,newbytes,*newlockptr);
-		reportandexit("BUFFER TOO BIG TO FIT IN CACHE!\n");
-	}
-
-	if (*newlockptr == 0)
-	{
-		reportandexit("ALLOCACHE CALLED WITH LOCK OF 0!\n");
-	}
-
-		/* Find best place */
-	bestval = 0x7fffffff; o1 = cachesize;
-	for(z=cacnum-1;z>=0;z--)
-	{
-		o1 -= cac[z].leng;
-		o2 = o1+newbytes; if (o2 > cachesize) continue;
-
-		daval = 0;
-		for(i=o1,zz=z;i<o2;i+=cac[zz++].leng)
-		{
-			if (*cac[zz].lock == 0) continue;
-			if (*cac[zz].lock >= 200) { daval = 0x7fffffff; break; }
-			daval += (int32_t) mulscale32(cac[zz].leng+65536,lockrecip[*cac[zz].lock]);
-			if (daval >= bestval) break;
-		}
-		if (daval < bestval)
-		{
-			bestval = daval; besto = o1; bestz = z;
-			if (bestval == 0) break;
-		}
-	}
-
-	/*printf("%ld %ld %ld\n",besto,newbytes,*newlockptr);*/
-
-	if (bestval == 0x7fffffff)
-		reportandexit("CACHE SPACE ALL LOCKED UP!\n");
-
-		/* Suck things out */
-	for(sucklen=-newbytes,suckz=bestz;sucklen<0;sucklen+=cac[suckz++].leng)
-		if (*cac[suckz].lock) *cac[suckz].hand = 0;
-
-		/* Remove all blocks except 1 */
-	suckz -= (bestz+1); cacnum -= suckz;
-
-    if (suckz != 0)
-	    copybufbyte(&cac[bestz+suckz],&cac[bestz],(cacnum-bestz)*sizeof(cactype));
-
-	cac[bestz].hand = newhandle; *newhandle = cachestart+besto;
-	cac[bestz].leng = newbytes;
-	cac[bestz].lock = newlockptr;
-	cachecount++;
-
-		/* Add new empty block if necessary */
-	if (sucklen <= 0) return;
-
-	bestz++;
-	if (bestz == cacnum)
-	{
-		cacnum++; if (cacnum > MAXCACHEOBJECTS) reportandexit("Too many objects in cache! (cacnum > MAXCACHEOBJECTS)\n");
-		cac[bestz].leng = sucklen;
-		cac[bestz].lock = &zerochar;
-		return;
-	}
-
-	if (*cac[bestz].lock == 0) { cac[bestz].leng += sucklen; return; }
-
-	cacnum++; if (cacnum > MAXCACHEOBJECTS) reportandexit("Too many objects in cache! (cacnum > MAXCACHEOBJECTS)\n");
-	for(z=cacnum-1;z>bestz;z--) cac[z] = cac[z-1];
-	cac[bestz].leng = sucklen;
-	cac[bestz].lock = &zerochar;
-}
-
-void suckcache (int32_t *suckptr)
-{
-	int32_t i;
-
-		/* Can't exit early, because invalid pointer might be same even though lock = 0 */
-	for(i=0;i<cacnum;i++)
-		if (*cac[i].hand == (intptr_t)suckptr)
-		{
-			if (*cac[i].lock) *cac[i].hand = 0;
-			cac[i].lock = &zerochar;
-			cac[i].hand = 0;
-
-				/* Combine empty blocks */
-			if ((i > 0) && (*cac[i-1].lock == 0))
-			{
-				cac[i-1].leng += cac[i].leng;
-				cacnum--; copybuf(&cac[i+1],&cac[i],(cacnum-i)*(int32_t)(sizeof(cactype)>>2));
-			}
-			else if ((i < cacnum-1) && (*cac[i+1].lock == 0))
-			{
-				cac[i+1].leng += cac[i].leng;
-				cacnum--; copybuf(&cac[i+1],&cac[i],(cacnum-i)*(int32_t)(sizeof(cactype)>>2));
-			}
-		}
-}
-
-void agecache(void)
-{
-	int32_t cnt;
-	char ch;
-
-	if (agecount >= cacnum) agecount = cacnum-1;
-	assert(agecount >= 0);
-
-	for(cnt=(cacnum>>4);cnt>=0;cnt--)
-	{
-		ch = (*cac[agecount].lock);
-		if (((ch-2)&255) < 198)
-			(*cac[agecount].lock) = (unsigned char) (ch-1);
-
-		agecount--; if (agecount < 0) agecount = cacnum-1;
-	}
-}
-
-void reportandexit(char *errormessage)
-{
-	int32_t i, j;
-
-	setvmode(0x3);
-	j = 0;
-	for(i=0;i<cacnum;i++)
-	{
-		printf("%d- ",i);
-		printf("ptr: %p, ",(void *)*cac[i].hand);
-		printf("leng: %d, ",cac[i].leng);
-		printf("lock: %d\n",*cac[i].lock);
-		j += cac[i].leng;
-	}
-	printf("Cachesize = %d\n",cachesize);
-	printf("Cacnum = %d\n",cacnum);
-	printf("Cache length sum = %d\n",j);
-	printf("ERROR: %s",errormessage);
-	exit(0);
-}
 
 
 #define MAXGROUPFILES 4     /* Warning: Fix groupfil if this is changed */
 #define MAXOPENFILES 64     /* Warning: Fix filehan if this is changed  */
 
-#if (!defined USE_PHYSICSFS)
 static unsigned char toupperlookup[256] =
 {
 	0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f,
@@ -267,46 +61,10 @@ static int32_t filehan[MAXOPENFILES] =
 	-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
 };
 
-#else
-static PHYSFS_file *filehan[MAXOPENFILES] =
-{
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-};
-#endif
 
 
 int32_t initgroupfile(const char *filename)
 {
-#if (defined USE_PHYSICSFS)
-    static int initted_physfs = 0;
-    static int added_cwd = 0;
-
-    if (!initted_physfs)
-    {
-        if (!PHYSFS_init(_argv[0]))
-            return(-1);
-        initted_physfs = 1;
-    } /* if */
-
-    if (!added_cwd)
-    {
-        if (!PHYSFS_addToSearchPath(".", 0))
-            return(-1);
-        added_cwd = 1;
-    } /* if */
-
-    if (!PHYSFS_addToSearchPath(filename, 1))
-        return(-1);
-
-    return(1); /* uhh...? */
-#else
 	char buf[16];
 	int32_t i, j, k;
 
@@ -331,9 +89,9 @@ int32_t initgroupfile(const char *filename)
 		}
 		gnumfiles[numgroupfiles] = BUILDSWAP_INTEL32(*((int32_t *)&buf[12]));
 
-		if ((gfilelist[numgroupfiles] = (char *)kmalloc(gnumfiles[numgroupfiles]<<4)) == 0)
+		if ((gfilelist[numgroupfiles] = (char *)malloc(gnumfiles[numgroupfiles]<<4)) == 0)
 			{ printf("Not enough memory for file grouping system\n"); exit(0); }
-		if ((gfileoffs[numgroupfiles] = (int32_t *)kmalloc((gnumfiles[numgroupfiles]+1)<<2)) == 0)
+		if ((gfileoffs[numgroupfiles] = (int32_t *)malloc((gnumfiles[numgroupfiles]+1)<<2)) == 0)
 			{ printf("Not enough memory for file grouping system\n"); exit(0); }
 
 		read(groupfil[numgroupfiles],gfilelist[numgroupfiles],gnumfiles[numgroupfiles]<<4);
@@ -350,123 +108,26 @@ int32_t initgroupfile(const char *filename)
 	}
 	numgroupfiles++;
 	return(groupfil[numgroupfiles-1]);
-#endif
 }
 
 void uninitgroupfile(void)
 {
-#if (defined USE_PHYSICSFS)
-    PHYSFS_deinit();
-    memset(filehan, '\0', sizeof (filehan));
-#else
 	int32_t i;
 
 	for(i=numgroupfiles-1;i>=0;i--)
 		if (groupfil[i] != -1)
 		{
-			kfree(gfilelist[i]);
-			kfree(gfileoffs[i]);
+			free(gfilelist[i]);
+			free(gfileoffs[i]);
 			close(groupfil[i]);
 			groupfil[i] = -1;
 		}
-#endif
 }
 
-#if (defined USE_PHYSICSFS)
-static int locateOneElement(char *buf)
-{
-    char *ptr;
-    char **rc;
-    char **i;
-
-    if (PHYSFS_exists(buf))
-        return(1);  /* quick rejection: exists in current case. */
-
-    ptr = strrchr(buf, '/');  /* find entry at end of path. */
-    if (ptr == NULL)
-    {
-        rc = PHYSFS_enumerateFiles("/");
-        ptr = buf;
-    } /* if */
-    else
-    {
-        *ptr = '\0';
-        rc = PHYSFS_enumerateFiles(buf);
-        *ptr = '/';
-        ptr++;  /* point past dirsep to entry itself. */
-    } /* else */
-
-    for (i = rc; *i != NULL; i++)
-    {
-        if (stricmp(*i, ptr) == 0)
-        {
-            strcpy(ptr, *i); /* found a match. Overwrite with this case. */
-            PHYSFS_freeList(rc);
-            return(1);
-        } /* if */
-    } /* for */
-
-    /* no match at all... */
-    PHYSFS_freeList(rc);
-    return(0);
-} /* locateOneElement */
-
-
-int PHYSFSEXT_locateCorrectCase(char *buf)
-{
-    int rc;
-    char *ptr;
-    char *prevptr;
-
-    while (*buf == '/')  /* skip any '/' at start of string... */
-        buf++;
-
-    ptr = prevptr = buf;
-    if (*ptr == '\0')
-        return(0);  /* Uh...I guess that's success. */
-
-    while ((ptr = strchr(ptr + 1, '/')) != NULL)
-    {
-        *ptr = '\0';  /* block this path section off */
-        rc = locateOneElement(buf);
-        *ptr = '/'; /* restore path separator */
-        if (!rc)
-            return(-2);  /* missing element in path. */
-    } /* while */
-
-    /* check final element... */
-    return(locateOneElement(buf) ? 0 : -1);
-} /* PHYSFSEXT_locateCorrectCase */
-#endif
 
 
 int32_t kopen4load(const char *filename, char searchfirst)
 {
-#if (defined USE_PHYSICSFS)
-    int i;
-    PHYSFS_file *rc;
-    char _filename[64];
-
-    assert(strlen(filename) < sizeof (_filename));
-    strcpy(_filename, filename);
-    PHYSFSEXT_locateCorrectCase(_filename);
-
-    rc = PHYSFS_openRead(_filename);
-    if (rc == NULL)
-        return(-1);
-
-    for (i = 0; i < MAXOPENFILES; i++)
-    {
-        if (filehan[i] == NULL)
-        {
-            filehan[i] = rc;
-            return(i);
-        }
-    }
-
-    PHYSFS_close(rc);  /* oh well. */
-    return(-1);
-#else
 	int32_t i, j, k, fil, newhandle;
 	unsigned char bad;
 	char *gfileptr;
@@ -516,15 +177,10 @@ int32_t kopen4load(const char *filename, char searchfirst)
 		}
 	}
 	return(-1);
-#endif
 }
 
 int32_t kread(int32_t handle, void *buffer, int32_t leng)
 {
-#if (defined USE_PHYSICSFS)
-    return(PHYSFS_read(filehan[handle], buffer, 1, leng));
-return(leng);
-#else
 	int32_t i, filenum, groupnum;
 
 	filenum = filehan[handle];
@@ -547,7 +203,6 @@ return(leng);
 	}
 
 	return(0);
-#endif
 }
 
 int kread16(int32_t handle, short *buffer)
@@ -578,21 +233,6 @@ int kread8(int32_t handle, char *buffer)
 
 int32_t klseek(int32_t handle, int32_t offset, int32_t whence)
 {
-#if (defined USE_PHYSICSFS)
-    if (whence == SEEK_END)  /* !!! FIXME: You can try PHYSFS_filelength(). */
-    {
-        printf("UNSUPPORTED SEEK SEMANTIC!\n");
-        exit(42);
-    } /* if */
-
-    if (whence == SEEK_CUR)
-        offset += PHYSFS_tell(filehan[handle]);
-
-    if (!PHYSFS_seek(filehan[handle], offset))
-        return(-1);
-
-    return(offset);
-#else
 	int32_t i, groupnum;
 
 	groupnum = filegrp[handle];
@@ -611,36 +251,23 @@ int32_t klseek(int32_t handle, int32_t offset, int32_t whence)
 		return(filepos[handle]);
 	}
 	return(-1);
-#endif
 }
 
 int32_t kfilelength(int32_t handle)
 {
-#if (defined USE_PHYSICSFS)
-    return(PHYSFS_fileLength(filehan[handle]));
-#else
 	int32_t i, groupnum;
 
 	groupnum = filegrp[handle];
 	if (groupnum == 255) return(filelength(filehan[handle]));
 	i = filehan[handle];
 	return(gfileoffs[groupnum][i+1]-gfileoffs[groupnum][i]);
-#endif
 }
 
 void kclose(int32_t handle)
 {
-#if (defined USE_PHYSICSFS)
-    if (filehan[handle] != NULL)
-    {
-        PHYSFS_close(filehan[handle]);
-        filehan[handle] = NULL;
-    } /* if */
-#else
 	if (handle < 0) return;
 	if (filegrp[handle] == 255) close(filehan[handle]);
 	filehan[handle] = -1;
-#endif
 }
 
 
@@ -905,8 +532,8 @@ int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf)
 	short *shortptr;
 
 	for(i=255;i>=0;i--) { lzwbuf1[i] = (char) i; lzwbuf3[i] = (short) ((i+1)&255); }
-	clearbuf((void *) FP_OFF(lzwbuf2),256>>1,0xffffffff);
-	clearbuf((void *) FP_OFF(lzwoutbuf),((uncompleng+15)+3)>>2,0L);
+	clearbuf((void *) ((intptr_t)(lzwbuf2)),256>>1,0xffffffff);
+	clearbuf((void *) ((intptr_t)(lzwoutbuf)),((uncompleng+15)+3)>>2,0L);
 
 	addrcnt = 256; bytecnt1 = 0; bytecnt2 = 4; bitcnt = 0;
 	numbits = 9; oneupnumbits = (1<<9);
@@ -974,7 +601,7 @@ int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 	if (strtot == 0)
 	{
 		i = min(compleng-4,LZWSIZE);
-		copybuf((void *)(FP_OFF(lzwinbuf)+4),(void *)(FP_OFF(lzwoutbuf)),(i+3)>>2);
+		copybuf((void *)(((intptr_t)(lzwinbuf))+4),(void *)(((intptr_t)(lzwoutbuf))),(i+3)>>2);
 		return(lzwgoal(BUILDSWAP_INTEL16(shortptr[0]))); /* uncompleng */
 	}
 	if (strtot > LZWBLOCK-1) strtot = LZWBLOCK-1;
@@ -1012,8 +639,8 @@ int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf)
 	short *shortptr;
 
 	for(i=255;i>=0;i--) { lzwbuf1[i] = (char) i; lzwbuf3[i] = (short) ((i+1)&255); }
-	clearbuf((void *) FP_OFF(lzwbuf2),256>>1,0xffffffff);
-	clearbuf((void *) FP_OFF(lzwoutbuf),((uncompleng+15)+3)>>2,0L);
+	clearbuf((void *) ((intptr_t)(lzwbuf2)),256>>1,0xffffffff);
+	clearbuf((void *) ((intptr_t)(lzwoutbuf)),((uncompleng+15)+3)>>2,0L);
 
 	addrcnt = 256; bytecnt1 = 0; bitcnt = (4<<3);
 	numbits = 8; oneupnumbits = (1<<8);
@@ -1085,7 +712,7 @@ int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 	if (strtot == 0)
 	{
 		i = min(compleng-4,LZWSIZE);
-		copybuf((void *)(FP_OFF(lzwinbuf)+4),(void *)(FP_OFF(lzwoutbuf)),(i+3)>>2);
+		copybuf((void *)(((intptr_t)(lzwinbuf))+4),(void *)(((intptr_t)(lzwoutbuf))),(i+3)>>2);
 		return(lzwgoal(BUILDSWAP_INTEL16(shortptr[0]))); /* uncompleng */
 	}
 	if (strtot > LZWBLOCK-1) strtot = LZWBLOCK-1;

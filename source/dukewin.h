@@ -14,9 +14,6 @@ typedef long long __int64;
 
 #define STUBBED(x) printf("STUB: %s in %s:%d\n", x, __FILE__, __LINE__)
 
-#define __far
-#define __interrupt
-
 #define PATH_SEP_CHAR '\\'
 #define PATH_SEP_STR  "\\"
 
@@ -51,17 +48,10 @@ void _dos_getdate(struct dosdate_t *date);
 #define max(x, y) ((x) > (y) ? (x) : (y))
 #endif
 
-#ifdef FP_OFF
-#undef FP_OFF
-#endif
-#define FP_OFF(x) ((intptr_t)(x))
 
 // 64 megs should be enough for anybody.  :)  --ryan.
 #define Z_AvailHeap() ((64 * 1024) * 1024)
 
-#define printchrasm(x,y,ch) printf("%c", (char) (ch & 0xFF))
-
-#define cdecl
 
 #define open _open
 #define O_BINARY _O_BINARY

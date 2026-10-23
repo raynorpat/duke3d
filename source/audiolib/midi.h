@@ -43,7 +43,7 @@ enum MIDI_Errors
    MIDI_NoTracks,
    MIDI_InvalidTrack,
    MIDI_NoMemory,
-   MIDI_DPMI_Error
+
    };
 
 
@@ -69,7 +69,7 @@ typedef struct
    int  ( *GetVolume )( void );
    } midifuncs;
 
-void MIDI_RerouteMidiChannel( int channel, int cdecl ( *function )( int event, int c1, int c2 ) );
+void MIDI_RerouteMidiChannel( int channel, int ( *function )( int event, int c1, int c2 ) );
 int  MIDI_AllNotesOff( void );
 void MIDI_SetUserChannelVolume( int channel, int volume );
 void MIDI_ResetUserChannelVolume( void );
@@ -93,7 +93,5 @@ void MIDI_SetSongPosition( int measure, int beat, int tick );
 void MIDI_GetSongPosition( songposition *pos );
 void MIDI_GetSongLength( songposition *pos );
 void MIDI_LoadTimbres( void );
-void MIDI_UnlockMemory( void );
-int  MIDI_LockMemory( void );
 
 #endif

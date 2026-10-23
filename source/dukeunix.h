@@ -1,10 +1,6 @@
 #ifndef _INCL_DUKEUNIX_H_
 #define _INCL_DUKEUNIX_H_ 1
 
-#define cdecl
-#define __far
-#define __interrupt
-
 #ifdef __GNUC__
 typedef long long __int64;
 #endif
@@ -60,7 +56,6 @@ void _dos_getdate(struct dosdate_t *date);
 #define max(x, y) ((x) > (y) ? (x) : (y))
 #endif
 
-#define FP_OFF(x) ((intptr_t)(x))
 
 #ifndef strcmpi
 #define strcmpi(x, y) strcasecmp(x, y)
@@ -79,7 +74,6 @@ void _dos_getdate(struct dosdate_t *date);
 #define Z_AvailHeap() ((64 * 1024) * 1024)
 #endif
 
-#define printchrasm(x,y,ch) printf("%c", (char) (ch & 0xFF))
 
 #ifdef __GNUC__
 #define GCC_PACK1_EXT __attribute__((packed,aligned(1)))

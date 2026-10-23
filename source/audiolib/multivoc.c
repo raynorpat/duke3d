@@ -36,10 +36,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <time.h>
 
 #include "util.h"
-#include "dpmi.h"
 #include "usrhooks.h"
 #include "interrup.h"
-#include "dma.h"
 #include "linklist.h"
 #include "sndcards.h"
 
@@ -90,12 +88,11 @@ static int MV_SwapLeftRight = FALSE;
 static int MV_RequestedMixRate;
 static int MV_MixRate;
 
-static int MV_DMAChannel = -1;
 static int MV_BuffShift;
 
 static int MV_TotalMemory;
 
-static intptr_t MV_BufferDescriptor;
+static char *MV_MixBufferAllocation;
 static int   MV_BufferEmpty[ NumberOfBuffers ];
 char *MV_MixBuffer[ NumberOfBuffers + 1 ];
 
@@ -174,9 +171,6 @@ char *MV_ErrorString
          ErrorString = "No voice with matching handle found.";
          break;
 
-      case MV_DPMI_Error :
-         ErrorString = "DPMI Error in Multivoc.";
-         break;
 
       case MV_InvalidVOCFile :
          ErrorString = "Invalid VOC file passed in to Multivoc.";
@@ -227,7 +221,6 @@ char *MV_ErrorString
 **********************************************************************/
 
 
-#define MV_LockStart MV_Mix
 
 
 /*---------------------------------------------------------------------
@@ -2498,19 +2491,7 @@ int MV_PlayLoopedVOC
    }
 
 
-/*---------------------------------------------------------------------
-   Function: MV_LockEnd
 
-   Used for determining the length of the functions to lock in memory.
----------------------------------------------------------------------*/
-
-static void MV_LockEnd
-   (
-   void
-   )
-
-   {
-   }
 
 
 /*---------------------------------------------------------------------
@@ -2764,27 +2745,12 @@ int MV_Init
 
    MV_SetErrorCode( MV_Ok );
 
-   status = MV_LockMemory();
-   if ( status != MV_Ok )
-      {
-      return( status );
-      }
-
    MV_TotalMemory = Voices * sizeof( VoiceNode ) + sizeof( HARSH_CLIP_TABLE_8 );
    status = USRHOOKS_GetMem( ( void ** )&ptr, MV_TotalMemory );
    if ( status != USRHOOKS_Ok )
       {
-      MV_UnlockMemory();
-      MV_SetErrorCode( MV_NoMem );
-      return( MV_Error );
-      }
 
-   status = DPMI_LockMemory( ptr, MV_TotalMemory );
-   if ( status != DPMI_Ok )
-      {
-      USRHOOKS_FreeMem( ptr );
-      MV_UnlockMemory();
-      MV_SetErrorCode( MV_DPMI_Error );
+      MV_SetErrorCode( MV_NoMem );
       return( MV_Error );
       }
 
@@ -2802,17 +2768,16 @@ int MV_Init
       LL_Add( (VoiceNode *)&VoicePool, &MV_Voices[ index ], next, prev );
       }
 
-   // Allocate mix buffer within 1st megabyte
-   status = DPMI_GetDOSMemory( ( void ** )&ptr, &MV_BufferDescriptor,
-      2 * TotalBufferSize );
+   // Allocate the mix buffer.
+   MV_MixBufferAllocation = ptr = malloc( 2 * TotalBufferSize );
 
-   if ( status )
+   if ( ptr == NULL )
       {
-      DPMI_UnlockMemory( MV_Voices, MV_TotalMemory );
+
       USRHOOKS_FreeMem( MV_Voices );
       MV_Voices      = NULL;
       MV_TotalMemory = 0;
-      MV_UnlockMemory();
+
 
       MV_SetErrorCode( MV_NoMem );
       return( MV_Error );
@@ -2831,13 +2796,12 @@ int MV_Init
       {
       status = MV_ErrorCode;
 
-      DPMI_UnlockMemory( MV_Voices, MV_TotalMemory );
       USRHOOKS_FreeMem( MV_Voices );
       MV_Voices      = NULL;
       MV_TotalMemory = 0;
 
-      DPMI_FreeDOSMemory( MV_BufferDescriptor );
-      MV_UnlockMemory();
+      free( MV_MixBufferAllocation );
+
 
       MV_SetErrorCode( status );
       return( MV_Error );
@@ -2934,7 +2898,7 @@ int MV_Shutdown
    RestoreInterrupts( flags );
 
    // Free any voices we allocated
-   DPMI_UnlockMemory( MV_Voices, MV_TotalMemory );
+
    USRHOOKS_FreeMem( MV_Voices );
    MV_Voices      = NULL;
    MV_TotalMemory = 0;
@@ -2944,8 +2908,8 @@ int MV_Shutdown
 
    MV_MaxVoices = 1;
 
-   // Release the descriptor from our mix buffer
-   DPMI_FreeDOSMemory( MV_BufferDescriptor );
+   // Release the mix buffer
+   free( MV_MixBufferAllocation );
    for( buffer = 0; buffer < NumberOfBuffers; buffer++ )
       {
       MV_MixBuffer[ buffer ] = NULL;
@@ -2955,131 +2919,10 @@ int MV_Shutdown
    }
 
 
-/*---------------------------------------------------------------------
-   Function: MV_UnlockMemory
-
-   Unlocks all neccessary data.
----------------------------------------------------------------------*/
-
-void MV_UnlockMemory
-   (
-   void
-   )
-
-   {
-   PITCH_UnlockMemory();
-
-   DPMI_UnlockMemoryRegion( MV_LockStart, MV_LockEnd );
-   DPMI_Unlock( MV_VolumeTable );
-   DPMI_Unlock( MV_PanTable );
-   DPMI_Unlock( MV_Installed );
-   DPMI_Unlock( MV_SoundCard );
-   DPMI_Unlock( MV_TotalVolume );
-   DPMI_Unlock( MV_MaxVoices );
-   DPMI_Unlock( MV_BufferSize );
-   DPMI_Unlock( MV_BufferLength );
-   DPMI_Unlock( MV_SampleSize );
-   DPMI_Unlock( MV_NumberOfBuffers );
-   DPMI_Unlock( MV_MixMode );
-   DPMI_Unlock( MV_Channels );
-   DPMI_Unlock( MV_Bits );
-   DPMI_Unlock( MV_Silence );
-   DPMI_Unlock( MV_SwapLeftRight );
-   DPMI_Unlock( MV_RequestedMixRate );
-   DPMI_Unlock( MV_MixRate );
-   DPMI_Unlock( MV_BufferDescriptor );
-   DPMI_Unlock( MV_MixBuffer );
-   DPMI_Unlock( MV_BufferEmpty );
-   DPMI_Unlock( MV_Voices );
-   DPMI_Unlock( VoiceList );
-   DPMI_Unlock( VoicePool );
-   DPMI_Unlock( MV_MixPage );
-   DPMI_Unlock( MV_VoiceHandle );
-   DPMI_Unlock( MV_CallBackFunc );
-   DPMI_Unlock( MV_RecordFunc );
-   DPMI_Unlock( MV_Recording );
-   DPMI_Unlock( MV_MixFunction );
-   DPMI_Unlock( MV_HarshClipTable );
-   DPMI_Unlock( MV_MixDestination );
-   DPMI_Unlock( MV_LeftVolume );
-   DPMI_Unlock( MV_RightVolume );
-   DPMI_Unlock( MV_MixPosition );
-   DPMI_Unlock( MV_ErrorCode );
-   DPMI_Unlock( MV_DMAChannel );
-   DPMI_Unlock( MV_BuffShift );
-   DPMI_Unlock( MV_ReverbLevel );
-   DPMI_Unlock( MV_ReverbDelay );
-   DPMI_Unlock( MV_ReverbTable );
-   }
 
 
-/*---------------------------------------------------------------------
-   Function: MV_LockMemory
 
-   Locks all neccessary data.
----------------------------------------------------------------------*/
 
-int MV_LockMemory
-   (
-   void
-   )
-
-   {
-   int status;
-   int pitchstatus;
-
-   status  = DPMI_LockMemoryRegion( MV_LockStart, MV_LockEnd );
-   status |= DPMI_Lock( MV_VolumeTable );
-   status |= DPMI_Lock( MV_PanTable );
-   status |= DPMI_Lock( MV_Installed );
-   status |= DPMI_Lock( MV_SoundCard );
-   status |= DPMI_Lock( MV_TotalVolume );
-   status |= DPMI_Lock( MV_MaxVoices );
-   status |= DPMI_Lock( MV_BufferSize );
-   status |= DPMI_Lock( MV_BufferLength );
-   status |= DPMI_Lock( MV_SampleSize );
-   status |= DPMI_Lock( MV_NumberOfBuffers );
-   status |= DPMI_Lock( MV_MixMode );
-   status |= DPMI_Lock( MV_Channels );
-   status |= DPMI_Lock( MV_Bits );
-   status |= DPMI_Lock( MV_Silence );
-   status |= DPMI_Lock( MV_SwapLeftRight );
-   status |= DPMI_Lock( MV_RequestedMixRate );
-   status |= DPMI_Lock( MV_MixRate );
-   status |= DPMI_Lock( MV_BufferDescriptor );
-   status |= DPMI_Lock( MV_MixBuffer );
-   status |= DPMI_Lock( MV_BufferEmpty );
-   status |= DPMI_Lock( MV_Voices );
-   status |= DPMI_Lock( VoiceList );
-   status |= DPMI_Lock( VoicePool );
-   status |= DPMI_Lock( MV_MixPage );
-   status |= DPMI_Lock( MV_VoiceHandle );
-   status |= DPMI_Lock( MV_CallBackFunc );
-   status |= DPMI_Lock( MV_RecordFunc );
-   status |= DPMI_Lock( MV_Recording );
-   status |= DPMI_Lock( MV_MixFunction );
-   status |= DPMI_Lock( MV_HarshClipTable );
-   status |= DPMI_Lock( MV_MixDestination );
-   status |= DPMI_Lock( MV_LeftVolume );
-   status |= DPMI_Lock( MV_RightVolume );
-   status |= DPMI_Lock( MV_MixPosition );
-   status |= DPMI_Lock( MV_ErrorCode );
-   status |= DPMI_Lock( MV_DMAChannel );
-   status |= DPMI_Lock( MV_BuffShift );
-   status |= DPMI_Lock( MV_ReverbLevel );
-   status |= DPMI_Lock( MV_ReverbDelay );
-   status |= DPMI_Lock( MV_ReverbTable );
-
-   pitchstatus = PITCH_LockMemory();
-   if ( ( pitchstatus != PITCH_Ok ) || ( status != DPMI_Ok ) )
-      {
-      MV_UnlockMemory();
-      MV_SetErrorCode( MV_DPMI_Error );
-      return( MV_Error );
-      }
-
-   return( MV_Ok );
-   }
 
 void ClearBuffer_DW( void *ptr, unsigned data, int length )
 {

@@ -39,7 +39,7 @@ PLAYER_SIZE_099 = 0x33f
 
 
 def uncompress(b):
-    """cache1d.c uncompress() as of engine revision 19960419."""
+    """filesystem.c uncompress() as of engine revision 19960419."""
     uleng, strtot = struct.unpack_from('<HH', b, 0)
     if strtot == 0:
         return b[4:4 + uleng]
