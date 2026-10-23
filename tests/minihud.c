@@ -11,7 +11,7 @@
  *  and inventory at the right edge, with nothing between; in a 4:3 or tall
  *  mode everything stays in the left half. Then <out-prefix>_bars.bmp: a
  *  two-player deathmatch's frag bar and full status bar, which widescreen
- *  carries out to the screen's edges. Every frame is drawn into a buffer
+ *  stretches across the screen. Every frame is drawn into a buffer
  *  with guard bytes before and after it, which must be left alone. The
  *  frames' checksums are checked when given. Run with SDL_VIDEODRIVER=dummy.
  */
@@ -28,6 +28,7 @@ extern SDL_Surface *surface;  /* sdl_driver.c */
 #define GUARD 65536
 #define GUARDBYTE 0xa5
 static unsigned char *guarded;
+static int fullhud_ok = 1;
 
 /* 1 if nothing was drawn outside the frame. */
 static int guards_ok(const char *name)
@@ -165,6 +166,35 @@ static uint32_t bars(const char *prefix)
     pus = 1;
     coolgaugetext(0);
     nextpage();
+    if (widescreen)
+    {
+        unsigned char *before = malloc((size_t)xdim*ydim);
+        int32_t minx = xdim, maxx = -1;
+        for (y = 0; y < ydim; y++) memcpy(before + y*xdim, row(y), xdim);
+        /* The health field belongs at 32/320 of the full width. A partial
+         * update must erase and redraw it there, without side padding. */
+        ps[0].last_extra = 99;
+        coolgaugetext(0);
+        nextpage();
+        for (y = 0; y < ydim; y++)
+            for (x = 0; x < xdim; x++)
+                if (before[y*xdim+x] != row(y)[x])
+                {
+                    minx = min(minx,x);
+                    maxx = max(maxx,x);
+                }
+        free(before);
+        if (maxx < 0 || minx < scale(20,xdim,320)-1 || maxx > scale(43,xdim,320)+1)
+        {
+            fprintf(stderr, "FAIL: full HUD health update at %d..%d, expected full-width field %d..%d\n",
+                    (int)minx, (int)maxx, (int)scale(20,xdim,320), (int)scale(43,xdim,320));
+            fullhud_ok = 0;
+        }
+        ps[0].last_extra = 100;
+        pus = 1;
+        coolgaugetext(0);
+        nextpage();
+    }
     snprintf(path, sizeof (path), "%s_bars.bmp", prefix);
     if (SDL_SaveBMP(surface, path) != 0)
         fprintf(stderr, "WARN: SDL_SaveBMP(%s): %s\n", path, SDL_GetError());
@@ -258,6 +288,7 @@ int main(int argc, char **argv)
     printf("bars=%08x\n", (unsigned) sum[2]);
     if (!guards_ok("bars"))
         fail = 1;
+    if (!fullhud_ok) fail = 1;
 
     uninitengine();
     for (i = 0; i < 3; i++)

@@ -175,6 +175,9 @@ target_link_libraries(render_classic2d PRIVATE buildengine duke3d::SDL2main)
 add_executable(render_maskorder render_maskorder.c)
 target_link_libraries(render_maskorder PRIVATE buildengine duke3d::SDL2main)
 
+add_executable(render_horplus render_horplus.c)
+target_link_libraries(render_horplus PRIVATE buildengine duke3d::SDL2main)
+
 set(DUKE3D_GRP "" CACHE FILEPATH "DUKE3D.GRP for tests that need game data")
 set(DUKE3D_E1L1_CHECKSUM "e0517697" CACHE STRING
     "Expected render_e1l1 frame checksum (hex); empty just prints it")
@@ -203,6 +206,15 @@ foreach(_pin "320x200;9f03fd16;763b8c56" "640x400;c6b6b632;7282abe5"
       "Expected render_classic2d_${_size} map view checksum (hex); empty just prints it")
 endforeach()
 if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
+  foreach(_renderer 0 2)
+    if(_renderer EQUAL 0 OR DUKE3D_POLYMOST)
+      add_test(NAME render_horplus_${_renderer}
+        COMMAND render_horplus "${DUKE3D_GRP}" ${_renderer})
+      set_tests_properties(render_horplus_${_renderer} PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
+        TIMEOUT 30)
+    endif()
+  endforeach()
   add_test(NAME render_e1l1
     COMMAND render_e1l1 "${DUKE3D_GRP}"
             "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1.bmp"
@@ -281,6 +293,13 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
   # window, so it's opt-in; with no OpenGL (the dummy driver) it's skipped.
   option(DUKE3D_GL_TESTS "Run the renderer 3 test, which opens a window" OFF)
   if(DUKE3D_POLYMOST AND DUKE3D_GL_TESTS)
+    foreach(_path immediate vbo shader)
+      add_test(NAME render_horplus_gl_${_path}
+        COMMAND render_horplus "${DUKE3D_GRP}" 3 ${_path})
+      set_tests_properties(render_horplus_gl_${_path} PROPERTIES
+        ENVIRONMENT "BUILD_WINDOWED=1"
+        SKIP_RETURN_CODE 77 TIMEOUT 30)
+    endforeach()
     # The game is linked in for its renderer 3 palette code; game.c's main()
     # is renamed (below), as in con_compile.
     add_executable(render_gl render_gl.c render_gl_game.c
@@ -393,8 +412,8 @@ endif()
 # The small full-screen HUD (screen_size 4) at several 8-bit modes: in
 # widescreen modes health sits at the screen's left edge and ammo and the
 # inventory at its right; 4:3 and tall modes keep their layout. Then a
-# deathmatch's frag bar and full status bar, which widescreen carries out to
-# the screen's edges. Each frame is drawn between guard bytes, so a write
+# deathmatch's frag bar and full status bar, stretched to the full width.
+# Each frame is drawn between guard bytes, so a write
 # past either end of the 8-bit frame fails. Pinned checksums, hex, of the
 # frame without and with an inventory item and of the bars; empty just
 # prints them. Needs game data.
@@ -403,8 +422,8 @@ target_link_libraries(minihud PRIVATE duke3d_game)
 if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
   foreach(_pin "320x200;f2070c6d;f191ac15;12e20f57" "640x480;3444f9f9;fab217a1;7e4e5ac7"
                "1280x1024;b324dd41;8b7c4151;b110fc47" "480x640;6b424f6e;b6211dae;46b43892"
-               "1280x720;d08e6033;f49c6dcd;22bd6018" "1600x900;742b8451;ac001fed;84cc6798"
-               "1600x675;43b810d6;14f9723b;383cc14b")
+               "1280x720;d08e6033;f49c6dcd;656a643e" "1600x900;742b8451;ac001fed;f6bfa15c"
+               "1600x675;43b810d6;14f9723b;86d25d4a")
     list(GET _pin 0 _size)
     list(GET _pin 1 _plain)
     list(GET _pin 2 _inv)

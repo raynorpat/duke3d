@@ -111,20 +111,11 @@ char confilename[128] = {"GAME.CON"},boardfilename[128] = {0};
 char waterpal[768], slimepal[768], titlepal[768], drealms[768], endingpal[768];
 char firstdemofile[80] = { '\0' };
 
-// Screen column of the status bar's x (0-320). Widescreen pillarboxes the
-// bar at 4:3, so this uses rotatesprite's own full-screen mapping.
-static int32_t sbarx(int32_t x)
-{
-    if (widescreen)
-        return ((xdim<<15)+32768+scale((x<<16)-(320<<15),ydim<<16,200*pixelaspect))>>16;
-    return scale(x,xdim,320);
-}
-
 #define patchstatusbar(x1,y1,x2,y2)                                        \
 {                                                                          \
-    rotatesprite(0,(200-34)<<16,65536L,0,BOTTOMSTATUSBAR,4,0,10+16+64+128, \
-        sbarx(x1),scale(y1,ydim,200),                                      \
-        sbarx(x2)-1,scale(y2,ydim,200)-1);                                 \
+    rotatesprite(0,(200-34)<<16,65536L,0,BOTTOMSTATUSBAR,4,0,10+16+64+128+512, \
+        scale(x1,xdim,320),scale(y1,ydim,200),                              \
+        scale(x2,xdim,320)-1,scale(y2,ydim,200)-1);                         \
 }
 
 
@@ -302,7 +293,7 @@ int gametextpart(int x,int y,char *t,char s,short p)
     return (x);
 }
 
-int minitext(int x,int y,char *str,char p,char sb)
+int minitext(int x,int y,char *str,char p,short sb)
 {
     short ac;
     char buf[128];
@@ -326,7 +317,7 @@ int minitext(int x,int y,char *str,char p,char sb)
     return (x);
 }
 
-int minitextshade(int x,int y,char *str,char s,char p,char sb)
+int minitextshade(int x,int y,char *str,char s,char p,short sb)
 {
     short ac;
     char buf[128];
@@ -1330,7 +1321,7 @@ void myospal(int32_t x, int32_t y, short tilenum, signed char shade, char orient
 
 }
 
-void invennum(int32_t x,int32_t y,char num1,char ha,char sbits)
+void invennum(int32_t x,int32_t y,char num1,char ha,short sbits)
 {
     char dabuf[80] = {0};
     sprintf(dabuf,"%d",num1);
@@ -1352,10 +1343,10 @@ void invennum(int32_t x,int32_t y,char num1,char ha,char sbits)
 #ifdef VOLUMEONE
 void orderweaponnum(short ind,int32_t x,int32_t y,int32_t num1, int32_t num2,char ha)
 {
-    rotatesprite((x-7)<<16,y<<16,65536L,0,THREEBYFIVE+ind+1,ha-10,7,10+128,0,0,xdim-1,ydim-1);
-    rotatesprite((x-3)<<16,y<<16,65536L,0,THREEBYFIVE+10,ha,0,10+128,0,0,xdim-1,ydim-1);
+    rotatesprite((x-7)<<16,y<<16,65536L,0,THREEBYFIVE+ind+1,ha-10,7,10+128+512,0,0,xdim-1,ydim-1);
+    rotatesprite((x-3)<<16,y<<16,65536L,0,THREEBYFIVE+10,ha,0,10+128+512,0,0,xdim-1,ydim-1);
 
-    minitextshade(x+1,y-4,"ORDER",26,6,2+8+16+128);
+    minitextshade(x+1,y-4,"ORDER",26,6,2+8+16+128+512);
 }
 #endif
 
@@ -1364,9 +1355,9 @@ void weaponnum(short ind,int32_t x,int32_t y,int32_t num1, int32_t num2,char ha)
 {
     char dabuf[80] = {0};
 
-    rotatesprite((x-7)<<16,y<<16,65536L,0,THREEBYFIVE+ind+1,ha-10,7,10+128,0,0,xdim-1,ydim-1);
-    rotatesprite((x-3)<<16,y<<16,65536L,0,THREEBYFIVE+10,ha,0,10+128,0,0,xdim-1,ydim-1);
-    rotatesprite((x+9)<<16,y<<16,65536L,0,THREEBYFIVE+11,ha,0,10+128,0,0,xdim-1,ydim-1);
+    rotatesprite((x-7)<<16,y<<16,65536L,0,THREEBYFIVE+ind+1,ha-10,7,10+128+512,0,0,xdim-1,ydim-1);
+    rotatesprite((x-3)<<16,y<<16,65536L,0,THREEBYFIVE+10,ha,0,10+128+512,0,0,xdim-1,ydim-1);
+    rotatesprite((x+9)<<16,y<<16,65536L,0,THREEBYFIVE+11,ha,0,10+128+512,0,0,xdim-1,ydim-1);
 
     if(num1 > 99) num1 = 99;
     if(num2 > 99) num2 = 99;
@@ -1374,55 +1365,55 @@ void weaponnum(short ind,int32_t x,int32_t y,int32_t num1, int32_t num2,char ha)
     sprintf(dabuf,"%d",num1);
     if(num1 > 9)
     {
-        rotatesprite((x)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
-        rotatesprite((x+4)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[1]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+        rotatesprite((x)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
+        rotatesprite((x+4)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[1]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
     }
-    else rotatesprite((x+4)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+    else rotatesprite((x+4)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
 
     sprintf(dabuf,"%d",num2);
     if(num2 > 9)
     {
-        rotatesprite((x+13)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
-        rotatesprite((x+17)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[1]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+        rotatesprite((x+13)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
+        rotatesprite((x+17)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[1]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
     }
-    else rotatesprite((x+13)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+    else rotatesprite((x+13)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
 }
 
 void weaponnum999(char ind,int32_t x,int32_t y,int32_t num1, int32_t num2,char ha)
 {
     char dabuf[80] = {0};
 
-    rotatesprite((x-7)<<16,y<<16,65536L,0,THREEBYFIVE+ind+1,ha-10,7,10+128,0,0,xdim-1,ydim-1);
-    rotatesprite((x-4)<<16,y<<16,65536L,0,THREEBYFIVE+10,ha,0,10+128,0,0,xdim-1,ydim-1);
-    rotatesprite((x+13)<<16,y<<16,65536L,0,THREEBYFIVE+11,ha,0,10+128,0,0,xdim-1,ydim-1);
+    rotatesprite((x-7)<<16,y<<16,65536L,0,THREEBYFIVE+ind+1,ha-10,7,10+128+512,0,0,xdim-1,ydim-1);
+    rotatesprite((x-4)<<16,y<<16,65536L,0,THREEBYFIVE+10,ha,0,10+128+512,0,0,xdim-1,ydim-1);
+    rotatesprite((x+13)<<16,y<<16,65536L,0,THREEBYFIVE+11,ha,0,10+128+512,0,0,xdim-1,ydim-1);
 
     sprintf(dabuf,"%d",num1);
     if(num1 > 99)
     {
-        rotatesprite((x)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
-        rotatesprite((x+4)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[1]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
-        rotatesprite((x+8)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[2]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+        rotatesprite((x)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
+        rotatesprite((x+4)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[1]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
+        rotatesprite((x+8)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[2]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
     }
     else if(num1 > 9)
     {
-        rotatesprite((x+4)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
-        rotatesprite((x+8)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[1]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+        rotatesprite((x+4)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
+        rotatesprite((x+8)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[1]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
     }
-    else rotatesprite((x+8)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+    else rotatesprite((x+8)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
 
     sprintf(dabuf,"%d",num2);
     if(num2 > 99)
     {
-        rotatesprite((x+17)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
-        rotatesprite((x+21)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[1]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
-        rotatesprite((x+25)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[2]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+        rotatesprite((x+17)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
+        rotatesprite((x+21)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[1]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
+        rotatesprite((x+25)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[2]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
     }
     else if(num2 > 9)
     {
-        rotatesprite((x+17)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
-        rotatesprite((x+21)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[1]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+        rotatesprite((x+17)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
+        rotatesprite((x+21)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[1]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
     }
-    else rotatesprite((x+25)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128,0,0,xdim-1,ydim-1);
+    else rotatesprite((x+25)<<16,y<<16,65536L,0,THREEBYFIVE+dabuf[0]-'0',ha,0,10+128+512,0,0,xdim-1,ydim-1);
 }
 
 
@@ -1543,7 +1534,7 @@ void weapon_amounts(struct player_struct *p,int32_t x,int32_t y,int32_t u)
      }
 }
 
-void digitalnumber(int32_t x,int32_t y,int32_t n,char s,char cs)
+void digitalnumber(int32_t x,int32_t y,int32_t n,char s,short cs)
 {
     short i, j, k, p, c;
     char b[10];
@@ -1673,51 +1664,6 @@ static int32_t backgroundtop(void)
     return y1;
 }
 
-// Screen column of a 16.16 x in widescreen's 320x200 full-screen mapping.
-static int32_t sbarx16(int32_t x)
-{
-    return ((xdim<<15)+32768+scale(x-(320<<15),ydim<<16,200*pixelaspect))>>16;
-}
-
-// One of drawwidebarends' copies, its clip rectangle held to the screen (a
-// copy at the edge reaches past it, and classic writes there): none if
-// nothing of it is on screen.
-static void drawwidebarcopy(int32_t sx, int32_t sy, int32_t z, short a, short picnum, signed char shade,
-                            unsigned short stat, int32_t cx1, int32_t cy1, int32_t cx2, int32_t cy2)
-{
-    cx1 = max(cx1,0); cy1 = max(cy1,0);
-    cx2 = min(cx2,xdim-1); cy2 = min(cy2,ydim-1);
-    if (cx1 > cx2 || cy1 > cy2) return;
-    rotatesprite(sx,sy,z,a,picnum,shade,0,stat,cx1,cy1,cx2,cy2);
-}
-
-// Widescreen: carry a 320-wide HUD bar (tile picnum at 320x200 x 0, y sy,
-// zoom z) out to the screen edges in rows y1..y2-1, with copies of its own
-// outer n columns mirrored back and forth so every join matches. Each
-// copy's tile edge pokes d past its join and its clip overlaps the copy
-// (or bar) inside it by a pixel, so rounding leaves no gap at a join.
-static void drawwidebarends(short picnum, int32_t sy, int32_t z, int32_t n, signed char shade, int32_t y1, int32_t y2)
-{
-    int32_t k, e, s, w, d;
-
-    if (!widescreen) return;
-
-    s = n*z; w = tilesizx[picnum]*z; d = z>>6;
-    for(k=0;sbarx16(-k*s) > 0 || sbarx16(w+k*s) < xdim;k++)
-    {
-        e = -k*s;   // left side: this copy ends at e
-        if (k&1)
-            drawwidebarcopy(e-s-d,sy,z,0,picnum,shade,2+8+16+64+128,sbarx16(e-s),y1,sbarx16(e),y2-1);
-        else
-            drawwidebarcopy(e+d,sy,z,1024,picnum,shade,2+4+8+16+64+128,sbarx16(e-s),y1,sbarx16(e),y2-1);
-        e = w+k*s;  // right side: this copy starts at e
-        if (k&1)
-            drawwidebarcopy(e+s-w+d,sy,z,0,picnum,shade,2+8+16+64+128,sbarx16(e)-1,y1,sbarx16(e+s)-1,y2-1);
-        else
-            drawwidebarcopy(e+w-d,sy,z,1024,picnum,shade,2+4+8+16+64+128,sbarx16(e)-1,y1,sbarx16(e+s)-1,y2-1);
-    }
-}
-
 void displayfragbar(void)
 {
     short i, j;
@@ -1727,18 +1673,16 @@ void displayfragbar(void)
     for(i=connecthead;i>=0;i=connectpoint2[i])
         if(i > j) j = i;
 
-    for(i=0;i<=(j>>2);i++)
-        drawwidebarends(FRAGBAR,(i*8)<<16,65600L,3,0,0,scale(ydim,8*(1+(j>>2)),200));
-    rotatesprite(0,0,65600L,0,FRAGBAR,0,0,2+8+16+64+128,0,0,xdim-1,ydim-1);
-    if(j >= 4) rotatesprite(319,(8)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128,0,0,xdim-1,ydim-1);
-    if(j >= 8) rotatesprite(319,(16)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128,0,0,xdim-1,ydim-1);
-    if(j >= 12) rotatesprite(319,(24)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128,0,0,xdim-1,ydim-1);
+    rotatesprite(0,0,65600L,0,FRAGBAR,0,0,2+8+16+64+128+512,0,0,xdim-1,ydim-1);
+    if(j >= 4) rotatesprite(319,(8)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128+512,0,0,xdim-1,ydim-1);
+    if(j >= 8) rotatesprite(319,(16)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128+512,0,0,xdim-1,ydim-1);
+    if(j >= 12) rotatesprite(319,(24)<<16,65600L,0,FRAGBAR,0,0,10+16+64+128+512,0,0,xdim-1,ydim-1);
 
     for(i=connecthead;i>=0;i=connectpoint2[i])
     {
-        minitext(21+(73*(i&3)),2+((i&28)<<1),&ud.user_name[i][0],sprite[ps[i].i].pal,2+8+16+128);
+        minitext(21+(73*(i&3)),2+((i&28)<<1),&ud.user_name[i][0],sprite[ps[i].i].pal,2+8+16+128+512);
         sprintf(tempbuf,"%d",ps[i].frag-ps[i].fraggedself);
-        minitext(17+50+(73*(i&3)),2+((i&28)<<1),tempbuf,sprite[ps[i].i].pal,2+8+16+128);
+        minitext(17+50+(73*(i&3)),2+((i&28)<<1),tempbuf,sprite[ps[i].i].pal,2+8+16+128+512);
     }
 }
 
@@ -1896,17 +1840,16 @@ void coolgaugetext(short snum)
 
     if ((uint32_t)u == 0xffffffff)
     {
-        drawwidebarends(BOTTOMSTATUSBAR,(200-34)<<16,65536L,3,4,scale(ydim,200-34,200),ydim);
         patchstatusbar(0,0,320,200);
         if (ud.multimode > 1 && ud.coop != 1)
-            rotatesprite(277<<16,(200-27)<<16,65536L,0,KILLSICON,0,0,10+16+128,0,0,xdim-1,ydim-1);
+            rotatesprite(277<<16,(200-27)<<16,65536L,0,KILLSICON,0,0,10+16+128+512,0,0,xdim-1,ydim-1);
     }
     if (ud.multimode > 1 && ud.coop != 1)
     {
         if (u&32768)
         {
             if ((uint32_t)u != 0xffffffff) patchstatusbar(276,183,299,193);
-            digitalnumber(287,200-17,max(p->frag-p->fraggedself,0),-16,10+16+128);
+            digitalnumber(287,200-17,max(p->frag-p->fraggedself,0),-16,10+16+128+512);
         }
     }
     else
@@ -1914,9 +1857,9 @@ void coolgaugetext(short snum)
         if (u&16384)
         {
             if ((uint32_t)u != 0xffffffff) patchstatusbar(275,182,299,194);
-            if (p->got_access&4) rotatesprite(275<<16,182<<16,65536L,0,ACCESS_ICON,0,23,10+16+128,0,0,xdim-1,ydim-1);
-            if (p->got_access&2) rotatesprite(288<<16,182<<16,65536L,0,ACCESS_ICON,0,21,10+16+128,0,0,xdim-1,ydim-1);
-            if (p->got_access&1) rotatesprite(281<<16,189<<16,65536L,0,ACCESS_ICON,0,0,10+16+128,0,0,xdim-1,ydim-1);
+            if (p->got_access&4) rotatesprite(275<<16,182<<16,65536L,0,ACCESS_ICON,0,23,10+16+128+512,0,0,xdim-1,ydim-1);
+            if (p->got_access&2) rotatesprite(288<<16,182<<16,65536L,0,ACCESS_ICON,0,21,10+16+128+512,0,0,xdim-1,ydim-1);
+            if (p->got_access&1) rotatesprite(281<<16,189<<16,65536L,0,ACCESS_ICON,0,0,10+16+128+512,0,0,xdim-1,ydim-1);
         }
     }
     if (u&(4+8+16+32+64+128+256+512+65536L)) weapon_amounts(p,96,182,u);
@@ -1925,13 +1868,13 @@ void coolgaugetext(short snum)
     {
         if ((uint32_t)u != 0xffffffff) patchstatusbar(20,183,43,193);
         if(sprite[p->i].pal == 1 && p->last_extra < 2)
-            digitalnumber(32,200-17,1,-16,10+16+128);
-        else digitalnumber(32,200-17,p->last_extra,-16,10+16+128);
+            digitalnumber(32,200-17,1,-16,10+16+128+512);
+        else digitalnumber(32,200-17,p->last_extra,-16,10+16+128+512);
     }
     if (u&2)
     {
         if ((uint32_t)u != 0xffffffff) patchstatusbar(52,183,75,193);
-        digitalnumber(64,200-17,p->shield_amount,-16,10+16+128);
+        digitalnumber(64,200-17,p->shield_amount,-16,10+16+128+512);
     }
 
     if (u&1024)
@@ -1940,7 +1883,7 @@ void coolgaugetext(short snum)
         if (p->curr_weapon != KNEE_WEAPON)
         {
             if (p->curr_weapon == HANDREMOTE_WEAPON) i = HANDBOMB_WEAPON; else i = p->curr_weapon;
-            digitalnumber(230-22,200-17,p->ammo_amount[i],-16,10+16+128);
+            digitalnumber(230-22,200-17,p->ammo_amount[i],-16,10+16+128+512);
         }
     }
 
@@ -1972,9 +1915,9 @@ void coolgaugetext(short snum)
                     case 7: i = BOOT_ICON; break;
 #endif
                 }
-                rotatesprite((231-o)<<16,(200-21)<<16,65536L,0,i,0,0,10+16+permbit,0,0,xdim-1,ydim-1);
-                minitext(292-30-o,190,"%",6,10+16+permbit);
-                if (p->inven_icon >= 6) minitext(284-35-o,180,"AUTO",2,10+16+permbit);
+                rotatesprite((231-o)<<16,(200-21)<<16,65536L,0,i,0,0,10+16+permbit+512,0,0,xdim-1,ydim-1);
+                minitext(292-30-o,190,"%",6,10+16+permbit+512);
+                if (p->inven_icon >= 6) minitext(284-35-o,180,"AUTO",2,10+16+permbit+512);
             }
             if (u&(2048+4096))
             {
@@ -1985,8 +1928,8 @@ void coolgaugetext(short snum)
                     case 5: j = p->heat_on; break;
                     default: j = 0x80000000;
                 }
-                if (j > 0) minitext(288-30-o,180,"ON",0,10+16+permbit);
-                else if ((uint32_t)j != 0x80000000) minitext(284-30-o,180,"OFF",2,10+16+permbit);
+                if (j > 0) minitext(288-30-o,180,"ON",0,10+16+permbit+512);
+                else if ((uint32_t)j != 0x80000000) minitext(284-30-o,180,"OFF",2,10+16+permbit+512);
             }
             if (u&8192)
             {
@@ -2005,7 +1948,7 @@ void coolgaugetext(short snum)
                     case 7: i = (p->boot_amount>>1); break;
 #endif
                 }
-                invennum(284-30-o,200-6,(char)i,0,10+permbit);
+                invennum(284-30-o,200-6,(char)i,0,10+permbit+512);
             }
         }
     }
