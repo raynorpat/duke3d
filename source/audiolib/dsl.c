@@ -76,6 +76,13 @@ static void DSL_SetErrorCode(int ErrorCode)
 	DSL_ErrorCode = ErrorCode;
 }
 
+/*
+================
+DSL_Init
+
+Initialize SDL audio and the shared mixer mutex used across device restarts.
+================
+*/
 int DSL_Init( void )
 {
 	DSL_SetErrorCode(DSL_Ok);
@@ -99,12 +106,22 @@ void DSL_Shutdown( void )
 	DSL_StopPlayback();
 }
 
+/*
+================
+mixer_callback
+
+Fill an SDL byte buffer with music and the current effects mix divisions
+while holding the shared audio lock.
+================
+*/
 static void mixer_callback(void *udata, Uint8 *stream, int len)
 {
 	Uint8 *fxptr;
 	int copysize;
 
 	while (SDL_TryLockMutex(audio_lock) != 0) {
+		/* Shutdown may hold the mix lock while waiting for this callback.
+		 * Return silence instead of waiting for the lock in that case. */
 		if (SDL_AtomicGet(&audio_closing)) {
 			SDL_memset(stream, audio_spec.silence, len);
 			return;
@@ -140,6 +157,14 @@ static void mixer_callback(void *udata, Uint8 *stream, int len)
 	SDL_UnlockMutex(audio_lock);
 }
 
+/*
+================
+DSL_BeginBufferedPlayback
+
+Open playback against the borrowed mixer ring in its requested format.
+BufferSize is total bytes; NumDivisions partitions that ring.
+================
+*/
 int   DSL_BeginBufferedPlayback( char *BufferStart,
       int BufferSize, int NumDivisions, unsigned SampleRate,
       int MixMode, void ( *CallBackFunc )( void ) )
@@ -194,9 +219,18 @@ int   DSL_BeginBufferedPlayback( char *BufferStart,
 	return DSL_Ok;
 }
 
+/*
+================
+DSL_StopPlayback
+
+Close playback and wait for the SDL callback before clearing device state.
+================
+*/
 void DSL_StopPlayback( void )
 {
 	if (mixer_initialized) {
+		/* Publish the escape condition before CloseAudioDevice waits for
+		 * a callback that may be contending for the caller-held mix lock. */
 		SDL_AtomicSet(&audio_closing, 1);
 		SDL_CloseAudioDevice(audio_device);
 		SDL_AtomicSet(&audio_closing, 0);
@@ -234,6 +268,14 @@ void DSL_SetMusicCallback( void ( *func )( unsigned char *stream, int len ) )
 	RestoreInterrupts(flags);
 }
 
+/*
+================
+DisableInterrupts
+
+Acquire the shared audio mutex when initialized and return placeholder flags
+for callers of the legacy interrupt-control interface.
+================
+*/
 uint32_t DisableInterrupts( void )
 {
 	if (audio_lock) {
@@ -242,6 +284,13 @@ uint32_t DisableInterrupts( void )
 	return 0;
 }
 
+/*
+================
+RestoreInterrupts
+
+Release the shared audio mutex; the legacy flags argument is unused.
+================
+*/
 void RestoreInterrupts( uint32_t flags )
 {
 	if (audio_lock) {

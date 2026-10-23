@@ -1,6 +1,13 @@
 #include "multivoc.h"
 #include "_multivc.h"
 
+/*
+================
+MV_16BitReverb
+
+Attenuate count 16-bit samples through the split-byte volume table.
+================
+*/
 void MV_16BitReverb( const char *src, char *dest, const VOLUME16 *volume, int count )
 {
 	int i;
@@ -16,6 +23,8 @@ void MV_16BitReverb( const char *src, char *dest, const VOLUME16 *volume, int co
 		int sh = src[i*2+1] ^ 0x80;
 		#endif
 
+		/* Reconstruct the attenuated sample from low/high-byte contributions;
+		 * the high-byte index above has its sign bit biased for the table. */
 		sl = (*volume)[sl] >> 8;
 		sh = (*volume)[sh];
 		
@@ -23,6 +32,13 @@ void MV_16BitReverb( const char *src, char *dest, const VOLUME16 *volume, int co
 	}
 }
 
+/*
+================
+MV_8BitReverb
+
+Attenuate count offset-binary 8-bit samples through a volume lookup.
+================
+*/
 void MV_8BitReverb( const signed char *src, signed char *dest, const VOLUME16 *volume, int count )
 {
 	int i;
@@ -36,6 +52,13 @@ void MV_8BitReverb( const signed char *src, signed char *dest, const VOLUME16 *v
 	}
 }
 
+/*
+================
+MV_16BitReverbFast
+
+Attenuate count signed 16-bit samples with the selected right shift.
+================
+*/
 void MV_16BitReverbFast( const char *src, char *dest, int count, int shift )
 {
 	int i;
@@ -48,10 +71,20 @@ void MV_16BitReverbFast( const char *src, char *dest, int count, int shift )
 	}
 }
 
+/*
+================
+MV_8BitReverbFast
+
+Attenuate count offset-binary 8-bit samples while retaining the silence bias
+and the legacy correction for the negative half of the input range.
+================
+*/
 void MV_8BitReverbFast( const signed char *src, signed char *dest, int count, int shift )
 {
 	int i;
 
+	/* Shifting raw unsigned bytes also shifts the silence centre.
+	 * Restore that offset before applying the one-bit rounding correction. */
 	unsigned char sh = 0x80 - (0x80 >> shift);
 	
 	for (i = 0; i < count; i++) {

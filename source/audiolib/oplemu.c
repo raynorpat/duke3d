@@ -29,6 +29,14 @@ static uint32_t OPLEMU_TickRemainder;
 
 volatile int TS_InInterrupt = FALSE;
 
+/*
+================
+OPLEMU_Init
+
+Initialize the local OPL chip at the output sample rate, creating shared
+emulator tables only on the first call.
+================
+*/
 void OPLEMU_Init
    (
    int rate
@@ -83,6 +91,14 @@ void OPLEMU_WriteReg
    }
 
 
+/*
+================
+OPLEMU_Generate
+
+Render bounded DBOPL blocks into mono/stereo signed 16-bit output.
+Apply music volume and saturate before storing the samples.
+================
+*/
 static void OPLEMU_Generate
    (
    int16_t *out,
@@ -142,6 +158,14 @@ static void OPLEMU_Generate
    }
 
 
+/*
+================
+OPLEMU_Render
+
+Render samples up to each scheduled MIDI tick, service that tick,
+and continue until the requested output frames have been produced.
+================
+*/
 void OPLEMU_Render
    (
    int16_t *out,
@@ -171,6 +195,8 @@ void OPLEMU_Render
                continue;
                }
 
+            /* Divide sample rate by task rate with a carried remainder, distributing
+             * fractional frames across ticks instead of rounding every period. */
             span = ( uint64_t )OPLEMU_Rate + OPLEMU_TickRemainder;
             OPLEMU_FramesToTick  = span / OPLEMU_Task.rate;
             OPLEMU_TickRemainder = span % OPLEMU_Task.rate;
@@ -180,6 +206,8 @@ void OPLEMU_Render
                }
             }
 
+         /* Do not render across a tick boundary with the old register state;
+          * service the MIDI task before generating the following samples. */
          if ( count > OPLEMU_FramesToTick )
             {
             count = OPLEMU_FramesToTick;
@@ -194,6 +222,14 @@ void OPLEMU_Render
    }
 
 
+/*
+================
+TS_ScheduleTask
+
+Prepare the single MIDI task for later activation by TS_Dispatch.
+Return NULL when the current task is already active.
+================
+*/
 task *TS_ScheduleTask
    (
    void ( *Function )( task * ),
@@ -222,6 +258,13 @@ task *TS_ScheduleTask
    }
 
 
+/*
+================
+TS_Terminate
+
+Deactivate the known MIDI task and remove its service callback.
+================
+*/
 int TS_Terminate
    (
    task *NodeToRemove
@@ -239,6 +282,13 @@ int TS_Terminate
    }
 
 
+/*
+================
+TS_Dispatch
+
+Activate the prepared MIDI task when a service callback has been installed.
+================
+*/
 void TS_Dispatch
    (
    void
@@ -252,6 +302,13 @@ void TS_Dispatch
    }
 
 
+/*
+================
+TS_SetTaskRate
+
+Change the task's tick frequency used by subsequent sample scheduling.
+================
+*/
 void TS_SetTaskRate
    (
    task *Task,

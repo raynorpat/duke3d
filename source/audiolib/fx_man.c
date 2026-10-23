@@ -330,6 +330,8 @@ int FX_SetCallBack
       case SoundSource :
       case TandySoundSource :
       case UltraSound :
+         /* The callback receives the owner's opaque token, not the voice handle.
+          * The game uses that token to release the corresponding sample cache lock. */
          MV_SetCallBack( function );
          break;
 

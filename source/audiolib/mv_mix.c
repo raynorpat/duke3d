@@ -1,3 +1,6 @@
+/* Kernel names describe output depth; a trailing 16 selects 16-bit input.
+ * Position/rate are 16.16 source-sample units, length is output frames, and
+ * MV_SampleSize is the byte stride between output frames. */
 #include <stdint.h>
 #include "multivoc.h"
 
@@ -12,6 +15,14 @@ extern unsigned char *MV_HarshClipTable;
 extern int MV_RightChannelOffset;
 extern int MV_SampleSize;
 
+/*
+================
+MV_Mix8BitMono
+
+Resample an 8-bit mono source into the 8-bit output channel using
+volume and saturation lookups, then publish the advanced cursors.
+================
+*/
 void MV_Mix8BitMono( uint32_t position, uint32_t rate,
    const char *start, uint32_t length )
 {
@@ -26,6 +37,8 @@ void MV_Mix8BitMono( uint32_t position, uint32_t rate,
 		int s = src[position >> 16];
 		int d = *dest;
 		
+		/* Volume entries are 16-bit slots; this 8-bit output path reads the
+		 * byte contribution used by its unsigned-sample clipping table. */
 		s = MV_LeftVolume[s * 2];
 
 		s += d;
@@ -42,6 +55,13 @@ void MV_Mix8BitMono( uint32_t position, uint32_t rate,
 	MV_MixDestination = (char *)dest;
 }
 
+/*
+================
+MV_Mix8BitStereo
+
+Resample an 8-bit mono source into two independently scaled 8-bit channels.
+================
+*/
 void MV_Mix8BitStereo( uint32_t position,
    uint32_t rate, const char *start, uint32_t length )
 {
@@ -74,6 +94,13 @@ void MV_Mix8BitStereo( uint32_t position,
 	MV_MixDestination = (char *)dest;
 }
 
+/*
+================
+MV_Mix16BitMono
+
+Mix an 8-bit mono source into signed 16-bit output with saturation.
+================
+*/
 void MV_Mix16BitMono( uint32_t position,
    uint32_t rate, const char *start, uint32_t length )
 {
@@ -108,6 +135,13 @@ void MV_Mix16BitMono( uint32_t position,
 	MV_MixDestination = (char *)dest;
 }
 
+/*
+================
+MV_Mix16BitStereo
+
+Mix an 8-bit mono source into independently scaled signed 16-bit channels.
+================
+*/
 void MV_Mix16BitStereo( uint32_t position,
    uint32_t rate, const char *start, uint32_t length )
 {
@@ -140,6 +174,7 @@ void MV_Mix16BitStereo( uint32_t position,
 		dest[MV_RightChannelOffset/2] = (short) dr;
 		
 		position += rate;
+		/* The shared stride is in bytes; this destination is a short pointer. */
 		dest += MV_SampleSize/2;
 	}
 	
@@ -147,6 +182,13 @@ void MV_Mix16BitStereo( uint32_t position,
 	MV_MixDestination = (char *)dest;
 }
 
+/*
+================
+MV_Mix8BitMono16
+
+Use the high byte of each 16-bit source sample for the 8-bit mono mix.
+================
+*/
 void MV_Mix8BitMono16( uint32_t position, uint32_t rate,
    const char *start, uint32_t length )
 {
@@ -177,6 +219,13 @@ void MV_Mix8BitMono16( uint32_t position, uint32_t rate,
 	MV_MixDestination = (char *)dest;
 }
 
+/*
+================
+MV_Mix8BitStereo16
+
+Use each 16-bit source sample's high byte for the two-channel 8-bit mix.
+================
+*/
 void MV_Mix8BitStereo16( uint32_t position,
    uint32_t rate, const char *start, uint32_t length )
 {
@@ -209,6 +258,14 @@ void MV_Mix8BitStereo16( uint32_t position,
 	MV_MixDestination = (char *)dest;
 }
 
+/*
+================
+MV_Mix16BitMono16
+
+Combine byte-volume lookups for a little-endian 16-bit source
+and add it to signed 16-bit mono output with saturation.
+================
+*/
 void MV_Mix16BitMono16( uint32_t position,
    uint32_t rate, const char *start, uint32_t length )
 {
@@ -224,6 +281,8 @@ void MV_Mix16BitMono16( uint32_t position,
 	
 	for (i = 0; i < length; i++) {
 		int sl = src[(position >> 16) * 2 + 0];
+		/* Bias the signed high byte into the lookup's unsigned index range.
+		 * The low-byte contribution is combined separately below. */
 		int sh = src[(position >> 16) * 2 + 1] ^ 0x80;
 		
 		int d = *dest;
@@ -246,6 +305,14 @@ void MV_Mix16BitMono16( uint32_t position,
 	MV_MixDestination = (char *)dest;
 }
 
+/*
+================
+MV_Mix16BitStereo16
+
+Mix a little-endian 16-bit mono source into independently scaled
+signed 16-bit channels using split-byte lookup contributions.
+================
+*/
 void MV_Mix16BitStereo16( uint32_t position,
    uint32_t rate, const char *start, uint32_t length )
 {

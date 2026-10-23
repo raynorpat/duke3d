@@ -152,12 +152,22 @@ static int music_bits = 16;
 static int music_channels = 2;
 static midifuncs music_midifuncs;
 
+/*
+================
+music_mixer
+
+Render OPL output in bounded signed-16-bit blocks and store it in the
+SDL device's channel count and 8-bit or 16-bit sample representation.
+================
+*/
 static void music_mixer(unsigned char *stream, int len)
 {
     int16_t buf[1024 * 2];
     int frames, count, i, c;
     int bytes = music_bits / 8;
 
+    /* The SDL request is in bytes; OPLEMU_Render consumes frames with
+     * one sample per channel. */
     frames = len / (bytes * music_channels);
 
     while (frames > 0)
@@ -190,6 +200,14 @@ static void music_mixer(unsigned char *stream, int len)
 } // music_mixer
 
 
+/*
+================
+MUSIC_Init
+
+Initialize MIDI/OPL against the mixer format when playback is available
+and install the music producer on that effects device.
+================
+*/
 int MUSIC_Init(int SoundCard, int Address)
 {
     int i;
@@ -250,6 +268,13 @@ int MUSIC_Init(int SoundCard, int Address)
 } // MUSIC_Init
 
 
+/*
+================
+MUSIC_Shutdown
+
+Stop sequencing, detach the music callback and reset the emulated voices.
+================
+*/
 int MUSIC_Shutdown(void)
 {
     musdebug("shutting down sound subsystem.");
@@ -263,6 +288,8 @@ int MUSIC_Shutdown(void)
     MUSIC_StopSong();
 
     if (music_hooked)
+        /* Detach under the audio lock before tearing down emulated state
+         * that the callback would otherwise still access. */
         DSL_SetMusicCallback(NULL);
     music_hooked = 0;
 
@@ -372,6 +399,14 @@ int MUSIC_StopSong(void)
 } // MUSIC_StopSong
 
 
+/*
+================
+MUSIC_PlaySong
+
+Replace the previous MIDI song under the shared audio lock.
+The caller retains the song bytes used by the track cursors.
+================
+*/
 int MUSIC_PlaySong(unsigned char *song, int loopflag)
 {
     uint32_t flags;

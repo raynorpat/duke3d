@@ -227,6 +227,9 @@ char *MV_ErrorString
    Function: MV_Mix
 
    Mixes the sound into the buffer.
+
+   Keep fractional source cursors across output divisions and request another
+   source block only when the current block has been consumed.
 ---------------------------------------------------------------------*/
 
 static void MV_Mix
@@ -268,6 +271,8 @@ static void MV_Mix
       {
       start    = voice->sound;
       rate     = voice->RateScale;
+      /* Source position, block length and rate use 16 fractional bits;
+       * length counts destination frames still available in this mix division. */
       position = voice->position;
 
       // Check if the last sample in this buffer would be
@@ -276,6 +281,8 @@ static void MV_Mix
          {
          if ( position < voice->length )
             {
+            /* Ceiling division limits the output frames to the remaining source
+             * block at this resampling rate. */
             voclength = ( voice->length - position + rate - 1 ) / rate;
             }
          else
@@ -291,6 +298,8 @@ static void MV_Mix
 
       voice->mix( position, rate, start, voclength );
 
+      /* Retain the legacy odd-count accounting: advance one extra source
+       * step and charge one fewer output frame to the remaining division. */
       if ( voclength & 1 )
          {
          MV_MixPosition += rate;
@@ -415,6 +424,8 @@ void MV_ServiceVoc
 
       end = MV_MixBuffer[ 0 ] + MV_BufferLength;;
       dest = MV_MixBuffer[ MV_MixPage ];
+      /* The reverb delay is a byte offset in the circular mix storage.
+       * A source span that crosses the ring end is handled in two pieces. */
       source = MV_MixBuffer[ MV_MixPage ] - MV_ReverbDelay;
       if ( source < MV_MixBuffer[ 0 ] )
          {
@@ -499,6 +510,8 @@ void MV_ServiceVoc
       // Is this voice done?
       if ( !voice->Playing )
          {
+         /* Return the voice to the pool before notifying its owner. The opaque
+          * callback token lets the owner release resources such as sample cache locks. */
          MV_StopVoice( voice );
 
          if ( MV_CallBackFunc )
@@ -1114,6 +1127,8 @@ int MV_Kill
       return( MV_Error );
       }
 
+   /* Save the owner token before returning the node to the pool; callbacks
+    * run after this function restores its list-mutation lock state. */
    callbackval = voice->callbackval;
 
    MV_StopVoice( voice );
@@ -1168,6 +1183,9 @@ int MV_VoicesPlaying
    Function: MV_AllocVoice
 
    Retrieve an inactive or lower priority voice for output.
+
+   An exhausted pool may steal an equal-or-lower-priority voice.
+   The returned node is reserved but is not linked for playback until MV_PlayVoice.
 ---------------------------------------------------------------------*/
 
 VoiceNode *MV_AllocVoice
@@ -1201,6 +1219,8 @@ VoiceNode *MV_AllocVoice
             }
          }
 
+      /* Equal priority is allowed to steal the least-important active voice
+       * when no free node remains. */
       if ( priority >= voice->priority )
          {
          MV_Kill( voice->handle );
@@ -1879,6 +1899,8 @@ int MV_StartPlayback
 //   return( MV_Ok );
 
    // Start playback
+    /* The SDL backend borrows this whole ring; its callback requests
+     * MV_ServiceVoc one division at a time. */
     status = DSL_BeginBufferedPlayback( MV_MixBuffer[ 0 ],
             TotalBufferSize, MV_NumberOfBuffers,
             MV_RequestedMixRate, MV_MixMode, MV_ServiceVoc );
@@ -1911,6 +1933,8 @@ void MV_StopPlayback
    VoiceNode   *next;
    unsigned    flags;
 
+   /* Close the device before recycling voices so a callback cannot still
+    * be mixing from a node as it returns to the free list. */
    DSL_StopPlayback();
 
    // Make sure all callbacks are done.
@@ -2518,6 +2542,8 @@ void MV_CreateVolumeTable
       {
       for( i = 0; i < 65536; i += 256 )
          {
+         /* The table indexes unsigned byte patterns but stores signed, scaled
+          * amplitudes; mix kernels combine the byte contributions for 16-bit input. */
          val   = i - 0x8000;
          val  *= level;
          val  /= MV_MaxVolume;
@@ -2552,6 +2578,8 @@ void MV_CalcVolume
    {
    int volume;
 
+   /* Pad both sides of the 8-bit identity ramp with saturated values so
+    * the hot loop can clamp a summed sample with one lookup. */
    for( volume = 0; volume < 128; volume++ )
       {
       MV_HarshClipTable[ volume ] = 0;

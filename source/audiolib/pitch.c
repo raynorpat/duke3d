@@ -136,6 +136,9 @@ void PITCH_Init
    Function: PITCH_GetScale
 
    Returns a fixed-point value to scale number the specified amount.
+
+   The offset is in cents and the result is a 16.16 playback-rate multiplier.
+   Zero cents returns the unity entry, 65536.
 ---------------------------------------------------------------------*/
 
 uint32_t PITCH_GetScale
@@ -160,6 +163,8 @@ uint32_t PITCH_GetScale
       return( PitchTable[ 0 ][ 0 ] );
       }
 
+   /* Pitch offsets are cents: 1200 per octave and 100 per semitone.
+    * Normalize a negative remainder before indexing the note/detune tables. */
    noteshift = pitchoffset % 1200;
    if ( noteshift < 0 )
       {
@@ -181,6 +186,8 @@ uint32_t PITCH_GetScale
          }
       }
 
+   /* The lookup supplies the within-octave 16.16 ratio; a power-of-two
+    * shift supplies the remaining octaves. */
    scale = PitchTable[ note ][ detune ];
 
    if ( octaveshift < 0 )

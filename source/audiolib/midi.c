@@ -141,6 +141,8 @@ static int32_t _MIDI_ReadNumber
    value = 0;
    while( size-- )
       {
+      /* This helper reads up to four big-endian bytes of a fixed-size field;
+       * it is separate from the seven-bit variable-length delta reader. */
       value <<= 8;
       value += *FromPtr++;
       }
@@ -172,6 +174,8 @@ static int32_t _MIDI_ReadDelta
       do
          {
          GET_NEXT_EVENT( ptr, c );
+         /* Only seven bits per byte contribute to the delay; bit 7 requests
+          * another byte and is not part of the tick count. */
          value = ( value << 7 ) + ( c & 0x7f );
          }
       while ( c & 0x80 );
@@ -603,6 +607,8 @@ void _MIDI_ServiceRoutine
             }
          else
             {
+            /* A data byte reuses the last channel status. Put it back so the
+             * normal parameter reader consumes it as the first event argument. */
             event = Track->RunningStatus;
             Track->pos--;
             }
@@ -1345,6 +1351,8 @@ void MIDI_SetTempo
    int32_t tickspersecond;
 
    MIDI_Tempo = tempo;
+   /* Convert beats/minute and ticks/beat into the task frequency;
+    * wall-clock position uses the matching fixed-point seconds per tick. */
    tickspersecond = ( tempo * _MIDI_Division ) / 60;
    if ( _MIDI_PlayRoutine != NULL )
       {

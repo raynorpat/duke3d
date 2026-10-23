@@ -536,6 +536,8 @@ static void AL_SetVoicePitch
    ScaleNote = NoteMod12[ note ];
    Octave    = NoteDiv12[ note ];
 
+   /* Build the OPL pitch register from the octave bits and the fine-tuned
+    * frequency number; the key-on status is added separately. */
    pitch = OctavePitch[ Octave ] | NotePitch[ detune ][ ScaleNote ];
 
    Voice[ voice ].pitchleft = pitch;
@@ -568,6 +570,8 @@ static void AL_SetVoicePitch
             }
          }
 
+      /* Build the OPL pitch register from the octave bits and the fine-tuned
+       * frequency number; the key-on status is added separately. */
       pitch = OctavePitch[ Octave ] | NotePitch[ detune ][ ScaleNote ];
 
       Voice[ voice ].pitchright = pitch;
@@ -1202,6 +1206,8 @@ void AL_SetPitchBend
    TotalBend  = pitchbend * Channel[ channel ].PitchBendRange;
    TotalBend /= ( PITCHBEND_CENTER / FINETUNE_RANGE );
 
+   /* Split bend into a whole-note offset and fine-table index before
+    * retuning every active voice on the channel. */
    Channel[ channel ].KeyOffset  = ( int )( TotalBend / FINETUNE_RANGE );
    Channel[ channel ].KeyOffset -= Channel[ channel ].PitchBendSemiTones;
 
