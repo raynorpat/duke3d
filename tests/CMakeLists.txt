@@ -73,6 +73,26 @@ target_include_directories(engine_inside PRIVATE "${PROJECT_SOURCE_DIR}/source")
 target_link_libraries(engine_inside PRIVATE buildengine)
 add_test(NAME engine_inside COMMAND engine_inside)
 
+add_executable(net_protocol_peer net_protocol_peer.c)
+target_link_libraries(net_protocol_peer PRIVATE buildengine duke3d::SDL2main)
+
+function(add_protocol_refusal_tests name data port)
+  # Other releases need no sibling build or private data folder. Optional
+  # DUKE3D_NET_PEERS entries still exercise complete external game builds.
+  foreach(_byteversion 9 10 12 14 103 116 117 27)
+    if(_byteversion EQUAL _vbyte)
+      continue()
+    endif()
+    math(EXPR port "${port} + 2")
+    add_test(NAME net_refuse_${name}_protocol_${_byteversion}
+      COMMAND "${CMAKE_COMMAND}" "-DA=$<TARGET_FILE:net_game>" "-DA_DATA=${data}"
+        "-DB=$<TARGET_FILE:net_protocol_peer>" -DB_VERSION=${_byteversion}
+        -DPORT=${port} -DMODE=refuse "-DWORK=${CMAKE_BINARY_DIR}/np_${name}_${_byteversion}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
+    set_tests_properties(net_refuse_${name}_protocol_${_byteversion} PROPERTIES TIMEOUT 90)
+  endforeach()
+endfunction()
+
 add_executable(engine_trace engine_trace.c)
 target_include_directories(engine_trace PRIVATE "${PROJECT_SOURCE_DIR}/source")
 target_link_libraries(engine_trace PRIVATE buildengine)
@@ -316,6 +336,36 @@ add_executable(game_helpers game_helpers.c "${_game_c}")
 target_link_libraries(game_helpers PRIVATE duke3d_game)
 add_test(NAME game_helpers COMMAND game_helpers)
 
+add_executable(net_game net_game.c "${_game_c}")
+target_link_libraries(net_game PRIVATE duke3d_game)
+
+if(NOT DUKE3D_VERSION MATCHES "^(0\\.99|1\\.0)$")
+  add_executable(player_death player_death.c "${_game_c}")
+  target_link_libraries(player_death PRIVATE duke3d_game)
+  add_test(NAME player_death COMMAND player_death)
+  set_tests_properties(player_death PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 30)
+endif()
+
+if(DUKE3D_VERSION MATCHES "^1\\.[01]$")
+  add_executable(early_scenarios early_scenarios.c "${_game_c}")
+  target_link_libraries(early_scenarios PRIVATE duke3d_game)
+  add_test(NAME early_scenarios COMMAND early_scenarios)
+  set_tests_properties(early_scenarios PROPERTIES TIMEOUT 30)
+  add_executable(player_prediction player_prediction.c "${_game_c}")
+  target_link_libraries(player_prediction PRIVATE duke3d_game)
+  add_test(NAME player_prediction COMMAND player_prediction)
+  set_tests_properties(player_prediction PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy" TIMEOUT 30)
+endif()
+
+# The private copy reports the first game tic; the shipped executable has no hook.
+configure_file("${_game_c}" "${CMAKE_CURRENT_BINARY_DIR}/boot_game_impl.c" COPYONLY)
+set_source_files_properties("${CMAKE_CURRENT_BINARY_DIR}/boot_game_impl.c" PROPERTIES
+  COMPILE_DEFINITIONS "SDL_MAIN_HANDLED;main=duke3d_main;DUKE3D_BOOT_TEST=1")
+add_executable(boot_game boot_game.c "${CMAKE_CURRENT_BINARY_DIR}/boot_game_impl.c")
+target_link_libraries(boot_game PRIVATE duke3d_game)
+
 if(DUKE3D_ROUTEBOT)
   add_executable(routebot_test routebot.c "${_game_c}")
   target_link_libraries(routebot_test PRIVATE duke3d_game)
@@ -359,6 +409,36 @@ set(DUKE3D_ATOMIC_GRP "" CACHE FILEPATH
 set(DUKE3D_DOS_SAVES_DIR "" CACHE PATH
     "Folder searched for DOS 1.5 .sav files for the DOS save tests")
 find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+  add_test(NAME capture_tools COMMAND "${Python3_EXECUTABLE}" -I
+    "${CMAKE_CURRENT_SOURCE_DIR}/capture_tools.py")
+endif()
+
+function(add_save_hardening_test name data save)
+  if(EXISTS "${save}")
+    if(ARGC GREATER 3)
+      set(_reader --codec "$<TARGET_FILE:savegame_codec>")
+    else()
+      set(_reader --duke3d "$<TARGET_FILE:duke3d>" --data "${data}")
+    endif()
+    add_test(NAME save_hardening_${name}
+      COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/savegame_hardening.py"
+        ${_reader} --save "${save}"
+        --version "${DUKE3D_VERSION}" --work "${CMAKE_BINARY_DIR}/sh_${name}")
+    set_tests_properties(save_hardening_${name} PROPERTIES TIMEOUT 180)
+  endif()
+endfunction()
+if(DUKE3D_VERSION MATCHES "^1\\.[45]$" AND DUKE3D_DOS_SAVES_DIR AND Python3_Interpreter_FOUND)
+  # 1.4 and 1.5 share the DOS block layout. This codec check deliberately
+  # bypasses the game's edition header check and needs no Atomic GRP.
+  file(GLOB_RECURSE _codec_saves "${DUKE3D_DOS_SAVES_DIR}/*")
+  list(FILTER _codec_saves INCLUDE REGEX "\\.[sS][aA][vV]$")
+  list(SORT _codec_saves)
+  if(_codec_saves)
+    list(GET _codec_saves 0 _codec_save)
+    add_save_hardening_test(codec "" "${_codec_save}" codec)
+  endif()
+endif()
 if(DUKE3D_VERSION STREQUAL "1.5" AND NOT DUKE3D_SHAREWARE AND
    DUKE3D_ATOMIC_GRP AND EXISTS "${DUKE3D_ATOMIC_GRP}" AND
    DUKE3D_DOS_SAVES_DIR AND IS_DIRECTORY "${DUKE3D_DOS_SAVES_DIR}" AND
@@ -413,6 +493,8 @@ if(DUKE3D_VERSION STREQUAL "1.5" AND NOT DUKE3D_SHAREWARE AND
 
   if(_saves)
     list(GET _saves 0 _first)
+    get_filename_component(_atomic_data "${DUKE3D_ATOMIC_GRP}" DIRECTORY)
+    add_save_hardening_test(v15 "${_atomic_data}" "${_first}")
     add_dos_save_test(dos_save_refuse refuse "${_first}")
     add_dos_save_test(dos_save_hostile hostile "${_first}")
   endif()
@@ -445,11 +527,12 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
   if(_v13d_data)
     add_test(NAME game_boot_v13d_${_v13d_edition}
       COMMAND "${CMAKE_COMMAND}"
-              "-DDUKE3D=$<TARGET_FILE:duke3d>"
+              "-DDUKE3D=$<TARGET_FILE:boot_game>"
               "-DDATA=${_v13d_data}" "-DEDITION=${_v13d_edition}"
               "-DWORK=${CMAKE_BINARY_DIR}/gb13"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/game_boot_v13d.cmake")
     set_tests_properties(game_boot_v13d_${_v13d_edition} PROPERTIES TIMEOUT 240)
+    add_save_hardening_test(v13d_${_v13d_edition} "${_v13d_data}" "${_v13d_data}/refsaves/e1l1start.SAV")
   endif()
   if(_v13d_data)
     # The original demos, played to the end and compared with the DOS state.
@@ -542,12 +625,14 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
     endif()
     add_test(NAME net_connect_v13d_${_v13d_edition}
       COMMAND "${CMAKE_COMMAND}"
-              "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_v13d_data}"
-              "-DB=$<TARGET_FILE:duke3d>" "-DB_DATA=${_v13d_data}"
+              "-DA=$<TARGET_FILE:net_game>" "-DA_DATA=${_v13d_data}"
+              "-DB=$<TARGET_FILE:net_game>" "-DB_DATA=${_v13d_data}"
               -DPORT=${_net_port} -DMODE=connect "-DARGS=/v1 /l1"
               "-DWORK=${CMAKE_BINARY_DIR}/nc13"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
     set_tests_properties(net_connect_v13d_${_v13d_edition} PROPERTIES TIMEOUT 90)
+    math(EXPR _protocol_port "${_net_port} + 500")
+    add_protocol_refusal_tests(v13d_${_v13d_edition} "${_v13d_data}" ${_protocol_port})
     set(_net_n 0)
     foreach(_peer IN LISTS DUKE3D_NET_PEERS)
       string(REGEX REPLACE "=.*" "" _peer_exe "${_peer}")
@@ -556,7 +641,7 @@ if(DUKE3D_VERSION STREQUAL "1.3D" AND Python3_Interpreter_FOUND)
       math(EXPR _net_port "${_net_port} + 2")
       add_test(NAME net_refuse_v13d_${_v13d_edition}_${_net_n}
         COMMAND "${CMAKE_COMMAND}"
-                "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_v13d_data}"
+                "-DA=$<TARGET_FILE:net_game>" "-DA_DATA=${_v13d_data}"
                 "-DB=${_peer_exe}" "-DB_DATA=${_peer_data}"
                 -DPORT=${_net_port} -DMODE=refuse
                 "-DWORK=${CMAKE_BINARY_DIR}/nr13_${_net_n}"
@@ -606,11 +691,12 @@ if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3
   endif()
   if(_vold_data)
     add_test(NAME game_boot_${_vold_name}
-      COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:duke3d>"
+      COMMAND "${CMAKE_COMMAND}" "-DDUKE3D=$<TARGET_FILE:boot_game>"
               "-DDATA=${_vold_data}" "-DEDITION=${_vold_edition}"
               "-DWORK=${CMAKE_BINARY_DIR}/gb_${_vold_name}"
               -P "${CMAKE_CURRENT_SOURCE_DIR}/game_boot_v13d.cmake")
     set_tests_properties(game_boot_${_vold_name} PROPERTIES TIMEOUT 240)
+    add_save_hardening_test(${_vold_name} "${_vold_data}" "${_vold_data}/refsaves/e1l1start.SAV")
   endif()
   if(_vold_data AND _vold_edition STREQUAL "sw099")
     # Private game.c copy: ending automation is absent from the shipped game.
@@ -761,14 +847,16 @@ if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3
       endif()
       add_test(NAME ${_net_test}
         COMMAND "${CMAKE_COMMAND}"
-                "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_vold_data}"
-                "-DB=$<TARGET_FILE:duke3d>" "-DB_DATA=${_vold_data}"
+                "-DA=$<TARGET_FILE:net_game>" "-DA_DATA=${_vold_data}"
+                "-DB=$<TARGET_FILE:net_game>" "-DB_DATA=${_vold_data}"
                 -DPORT=${_net_port} -DMODE=connect "-DARGS=${_net_args}"
                 "-DWORK=${CMAKE_BINARY_DIR}/nc_${_vold_name}_${_mode}"
                 -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
       set_tests_properties(${_net_test} PROPERTIES TIMEOUT 90)
       math(EXPR _net_port "${_net_port} + 2")
     endforeach()
+    math(EXPR _protocol_port "${_net_port} + 500")
+    add_protocol_refusal_tests(${_vold_name} "${_vold_data}" ${_protocol_port})
     set(_net_n 0)
     foreach(_peer IN LISTS DUKE3D_NET_PEERS)
       string(REGEX REPLACE "=.*" "" _peer_exe "${_peer}")
@@ -777,7 +865,7 @@ if(DUKE3D_VERSION MATCHES "^(0\\.99|1\\.[01])$" AND DUKE3D_SHAREWARE AND Python3
       math(EXPR _net_port "${_net_port} + 2")
       add_test(NAME net_refuse_${_vold_name}_${_net_n}
         COMMAND "${CMAKE_COMMAND}"
-                "-DA=$<TARGET_FILE:duke3d>" "-DA_DATA=${_vold_data}"
+                "-DA=$<TARGET_FILE:net_game>" "-DA_DATA=${_vold_data}"
                 "-DB=${_peer_exe}" "-DB_DATA=${_peer_data}"
                 -DPORT=${_net_port} -DMODE=refuse
                 "-DWORK=${CMAKE_BINARY_DIR}/nr_${_vold_name}_${_net_n}"

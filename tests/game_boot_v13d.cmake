@@ -1,8 +1,8 @@
 # Boots a 1.3D, 1.1, 1.0 or 0.99 build headless on the original data of its
 # version: to the title/demo loop, into E1L1, and (full only) into E3L1. Each
-# run must still be alive when the 15 s timeout kills it. (con_compile_v13d
-# checks the CONs compile cleanly; the game's own output is lost when the
-# timeout kills it.)
+# run must still be alive when the 15 s timeout kills it. Level runs also
+# require the private boot_game executable's first-tic marker and live player.
+# con_compile_v13d separately checks the CONs compile cleanly.
 #
 #   cmake -DDUKE3D=<exe> -DDATA=<data dir> -DEDITION=<full|sw|sw11|sw10|sw099>
 #         -DWORK=<scratch dir> -P game_boot_v13d.cmake
@@ -52,6 +52,13 @@ foreach(_run_args IN LISTS _runs)
   if(NOT _result MATCHES "timeout")
     message(SEND_ERROR "duke3d ${_shown} didn't run until the timeout: ${_result}")
     set(_failed 1)
+  endif()
+  if(NOT _shown STREQUAL "title")
+    string(REGEX MATCH "/v([0-9]+) /l([0-9]+)" _level "${_shown}")
+    if(NOT _out MATCHES "BOOTFRAME E${CMAKE_MATCH_1}L${CMAKE_MATCH_2} player=1405 health=100")
+      message(SEND_ERROR "duke3d ${_shown} never completed a game tic with its live player")
+      set(_failed 1)
+    endif()
   endif()
 endforeach()
 
