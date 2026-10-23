@@ -396,6 +396,14 @@ void makeitfall(short i)
 }
 
 
+/*
+================
+getlabel
+
+Read the next label into the current fixed-width symbol slot,
+advancing the source cursor and line count.
+================
+*/
 void getlabel(void)
 {
     int32_t i;
@@ -408,6 +416,7 @@ void getlabel(void)
             return;
     }
 
+    /* Labels occupy 64-byte slots; the shift selects the current symbol. */
     i = 0;
     while( ispecial(*textptr) == 0 )
         label[(labelcnt<<6)+i++] = *(textptr++);
@@ -1854,6 +1863,14 @@ void loadefs(char *filenam,char *mptr)
     }
 }
 
+/*
+================
+dodge
+
+Check approaching projectiles in the actor's sector and turn aside
+when the projected path passes close enough.
+================
+*/
 char dodge(spritetype *s)
 {
     short i;
@@ -1890,6 +1907,15 @@ char dodge(spritetype *s)
     return 0;
 }
 
+/*
+================
+furthestangle
+
+Sample hitscan directions around the sprite and choose the one
+with the greatest Manhattan distance to its hit point.
+Most actor ticks use a version-specific turn instead of scanning.
+================
+*/
 short furthestangle(short i,short angs)
 {
     short j=0, hitsect=0, hitwall=0,hitspr, furthest_angle=0, angincs=0;
@@ -1924,6 +1950,14 @@ short furthestangle(short i,short angs)
     return (furthest_angle&2047);
 }
 
+/*
+================
+furthestcanseepoint
+
+Periodically sample rays from the target for a point visible to the actor.
+Write its coordinates and return its sector, or -1 when no point is found.
+================
+*/
 short furthestcanseepoint(short i,spritetype *ts,int32_t *dax,int32_t *day)
 {
     short j, hitsect,hitwall,hitspr, angincs, tempang;
@@ -1964,6 +1998,14 @@ short furthestcanseepoint(short i,spritetype *ts,int32_t *dax,int32_t *day)
 
 
 
+/*
+================
+alterang
+
+Ease the actor toward its CON move velocities and steer it
+according to the active movement flags.
+================
+*/
 void alterang(short a)
 {
     short aang, angdif, goalang,j;
@@ -1975,6 +2017,8 @@ void alterang(short a)
 
     aang = g_sp->ang;
 
+    /* Approach the scripted velocity by one fifth of the remaining difference
+     * each tick rather than replacing it outright. */
     g_sp->xvel += (*moveptr-g_sp->xvel)/5;
 #if DUKE3D_GAMEVER >= GAMEVER_10
     if(g_sp->zvel < 648)

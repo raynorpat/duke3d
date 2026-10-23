@@ -145,6 +145,13 @@ void restoreinterpolations()  //Stick at end of drawscreen
 	for(i=numinterpolations-1;i>=0;i--) *curipos[i] = bakipos[i];
 }
 
+/*
+================
+ceilingspace
+
+Recognize the unpaletted parallax ceiling tiles used as outer space.
+================
+*/
 int32_t ceilingspace(short sectnum)
 {
     if( (sector[sectnum].ceilingstat&1) && sector[sectnum].ceilingpal == 0 )
@@ -159,6 +166,13 @@ int32_t ceilingspace(short sectnum)
     return 0;
 }
 
+/*
+================
+floorspace
+
+Recognize the space floor tiles using the legacy ceiling-palette test.
+================
+*/
 int32_t floorspace(short sectnum)
 {
     if( (sector[sectnum].floorstat&1) && sector[sectnum].ceilingpal == 0 )
@@ -173,6 +187,13 @@ int32_t floorspace(short sectnum)
     return 0;
 }
 
+/*
+================
+addammo
+
+Apply an ammunition change and clamp it to this weapon's maximum.
+================
+*/
 void addammo( short weapon,struct player_struct *p,short amount)
 {
    p->ammo_amount[weapon] += amount;
@@ -184,6 +205,14 @@ void addammo( short weapon,struct player_struct *p,short amount)
 #endif
 }
 
+/*
+================
+addweapon
+
+Grant a weapon and start its selection animation and sound
+under this version's weapon rules.
+================
+*/
 void addweapon( struct player_struct *p,short weapon)
 {
     if ( p->gotweapon[weapon] == 0 )
@@ -233,6 +262,13 @@ void addweapon( struct player_struct *p,short weapon)
 #endif
 }
 
+/*
+================
+checkavailinven
+
+Select a remaining inventory item according to the game's priority order.
+================
+*/
 void checkavailinven( struct player_struct *p )
 {
 
@@ -269,6 +305,13 @@ void checkavailinven( struct player_struct *p )
 
 // 1.3D picks the next weapon by scanning up and down from the current one
 // (the older algorithm kept commented out below), with no expander.
+/*
+================
+checkavailweapon
+
+Choose a usable fallback when the current weapon runs out of ammunition.
+================
+*/
 void checkavailweapon( struct player_struct *p )
 {
     short i,okay,check_shoot,check_bombs;
@@ -426,6 +469,13 @@ void checkavailweapon( struct player_struct *p )
     }
 }
 #else
+/*
+================
+checkavailweapon
+
+Choose a usable fallback when the current weapon runs out of ammunition.
+================
+*/
 void checkavailweapon( struct player_struct *p )
 {
     short i,snum;
@@ -634,6 +684,14 @@ void checkavailweapon( struct player_struct *p )
 }
    */
 
+/*
+================
+ifsquished
+
+Test the sector gap for crushing, with the version-specific exclusions
+and frozen-actor damage handling.
+================
+*/
 int32_t ifsquished(short i, short p)
 {
     sectortype *sc;
@@ -1202,6 +1260,13 @@ void lotsofpaper(spritetype *s, short n)
 
 
      
+/*
+================
+guts
+
+Scatter body fragments with the version's size, palette and velocity rules.
+================
+*/
 void guts(spritetype *s,short gtype, short n, short p)
 {
     int32_t gutz,floorz;
@@ -1272,6 +1337,13 @@ void guts(spritetype *s,short gtype, short n, short p)
     }
 }
 
+/*
+================
+gutsdir
+
+Throw body fragments from the victim's height with randomized velocities.
+================
+*/
 void gutsdir(spritetype *s,short gtype, short n, short p)
 {
     int32_t gutz,floorz;
@@ -1514,6 +1586,13 @@ void movefta(void)
     }
 }
 
+/*
+================
+ifhitsectors
+
+Find an explosion effect in this sector, or return -1 when none is present.
+================
+*/
 short ifhitsectors(short sectnum)
 {
     short i;
@@ -1650,6 +1729,14 @@ short ifhitbyweapon(short sn)
     return -1;
 }
 
+/*
+================
+movecyclers
+
+Advance the sine-driven sector lighting cycles and shade their walls
+and surfaces within the configured limits.
+================
+*/
 void movecyclers(void)
 {
     short q, j, x, t, s, *c;
@@ -1687,6 +1774,14 @@ void movecyclers(void)
     }
 }
 
+/*
+================
+movedummyplayers
+
+Keep the water-surface player doubles aligned with their owners,
+removing doubles when their owner no longer needs one.
+================
+*/
 void movedummyplayers(void)
 {
     short i, p, nexti;
@@ -1737,6 +1832,14 @@ void movedummyplayers(void)
 
 
 short otherp;
+/*
+================
+moveplayers
+
+Update player sprites and holograms, including camera ownership,
+world placement and sector shading.
+================
+*/
 void moveplayers(void) //Players
 {
     short i , nexti;
@@ -1952,6 +2055,13 @@ void moveplayers(void) //Players
 }
 
 
+/*
+================
+movefx
+
+Tick the respawn and sound-controller sprites in the effects control list.
+================
+*/
 void movefx(void)
 {
     short i, j, nexti, p;
@@ -2080,6 +2190,13 @@ void movefx(void)
 
 
 
+/*
+================
+movefallers
+
+Activate and move falling map objects, handling their impact and debris.
+================
+*/
 void movefallers(void)
 {
     short i, nexti, sect, j;
@@ -2188,6 +2305,13 @@ void movefallers(void)
     }
 }
 
+/*
+================
+movestandables
+
+Advance the state machines for props, switches and destructible map objects.
+================
+*/
 void movestandables(void)
 {
     short i=0, j=0, k=0, m=0, nexti=0, nextj=0, nextk=0, p=0, q=0, sect=0;
@@ -4031,6 +4155,14 @@ void moveweapons(void)
 #if DUKE3D_GAMEVER < GAMEVER_14
 // 1.3D's transporters. They differ from the later ones throughout (see the
 // G13-A18 ledger row), so they are a separate function.
+/*
+================
+movetransports
+
+Move eligible players and sprites through paired transporters
+and water boundaries, applying their cooldown and placement rules.
+================
+*/
 void movetransports(void)
 {
     char warpspriteto;
@@ -4415,6 +4547,14 @@ void movetransports(void)
     }
 }
 #else
+/*
+================
+movetransports
+
+Move eligible players and sprites through paired transporters
+and water boundaries, applying their cooldown and placement rules.
+================
+*/
 void movetransports(void)
 {
     char warpspriteto;
@@ -6519,6 +6659,14 @@ void moveactors(void)
 }
 
 
+/*
+================
+moveexplosions
+
+Advance the temporary effects list, including debris, smoke and explosions.
+Remove effects as their individual lifetimes expire.
+================
+*/
 void moveexplosions(void)  // STATNUM 5
 {
     short i, j, k, nexti, sect, p;

@@ -98,6 +98,14 @@ short callsound(short sn,short whatsprite)
 }
 
 
+/*
+================
+check_activator_motion
+
+Report whether a matching activator has an active sector animation
+or a moving sector effector.
+================
+*/
 short check_activator_motion( short lotag )
 {
     short i, j;
@@ -476,6 +484,13 @@ static int32_t setanimation(short animsect,int32_t *animptr, int32_t thegoal, in
 
 
 
+/*
+================
+animatecamsprite
+
+Refresh an active in-world camera monitor when its update timer allows.
+================
+*/
 void animatecamsprite(void)
 {
     short i;
@@ -497,6 +512,13 @@ void animatecamsprite(void)
     else T1++;
 }
 
+/*
+================
+animatewalls
+
+Advance the registered animated wall textures and their effect timers.
+================
+*/
 void animatewalls(void)
 {
     int32_t i, j, p, t;
@@ -602,6 +624,14 @@ void animatewalls(void)
     }
 }
 
+/*
+================
+activatewarpelevators
+
+Find a linked warp-elevator destination and arm the matching effectors
+for travel in the requested direction.
+================
+*/
 char activatewarpelevators(short s,short d) //Parm = sectoreffectornum
 {
     short i, sn;
@@ -1136,6 +1166,13 @@ void operatesectors(short sn,short ii)
 
 
 
+/*
+================
+operaterespawns
+
+Arm matching respawn markers, subject to this version's monster rules.
+================
+*/
 void operaterespawns(short low)
 {
     short i, j, nexti;
@@ -1290,6 +1327,13 @@ void operateactivators(short low,short snum)
     operaterespawns(low);
 }
 
+/*
+================
+operatemasterswitches
+
+Arm matching master switches that have not already been activated.
+================
+*/
 void operatemasterswitches(short low)
 {
     short i;
@@ -1305,6 +1349,14 @@ void operatemasterswitches(short low)
 
 
 
+/*
+================
+operateforcefields
+
+Toggle the matching forcefield walls and reset their animation state.
+A tag of -1 selects the whole set.
+================
+*/
 void operateforcefields(short s, short low)
 {
     short i, p;
@@ -1769,6 +1821,14 @@ char checkhitswitch(short snum,int32_t w,char switchtype)
 }
 
 
+/*
+================
+activatebysector
+
+Operate a sector through its activators when present,
+otherwise operate the sector directly.
+================
+*/
 void activatebysector(short sect,short j)
 {
     short i,didit;
@@ -1813,6 +1873,13 @@ static void breaktechwall13(short newpn,short spr,short dawallnum,short glasssou
 }
 #endif
 
+/*
+================
+checkhitwall
+
+Apply the wall texture and effect changes caused by a weapon impact.
+================
+*/
 void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short atwith)
 {
     short j, i, sn = -1, darkestwall;
@@ -2139,6 +2206,14 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
 }
 
 
+/*
+================
+checkplayerhurt
+
+Decode a movement collision and apply the corresponding sprite
+or wall hazard damage, feedback and knockback.
+================
+*/
 void checkplayerhurt(struct player_struct *p,short j)
 {
     if( (j&49152) == 49152 )
@@ -2228,6 +2303,14 @@ void checkplayerhurt(struct player_struct *p,short j)
 }
 
 
+/*
+================
+checkhitceiling
+
+Break supported ceiling lights and propagate their lighting effects.
+Return whether a breakable ceiling was handled.
+================
+*/
 char checkhitceiling(short sn)
 {
     short i, j, q, darkestwall, darkestceiling;
@@ -2307,6 +2390,14 @@ char checkhitceiling(short sn)
 // 1.1's checkhitsprite (G11-S10..S12). Its case set, the stripper damage case,
 // the THROWFLAME reactions and the default knockback differ throughout, so it
 // is a separate copy.
+/*
+================
+checkhitsprite
+
+Apply tile-specific hit reactions and record pending actor damage
+from the impacting sprite.
+================
+*/
 void checkhitsprite(short i,short sn)
 {
     short j, k, p;
@@ -2853,6 +2944,14 @@ void checkhitsprite(short i,short sn)
     }
 }
 #else
+/*
+================
+checkhitsprite
+
+Apply tile-specific hit reactions and record pending actor damage
+from the impacting sprite.
+================
+*/
 void checkhitsprite(short i,short sn)
 {
     short j, k, l, nextj, p;
@@ -3351,6 +3450,13 @@ void checkhitsprite(short i,short sn)
 #endif
 
 
+/*
+================
+allignwarpelevators
+
+Align sectors belonging to matching warp-elevator effectors.
+================
+*/
 void allignwarpelevators(void)
 {
     short i, j;

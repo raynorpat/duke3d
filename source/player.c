@@ -32,6 +32,14 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 int32 turnheldtime; //MED
 int32 lastcontroltime; //MED
 
+/*
+================
+setpal
+
+Choose the player's normal, water or heat/slime palette
+and request a palette refresh.
+================
+*/
 void setpal(struct player_struct *p)
 {
     if(p->heat_on) p->palette = slimepal;
@@ -154,11 +162,20 @@ void forceplayerangle(struct player_struct *p)
     p->rotscrnang = n>>1;
 }
 
+/*
+================
+tracers
+
+Place smoke or water-bubble effects at evenly spaced points
+along the shot segment.
+================
+*/
 void tracers(int32_t x1,int32_t y1,int32_t z1,int32_t x2,int32_t y2,int32_t z2,int32_t n)
 {
      int32_t i, xv, yv, zv;
      short sect = -1;
 
+	 /* Divide by n+1 to keep the n effect positions inside the shot segment. */
 	 i = n+1;
 	 xv = (x2-x1)/i;
 	 yv = (y2-y1)/i;
@@ -261,6 +278,14 @@ long hitaspriteandwall(short i,short *hitsp,short *hitw,short *x, short *y)
 */
 
 
+/*
+================
+hitawall
+
+Trace horizontally along the player's facing direction and return the hit wall.
+The function result is a distance only in the later game versions.
+================
+*/
 int32_t hitawall(struct player_struct *p,short *hitw)
 {
     int32_t sx,sy,sz;
@@ -1967,6 +1992,13 @@ void shoot(short i,short atwith)
 
 
 
+/*
+================
+displayloogie
+
+Draw the spit overlay from the player's loogie positions and timer.
+================
+*/
 void displayloogie(short snum)
 {
     int32_t i, a, x, y, z;
@@ -1986,6 +2018,13 @@ void displayloogie(short snum)
     }
 }
 
+/*
+================
+animatefist
+
+Draw the fist animation when active and report whether it took the view.
+================
+*/
 char animatefist(short gs,short snum)
 {
     short looking_arc,fisti,fistpal;
@@ -2017,6 +2056,13 @@ char animatefist(short gs,short snum)
     return 1;
 }
 
+/*
+================
+animateknee
+
+Draw the knee attack overlay when its animation is active.
+================
+*/
 char animateknee(short gs,short snum)
 {
     short knee_y[] = {0,-8,-16,-32,-64,-84,-108,-108,-108,-72,-32,-8};
@@ -2042,6 +2088,13 @@ char animateknee(short gs,short snum)
     return 1;
 }
 
+/*
+================
+animateknuckles
+
+Draw the knuckle-cracking overlay and report whether it took the view.
+================
+*/
 char animateknuckles(short gs,short snum)
 {
     short knuckle_frames[] = {0,1,2,2,3,3,3,2,2,1,0};
@@ -2067,6 +2120,13 @@ char animateknuckles(short gs,short snum)
 
 int32_t lastvisinc;
 
+/*
+================
+displaymasks
+
+Draw the equipped breathing-mask overlay for this player.
+================
+*/
 void displaymasks(short snum)
 {
     short i, p;
@@ -2109,6 +2169,13 @@ void displaymasks(short snum)
 #endif
 }
 
+/*
+================
+animatetip
+
+Draw the tipping hand animation and report whether it took the view.
+================
+*/
 char animatetip(short gs,short snum)
 {
     short p,looking_arc;
@@ -2135,6 +2202,13 @@ char animatetip(short gs,short snum)
     return 1;
 }
 
+/*
+================
+animateaccess
+
+Draw the access-card hand animation and report whether it took the view.
+================
+*/
 char animateaccess(short gs,short snum)
 {
     short access_y[] = {0,-8,-16,-32,-64,-84,-108,-108,-108,-108,-108,-108,-108,-108,-108,-108,-96,-72,-64,-32,-16};
@@ -2162,6 +2236,14 @@ char animateaccess(short gs,short snum)
 
 short fistsign;
 
+/*
+================
+displayweapon
+
+Compose the first-person weapon and hand sprites from the player's
+weapon state, sway, landing motion and current palette.
+================
+*/
 void displayweapon(short snum)
 {
     int32_t gun_pos, looking_arc, cw;
@@ -2186,6 +2268,8 @@ void displayweapon(short snum)
 
     animateknee(gs,snum);
 
+    /* Square the lowering counter so the weapon moves offscreen faster
+     * near the end of the transition. */
     gun_pos = 80-(p->weapon_pos*p->weapon_pos);
 
     weapon_xoffset =  (160)-90;
@@ -3379,6 +3463,13 @@ short weapon_sprites[MAX_WEAPONS] = { KNEE, FIRSTGUNSPRITE, SHOTGUNSPRITE,
         CHAINGUNSPRITE, RPGSPRITE, HEAVYHBOMB, SHRINKERSPRITE, DEVISTATORSPRITE,
         TRIPBOMBSPRITE, FREEZESPRITE, HEAVYHBOMB, SHRINKERSPRITE};
 
+/*
+================
+checkweapons
+
+Apply the version-specific random weapon drop or explosion on player death.
+================
+*/
 void checkweapons(struct player_struct *p)
 {
     short j,cw;

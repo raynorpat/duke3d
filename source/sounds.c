@@ -44,6 +44,9 @@ int32_t backflag,numenvsnds;
 =
 = SoundStartup
 =
+= Initialize the effects mixer, volume and stereo settings, then install
+= the callback that releases sound cache locks.
+=
 ===================
 */
 
@@ -112,6 +115,8 @@ void SoundStartup( void )
 =
 = SoundShutdown
 =
+= Shut down the effects mixer and report a backend shutdown error.
+=
 ===================
 */
 
@@ -134,6 +139,8 @@ void SoundShutdown( void )
 ===================
 =
 = MusicStartup
+=
+= Initialize the selected music backend and apply the configured volume.
 =
 ===================
 */
@@ -190,6 +197,8 @@ void MusicStartup( void )
 ===================
 =
 = MusicShutdown
+=
+= Shut down the selected music backend and report a shutdown error.
 =
 ===================
 */
@@ -255,6 +264,13 @@ void intomenusounds(void)
     menunum %= 17;
 }
 
+/*
+================
+playmusic
+
+Load a permitted music file into the song buffer and start looped playback.
+================
+*/
 void playmusic(char *fn)
 {
     short      fp;
@@ -280,6 +296,14 @@ void playmusic(char *fn)
     MUSIC_PlaySong( MusicPtr, MUSIC_LoopSong );
 }
 
+/*
+================
+loadsound
+
+Load a sound sample into the Build cache with an active sound lock.
+Return zero when sound is disabled or the file cannot be loaded.
+================
+*/
 char loadsound(unsigned short num)
 {
     int32_t   fp, l;
@@ -308,6 +332,14 @@ char loadsound(unsigned short num)
     return 1;
 }
 
+/*
+================
+xyzsound
+
+Start a positional sound with the game's distance, pitch and priority rules.
+Track sprite-owned voices so later updates can move or stop them.
+================
+*/
 int xyzsound(short num,short i,int32_t x,int32_t y,int32_t z)
 {
     int32_t sndist, cx, cy, cz, j,k;
@@ -347,6 +379,8 @@ int xyzsound(short num,short i,int32_t x,int32_t y,int32_t z)
     cs = ps[screenpeek].cursectnum;
     ca = ps[screenpeek].ang+ps[screenpeek].look_ang;
 
+    /* Build Z has sixteen units per XY unit; scale height before measuring
+     * the sound distance. */
     sndist = FindDistance3D((cx-x),(cy-y),(cz-z)>>4);
 
     if( i >= 0 && (soundm[num]&16) == 0 && PN == MUSICANDSFX && SLT < 999 && (sector[SECT].lotag&0xff) < 9 )
@@ -452,6 +486,14 @@ int xyzsound(short num,short i,int32_t x,int32_t y,int32_t z)
     return (voice);
 }
 
+/*
+================
+sound
+
+Play a sound without a sprite position, using its configured pitch range,
+looping flag and voice priority.
+================
+*/
 void sound(short num)
 {
     short pitch,pitche,pitchs,cx;
@@ -511,12 +553,26 @@ void sound(short num)
     Sound[num].lock--;
 }
 
+/*
+================
+spritesound
+
+Start a positional sound at the current coordinates of a sprite.
+================
+*/
 int spritesound(unsigned short num, short i)
 {
     if(num >= NUM_SOUNDS) return -1;
     return xyzsound(num,i,SX,SY,SZ);
 }
 
+/*
+================
+stopsound
+
+Stop the last tracked instance of this sound and update its bookkeeping.
+================
+*/
 void stopsound(short num)
 {
     if(Sound[num].num > 0)
@@ -526,6 +582,13 @@ void stopsound(short num)
     }
 }
 
+/*
+================
+stopenvsound
+
+Stop the first tracked instance of this sound owned by the given sprite.
+================
+*/
 void stopenvsound(short num,short i)
 {
     short j, k;
@@ -542,6 +605,14 @@ void stopenvsound(short num,short i)
     }
 }
 
+/*
+================
+pan3dsound
+
+Refresh positional voice panning and distance from the current listener,
+and retire voices that have moved beyond their allowed range.
+================
+*/
 void pan3dsound(void)
 {
     int32_t sndist, sx, sy, sz, cx, cy, cz;
@@ -622,8 +693,17 @@ void pan3dsound(void)
     }
 }
 
+/*
+================
+testcallback
+
+Release the cache lock and ownership bookkeeping for a completed sound.
+Negative callback codes identify RTS lumps instead of ordinary sound slots.
+================
+*/
 void testcallback(uint32_t _num)
 {
+    /* The callback ABI is unsigned, but legacy RTS identifiers are negative. */
     int32_t num = (int32_t) _num;
     
     short tempi,tempj,tempk;
@@ -662,6 +742,14 @@ void testcallback(uint32_t _num)
         Sound[num].lock--;
 }
 
+/*
+================
+clearsoundlocks
+
+Lower active sample and RTS cache locks to an evictable value.
+The cache storage itself is left for the allocator to reclaim.
+================
+*/
 void clearsoundlocks(void)
 {
     int32_t i;

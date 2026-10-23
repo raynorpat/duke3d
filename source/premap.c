@@ -36,11 +36,26 @@ static char savedpal[MAXPLAYERS];
 #endif
 
 
+/*
+================
+tloadtile
+
+Mark a tile in the level precache bitmap. Loading is deferred to docacheit.
+================
+*/
 static void tloadtile(short tilenume)
 {
     gotpic[tilenume>>3] |= (1<<(tilenume&7));
 }
 
+/*
+================
+cachespritenum
+
+Mark the animation and debris tiles needed by this sprite type,
+respecting the level monster setting.
+================
+*/
 void cachespritenum(short i)
 {
     char maxc;
@@ -162,6 +177,13 @@ void cachespritenum(short i)
             tloadtile(j);
 }
 
+/*
+================
+cachegoodsprites
+
+Mark the common player, weapon and HUD art needed by this game version.
+================
+*/
 void cachegoodsprites(void)
 {
     short i;
@@ -235,6 +257,14 @@ void cachegoodsprites(void)
             tloadtile(i);
 }
 
+/*
+================
+getsound
+
+Find a sound file and preload it when the level and size rules allow.
+A successful lookup does not necessarily leave the sample cached.
+================
+*/
 char getsound(unsigned short num)
 {
     short fp;
@@ -277,6 +307,14 @@ char getsound(unsigned short num)
     return 1;
 }
 
+/*
+================
+precachenecessarysounds
+
+Visit missing sound samples for level precaching, servicing packets
+between batches in the later game versions.
+================
+*/
 void precachenecessarysounds(void)
 {
     short i, j;
@@ -299,6 +337,14 @@ void precachenecessarysounds(void)
 }
 
 
+/*
+================
+cacheit
+
+Collect the map and common sprite art needed for this level,
+and start sound precaching.
+================
+*/
 void cacheit(void)
 {
     short i,j;
@@ -342,6 +388,14 @@ void cacheit(void)
 
 }
 
+/*
+================
+docacheit
+
+Load the tiles marked by cacheit and prepare their shader textures
+when needed. Clear the request bitmap after the pass.
+================
+*/
 void docacheit(void)
 {
     int32_t i,j;
@@ -375,6 +429,14 @@ void docacheit(void)
 
 
 
+/*
+================
+xyzmirror
+
+Render the selected camera sprite into a tile, then transpose the
+result for use by the in-world monitor.
+================
+*/
 void xyzmirror(short i,short wn)
 {
     if (waloff[wn] == 0) loadtile(wn);
@@ -388,6 +450,14 @@ void xyzmirror(short i,short wn)
 	squarerotatetile(wn);
 }
 
+/*
+================
+vscrn
+
+Convert the chosen screen size and HUD margins into a Build view rectangle.
+Invalidate the status bar pages after changing the view.
+================
+*/
 void vscrn(void)
 {
      int32_t i, j, ss, x1, x2, y1, y2;
@@ -426,6 +496,14 @@ void vscrn(void)
      pus = NUMPAGES;
 }
 
+/*
+================
+pickrandomspot
+
+Choose a starting position under this version's multiplayer rules,
+and initialize the player position, angle and sector together.
+================
+*/
 void pickrandomspot(short snum)
 {
     struct player_struct *p;
@@ -454,6 +532,14 @@ void pickrandomspot(short snum)
     p->cursectnum = po[i].os;
 }
 
+/*
+================
+resetplayerstats
+
+Reset the player's transient movement, damage and hand-animation state
+for a fresh start.
+================
+*/
 void resetplayerstats(short snum)
 {
     struct player_struct *p;
@@ -592,6 +678,13 @@ void resetplayerstats(short snum)
 
 
 
+/*
+================
+resetweapons
+
+Restore the starting weapon ownership, ammunition and selection state.
+================
+*/
 void resetweapons(short snum)
 {
     short  weapon;
@@ -620,6 +713,13 @@ void resetweapons(short snum)
     p->holster_weapon = 0;
 }
 
+/*
+================
+resetinventory
+
+Clear carried inventory and active equipment, and restore starting armour.
+================
+*/
 void resetinventory(short snum)
 {
     struct player_struct *p;
@@ -650,6 +750,14 @@ void resetinventory(short snum)
 }
 
 
+/*
+================
+resetprestat
+
+Clear level counters and temporary player state before map initialization.
+Also reset the shared disposable-sprite queue.
+================
+*/
 void resetprestat(short snum,char g)
 {
     struct player_struct *p;
@@ -744,6 +852,13 @@ void resetprestat(short snum,char g)
 
 }
 
+/*
+================
+setupbackdrop
+
+Select the sky tile offsets and parallax scale for this backdrop.
+================
+*/
 void setupbackdrop(short sky)
 {
     short i;
@@ -783,6 +898,14 @@ void setupbackdrop(short sky)
    pskybits=3;
 }
 
+/*
+================
+prelevel
+
+Turn the loaded map tags and sprites into runtime level state,
+including effectors, mirrors, switches and map counters.
+================
+*/
 void prelevel(char g)
 {
     short i, nexti, j, startwall, endwall, lotaglist;
@@ -1117,6 +1240,14 @@ void prelevel(char g)
 }
 
 
+/*
+================
+newgame
+
+Initialize the episode, level and skill selection and reset session state.
+The actual map load is performed by enterlevel.
+================
+*/
 void newgame(char vn,char ln,char sk)
 {
     struct player_struct *p = &ps[0];
@@ -1227,6 +1358,14 @@ void newgame(char vn,char ln,char sk)
 }
 
 
+/*
+================
+resetpspritevars
+
+Prepare player sprites and starting positions for the new map,
+applying the mode-specific rules for carried player state.
+================
+*/
 void resetpspritevars(char g)
 {
     short i, j, nexti,circ;
@@ -1388,6 +1527,13 @@ void resetpspritevars(char g)
     }
 }
 
+/*
+================
+clearfrags
+
+Clear the player frag counters and their per-opponent totals.
+================
+*/
 void clearfrags(void)
 {
     short i;
@@ -1397,6 +1543,14 @@ void clearfrags(void)
      clearbufbyte(&frags[0][0],(MAXPLAYERS*MAXPLAYERS)<<1,0L);
 }
 
+/*
+================
+resettimevars
+
+Restart the simulation clocks and local control velocities,
+then allow input packets to be sent.
+================
+*/
 void resettimevars(void)
 {
     vel = svel = angvel = horiz = 0;
@@ -1409,6 +1563,14 @@ void resettimevars(void)
 }
 
 
+/*
+================
+genspriteremaps
+
+Read lookup.dat colour remaps and environment palettes.
+Reserve the final palette entry as black for the main environment palettes.
+================
+*/
 void genspriteremaps(void)
 {
     int32_t j,fp;
@@ -1446,6 +1608,14 @@ void genspriteremaps(void)
 char waitabort; // 1.1: Escape ended the last wait for players
 #endif
 
+/*
+================
+waitforeverybody
+
+Exchange ready counters until every connected player reaches this barrier.
+Keep servicing events and packets while waiting.
+================
+*/
 void waitforeverybody()
 {
     int32_t i;
@@ -1538,6 +1708,14 @@ void dofrontscreens(void)
     }
 }
 
+/*
+================
+clearfifo
+
+Reset the input and synchronization rings, their sequence counters,
+and the prediction lag bookkeeping.
+================
+*/
 void clearfifo(void)
 {
     syncvaltail = 0L;
@@ -1562,6 +1740,14 @@ void clearfifo(void)
 //    clearbufbyte(playerquitflag,MAXPLAYERS,0x01);
 }
 
+/*
+================
+resetmys
+
+Seed local movement prediction from the authoritative player state
+and clear the predicted velocities.
+================
+*/
 void resetmys(void)
 {
       myx = omyx = ps[myconnectindex].posx;
@@ -1579,6 +1765,14 @@ void resetmys(void)
       myreturntocenter = ps[myconnectindex].return_to_center;
 }
 
+/*
+================
+enterlevel
+
+Apply the selected game options, load and prepare the map and its resources,
+and synchronize players for the start of play.
+================
+*/
 void enterlevel(char g)
 {
     short i,j;

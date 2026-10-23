@@ -1166,6 +1166,13 @@ void check_fta_sounds(short i)
     }
 }
 
+/*
+================
+inventory
+
+Recognize the pickup tiles that count as carried inventory.
+================
+*/
 short inventory(spritetype *s)
 {
     switch(s->picnum)
@@ -1183,6 +1190,13 @@ short inventory(spritetype *s)
 }
 
 
+/*
+================
+badguy
+
+Classify an enemy sprite using the version's actor definitions and tile list.
+================
+*/
 short badguy(spritetype *s)
 {
 
@@ -1251,6 +1265,13 @@ short badguy(spritetype *s)
 }
 
 
+/*
+================
+badguypic
+
+Classify an enemy tile without requiring a live sprite.
+================
+*/
 short badguypic(short pn)
 {
 
@@ -2970,6 +2991,14 @@ void typemode(void)
      }
 }
 
+/*
+================
+moveclouds
+
+Advance the registered sky panning from the viewed player's angle
+on the cloud update clock.
+================
+*/
 void moveclouds(void)
 {
     if( totalclock > cloudtotalclock || totalclock < (cloudtotalclock-7))
@@ -2990,6 +3019,13 @@ void moveclouds(void)
 }
 
 
+/*
+================
+displayrest
+
+Compose the HUD, map, messages and other overlays after the world view.
+================
+*/
 void displayrest(int32_t smoothratio)
 {
     int32_t a, i, j;
@@ -3217,6 +3253,14 @@ void displayrest(int32_t smoothratio)
 }
 
 
+/*
+================
+updatesectorz
+
+Find a sector containing the point in both its XY outline and sloped Z span.
+Try the current sector and neighbours before scanning the map.
+================
+*/
 void updatesectorz(int32_t x, int32_t y, int32_t z, short *sectnum)
 {
     walltype *wal;
@@ -3255,6 +3299,14 @@ void updatesectorz(int32_t x, int32_t y, int32_t z, short *sectnum)
     *sectnum = -1;
 }
 
+/*
+================
+view
+
+Place the over-shoulder camera behind the player while respecting geometry.
+Later versions pull in immediately and ease back out after an obstruction.
+================
+*/
 void view(struct player_struct *pp, int32_t *vx, int32_t *vy,int32_t *vz,short *vsectnum, short ang, short horiz)
 {
 #if DUKE3D_GAMEVER < GAMEVER_10
@@ -3314,6 +3366,8 @@ void view(struct player_struct *pp, int32_t *vx, int32_t *vy,int32_t *vz,short *
              if (klabs(nx) > klabs(ny)) hx -= (nx>>5);
                                           else hy -= (ny>>5);
          }
+         /* Use the larger direction component to recover a 16.16 ray fraction
+          * without dividing by a nearly perpendicular component. */
          if (klabs(nx) > klabs(ny)) i = divscale16(hx,nx);
                                       else i = divscale16(hy,ny);
          if (i < cameradist) cameradist = i;
@@ -3322,6 +3376,8 @@ void view(struct player_struct *pp, int32_t *vx, int32_t *vy,int32_t *vz,short *
      *vy = (*vy)+mulscale16(ny,cameradist);
      *vz = (*vz)+mulscale16(nz,cameradist);
 
+     /* The obstruction clamps distance immediately; elapsed ticks let the
+      * camera move outward again, up to the full 65536 fraction. */
      cameradist = min(cameradist+((totalclock-cameraclock)<<10),65536);
      cameraclock = totalclock;
 
@@ -3556,6 +3612,14 @@ static int32_t oyrepeat=-1, oxfov=65536;
 static int32_t tiltbytes;
 static char *tiltbuf;
 
+/*
+================
+displayrooms
+
+Build the interpolated player or camera view and render the world,
+including its mirror and sprite passes.
+================
+*/
 void displayrooms(short snum,int32_t smoothratio)
 {
     int32_t cposx,cposy,cposz,dst,j,fz,cz,hz,lz;
