@@ -103,3 +103,5 @@
 - Real 1.3D and Atomic data: launched all four sources through the menu, with different wall shades proving the chosen source loaded, and verified skill 2 applied.
 - Real-art capture checks cover cursor bounds, selected-path/count/hint rendering, and long filename clipping.
 - Linux and Windows execution was not available locally.
+- Independent whole-branch review: no blocking findings; scanner and menu fixtures rerun successfully. Deferred minor: clipping counts characters rather than pixel advances, so long filenames with many spaces can overlap the source column or footer width.
+- Implementation decisions: use a feature branch in the current checkout to honor native execution here; retain existing loader validation and font coverage. Concurrent edits share the checkout; malformed maps and unsupported glyphs retain the engine's existing limitations.
