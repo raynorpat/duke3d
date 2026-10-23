@@ -403,6 +403,7 @@ static void test_animation_offsets(void)
 int main(int argc, char **argv)
 {
     if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     if (argc > 1)
     {
         static unsigned char cache[4<<20];

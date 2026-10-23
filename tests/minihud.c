@@ -211,6 +211,7 @@ static uint32_t bars(const char *prefix)
 int main(int argc, char **argv)
 {
     if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     int32_t w, h, minx[2], maxx[2], gapa[2], gapb[2], i, edge;
     uint32_t sum[3];
     const char *name[3] = { "plain", "inv", "bars" };

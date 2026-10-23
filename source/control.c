@@ -114,13 +114,15 @@ Return the release's nominal command-to-angle scale used for look rates.
 */
 static int turnscale(void)
 {
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
     return TICSPERFRAME;
-#elif DUKE3D_GAMEVER < GAMEVER_13D
+} else {
+if (game_profile->gamever < GAMEVER_13D) {
     return 1;
-#else
+} else {
     return 2;
-#endif
+}
+}
 }
 
 /*
@@ -133,17 +135,19 @@ Quantization must use the same result as player simulation.
 */
 static int turn_delta(int turn)
 {
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
     return (turn + (turn >> 3)) * TICSPERFRAME;
-#elif DUKE3D_GAMEVER < GAMEVER_13D
+} else {
+if (game_profile->gamever < GAMEVER_13D) {
     return turn;
-#else
+} else {
     int delta = turn * 2;
     int sect = ps[myconnectindex].cursectnum;
     if (sect >= 0 && sect < numsectors && sector[sect].lotag == 2)
         delta -= delta >> 3;
     return delta;
-#endif
+}
+}
 }
 
 /*
@@ -599,11 +603,11 @@ void CONTROL_PollDevices(void)
     if (active) {
         int64_t yaw = 0, pitch = 0;
         if (!BUTTON(gamefunc_Strafe)) {
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
             yaw = (int64_t)mx * CONTROL_GetMouseSensitivity() * 65536 * turnscale() / (512 * 256);
-#else
+} else {
             yaw = (int64_t)mx * CONTROL_GetMouseSensitivity() * 65536 * turnscale() / (512 * 64);
-#endif
+}
             info->dyaw = 0;
         }
         if (myaimmode || ControllerType == controltype_joystickandmouse) {
@@ -707,11 +711,11 @@ void CONTROL_PollDevices(void)
     GAMEPAD_GetLook(&padturn, &padpitch);
     turn_rate = padturn;
     if (!BUTTON(gamefunc_Strafe))
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
         turn_rate += (int32_t)((int64_t)sample.dyaw * 65536 / 256);
-#else
+} else {
         turn_rate += (int32_t)((int64_t)sample.dyaw * 65536 / 64);
-#endif
+}
     pitch_rate = padpitch + (int32_t)((int64_t)sample.dpitch * 65536 / 186 * (ud.mouseflip ? -1 : 1));
     if (active) {
         if (!BUTTON(gamefunc_Strafe)) sample.dyaw = 0;

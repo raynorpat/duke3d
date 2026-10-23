@@ -50,6 +50,7 @@ static struct player_struct *setup(void)
 int main(int argc, char **argv)
 {
     if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     struct player_struct *p;
     int i,j,k;
     initengine();

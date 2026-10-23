@@ -7,6 +7,7 @@ extern int32_t cosglobalang, singlobalang, globalhoriz;
 int main(int argc, char **argv)
 {
     if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     int32_t sine, horizon;
     int w, f;
     _platform_init(argc, argv, "input_render", "input_render");

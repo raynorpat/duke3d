@@ -7,6 +7,7 @@ static int failures;
 int main(int argc, char **argv)
 {
     if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     FILE *f=fopen("routebot-test.route","w"); input in; int i;
     fputs("# test\n0 0 wait 2\n1024 0 use\n1024 1024 fire\n2048 1024 jump\n",f); fclose(f);
     initengine(); CHECK(routebot_load("routebot-test.route"));

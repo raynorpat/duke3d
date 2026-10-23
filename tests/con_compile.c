@@ -141,6 +141,7 @@ static int compare_reference(const char *reffile)
 int main(int argc, char **argv)
 {
     if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     int32_t i, a, b, addrslots = 0, addrlabels = 0, actors = 0;
 
     groupfile = -1;          /* no GRP: never offer the internal defaults */

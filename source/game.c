@@ -6626,7 +6626,7 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
                 if(camsprite >= 0 && hittype[OW].temp_data[0] == 1)
                 {
                     t->picnum = STATIC;
-                    t->cstat |= (rand()&12);
+                    t->cstat |= (game_rand()&12);
                     t->xrepeat += 8;
                     t->yrepeat += 8;
                 }
@@ -9450,6 +9450,7 @@ int main(int argc,char **argv)
     int32 tempautorun;
 
     game_profile_select_build_default();
+    game_init_release_defaults();
 
 #ifdef DC
     platform_init(&argc,&argv);
@@ -11556,7 +11557,7 @@ static void betabonus(void)
                         bonuscnt++;
                         FX_StopAllSounds();
                         sound(SHOTGUN_COCK);
-                        switch(rand()&3)
+                        switch(game_rand()&3)
                         {
                             case 0: sound(BONUS_SPEECH1); break;
                             case 1: sound(BONUS_SPEECH2); break;
@@ -12053,7 +12054,7 @@ void dobonus(char bonusonly)
                         {
                             bonuscnt++;
                             sound(SHOTGUN_COCK);
-                            switch(rand()&3)
+                            switch(game_rand()&3)
                             {
                                 case 0:
                                     sound(BONUS_SPEECH1);

@@ -26,6 +26,7 @@ static void pollpad(void)
 int main(int argc, char **argv)
 {
     if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     SDL_Joystick *pad;
     int device, action = gamefunc_Jump;
     char guid[33], mapping[1024];
@@ -244,5 +245,6 @@ int main(int argc, char **argv)
 }
 #else
 int main(int argc, char **argv) {
-    if (!test_select_profile(&argc,argv,NULL)) return 1; return 77; }
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults(); return 77; }
 #endif

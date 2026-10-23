@@ -97,6 +97,7 @@ static void movingsectorflags(void)
 int main(int argc, char **argv)
 {
     if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     int i, j, k;
     movingsectorflags();
     setup(); ps[0].curr_weapon=RPG_WEAPON;

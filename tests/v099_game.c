@@ -19,6 +19,7 @@ static int item(int pic)
 int main(int argc, char **argv)
 {
     if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     int i;
     initengine(); numsectors=1; numwalls=4; sector[0].wallptr=0; sector[0].wallnum=4;
     sector[0].ceilingz=-8192; sector[0].floorz=8192;

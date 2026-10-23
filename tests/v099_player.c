@@ -47,6 +47,7 @@ static void button(int n)
 int main(int argc, char **argv)
 {
     if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     struct player_struct *p;
     initengine();
     p=setup(); forceplayerangle(p); check("force angle center",p->return_to_center,8);

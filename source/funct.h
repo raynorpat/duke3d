@@ -414,3 +414,12 @@ extern void movetransports(void);
 extern void moveactors(void);
 extern void moveexplosions(void);
 extern void moveeffectors(void);
+
+void game_init_keywords(void);
+void game_init_release_defaults(void);
+int game_freeze_weapon(void);
+int game_remote_weapon(void);
+int game_script_limit(void);
+int game_sound_limit(void);
+int game_weaprecs_limit(void);
+int game_rand(void);

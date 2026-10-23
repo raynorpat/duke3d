@@ -99,13 +99,8 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 // #define AUSTRALIA
 
-#if DUKE3D_GAMEVER < GAMEVER_10
-#define MAXSLEEPDIST  8192
-#define SLEEPTIME 6*64
-#else
-#define MAXSLEEPDIST  16384
-#define SLEEPTIME 24*64
-#endif
+#define MAXSLEEPDIST (game_profile->gamever < GAMEVER_10 ? 8192 : 16384)
+#define SLEEPTIME (game_profile->gamever < GAMEVER_10 ? 6*64 : 24*64)
 
 #if DUKE3D_GAMEVER < GAMEVER_10
     // 0.99: no version field in DOS; 9 distinguishes our net handshake.
@@ -164,7 +159,6 @@ struct player_struct;
 
 #include "names.h"
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
 // 1.1 tiles from its DEFS.CON that names.h doesn't name.
 #define FUELCAN 45
 #define BODYSUIT 58
@@ -174,7 +168,7 @@ struct player_struct;
 #define THROWFLAME 2500
 #define FLAMETHROWERSPRITE 24 // 1.3D's FREEZESPRITE tile
 #define FLAMETHROWER 2548 // 1.3D's FREEZE tile
-#endif
+
 
 #include "build/engine.h"
 
@@ -282,11 +276,7 @@ struct player_struct;
 
 #define TRAND krand()
 
-#if DUKE3D_GAMEVER >= GAMEVER_10 && DUKE3D_GAMEVER < GAMEVER_11
-// DOS 1.0 shares Watcom rand across game logic, drawing and sound (C10-002).
-int game_rand(void);
-#define rand() game_rand()
-#endif
+
 
 
 #define MAX_WEAPONS  12

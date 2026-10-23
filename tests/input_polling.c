@@ -27,6 +27,7 @@ static void event(int type, int x, int y)
 int main(int argc, char **argv)
 {
     if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     ControlInfo a, b;
     int fire = gamefunc_Fire;
     _platform_init(argc, argv, "input_polling", "input_polling");

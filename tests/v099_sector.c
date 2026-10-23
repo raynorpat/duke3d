@@ -49,6 +49,7 @@ static void setup(void)
 int main(int argc, char **argv)
 {
     if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     int i,j,k; int32_t seed;
     static const int32_t activate[]={69,777,4};
     setup(); ps[0].steroids_amount=400; resetinventory(0);

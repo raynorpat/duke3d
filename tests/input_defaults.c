@@ -17,6 +17,7 @@ static void check(const char *what, int got, int want)
 int main(int argc, char **argv)
 {
     if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     static const struct { int key, function; } bindings[] = {
         { sc_W, gamefunc_Move_Forward }, { sc_S, gamefunc_Move_Backward },
         { sc_A, gamefunc_Strafe_Left }, { sc_D, gamefunc_Strafe_Right },
