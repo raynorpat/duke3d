@@ -1,7 +1,7 @@
 # macOS app bundle and native launcher
 
 Date: 2026-10-23
-Status: Proposed design; launcher approach and data-location policy approved by the user
+Status: Approved by the user, 2026-10-23
 
 Builder review: completed; no important unanswered planning questions.
 
@@ -197,5 +197,4 @@ closing/hiding the launcher must not silently kill an editing session.
 File decomposition, Swift testing harness, exact names of internal C helpers,
 window spacing and control placement are builder decisions. The deployment
 target, static SDL requirement, workspace behavior, validation CLI and child
-lifecycle above are proposed implementation defaults, not additional user
-requests. They are included here for review before implementation.
+lifecycle above are implementation defaults approved with this design.
