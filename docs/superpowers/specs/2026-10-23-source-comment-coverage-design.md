@@ -59,7 +59,6 @@ names and miss the version and arithmetic contracts that matter here.
 
 ## Execution
 
-Use the previously selected native execution method in the existing worktree.
-This document and its plan authorize no immediate source implementation: the
-current request is to prepare the plan. Retain the existing code-review and
-verification workflow when execution is requested.
+The user approved native execution on 2026-10-23 in the existing worktree.
+Retain the code-review and verification workflow and keep the work isolated.
+The completed plan records the resulting commits and validation.
