@@ -32,6 +32,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "glext.h"
 #include "displaymode.h"
 #include "videoopts.h"
+#include "usermaps.h"
 
 /* this should be a proper prototype included from a header file */
 #if PLATFORM_UNIX
@@ -45,6 +46,20 @@ short probey=0,lastprobey=0,last_menu,globalskillsound=-1;
 short sh,onbar,buttonstat,deletespot;
 short last_zero,last_fifty,last_threehundred = 0;
 static char fileselect = 1, menunamecnt, menuname[256][17], curpath[80], menupath[80];
+
+#ifndef VOLUMEONE
+#ifdef PLUTOPAK
+#define USERMAP_EPISODE_ROW 4
+#else
+#define USERMAP_EPISODE_ROW 3
+#endif
+#define MENU_USERMAPS 120
+#define USERMAP_ROWS 12
+static usermap_list usermaps;
+static size_t usermap_row, usermap_top;
+static int usermap_pending;
+static const char *usermap_message;
+#endif
 
 int ignore_escape = 0;
 
@@ -117,6 +132,25 @@ Save confirmation pages keep the current row.
 */
 void cmenu(short cm)
 {
+#ifndef VOLUMEONE
+    int from_maps = current_menu == MENU_USERMAPS;
+    if (cm == MENU_USERMAPS)
+    {
+        if (current_menu != 110)
+        {
+            char profile[MAX_PATH];
+            GetPathFromEnvironment(profile,sizeof(profile),"");
+            usermap_message = usermaps_scan(&usermaps,".",profile) ? "UNABLE TO LIST MAPS" : NULL;
+            usermap_row = usermap_top = 0;
+        }
+        usermap_pending = 0;
+    }
+    else if (cm != 110 || !from_maps)
+    {
+        usermap_pending = 0;
+        usermaps_free(&usermaps);
+    }
+#endif
     current_menu = cm;
 
     if( (cm >= 1000 && cm <= 1009) )
@@ -131,6 +165,9 @@ void cmenu(short cm)
     else if(cm == 110)
         probey = 1;
     else probey = 0;
+#ifndef VOLUMEONE
+    if (cm == 100 && from_maps) probey = USERMAP_EPISODE_ROW;
+#endif
     lastprobey = -1;
 }
 
@@ -1714,6 +1751,78 @@ void sortfilenames()
                 }
 }
 
+#ifndef VOLUMEONE
+/* Clip display strings only; filenames and load paths keep their full bytes. */
+static void usermap_text(int x,int y,const char *text,size_t width,int pal)
+{
+    char clipped[75];
+    size_t len = strlen(text);
+    if (len > width) len = width;
+    memcpy(clipped,text,len);
+    clipped[len] = 0;
+    if (text[len]) memcpy(clipped+len-3,"...",3);
+    minitext(x,y,clipped,pal,26);
+}
+
+static int usermap_available(void)
+{
+    int status = usermap_check(&usermaps.entries[usermap_row],sizeof(boardfilename));
+    if (status == USERMAP_READY) return 1;
+    usermap_message = status == USERMAP_PATH_TOO_LONG ? "MAP PATH TOO LONG" : "MAP NOT AVAILABLE";
+    return 0;
+}
+
+static void usermaps_menu(void)
+{
+    int x;
+    size_t old_row = usermap_row, i;
+    char position[80];
+    rotatesprite(160<<16,19<<16,65536L,0,MENUBAR,16,0,10,0,0,xdim-1,ydim-1);
+    menutext(160,24,0,0,"USER MAPS");
+    onbar = 0;
+    /* A three-position probe supplies normal menu input and sounds while
+     * the actual list index stays independent of the short cursor field. */
+    probey = 1;
+    x = probe(tilesizx[BIGFNTCURSOR]+24,52+(int)(usermap_row-usermap_top)*10,0,3);
+    if (usermaps.count)
+    {
+        if (probey == 0) usermap_row = usermap_row ? usermap_row-1 : usermaps.count-1;
+        else if (probey == 2) usermap_row = usermap_row+1 == usermaps.count ? 0 : usermap_row+1;
+        if (usermap_row != old_row) usermap_message = NULL;
+        if (usermap_row < usermap_top) usermap_top = usermap_row;
+        if (usermap_row >= usermap_top+USERMAP_ROWS) usermap_top = usermap_row-USERMAP_ROWS+1;
+    }
+    probey = (short)(usermap_row-usermap_top);
+    if (x == -1) { cmenu(100); return; }
+    if (x >= 0 && usermaps.count && usermap_available())
+    {
+        usermap_pending = 1;
+        ud.m_volume_number = 0;
+        ud.m_level_number = 7;
+        cmenu(110);
+        return;
+    }
+    minitext(44,36,"MAP",0,26);
+    minitext(220,36,"LOCATION",0,26);
+    for (i = usermap_top; i < usermaps.count && i < usermap_top+USERMAP_ROWS; i++)
+    {
+        int y = 48+(int)(i-usermap_top)*10, pal = i == usermap_row ? 0 : 16;
+        usermap_text(44,y,usermaps.entries[i].name,42,pal);
+        minitext(220,y,(char *)usermap_source(usermaps.entries[i].source),pal,26);
+    }
+    if (usermaps.count)
+        usermap_text(12,168,usermaps.entries[usermap_row].path,74,0);
+    if (usermap_message) gametext(160,178,(char *)usermap_message,0,2+8+16);
+    else if (!usermaps.count) gametext(160,90,"NO MAPS FOUND",0,2+8+16);
+    else
+    {
+        snprintf(position,sizeof(position),"%lu / %lu MAPS",(unsigned long)usermap_row+1,(unsigned long)usermaps.count);
+        gametext(160,178,position,0,2+8+16);
+    }
+    minitext(40,192,"UP/DOWN SELECT  ENTER CHOOSE  ESC BACK",0,26);
+}
+#endif
+
 int32_t quittimer = 0;
 
 
@@ -3205,14 +3314,12 @@ void menus(void)
             menutext(160,24,0,0,"SELECT AN EPISODE");
 #if DUKE3D_GAMEVER < GAMEVER_10
             x = probe(160,60,20,3);
-#elif defined PLUTOPAK
-            if(boardfilename[0])
-                x = probe(160,60,20,5);
-            else x = probe(160,60,20,4);
-#else
+#elif defined VOLUMEONE
             if(boardfilename[0])
                 x = probe(160,60,20,4);
             else x = probe(160,60,20,3);
+#else
+            x = probe(160,60,20,USERMAP_EPISODE_ROW+1);
 #endif
             if(x >= 0)
             {
@@ -3228,27 +3335,14 @@ void menus(void)
 #endif
 
 #ifndef VOLUMEONE
-#ifndef PLUTOPAK
-
-                if(x == 3 && boardfilename[0])
-                {
-                    ud.m_volume_number = 0;
-                    ud.m_level_number = 7;
-                }
-#else
-                if(x == 4 && boardfilename[0])
-                {
-                    ud.m_volume_number = 0;
-                    ud.m_level_number = 7;
-                }
-#endif
-
+                if(x == USERMAP_EPISODE_ROW) cmenu(MENU_USERMAPS);
                 else
                 {
+                    boardfilename[0] = 0;
                     ud.m_volume_number = x;
                     ud.m_level_number = 0;
+                    cmenu(110);
                 }
-                cmenu(110);
 #endif
             }
             else if(x == -1)
@@ -3271,22 +3365,17 @@ void menus(void)
             menutext(160,60+20+20,SHX(-4),PHX(-4),volume_names[2]);
 #ifdef PLUTOPAK
             menutext(160,60+20+20+20,SHX(-5),PHX(-5),volume_names[3]);
-            if(boardfilename[0])
-            {
-
-                menutext(160,60+20+20+20+20,SHX(-6),PHX(-6),"USER MAP");
-                gametextpal(160,60+20+20+20+20+3,boardfilename,16+(sintable[(totalclock<<4)&2047]>>11),2);
-            }
-#else
-            if(boardfilename[0])
-            {
-                menutext(160,60+20+20+20,SHX(-6),PHX(-6),"USER MAP");
-                gametext(160,60+20+20+20+6,boardfilename,2,2+8+16);
-            }
 #endif
+            menutext(160,60+20*USERMAP_EPISODE_ROW,SHX(-USERMAP_EPISODE_ROW-2),PHX(-USERMAP_EPISODE_ROW-2),"USER MAPS");
 
 #endif
             break;
+
+#ifndef VOLUMEONE
+        case MENU_USERMAPS:
+            usermaps_menu();
+            break;
+#endif
 
         case 110:
             c = (320>>1);
@@ -3309,6 +3398,15 @@ void menus(void)
             x = probe(c,70,19,4);
             if(x >= 0)
             {
+#ifndef VOLUMEONE
+                if (usermap_pending)
+                {
+                    if (!usermap_available()) { cmenu(MENU_USERMAPS); break; }
+                    strcpy(boardfilename,usermaps.entries[usermap_row].path);
+                    usermap_pending = 0;
+                    usermaps_free(&usermaps);
+                }
+#endif
                 switch(x)
                 {
                     case 0: globalskillsound = JIBBED_ACTOR6;break;
@@ -3343,6 +3441,10 @@ void menus(void)
             }
             else if(x == -1)
             {
+#ifndef VOLUMEONE
+                if (usermap_pending) cmenu(MENU_USERMAPS);
+                else
+#endif
                 cmenu(100);
                 KB_FlushKeyboardQueue();
             }

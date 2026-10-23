@@ -406,6 +406,23 @@ its default.
 
 ## Running
 
+### Custom user maps
+
+In a full/registered 1.3D, 1.4 or 1.5 build, choose **NEW GAME**, then
+**USER MAPS** beneath the episode list. Select a map, choose a difficulty,
+and start playing. Escape from difficulty returns to the map list.
+
+The combined alphabetical list finds `.map` files (in any filename case)
+directly in the current working directory, its `maps/` folder, the user
+config folder listed below, and that folder's `maps/` subfolder. Each entry
+shows its source, so files with the same name remain separately selectable.
+Subfolders are not searched recursively. The list refreshes when reopened.
+
+Map load paths must fit the game's existing 127-byte limit: working-directory
+maps use relative paths, while profile maps use absolute paths. A longer
+path stays visible but shows **MAP PATH TOO LONG** when selected. Move the
+map to a shorter path to play it.
+
 ### Config and saves
 
 Without a `duke3d.cfg` the game starts with default settings and writes one.

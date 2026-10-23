@@ -400,6 +400,13 @@ add_executable(game_helpers game_helpers.c "${_game_c}")
 target_link_libraries(game_helpers PRIVATE duke3d_game)
 add_test(NAME game_helpers COMMAND game_helpers)
 
+add_executable(usermaps_menu usermaps_menu.c "${_game_c}")
+target_link_libraries(usermaps_menu PRIVATE duke3d_game duke3d::SDL2main)
+add_test(NAME usermaps_menu COMMAND "${CMAKE_COMMAND}"
+  "-DTEST=$<TARGET_FILE:usermaps_menu>" "-DWORK=${CMAKE_CURRENT_BINARY_DIR}/umm"
+  -P "${CMAKE_CURRENT_SOURCE_DIR}/usermaps_menu.cmake")
+set_tests_properties(usermaps_menu PROPERTIES TIMEOUT 30)
+
 add_executable(gamepad gamepad.c "${_game_c}")
 target_link_libraries(gamepad PRIVATE duke3d_game duke3d::SDL2main)
 add_test(NAME gamepad COMMAND gamepad)

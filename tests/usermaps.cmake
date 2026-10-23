@@ -8,11 +8,12 @@ foreach(_file current/alpha.MAP current/duplicate.map current/maps/duplicate.map
   file(WRITE "${WORK}/${_file}" "fixture")
 endforeach()
 file(CREATE_LINK "${WORK}/current" "${WORK}/alias" SYMBOLIC RESULT _link)
+file(REAL_PATH "${WORK}/profile" _profile)
 set(_mode main)
 if(NOT _link STREQUAL "0")
   set(_mode no-symlink)
 endif()
-execute_process(COMMAND "${TEST}" "${WORK}/profile" "${_mode}"
+execute_process(COMMAND "${TEST}" "${_profile}" "${_mode}"
   WORKING_DIRECTORY "${WORK}/current" RESULT_VARIABLE _result)
 if(NOT _result STREQUAL "0")
   message(FATAL_ERROR "user map discovery failed: ${_result}")
@@ -27,7 +28,7 @@ foreach(_i RANGE 0 299)
   endif()
   file(WRITE "${WORK}/current/maps/bulk${_name}.map" "fixture")
 endforeach()
-execute_process(COMMAND "${TEST}" "${WORK}/profile" bulk
+execute_process(COMMAND "${TEST}" "${_profile}" bulk
   WORKING_DIRECTORY "${WORK}/current" RESULT_VARIABLE _result)
 if(NOT _result STREQUAL "0")
   message(FATAL_ERROR "user map bulk discovery failed: ${_result}")
