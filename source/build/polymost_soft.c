@@ -39,6 +39,8 @@ void drawline2d (float x0, float y0, float x1, float y1, char col)
 	else if (y1 <      0) {                          x1 += (    0-y1)*dx/dy; y1 =     0; }
 
 	/* The unsigned range test below rejects negative and off-screen positions. */
+	/* Step along the dominant axis so the fixed-point minor coordinate
+	 * advances by at most about one pixel per iteration. */
 	if (fabs(dx) > fabs(dy))
 	{
 		if (x0 > x1) { f = x0; x0 = x1; x1 = f; f = y0; y0 = y1; y1 = f; }
@@ -94,10 +96,14 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 			zbufmem = (int32_t *)realloc(zbufmem,zbufbpl*zbufysiz*4);
 		}
 #endif
+		/* Without a translucency lookup, use the masked path rather than
+		 * dereferencing a missing blend table. */
 		if ((!transluc)) method = (method&~3)+1; //In case translucent table doesn't exist
 
 		if (!dorot)
 		{
+			/* The half-pixel offset evaluates the mapping planes at pixel centres,
+			 * matching the scan conversion below. */
 			ngdx = gdx; ngdy = gdy; ngdo = gdo+(ngdx+ngdy)*.5;
 			ngux = gux; nguy = guy; nguo = guo+(ngux+nguy)*.5;
 			ngvx = gvx; ngvy = gvy; ngvo = gvo+(ngvx+ngvy)*.5;
@@ -150,6 +156,8 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 		dacol = palookup[0][(int32_t)(*(char *)(waloff[globalpicnum]))+(min(max(globalshade,0),numpalookups-1)<<8)];
 	}
 
+	/* Mirror X and reverse vertex order together to retain the expected
+	 * winding; flip each mapping plane's X slope about the same screen width. */
 	if (grhalfxdown10x < 0) //Hack for mirrors
 	{
 		for(i=((n-1)>>1);i>=0;i--)
@@ -162,6 +170,8 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 		ngvo += ((double)xdimen)*ngvx; ngvx = -ngvx;
 	}
 
+	/* Advance depth and texture numerators by a whole interpolation block
+	 * before dividing to recover the next endpoint. */
 	ngdx2 = ngdx*(1<<LINTERPSIZ);
 	ngux2 = ngux*(1<<LINTERPSIZ);
 	ngvx2 = ngvx*(1<<LINTERPSIZ);
@@ -181,6 +191,8 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 		dtol(py[j],&y); if (y < 0) y = 0;
 		if (y < yy)
 		{
+			/* Edge X uses 14 fractional bits. The half-pixel biases select span
+			 * limits from samples through the centres of the raster rows. */
 			f = (px[j]-px[i])/(py[j]-py[i]); dtol(f*16384.0,&xi);
 			dtol((((double)yy-.5-py[j])*f + px[j])*16384.0+8192.0,&x);
 			for(;yy>y;yy--,x-=xi) lastx[yy-1] = (x>>14);
@@ -193,10 +205,14 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 		dtol(py[j],&yy); if (yy > ydimen) yy = ydimen;
 		if (y < yy)
 		{
+			/* Edge X uses 14 fractional bits. The half-pixel biases select span
+			 * limits from samples through the centres of the raster rows. */
 			f = (px[j]-px[i])/(py[j]-py[i]); dtol(f*16384.0,&xi);
 			dtol((((double)y+.5-py[j])*f + px[j])*16384.0+8192.0,&x);
 			for(;y<yy;y++,x+=xi)
 			{
+				/* Clip the horizontal span to [0,xdimen); ix1 is an exclusive endpoint
+				 * for both flat fills and textured blocks. */
 				ix0 = lastx[y]; if (ix0 < 0) ix0 = 0;
 				ix1 = (x>>14); if (ix1 > xdimen) ix1 = xdimen;
 				if (ix0 < ix1)
@@ -209,6 +225,8 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 						dp = ngdx*(double)ix0 + ngdy*(double)y + ngdo;
 						up = ngux*(double)ix0 + nguy*(double)y + nguo;
 						vp = ngvx*(double)ix0 + ngvy*(double)y + ngvo;
+						/* dp is the reciprocal-depth plane; division produces proportional depth
+						 * and the perspective-correct texture coordinates in 16.16 form. */
 						rdp = 65536.0/dp; dp += ngdx2;
 						dtol(   rdp,&d0);
 						dtol(up*rdp,&u0); up += ngux2;
@@ -219,6 +237,8 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 						 * each block. LINTERPSIZ trades perspective error for fewer divides. */
 						switch (method&3)
 						{
+							/* Opaque spans write every texel; their specialized power-of-two path
+							 * uses shifts and masks instead of general column multiplication/modulo. */
 							case 0:
 								if (xmodnice&ymulnice) //both u&v texture sizes are powers of 2 :)
 								{
@@ -265,6 +285,8 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 									}
 								}
 								break;
+							/* Masked spans discard palette index 255 before touching colour or depth.
+							 * With a Z buffer, zbufwrite controls updates independently of depth testing. */
 							case 1:
 								if (xmodnice) //both u&v texture sizes are powers of 2 :)
 								{
@@ -323,6 +345,8 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 									}
 								}
 								break;
+							/* Normal translucency indexes the blend table by destination then
+							 * shaded source; it blends palette indices rather than RGB channels. */
 							case 2: //Transluscence #1
 								for(xx=ix0;xx<ix1;xx+=(1<<LINTERPSIZ))
 								{
@@ -352,6 +376,8 @@ static void polymost_soft_drawpoly(const polymost_polygon *poly)
 									} while (vidp < vide);
 								}
 								break;
+							/* Reverse translucency exchanges the source and destination byte
+							 * positions in that same blend table. */
 							case 3: //Transluscence #2
 								for(xx=ix0;xx<ix1;xx+=(1<<LINTERPSIZ))
 								{

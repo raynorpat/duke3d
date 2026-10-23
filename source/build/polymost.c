@@ -144,6 +144,8 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 	int32_t layers = method&METH_LAYERS, behind = 0;
 
 	method &= ~METH_LAYERS;
+	/* Cull by projected winding before backend setup. Triangles use a
+	 * single cross product instead of summing the polygon area. */
 	if (n == 3)
 	{
 		if ((dpx[0]-dpx[1])*(dpy[2]-dpy[1]) >= (dpx[2]-dpx[1])*(dpy[0]-dpy[1])) return; //for triangle
@@ -192,6 +194,8 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 			oy = ox2*gstang + oy2*gctang;
 			oz = oz2;
 
+			/* The software path rejects a polygon with a vertex behind the near
+			 * threshold here; the GL path carries a flag for its later handling. */
 			if (oz < SCISDIST) { if (rendmode != 3) return; behind = 1; } //annoying hack to avoid bugs in software rendering
 
 			r = ghalfx / oz;
@@ -215,6 +219,8 @@ void drawpoly (double *dpx, double *dpy, int32_t n, int32_t method)
 			if ((!j) || (px[j] != px[j-1]) || (py[j] != py[j-1])) j++;
 		}
 	}
+	/* Remove a repeated closing vertex as well as adjacent duplicates,
+	 * so the backend does not receive a zero-length closing edge. */
 	while ((j >= 3) && (px[j-1] == px[0]) && (py[j-1] == py[0])) j--;
 	if (j < 3) return;
 	n = j;
