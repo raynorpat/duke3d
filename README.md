@@ -634,8 +634,14 @@ The engine files in `source/build/` are grouped by responsibility:
 | `cache.c` | Cache allocation, eviction, aging and diagnostics |
 | `math.c` | Fixed-point and memory helpers, math tables, angles and square roots |
 | `network.c` | Multiplayer transport |
+| `polymost.c` | Shared Polymost scene traversal, clipping/projection and renderer dispatch |
+| `polymost_soft.c` | Polymost software rasterization and depth buffer (modes 1/2) |
+| `polymost_opengl.c` | OpenGL shaders, textures/framebuffers, polygon submission and GL state |
 
-`polymost.c` remains included by `engine.c`; `sdl_driver.c` owns the SDL
+`polymost.c` remains included by `engine.c` and includes its two backend
+implementations, with the OpenGL file guarded by `USE_OPENGL`. All three are
+listed as include-only sources in CMake, preserving private engine state.
+`sdl_driver.c` owns the SDL
 window, input, timer and presentation backend. `engine_internal.h` contains
 private declarations between engine modules. Existing public header names,
 including `a.h`, `cache1d.h` and `pragmas.h`, are retained.

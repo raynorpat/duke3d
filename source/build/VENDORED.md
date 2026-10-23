@@ -162,6 +162,20 @@ those implementations before the split.
 and links OpenGL). The first commit that adds it holds the upstream file
 unchanged.
 
+The local source is organized as `polymost.c` (scene traversal, projection and
+shared entry points), `polymost_soft.c` (software spans/debug rendering and its
+depth buffer), and `polymost_opengl.c` (GL state, textures, shaders/framebuffers,
+polygon submission and map tessellation). The shared file dispatches a projected
+polygon to its backend and uses private helpers for GL state transitions.
+Repeated sky/fog setup is shared within the OpenGL backend.
+
+`engine.c` still includes `polymost.c`, which includes the backend files in the
+same translation unit, with the GL include guarded by `USE_OPENGL`. CMake marks
+all three as `HEADER_FILE_ONLY`; they are not separate objects. This retains
+static engine/renderer state and public interfaces without exporting globals.
+Rasterization equations, frame bindings, batch-flush wrappers and call ordering
+are retained.
+
 ## Local changes
 
 - `long` → `int32_t`, `unsigned long` → `uint32_t` via `tools/retype_long.py`
