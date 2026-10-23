@@ -2,7 +2,7 @@
 
 Date: 2026-10-21
 Updated: 2026-10-22
-Status: Proposed for written-spec review; module split approved in conversation
+Status: Approved for implementation planning on 2026-10-22
 
 ## Intent and scope
 
