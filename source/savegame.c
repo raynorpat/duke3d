@@ -24,6 +24,14 @@ static int32_t get32(const unsigned char *b)
 #define A16(a,n) do { for (k = 0; k < (n); k++) F16((a)[k]); } while (0)
 #define A32(a,n) do { for (k = 0; k < (n); k++) F32((a)[k]); } while (0)
 
+/*
+================
+sg_wall
+
+Convert one wall between native fields and the packed little-endian record.
+Return the serialized byte count, independent of native structure padding.
+================
+*/
 int32_t sg_wall(unsigned char *b, void *rec, int write)
 {
     walltype *w = (walltype *)rec;
@@ -38,6 +46,13 @@ int32_t sg_wall(unsigned char *b, void *rec, int write)
     return o;
 }
 
+/*
+================
+sg_sector
+
+Convert one sector in DOS field order, excluding native structure padding.
+================
+*/
 int32_t sg_sector(unsigned char *b, void *rec, int write)
 {
     sectortype *s = (sectortype *)rec;
@@ -57,6 +72,13 @@ int32_t sg_sector(unsigned char *b, void *rec, int write)
     return o;
 }
 
+/*
+================
+sg_sprite
+
+Convert one sprite using the fixed-width DOS record fields.
+================
+*/
 int32_t sg_sprite(unsigned char *b, void *rec, int write)
 {
     spritetype *s = (spritetype *)rec;
@@ -88,6 +110,14 @@ int32_t sg_sprite(unsigned char *b, void *rec, int write)
  * are per-player. Only the active player's redraw/help fields map to the
  * native globals; on_sector_effector is carried as a per-player byte.
  */
+/*
+================
+sg_player
+
+Convert the player fields stored by this game revision.
+The explicit field list preserves its original packed layout.
+================
+*/
 int32_t sg_player(unsigned char *b, void *rec, int write)
 {
     struct player_struct *p = (struct player_struct *)rec;
@@ -219,6 +249,14 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
  * F-007): no subweapon or wantweaponfire, aim_mode is a char near the end,
  * 11 weapons, 256 weaprecs and a 13-byte name.
  */
+/*
+================
+sg_player
+
+Convert the player fields stored by this game revision.
+The explicit field list preserves its original packed layout.
+================
+*/
 int32_t sg_player(unsigned char *b, void *rec, int write)
 {
     struct player_struct *p = (struct player_struct *)rec;
@@ -276,6 +314,14 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
     return o;
 }
 #else
+/*
+================
+sg_player
+
+Convert the player fields stored by this game revision.
+The explicit field list preserves its original packed layout.
+================
+*/
 int32_t sg_player(unsigned char *b, void *rec, int write)
 {
     struct player_struct *p = (struct player_struct *)rec;
@@ -334,6 +380,13 @@ int32_t sg_player(unsigned char *b, void *rec, int write)
 }
 #endif
 
+/*
+================
+sg_playerorig
+
+Convert a saved player starting position, angle and sector.
+================
+*/
 int32_t sg_playerorig(unsigned char *b, void *rec, int write)
 {
     struct player_orig *p = (struct player_orig *)rec;
@@ -344,6 +397,14 @@ int32_t sg_playerorig(unsigned char *b, void *rec, int write)
     return o;
 }
 
+/*
+================
+sg_weaponhit
+
+Convert the packed actor bookkeeping record, including its six script words.
+Script-address relocation is handled separately from these field copies.
+================
+*/
 int32_t sg_weaponhit(unsigned char *b, void *rec, int write)
 {
     struct weaponhit *h = (struct weaponhit *)rec;
@@ -359,6 +420,13 @@ int32_t sg_weaponhit(unsigned char *b, void *rec, int write)
     return o;
 }
 
+/*
+================
+sg_animwall
+
+Convert an animated-wall index and tag without native alignment padding.
+================
+*/
 int32_t sg_animwall(unsigned char *b, void *rec, int write)
 {
     struct animwalltype *a = (struct animwalltype *)rec;
@@ -375,6 +443,14 @@ int32_t sg_read8(int32_t fil) { unsigned char b; kdfread(&b,1,1,fil); return b; 
 int32_t sg_read16(int32_t fil) { unsigned char b[2]; kdfread(b,2,1,fil); return get16(b); }
 int32_t sg_read32(int32_t fil) { unsigned char b[4]; kdfread(b,4,1,fil); return get32(b); }
 
+/*
+================
+sg_write16s
+
+Pack native shorts into little-endian scratch storage, then issue one
+compressed write with the caller's original element size and count.
+================
+*/
 void sg_write16s(FILE *fil, short *a, int32_t dasizeof, int32_t count)
 {
     int32_t i, n = dasizeof*count/2;
@@ -383,6 +459,14 @@ void sg_write16s(FILE *fil, short *a, int32_t dasizeof, int32_t count)
     dfwrite(sgbuf,dasizeof,count,fil);
 }
 
+/*
+================
+sg_read16s
+
+Decode one compressed call and unpack its little-endian shorts
+into the caller's native array.
+================
+*/
 void sg_read16s(int32_t fil, short *a, int32_t dasizeof, int32_t count)
 {
     int32_t i, n = dasizeof*count/2;
@@ -391,10 +475,20 @@ void sg_read16s(int32_t fil, short *a, int32_t dasizeof, int32_t count)
     for (i = 0; i < n; i++) a[i] = (short)get16(sgbuf+i*2);
 }
 
+/*
+================
+sg_read16sn
+
+Decode a bounded number of serialized shorts through scratch storage.
+Copy at most n shorts into the caller's array.
+================
+*/
 void sg_read16sn(int32_t fil, short *a, int32_t n, int32_t dasizeof, int32_t count)
 {
     int32_t i, m;
 
+    /* Bound the compressed-call scratch size separately from the number
+     * of shorts the destination is allowed to receive. */
     if (count < 0) count = 0;
     if (count > (int32_t)sizeof(sgbuf)/dasizeof) count = sizeof(sgbuf)/dasizeof;
     m = dasizeof*count/2;
@@ -404,6 +498,13 @@ void sg_read16sn(int32_t fil, short *a, int32_t n, int32_t dasizeof, int32_t cou
     for (i = 0; i < m; i++) a[i] = (short)get16(sgbuf+i*2);
 }
 
+/*
+================
+sg_write32s
+
+Pack native 32-bit values before writing with the original call boundaries.
+================
+*/
 void sg_write32s(FILE *fil, int32_t *a, int32_t dasizeof, int32_t count)
 {
     int32_t i, n = dasizeof*count/4;
@@ -412,6 +513,13 @@ void sg_write32s(FILE *fil, int32_t *a, int32_t dasizeof, int32_t count)
     dfwrite(sgbuf,dasizeof,count,fil);
 }
 
+/*
+================
+sg_read32s
+
+Decode one compressed call and unpack its little-endian 32-bit values.
+================
+*/
 void sg_read32s(int32_t fil, int32_t *a, int32_t dasizeof, int32_t count)
 {
     int32_t i, n = dasizeof*count/4;
@@ -420,14 +528,31 @@ void sg_read32s(int32_t fil, int32_t *a, int32_t dasizeof, int32_t count)
     for (i = 0; i < n; i++) a[i] = get32(sgbuf+i*4);
 }
 
+/*
+================
+sg_writerecs
+
+Pack n native records through their codec, advancing native memory by stride.
+The compressed call retains its separate DOS element size and count.
+================
+*/
 void sg_writerecs(FILE *fil, void *recs, size_t stride, sg_rec fn, int32_t n, int32_t dasizeof, int32_t count)
 {
     int32_t i, o = 0;
 
+    /* Native stride can include padding; the codec's return value advances
+     * the packed byte stream instead. */
     for (i = 0; i < n; i++) o += fn(sgbuf+o,(char *)recs+i*stride,1);
     dfwrite(sgbuf,dasizeof,count,fil);
 }
 
+/*
+================
+sg_readrecs
+
+Decode a DOS record block, then unpack n records at the native stride.
+================
+*/
 void sg_readrecs(int32_t fil, void *recs, size_t stride, sg_rec fn, int32_t n, int32_t dasizeof, int32_t count)
 {
     int32_t i, o = 0;
@@ -437,10 +562,20 @@ void sg_readrecs(int32_t fil, void *recs, size_t stride, sg_rec fn, int32_t n, i
 }
 
 /* Mirrors dfwrite's chunking in build/filesystem.c. */
+/*
+================
+sg_dfblocks
+
+Predict how many compressed blocks one legacy dfwrite call produces.
+Element boundaries and the oversized-element path affect the split.
+================
+*/
 int32_t sg_dfblocks(int32_t dasizeof, int32_t count)
 {
     int32_t i, k, n = 0;
 
+    /* Oversized elements become a byte stream, matching dfwrite's fallback
+     * rather than splitting a native record by its own stride. */
     if (dasizeof > SG_LZWSIZE) { count *= dasizeof; dasizeof = 1; }
     k = dasizeof;
     if (k > SG_LZWSIZE-dasizeof) { n++; k = 0; }
@@ -464,12 +599,15 @@ static int32_t sg_call(int32_t fil, int32_t dasizeof, int32_t count, void *buf)
     short leng, uncompleng;
 
     if (size > SG_LZWSIZE) { n *= size; size = 1; }
+    /* Preserve the writer's zero-count quirk when predicting its first block. */
     if (n == 0) n = 1; /* dfwrite still emits its first element for count 0. */
     for (i = 0; i < n; i++)
     {
         k += size;
         if (k <= SG_LZWSIZE-size && i < n-1) continue;
         if (!kread16(fil,&leng) || leng < 4 || leng > SG_LZWBLOCK) return 0;
+        /* The saved uncompressed length must match this exact call boundary;
+         * a plausible compressed length alone does not establish the layout. */
         if (!kread16(fil,&uncompleng) || uncompleng != k) return 0;
         end = klseek(fil,leng-2,SEEK_CUR);
         if (end < 0 || end > kfilelength(fil)) return 0;
@@ -484,6 +622,14 @@ static int32_t sg_call(int32_t fil, int32_t dasizeof, int32_t count, void *buf)
     return 1;
 }
 
+/*
+================
+sg_calls
+
+Check a sequence of compressed-call shapes, leaving the cursor after them.
+Stop at the first call whose block layout is invalid.
+================
+*/
 static int32_t sg_calls(int32_t fil, const int32_t (*calls)[2], int32_t n)
 {
     int32_t i;
@@ -505,10 +651,14 @@ int32_t sg_walloffset(int32_t offset, int64_t nativebase, int32_t dos)
 #elif DUKE3D_GAMEVER >= GAMEVER_15
     d = (int64_t)offset+0x4b800; /* DOS 1.5: 0x251aa4 - 0x29d2a4. */
 #endif
+    /* Only the x and y words of a packed wall may become animation targets.
+     * A range match at another field is not a valid pointer. */
     nv = n >= 0 && n < SG_WALL_SIZE*MAXWALLS && (n%SG_WALL_SIZE == 0 || n%SG_WALL_SIZE == 4);
     dv = d >= 0 && d < SG_WALL_SIZE*MAXWALLS && (d%SG_WALL_SIZE == 0 || d%SG_WALL_SIZE == 4);
     if (dos) return dv ? (int32_t)d : -1;
     if (!nv) return dv ? (int32_t)d : -1;
+    /* Without proven DOS provenance, reject two valid interpretations
+     * that would animate different wall fields. */
     if (dv && n != d) return -1;
     return (int32_t)n;
 }
@@ -523,11 +673,21 @@ int32_t *sg_animptr(int32_t offset, int32_t dos)
         (offset%sizeof(sectortype) == offsetof(sectortype,ceilingz) ||
          offset%sizeof(sectortype) == offsetof(sectortype,floorz)))
         return (int32_t *)((char *)sector+offset);
+    /* Wall arrays may precede sector arrays, so a negative saved value
+     * can still identify a valid wall coordinate. */
     w = sg_walloffset(offset,(int64_t)(intptr_t)wall-(int64_t)(intptr_t)sector,dos);
     return w < 0 ? NULL : (int32_t *)((char *)wall+w);
 }
 
 #if DUKE3D_GAMEVER >= GAMEVER_11
+/*
+================
+sg_checksave
+
+Validate the revision's save layout and script/animation reference ranges
+without restoring the world. Restore the caller's file position afterward.
+================
+*/
 int32_t sg_checksave(int32_t fil)
 {
     static const int32_t head[][2] =
@@ -588,6 +748,8 @@ int32_t sg_checksave(int32_t fil)
         {
             dos = 1;
             v = get32(sgbuf+i*4);
+            /* Only the script end marker at word zero may point one past the array;
+             * other marked words must identify an aligned in-range script word. */
             if (v < 0 || v > SG_DOS_MAXSCRIPT*4-(i == 0 ? 0 : 4) || (v&3)) goto done;
         }
     CALL(4,SG_DOS_MAXTILES,sgbuf);
@@ -619,6 +781,8 @@ int32_t sg_checksave(int32_t fil)
     for (i = 0; i < n; i++)
         if (sg_animptr(get32(sgbuf+i*4),dos) == NULL) goto done;
     if (!sg_calls(fil,tail,sizeof(tail)/sizeof(tail[0]))) goto done;
+    /* Require the revision's layout to consume the file exactly, then restore
+     * the entry position so the real loader can read it again. */
     ok = klseek(fil,0,SEEK_CUR) == kfilelength(fil);
 done:
     klseek(fil,start,SEEK_SET);
@@ -630,6 +794,14 @@ done:
 #if DUKE3D_GAMEVER < GAMEVER_11
 const int32_t sg_scriptslots10[3] = { 1, 4, 5 };
 
+/*
+================
+sg_check10
+
+Validate an early unversioned save and recover its stored script base.
+Return -1 on rejection and restore the caller's file position.
+================
+*/
 int32_t sg_check10(int32_t fil)
 {
     /* saveplayer's dfwrite calls (1.0 0x388d0), between the decoded ones. */
@@ -663,6 +835,8 @@ int32_t sg_check10(int32_t fil)
     static const int32_t bytes[3] = { 8, 20, 12 };
     static short picnum[SG_DOS_MAXHITTYPES];
     static unsigned char actors[SG_DOS_MAXTILES*4];
+    /* Keep raw actor data in sgbuf while script words are decoded elsewhere;
+     * its embedded addresses are checked after the script base is recovered. */
     static unsigned char flags[SG_DOS_MAXSCRIPT], savedscript[SG_DOS_MAXSCRIPT*4];
     unsigned char b[4], anim[4*MAXANIMATES];
     int32_t start = klseek(fil,0,SEEK_CUR), base = -1, dos = 0, n, i, k, v;
@@ -734,6 +908,14 @@ done:
 #endif
 
 #if DUKE3D_GAMEVER >= GAMEVER_11
+/*
+================
+sg_playerblocksize
+
+Probe the first player block's uncompressed byte count, or return -1.
+Restore the file position instead of consuming the block.
+================
+*/
 int32_t sg_playerblocksize(int32_t fil)
 {
     /* The dfwrite calls between the version block and ps[]. */
@@ -753,6 +935,8 @@ int32_t sg_playerblocksize(int32_t fil)
     short leng, uncompleng;
 
     for (i = 0; i < (int32_t)(sizeof(calls)/sizeof(calls[0])); i++)
+        /* Count compression blocks, not write calls: a single array write may
+         * produce several blocks before ps[] begins. */
         n += sg_dfblocks(calls[i][0],calls[i][1]);
     for (i = 0; i < n; i++)
     {
