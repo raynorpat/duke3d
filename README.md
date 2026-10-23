@@ -436,6 +436,7 @@ Tests that need game data are only registered when you point CMake at it:
 |---|---|
 | `DUKE3D_GRP` | `render_e1l1` (frame checksum, compared with `DUKE3D_E1L1_CHECKSUM`) and `game_boot` (not in 1.3D builds) |
 | `DUKE3D_ATOMIC_GRP` and `DUKE3D_DOS_SAVES_DIR` | `dos_save_*`: loads original DOS 1.5 saves and compares with an independent decoder (`tests/dos_save_decode.py`). 1.5 builds only; needs Python 3 |
+| `DUKE3D_DOS_SAVES_DIR` alone | `save_hardening_codec` in 1.4/1.5 builds: checks compressed save structure and malformed offsets without booting the game or requiring a GRP. The 1.4 check uses the shared layout, not an original 1.4 capture; needs Python 3 |
 | `DUKE3D_V13D_DATA_DIR` | In 1.3D builds: CON compile, game boot, demo playback, multiplayer and edition checks against the 1.3D full release. With DOS reference saves in its `refsaves/` folder (listed in `tests/data/v13d_save_refs.cmake`), also `dos_save_v13d_*` and `save_refuse_v13d_*`; needs Python 3 |
 | `DUKE3D_V13D_SW_DATA_DIR` | The same for a 1.3D shareware build |
 | `DUKE3D_V11_SW_DATA_DIR`, `DUKE3D_V10_SW_DATA_DIR` | The same for a 1.1 or 1.0 shareware build, using that release's folder. DOS reference saves go in its `refsaves/` folder |

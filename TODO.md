@@ -1,82 +1,103 @@
 # TODO
 
-Small follow-ups left from the 1.0 and 1.1 shareware variants (branch `v10-v11`). Each was
-reviewed and judged safe to leave for now. Ledger row IDs refer to the Differences ledger in
-`docs/superpowers/plans/2026-10-20-v10-v11-variant.md`.
+Follow-ups from the 1.0/1.1 variants and the 0.99 beta, reviewed on 2026-10-22
+on `todo-followups`. Checked entries include fixes, verified existing behavior,
+and the explicitly documented decisions below. Original DOS data stays outside
+the repository. Historical row IDs refer to the variant plans under
+`docs/superpowers/plans/`.
+
+Final verification: 284 tests passed across all seven versions (24/24/45/44/50/50/47),
+plus four optional routebot checks. Independent review found no remaining blocking
+issues. The one unchecked item below requires an unavailable original executable.
 
 ## Code
 
-- [x] **Signed overflow in `inside()`** (`source/build/engine.c`). The 1.0/1.1 and 1.3D forms
-  (E11-001, E-004) rely on `int32` products wrapping, which is undefined in C. Compute them
-  with `uint32_t` casts, or build `buildengine` with `-fwrapv`. Watch for it if demo sync ever
-  breaks under a new compiler.
-- [ ] **Two `TRAND` calls in one expression** (`source/player.c`, the 1.1 death path and the
-  1.3D one below it). C leaves their order unspecified; DOS drew `&1` first. Split each into
-  two statements.
-- [x] **1.3D demo header reader** (`source/game.c`, `opendemoread`): a truncated header still
-  range-checks uninitialized locals. Start them out of range, as the 1.1/1.0 reader now does.
-- [ ] **`checkhitsprite` and `cheatkeys` have 1.1-only copies** (`source/sector.c`). A future
-  fix to either function has to be made twice; consider folding the 1.1 copy of
-  `checkhitsprite` back into guards (about 15 `#if` blocks).
-- [ ] **`checkweapons` 1.0 branch** (`source/player.c`) ends in `return;`, leaving the 1.1 body
-  compiled but unreachable. Wrap the body in `#if`/`#else` instead.
-- [ ] **`move` flag 2048 owner guard** (`source/gamedef.c`): the `j < 0` test isn't in the
-  1.1 EXE (it reads `sprite[-1]`). Add a one-line comment saying so.
-- [ ] **Net prediction drift in 1.0 and 1.1** (`source/game.c`, `fakedomovethings`): it still
-  applies water friction and the 1.3D shrunk formula, which 1.0/1.1 `processinput` doesn't.
-  Prediction only; visible as small corrections in net games.
-- [ ] **1.0 `debugprint` opcode** uses the host `rand()`, not Watcom's generator. No shipped
-  CON uses it; a mod that does would play a different sound.
-- [ ] **1.0 demo `avel`** (`source/game.c`, `demo10_fromdos`) narrows s16 to s8 without a
-  clamp. Safe for DOS demos (1.0 clamps to ±108); add a clamp or comment.
-- [ ] **1.0/1.1 saves with a modified CON over 10240 longs** are cut to 10240 without a warning.
-- [ ] **`ps[]`/`po[]` entries 8–15** keep old values when a 1.1/1.0 save loads. Unused (at most
-  8 players), but clearing them would be tidier.
-- [ ] **1.0 save writer heuristic** (`source/menues.c`): a genuine numeric actor
-  `t[1]`/`t[4]`/`t[5]` that looks like a script offset is written as an address. Our loader
-  reverses it; the DOS EXE wouldn't.
-- [ ] **`sg_playerblocksize`** is compiled but unused in 1.0 builds.
-- [ ] **Save loader hardening, all versions** (`source/menues.c`): `animateptr` offsets, stored
-  script offsets and `kdfread` short reads aren't checked for 1.3D/1.4/1.5 saves (1.0 saves are
-  fully checked by `sg_check10`).
-- [ ] **Order screens before video is set up** (`source/game.c`, `showtwoscreens`): shareware
-  builds draw them from `gameexit` even when a CON error exits before the video mode is set
-  (`source/gamedef.c` missing-CON, error and modified-CON paths). Unreachable today (the prompt
-  waits for a key first), but a `qsetmode == 200` check at the top would make it safe.
-- [ ] **`ps.auto_run` in 1.0** is never cleared at a new game, matching the EXE. It only feeds
-  local input.
+- [x] **Signed overflow in `inside()`:** coordinate differences, products and
+  determinants use unsigned 32-bit arithmetic while preserving all three historical
+  algorithms. Existing overflow cases pass the signed-overflow sanitizer.
+- [x] **Death-path `TRAND` order:** draw the side bit before the angle byte in
+  separate statements, including the beta form. Fixed-seed checks cover the result
+  and final RNG state.
+- [x] **1.3D demo headers:** reject files shorter than 24 bytes and initialize
+  header locals. Every truncated length is tested in both 1.3D editions.
+- [x] **Separate `checkhitsprite` / `cheatkeys` copies:** reviewed and retained.
+  Their case sets, flame reactions, damage handling and input paths differ
+  throughout; folding them would add substantial conditional code without fixing
+  behavior. The existing comments explain the separation.
+- [x] **1.0 `checkweapons`:** preprocessor branches exclude the unreachable 1.1
+  body rather than relying on an early return.
+- [x] **`move` flag 2048:** the negative-owner guard now explicitly notes its
+  departure from the 1.1 executable's invalid sprite read.
+- [x] **1.0/1.1 prediction:** water and shrunk friction match `processinput`.
+  Regression cases compare predicted and actual velocities for all four combinations.
+- [x] **1.0 `debugprint`:** all game-layer C-library random calls share the
+  measured Watcom generator and initial seed. Native networking retains its own
+  host generator. Literal sequence checks cover both the alias and direct helper.
+- [x] **1.0 demo `avel`:** the existing conversion comment documents the original
+  input clamp to ±108 and why signed-byte storage is sufficient. Valid DOS demo
+  behavior is preserved.
+- [x] **Oversize CON saves:** old shareware builds warn when the DOS script limit
+  truncates a modified CON beyond 10240 longs.
+- [x] **Unused players:** loading an eight-player save clears `ps[]` / `po[]`
+  entries 8–15.
+- [x] **1.0 writer heuristic:** reviewed; retain the documented limitation by
+  explicit user decision. A numeric actor value matching a script offset cannot
+  be distinguished without adding runtime assignment-type tracking. Native reload
+  reverses the heuristic; DOS compatibility for those ambiguous mod values remains
+  limited.
+- [x] **`sg_playerblocksize`:** excluded from builds where it is unused.
+- [x] **Save loader hardening:** preflight compressed block boundaries and validate
+  stored script, actor and animation offsets before restoring game state. Mutation
+  fixtures cover truncation, invalid offsets and legal boundary values.
+- [ ] **Original DOS 1.4 wall animations:** the executable is unavailable, so its
+  wall-to-sector address delta remains unverified. Native 1.4 wall offsets and
+  sector animations are supported; unmapped DOS wall offsets are refused safely.
+  Verify the original delta when a 1.4 executable becomes available. The measured
+  deltas for the other releases are supported.
+- [x] **Quit screens before video setup:** skip them unless `qsetmode == 200`.
+  The regression previously waited for input before a framebuffer existed.
+- [x] **1.0 `ps.auto_run`:** intentionally preserved across new games, matching DOS;
+  a regression now locks down this local-input behavior.
 
 ## Tests
 
-- [ ] **No ctest covers G10-L14** (1.0 `weapon_ang`), G11-A35 or other fixes found by scenario
-  demos; the DOS captures are scratch only. Consider committing the scenario numbers as refs.
-- [ ] **Burning and the space suit** (`burn_time`, G11-A15/L06, G11-A11/L13/L23) are never
-  exercised: no shareware map reaches them. Ported from disassembly only.
-- [ ] **No reference save has armor**, and every save name is empty.
-- [ ] **Connect tests show no positive "sync was checked" marker**; a test would pass if the
-  peers never reached a level. Print a line when the first sync value is compared.
-- [ ] **`game_boot_v11_sw` was never seen failing** (it passed before the port it guards).
-- [ ] **Edition-mismatch tests** (`v11_edition_mismatch`, `v10_edition_mismatch`) register only
-  when both other data folders are set; register with whichever is present.
-- [ ] **Refusal peers** in `DUKE3D_NET_PEERS` are wired by hand, and the 1.5 peer needs the
-  git-ignored `build-v15/netpeer` folder. A 1.5 shareware peer (BYTEVERSION 27) can't be built.
-- [ ] **`net_connect_v13d_full`** has timed out once under heavy parallel load. Watch it.
+- [x] **G10-L14 / G11-A35:** committed direct scenarios use cited DOS/disassembly
+  literals. The old scratch captures were unavailable; expectations were not
+  regenerated from native output.
+- [x] **Burning and space suit:** scenarios exercise flame hits, water removal,
+  burn timing/RNG, suit activation/depletion, space damage/death, gravity and jumping.
+- [x] **Armor and save names:** new original-DOS `e1armor` references cover armor
+  100 and nonempty names in 0.99, 1.0 and 1.1, with round-trip comparisons.
+- [x] **Positive sync evidence:** both connecting peers must report that an actual
+  remote/local sync comparison occurred.
+- [x] **1.1 boot:** the private test copy reports a completed gameplay tic with the
+  expected live player. The old alive-without-marker behavior fails the assertion.
+- [x] **Edition mismatch:** verified the existing registration works with only
+  one other data folder configured, for both 1.0 and 1.1.
+- [x] **Refusal peers:** automatic protocol fixtures cover mismatched BYTEVERSIONs,
+  including 117 and unsupported-build protocol 27, without sibling game data.
+  Optional complete external peers remain available through `DUKE3D_NET_PEERS`.
+- [x] **Network startup under load:** a forced delay reproduced equal time-seeded
+  peer IDs with the old launcher. The new test waits for A's actual ID before
+  delaying and launching B; the same case and concurrent test load pass.
 
 ## Tools and docs
 
-- [ ] **`tools/v13d/mksave.py`** duplicates `mkcapture.py`'s LE helpers and addresses, and
-  places its hook at a fixed cave offset.
-- [ ] **Ledger row G11-L33**'s Version column still says 1.1; it now covers 1.3D and 1.0 too.
-- [ ] **Coverage list (1.1)** doesn't list HOLODUKE (an item, not a weapon or enemy).
-- [ ] **README** names `net_refuse_v10_sw_3`; the number depends on the order of
-  `DUKE3D_NET_PEERS` entries.
-- [ ] **`CMakeLists.txt`** comment above `DUKE3D_VERSION` points only at `docs/v13d/`.
-- [ ] **Shareware-only configure error** (`CMakeLists.txt`) repeats itself ("only supported as
-  shareware: 1.1 and 1.0 only exist as shareware builds").
+- [x] **DOS patch helpers:** capture and save tools share LE mapping and edition
+  addresses. Save hooks follow the actual capture payload and check cave bounds.
+  All existing no-name patch outputs remain byte-identical; names are optional.
+- [x] **G11-L33:** the ledger version column includes 1.0 and 1.3D.
+- [x] **1.1 HOLODUKE:** the coverage list explicitly distinguishes captured
+  inventory from unchecked activation.
+- [x] **README peer names:** documents automatic protocol peers and optional
+  full-game peers without a brittle numbered test name or required private folder.
+- [x] **Version-option comment:** links all variant reference directories.
+- [x] **Shareware configure message:** verified the existing concise wording and
+  all invalid version/edition combinations.
 
 ## 0.99 beta
 
-- [ ] **Moving-sector view interpolation** (`source/game.c`, G099-128): the beta's
-  per-player `on_sector_effector` display flag has no native representation. The
-  camera calculations match measured beta paths, but smoothing on moving sectors
-  can differ. Add the flag and verify the actual renderer on a moving-sector case.
+- [x] **Moving-sector view:** added the per-player flag, measured actor writes,
+  input reset, DOS save-byte translation and current-camera selection. A real SE0
+  rotation matches literal DOS camera coordinates and raw-renderer pixels;
+  third-person interpolation remains covered separately.
