@@ -147,6 +147,8 @@ byte * ANIM_DrawFrame (int32 framenumber);
 
 byte * ANIM_GetPalette ( void );
 
+/* The caller supplies this storage and retains the ANM file bytes for playback.
+ * Frame and palette results alias that storage; ANIM_FreeAnim only deactivates it. */
 extern anim_t * anim;
 
 #ifdef __cplusplus

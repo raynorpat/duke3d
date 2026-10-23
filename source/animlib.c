@@ -54,6 +54,8 @@ static boolean Anim_Started = false;
 //
 //      CheckAnimStarted ()
 //
+// Require an active decoder before accessing the shared animation state.
+//
 //****************************************************************************
 
 void CheckAnimStarted ( char * funcname )
@@ -100,9 +102,13 @@ void loadpage (uint16 pagenumber, uint16 *pagepointer)
 
    CheckAnimStarted ( "loadpage" );
    buffer = anim->buffer;
+   /* The page number is the cache key; callers retain the same page buffer
+    * between requests so a cache hit can reuse its previous contents. */
    if (anim->curlpnum != pagenumber)
       {
       anim->curlpnum = pagenumber;
+      /* Large pages begin after the header/palette/index area and occupy
+       * 64 KiB slots in the caller's file image. */
       buffer += 0xb00 + (pagenumber*0x10000);
       size = sizeof(lp_descriptor);
       memcpy(&anim->curlp,buffer,size);
@@ -125,6 +131,9 @@ void loadpage (uint16 pagenumber, uint16 *pagepointer)
 //      CPlayRunSkipDump ()
 //      - This version of the decompressor is here for portability to non PC's
 //
+// Apply run, skip and literal operations to the existing image.
+// Unwritten pixels carry forward from earlier records.
+//
 //****************************************************************************
 
 void CPlayRunSkipDump (char *srcP, char *dstP)
@@ -134,6 +143,8 @@ void CPlayRunSkipDump (char *srcP, char *dstP)
    byte pixel;
 
 nextOp:
+   /* A positive byte copies literals, zero repeats a colour, and a negative
+    * byte skips unchanged pixels or introduces the extended operation. */
    cnt = (signed char) *srcP++;
    if (cnt > 0)
       goto dump;
@@ -143,6 +154,8 @@ nextOp:
    if (cnt == 0)
       goto longOp;
 /* shortSkip */
+   /* Skipped pixels retain the previous image; these records are deltas,
+    * not independent full-frame bitmaps. */
    dstP += cnt;                    /* adding 7-bit count to 32-bit pointer */
    goto nextOp;
 dump:
@@ -168,6 +181,8 @@ longOp:
 #endif
 
    srcP += sizeof(uint16);
+   /* The extended word is little-endian: a positive signed value skips,
+    * zero terminates, and the high bits select literal or repeated data. */
    if ((int16)wordCnt <= 0)
       goto notLongSkip;       /* Do SIGNED test. */
 
@@ -227,10 +242,14 @@ void renderframe (uint16 framenumber, uint16 *pagepointer)
       }
    ppointer = (byte *)pagepointer;
 
+   /* The page starts with one 16-bit length per record; sum earlier lengths
+    * to reach this frame's record after that table. */
    ppointer+=anim->curlp.nRecords*2+offset;
    if(ppointer[1])
       {
       uint16 pp1 = BUILDSWAP_INTEL16(((uint16 *)ppointer)[1]);
+      /* Round the optional record header data up to an even byte boundary
+       * before passing the compressed pixels to the delta decoder. */
       ppointer += (4 + (pp1 + (pp1 & 1)));
       }
    else
@@ -261,6 +280,9 @@ void drawframe (uint16 framenumber)
 //
 //      ANIM_LoadAnim ()
 //
+// Attach the caller's ANM bytes and initialize header, palette and page metadata.
+// The caller must provide anim storage before entering this routine.
+//
 //****************************************************************************
 
 void ANIM_LoadAnim (char * buffer)
@@ -274,6 +296,8 @@ void ANIM_LoadAnim (char * buffer)
 
    if (!Anim_Started) Anim_Started = true;
 
+   /* playanm supplies both anim storage and the file bytes from its cache
+    * allocation. This decoder borrows them and performs no allocation here. */
    anim->buffer = buffer;
    anim->curlpnum = 0xffff;
    anim->currentframe = -1;
@@ -299,6 +323,8 @@ void ANIM_LoadAnim (char * buffer)
    // load the color palette
    for (i = 0; i < 768; i += 3)
       {
+      /* The file stores four-byte BGR entries; expose packed RGB channels
+       * without carrying the unused fourth byte into the palette. */
       anim->pal[i+2] = *buffer++;
       anim->pal[i+1] = *buffer++;
       anim->pal[i] = *buffer++;
@@ -323,6 +349,8 @@ void ANIM_LoadAnim (char * buffer)
 //
 //      ANIM_FreeAnim ()
 //
+// Mark the decoder inactive; the caller's cache allocation is not freed here.
+//
 //****************************************************************************
 
 void ANIM_FreeAnim ( void )
@@ -338,6 +366,8 @@ void ANIM_FreeAnim ( void )
 //
 //      ANIM_NumFrames ()
 //
+// Return the header's record count used by the playback API.
+//
 //****************************************************************************
 
 int32 ANIM_NumFrames ( void )
@@ -350,6 +380,9 @@ int32 ANIM_NumFrames ( void )
 //
 //      ANIM_DrawFrame ()
 //
+// Apply delta records up to the requested frame and return the borrowed image.
+// Frame 1 applies record 0; later draws overwrite the same image storage.
+//
 //****************************************************************************
 
 byte * ANIM_DrawFrame (int32 framenumber)
@@ -357,6 +390,8 @@ byte * ANIM_DrawFrame (int32 framenumber)
    int32 cnt;
 
    CheckAnimStarted ( "DrawFrame" );
+   /* The public frame number is one beyond the last applied record.
+    * Forward requests resume there; earlier requests replay from record zero. */
    if ((anim->currentframe != -1) && (anim->currentframe<=framenumber))
       {
       for (cnt = anim->currentframe; cnt < framenumber; cnt++)
@@ -374,6 +409,8 @@ byte * ANIM_DrawFrame (int32 framenumber)
 //****************************************************************************
 //
 //      ANIM_GetPalette ()
+//
+// Return the packed RGB palette inside the caller-provided animation storage.
 //
 //****************************************************************************
 
