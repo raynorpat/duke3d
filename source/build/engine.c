@@ -214,6 +214,14 @@ int32_t totalclocklock;
 #include "a.h"
 
 
+/*
+================
+scansector
+
+Collect projected wall chains and visible sprites for the classic renderer.
+Nearby portals are visited before their walls can fall behind the near plane.
+================
+*/
 static void scansector (short sectnum)
 {
 	walltype *wal, *wal2;
@@ -350,6 +358,14 @@ skipitaddwall:
 }
 
 
+/*
+================
+prepwall
+
+Prepare horizontal texture positions and vertical scales for a wall scan.
+Divide at four-column intervals and interpolate the columns between them.
+================
+*/
 static void prepwall(int32_t z, walltype *wal)
 {
 	int32_t i, l=0, ol=0, splc, sinc, x, topinc, top, botinc, bot, walxrepeat;
@@ -374,6 +390,8 @@ static void prepwall(int32_t z, walltype *wal)
 		l *= walxrepeat;
 		lwall[x] = (l>>18);
 	}
+	/* Perspective mapping is a ratio, not a linear u step.
+	 * Refresh the ratio every four columns and bisect the intervening samples. */
 	while (x+4 <= xb2[z])
 	{
 		top += topinc; bot += botinc;
@@ -1392,6 +1410,14 @@ static void grouscan (int32_t dax1, int32_t dax2, int32_t sectnum, char dastat)
 }
 
 
+/*
+================
+owallmost
+
+Project a flat ceiling/floor edge into one screen y value per wall column.
+Clip against the upper and lower view planes and return the endpoint clip bits.
+================
+*/
 static int owallmost(short *mostbuf, int32_t w, int32_t z)
 {
 	int32_t bad, inty, xcross, y, yinc;
@@ -1466,6 +1492,14 @@ static int owallmost(short *mostbuf, int32_t w, int32_t z)
 }
 
 
+/*
+================
+wallmost
+
+Build the projected ceiling/floor boundary along a wall, including slopes.
+Flat planes use owallmost; slopes are measured from the sector's first wall.
+================
+*/
 static int wallmost(short *mostbuf, int32_t w, int32_t sectnum, char dastat)
 {
 	int32_t bad, i, j, t, y, z, inty, intz, xcross, yinc, fw;
@@ -2011,6 +2045,14 @@ static void dosetaspect(void)
 }
 
 
+/*
+================
+wallfront
+
+Compare two scanned walls by testing their endpoints and the eye against each line.
+Negative results cover collinear or crossing cases where the ordering is ambiguous.
+================
+*/
 int wallfront(int32_t l1, int32_t l2)
 {
 	walltype *wal;
@@ -2099,6 +2141,14 @@ void engine_gl_resetview(void)
 
 
 
+/*
+================
+drawrooms
+
+Set the view and render opaque sectors in front-to-back wall-bunch order.
+Masked walls and sprites are collected for the later drawmasks pass.
+================
+*/
 void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
                short daang, int32_t dahoriz, short dacursectnum)
 {
@@ -2414,6 +2464,14 @@ static void transmaskwallscan(int32_t x1, int32_t x2)
 }
 
 
+/*
+================
+loadboard
+
+Read a version-7 map field by field and rebuild the sprite lists.
+Disk record widths and byte order are independent of native structure layout.
+================
+*/
 int loadboard(char *filename, int32_t *daposx, int32_t *daposy,
               int32_t *daposz, short *daang, short *dacursectnum)
 {
@@ -2553,6 +2611,14 @@ static void write8(int f, char val)
 }
 
 
+/*
+================
+saveboard
+
+Write the version-7 map layout explicitly, including the live sprites.
+Do not write native structures: their padding and byte order can differ.
+================
+*/
 int saveboard(char *filename, int32_t *daposx, int32_t *daposy,
               int32_t *daposz, short *daang, short *dacursectnum)
 {
@@ -3311,6 +3377,14 @@ void nextpage(void)
 }
 
 
+/*
+================
+clipinsidebox
+
+Test a wall segment against the square clearance box around a point.
+A hit returns 1 on the front side or 2 on the back side; zero means no overlap.
+================
+*/
 int clipinsidebox(int32_t x, int32_t y, short wallnum, int32_t walldist)
 {
 	walltype *wal;
@@ -3337,6 +3411,14 @@ int clipinsidebox(int32_t x, int32_t y, short wallnum, int32_t walldist)
 	return((x2 >= y2)<<1);
 }
 
+/*
+================
+clipinsideboxline
+
+Test an explicit segment against the same square used by clipinsidebox.
+The return value distinguishes front-side and back-side overlaps.
+================
+*/
 int clipinsideboxline(int32_t x, int32_t y, int32_t x1, int32_t y1, int32_t x2, int32_t y2, int32_t walldist)
 {
 	int32_t r;
@@ -3366,6 +3448,14 @@ int clipinsideboxline(int32_t x, int32_t y, int32_t x1, int32_t y1, int32_t x2, 
 
 
 
+/*
+================
+inside
+
+Test sector membership by the parity of horizontal ray crossings.
+Keep the revision-specific bit arithmetic: edge cases affect game simulation.
+================
+*/
 int inside(int32_t x, int32_t y, short sectnum)
 {
 	walltype *wal;
@@ -3387,6 +3477,7 @@ int inside(int32_t x, int32_t y, short sectnum)
 	{
 		y1 = (int32_t)((uint32_t)wal->y-(uint32_t)y);
 		y2 = (int32_t)((uint32_t)wall[wal->point2].y-(uint32_t)y);
+		/* Only edges straddling the point's y can cross the horizontal test ray. */
 		if ((y1^y2) < 0)
 		{
 			x1 = (int32_t)((uint32_t)wal->x-(uint32_t)x);
@@ -4904,6 +4995,14 @@ int nextsectorneighborz(short sectnum, int32_t thez,
 }
 
 
+/*
+================
+cansee
+
+Trace a line of sight through wall portals and their sloped vertical openings.
+Sprites are not obstacles in this visibility test.
+================
+*/
 int cansee(int32_t x1, int32_t y1, int32_t z1, short sect1,
             int32_t x2, int32_t y2, int32_t z2, short sect2)
 {
@@ -4951,6 +5050,7 @@ int cansee(int32_t x1, int32_t y1, int32_t z1, short sect1,
 			z = z1 + mulscale24(z21,t);
 #endif
 
+			/* The crossing must lie inside both vertical openings, not just the XY portal. */
 			getzsofslope((short)dasectnum,x,y,&cz,&fz);
 			if ((z <= cz) || (z >= fz)) return(0);
 			getzsofslope((short)nexts,x,y,&cz,&fz);
@@ -4965,6 +5065,14 @@ int cansee(int32_t x1, int32_t y1, int32_t z1, short sect1,
 }
 
 
+/*
+================
+lintersect
+
+Intersect two XY segments and interpolate z along the first segment.
+Half-open endpoint tests keep a shared wall vertex from being counted twice.
+================
+*/
 int lintersect(int32_t x1, int32_t y1, int32_t z1, int32_t x2, int32_t y2, int32_t z2,
                int32_t x3, int32_t y3, int32_t x4, int32_t y4, int32_t *intx,
                int32_t *inty, int32_t *intz)
@@ -4987,6 +5095,7 @@ int lintersect(int32_t x1, int32_t y1, int32_t z1, int32_t x2, int32_t y2, int32
 		topt = x31*y34 - y31*x34; if ((topt > 0) || (topt <= bot)) return(0);
 		topu = x21*y31 - y21*x31; if ((topu > 0) || (topu <= bot)) return(0);
 	}
+	/* Cross products reject misses before the single parameter division. */
 	t = divscale24(topt,bot);
 	*intx = x1 + mulscale24(x21,t);
 	*inty = y1 + mulscale24(y21,t);
@@ -4995,6 +5104,14 @@ int lintersect(int32_t x1, int32_t y1, int32_t z1, int32_t x2, int32_t y2, int32
 }
 
 
+/*
+================
+rintersect
+
+Intersect a forward XY ray with a half-open wall segment.
+Use the ray parameter to recover the three-dimensional hit position.
+================
+*/
 int rintersect(int32_t x1, int32_t y1, int32_t z1, int32_t vx, int32_t vy, int32_t vz,
                int32_t x3, int32_t y3, int32_t x4, int32_t y4, int32_t *intx,
                int32_t *inty, int32_t *intz)
@@ -5024,6 +5141,14 @@ int rintersect(int32_t x1, int32_t y1, int32_t z1, int32_t vx, int32_t vy, int32
 }
 
 
+/*
+================
+hitscan
+
+Trace a 3D ray through sectors, keeping the nearest blocking plane, wall or sprite.
+Clip-mask interpretation and intersection rounding follow the engine revision.
+================
+*/
 int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
             int32_t vx, int32_t vy, int32_t vz,
 	        short *hitsect, short *hitwall, short *hitsprite,
@@ -5328,6 +5453,14 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 }
 
 
+/*
+================
+neartag
+
+Probe forward for tagged sectors, walls and sprites used by interaction code.
+tagsearch bit 1 selects lotag and bit 2 selects hitag.
+================
+*/
 int neartag(int32_t xs, int32_t ys, int32_t zs, short sectnum, short ange,
             short *neartagsector, short *neartagwall, short *neartagsprite,
             int32_t *neartaghitdist, int32_t neartagrange, char tagsearch)
@@ -5449,6 +5582,14 @@ int neartag(int32_t xs, int32_t ys, int32_t zs, short sectnum, short ange,
 }
 
 
+/*
+================
+dragpoint
+
+Move a map vertex and the matching vertices reached through two-sided walls.
+Walk both directions around the join so connected sector outlines stay together.
+================
+*/
 void dragpoint(short pointhighlight, int32_t dax, int32_t day)
 {
 	short cnt, tempshort;
@@ -5492,6 +5633,14 @@ void dragpoint(short pointhighlight, int32_t dax, int32_t day)
 }
 
 
+/*
+================
+lastwall
+
+Find the wall whose point2 links to this wall in its loop.
+Consecutive walls take the fast path; reordered loops require a walk.
+================
+*/
 int lastwall(short point)
 {
 	int32_t i, j, cnt;
@@ -5518,6 +5667,14 @@ int lastwall(short point)
 }                                                        \
 
 
+/*
+================
+keepaway
+
+Nudge an integer point strictly onto the open side of a collision line.
+Alternating coordinate steps avoids leaving a rounded intersection on the boundary.
+================
+*/
 static void keepaway (int32_t *x, int32_t *y, int32_t w)
 {
 	int32_t dx, dy, ox, oy, x1, y1;
@@ -5536,6 +5693,14 @@ static void keepaway (int32_t *x, int32_t *y, int32_t w)
 }
 
 
+/*
+================
+raytrace
+
+Shorten a movement segment to its nearest collision-line intersection.
+Back off the integer intersection until it lies strictly on the permitted side.
+================
+*/
 static int raytrace(int32_t x3, int32_t y3, int32_t *x4, int32_t *y4)
 {
 	int32_t x1, y1, x2, y2, bot, topu, nintx, ninty, cnt, z, hitwall;
@@ -5572,6 +5737,14 @@ static int raytrace(int32_t x3, int32_t y3, int32_t *x4, int32_t *y4)
 
 /* !!! ugh...move this var into clipmove as a parameter, and update build2.txt! */
 int32_t clipmoveboxtracenum = 3;
+/*
+================
+clipmove
+
+Move a clearance box through sectors and slide the remaining motion along obstacles.
+xvect/yvect have 14 fractional bits; the return value encodes the first collision.
+================
+*/
 int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
               int32_t xvect, int32_t yvect, int32_t walldist, int32_t ceildist,
               int32_t flordist, uint32_t cliptype)
@@ -5599,6 +5772,7 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 	oxvect = xvect;
 	oyvect = yvect;
 
+	/* Convert the fixed-point displacement only when constructing the integer goal. */
 	goalx = (*x) + (xvect>>14);
 	goaly = (*y) + (yvect>>14);
 
@@ -5613,6 +5787,7 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 	xmin = cx-rad; ymin = cy-rad;
 	xmax = cx+rad; ymax = cy+rad;
 
+	/* The low word selects blocking wall flags; the high word selects sprite flags. */
 	dawalclipmask = (cliptype&65535);        /* CLIPMASK0 = 0x00010001 */
 	dasprclipmask = (cliptype>>16);          /* CLIPMASK1 = 0x01000040 */
 
@@ -5839,6 +6014,7 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 			templong2 = lx*lx + ly*ly;
 			if (templong2 > 0)
 			{
+				/* Project the unused displacement onto the hit line to produce wall sliding. */
 				templong1 = (goalx-intx)*lx + (goaly-inty)*ly;
 
 				if ((klabs(templong1)>>11) < templong2)
@@ -5918,6 +6094,14 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 }
 
 
+/*
+================
+pushmove
+
+Push a point out of blocking wall clearances after movement or geometry changes.
+Alternate traversal direction and limit correction attempts to avoid endless corner pushes.
+================
+*/
 int pushmove(int32_t *x, int32_t *y, int32_t *z, short *sectnum,
              int32_t walldist, int32_t ceildist, int32_t flordist,
              uint32_t cliptype)
@@ -6055,6 +6239,14 @@ int pushmove(int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 }
 
 
+/*
+================
+updatesector
+
+Find the sector containing an XY point, starting with the caller's last sector.
+Try adjoining sectors before falling back to a reverse scan of the whole map.
+================
+*/
 void updatesector(int32_t x, int32_t y, short *sectnum)
 {
 	walltype *wal;
@@ -6357,6 +6549,14 @@ void draw2dscreen(int32_t posxe, int32_t posye, short ange, int32_t zoome, short
 
 
 
+/*
+================
+getzrange
+
+Find nearby blocking ceiling/floor heights, including sprite surfaces.
+Hit values encode sectors with 16384 and sprites with 49152 added to their indices.
+================
+*/
 void getzrange(int32_t x, int32_t y, int32_t z, short sectnum,
                int32_t *ceilz, int32_t *ceilhit, int32_t *florz, int32_t *florhit,
                int32_t walldist, uint32_t cliptype)
@@ -6384,6 +6584,7 @@ void getzrange(int32_t x, int32_t y, int32_t z, short sectnum,
 	xmax = x+i; ymax = y+i;
 
 	getzsofslope(sectnum,x,y,ceilz,florz);
+	/* The high bits identify the hit kind; the low bits retain the object index. */
 	*ceilhit = sectnum+16384; *florhit = sectnum+16384;
 
 	dawalclipmask = (cliptype&65535);
@@ -7242,6 +7443,14 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 }
 
 
+/*
+================
+preparemirror
+
+Reflect the eye position and viewing angle across a wall line.
+The next world draw records the classic mirror rectangle for completemirror.
+================
+*/
 void preparemirror(int32_t dax, int32_t day, int32_t daz,
                    short daang, int32_t dahoriz, short dawall,
                    short dasector, int32_t *tposx, int32_t *tposy,
@@ -7252,6 +7461,7 @@ void preparemirror(int32_t dax, int32_t day, int32_t daz,
 	x = wall[dawall].x; dx = wall[wall[dawall].point2].x-x;
 	y = wall[dawall].y; dy = wall[wall[dawall].point2].y-y;
 	j = dx*dx + dy*dy; if (j == 0) return;
+	/* Twice the projection onto the wall, minus the eye, gives its reflection. */
 	i = (((dax-x)*dx + (day-y)*dy)<<1);
 	*tposx = (x<<1) + scale(dx,i,j) - dax;
 	*tposy = (y<<1) + scale(dy,i,j) - day;
@@ -7261,6 +7471,14 @@ void preparemirror(int32_t dax, int32_t day, int32_t daz,
 }
 
 
+/*
+================
+completemirror
+
+Reverse the rendered classic mirror rectangle into its screen position.
+A temporary row prevents the source pixels from being overwritten during the flip.
+================
+*/
 void completemirror(void)
 {
 	int32_t i, dy;
@@ -7292,6 +7510,14 @@ void completemirror(void)
 }
 
 
+/*
+================
+sectorofwall
+
+Find the sector owning a wall from its partner or the ordered wall ranges.
+Two-sided walls can answer directly through nextwall/nextsector.
+================
+*/
 int sectorofwall(short theline)
 {
 	int32_t i, gap;
@@ -7311,6 +7537,14 @@ int sectorofwall(short theline)
 }
 
 
+/*
+================
+getceilzofslope
+
+Evaluate the ceiling height at XY from its signed distance to the first wall.
+The selected engine revision determines the fixed-point slope calculation.
+================
+*/
 int getceilzofslope(short sectnum, int32_t dax, int32_t day)
 {
 	int32_t dx, dy, i, j;
@@ -7336,6 +7570,14 @@ int getceilzofslope(short sectnum, int32_t dax, int32_t day)
 }
 
 
+/*
+================
+getflorzofslope
+
+Evaluate the floor height at XY from its signed distance to the first wall.
+Flat floors bypass the length normalization and return their stored z.
+================
+*/
 int getflorzofslope(short sectnum, int32_t dax, int32_t day)
 {
 	int32_t dx, dy, i, j;
@@ -7361,6 +7603,14 @@ int getflorzofslope(short sectnum, int32_t dax, int32_t day)
 }
 
 
+/*
+================
+getzsofslope
+
+Evaluate ceiling and floor at the same XY using one shared wall-distance calculation.
+Each plane applies its own heinum only when its slope flag is set.
+================
+*/
 void getzsofslope(short sectnum, int32_t dax, int32_t day, int32_t *ceilz, int32_t *florz)
 {
 	int32_t dx, dy, i, j;
@@ -7374,6 +7624,8 @@ void getzsofslope(short sectnum, int32_t dax, int32_t day, int32_t *ceilz, int32
 		wal = &wall[sec->wallptr]; wal2 = &wall[wal->point2];
 		dx = wal2->x-wal->x; dy = wal2->y-wal->y;
 		i = (LOGICSQRT(dx*dx+dy*dy)<<5); if (i == 0) return;
+		/* The cross product measures signed distance across the first wall.
+		 * Dividing by wall length makes the slope independent of that wall's size. */
 		j = dmulscale3(dx,day-wal->y,-dy,dax-wal->x);
 		if (sec->ceilingstat&2) *ceilz = (*ceilz)+scale(sec->ceilingheinum,j,i);
 		if (sec->floorstat&2) *florz = (*florz)+scale(sec->floorheinum,j,i);
@@ -7381,6 +7633,14 @@ void getzsofslope(short sectnum, int32_t dax, int32_t day, int32_t *ceilz, int32
 }
 
 
+/*
+================
+alignceilslope
+
+Choose ceiling heinum so the plane passes through the supplied XYZ point.
+A point on the first wall cannot determine a slope and leaves the plane unchanged.
+================
+*/
 void alignceilslope(short dasect, int32_t x, int32_t y, int32_t z)
 {
 	int32_t i, dax, day;
@@ -7399,6 +7659,14 @@ void alignceilslope(short dasect, int32_t x, int32_t y, int32_t z)
 }
 
 
+/*
+================
+alignflorslope
+
+Choose floor heinum so the plane passes through the supplied XYZ point.
+Set or clear the slope flag according to the resulting heinum.
+================
+*/
 void alignflorslope(short dasect, int32_t x, int32_t y, int32_t z)
 {
 	int32_t i, dax, day;

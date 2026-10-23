@@ -39,6 +39,14 @@ static int32_t numtilefiles, artfil = -1, artfilnum, artfilplc;
 
 
 
+/*
+================
+setgotpic
+
+Mark a tile in the usage bitmap and refresh its evictable cache lock.
+Locks at 200 or above are pinned and must not be downgraded.
+================
+*/
         void setgotpic(uint32_t param)
         {
 	    unsigned char *gotpic_a = (unsigned char*)gotpic;
@@ -51,11 +59,20 @@ static int32_t numtilefiles, artfil = -1, artfilnum, artfilplc;
         }
 
 
+/*
+================
+animateoffs
+
+Select a tile animation frame from the locked render clock and picanm flags.
+Return a signed offset for oscillating, forward or backward animation.
+================
+*/
 int animateoffs(short tilenum, short fakevar)
 {
 	int32_t i, k, offs;
 
 	offs = 0;
+	/* Low picanm bits give the frame count; the high-byte shift controls playback speed. */
 	i = (totalclocklock>>((picanm[tilenum]>>24)&15));
 	if ((picanm[tilenum]&63) > 0)
 	{
@@ -78,6 +95,14 @@ int animateoffs(short tilenum, short fakevar)
 	return(offs);
 }
 
+/*
+================
+loadtile
+
+Load a tile's column-major pixels from its ART file into the cache.
+Keep the current ART handle and file position so nearby reads avoid reopening it.
+================
+*/
 void loadtile(short tilenume)
 {
 	char *ptr;
@@ -123,6 +148,14 @@ void loadtile(short tilenume)
 }
 
 
+/*
+================
+allocatepermanenttile
+
+Allocate a pinned cache tile for generated pictures such as camera views.
+Set dimensions and packed size exponents without assigning an ART animation.
+================
+*/
 intptr_t allocatepermanenttile(short tilenume, int32_t xsiz, int32_t ysiz)
 {
 	int32_t j, dasiz;
@@ -132,6 +165,7 @@ intptr_t allocatepermanenttile(short tilenume, int32_t xsiz, int32_t ysiz)
 
 	dasiz = xsiz*ysiz;
 
+	/* Generated art must survive ordinary cache aging and eviction. */
 	walock[tilenume] = 255;
 	allocache(&waloff[tilenume],dasiz,(unsigned char *) &walock[tilenume]);
 
@@ -148,6 +182,14 @@ intptr_t allocatepermanenttile(short tilenume, int32_t xsiz, int32_t ysiz)
 }
 
 
+/*
+================
+loadpics
+
+Index the ART files and allocate the shared tile-cache arena.
+Only metadata is loaded here; pixel data is read later by loadtile.
+================
+*/
 int loadpics(char *filename)
 {
 	int32_t offscount, localtilestart, localtileend, dasiz;
@@ -193,6 +235,7 @@ int loadpics(char *filename)
 			for (i = localtilestart; i <= localtileend; i++)
 			    kread32(fil,&picanm[i]);
 
+			/* ART stores dimensions and animation words before the concatenated tile pixels. */
 			offscount = 4+4+4+4+((localtileend-localtilestart+1)<<3);
 			for(i=localtilestart;i<=localtileend;i++)
 			{
@@ -219,12 +262,14 @@ int loadpics(char *filename)
 		cachesize -= 65536L;
 		if (cachesize < 65536) return(-1);
 	}
+	/* Align the arena start upward and trim the usable length to the same 16-byte grid. */
 	initcache((((intptr_t)(pic))+15)&~(intptr_t)15,(cachesize-(int32_t)((-((intptr_t)(pic)))&15))&0xfffffff0);
 
 	for(i=0;i<MAXTILES;i++)
 	{
 		j = 15;
 		while ((j > 1) && (pow2long[j] > tilesizx[i])) j--;
+		/* Pack x and y size exponents into the low and high nibbles for the span drawers. */
 		picsiz[i] = ((char)j);
 		j = 15;
 		while ((j > 1) && (pow2long[j] > tilesizy[i])) j--;
@@ -267,6 +312,14 @@ void qloadkvx(int32_t voxindex, char *filename)
 #endif
 
 
+/*
+================
+copytilepiece
+
+Copy nontransparent pixels between column-major tiles.
+Wrap the source coordinates while clipping writes to the destination dimensions.
+================
+*/
 void copytilepiece(int32_t tilenume1, int32_t sx1, int32_t sy1, int32_t xsiz, int32_t ysiz,
                    int32_t tilenume2, int32_t sx2, int32_t sy2)
 {
@@ -304,6 +357,14 @@ void copytilepiece(int32_t tilenume1, int32_t sx1, int32_t sy1, int32_t xsiz, in
 	}
 }
 
+/*
+================
+squarerotatetile
+
+Transpose a square tile in place with paired swaps across its diagonal.
+The operation is skipped for nonsquare tiles.
+================
+*/
 void squarerotatetile(short tilenume)
 {
 	int32_t i, j, k, xsiz, ysiz;
@@ -326,6 +387,14 @@ void squarerotatetile(short tilenume)
 	}
 }
 
+/*
+================
+setsprite
+
+Update a sprite's XYZ and relink its sector list when the XY position crosses a boundary.
+A failed sector lookup returns -1 after the position has already been changed.
+================
+*/
 int setsprite(short spritenum, int32_t newx, int32_t newy, int32_t newz)
 {
 	short tempsectnum;
@@ -345,6 +414,14 @@ int setsprite(short spritenum, int32_t newx, int32_t newy, int32_t newz)
 }
 
 
+/*
+================
+initspritelists
+
+Put every sprite slot on the sector and status free lists.
+The extra MAXSECTORS/MAXSTATUS heads are free-list sentinels, not live buckets.
+================
+*/
 void initspritelists(void)
 {
 	int32_t i;
@@ -376,6 +453,14 @@ void initspritelists(void)
 }
 
 
+/*
+================
+insertsprite
+
+Pair status and sector insertions for a new sprite slot.
+The two free lists must agree on the next unused index.
+================
+*/
 int insertsprite(short sectnum, short statnum)
 {
 	insertspritestat(statnum);
@@ -383,6 +468,14 @@ int insertsprite(short sectnum, short statnum)
 }
 
 
+/*
+================
+insertspritesect
+
+Take the first sector-free slot and link it at the requested sector's head.
+Update both directions of the chain and the sprite's sectnum.
+================
+*/
 int insertspritesect(short sectnum)
 {
 	short blanktouse;
@@ -408,6 +501,14 @@ int insertspritesect(short sectnum)
 }
 
 
+/*
+================
+insertspritestat
+
+Take the first status-free slot and link it at the requested status head.
+The parallel sector insertion is performed separately.
+================
+*/
 int insertspritestat(short statnum)
 {
 	short blanktouse;
@@ -433,6 +534,14 @@ int insertspritestat(short statnum)
 }
 
 
+/*
+================
+deletesprite
+
+Return a sprite slot to both free lists.
+Removing it from only one list would leave its sector and status ownership inconsistent.
+================
+*/
 int deletesprite(short spritenum)
 {
 	deletespritestat(spritenum);
@@ -440,6 +549,14 @@ int deletesprite(short spritenum)
 }
 
 
+/*
+================
+deletespritesect
+
+Unlink a sprite from its sector chain and push it onto the sector free list.
+Its status chain is handled separately.
+================
+*/
 int deletespritesect(short deleteme)
 {
 	if (sprite[deleteme].sectnum == MAXSECTORS)
@@ -461,6 +578,14 @@ int deletespritesect(short deleteme)
 }
 
 
+/*
+================
+deletespritestat
+
+Unlink a sprite from its status chain and push it onto the status free list.
+Its sector chain is handled separately.
+================
+*/
 int deletespritestat(short deleteme)
 {
 	if (sprite[deleteme].statnum == MAXSTATUS)
@@ -482,6 +607,14 @@ int deletespritestat(short deleteme)
 }
 
 
+/*
+================
+changespritesect
+
+Relink a live sprite into a different sector bucket.
+Delete-then-insert reuses the just-freed index and leaves the status chain alone.
+================
+*/
 int changespritesect(short spritenum, short newsectnum)
 {
 	if ((newsectnum < 0) || (newsectnum > MAXSECTORS)) return(-1);
@@ -493,6 +626,14 @@ int changespritesect(short spritenum, short newsectnum)
 }
 
 
+/*
+================
+changespritestat
+
+Relink a live sprite into a different status bucket.
+Delete-then-insert reuses the just-freed index and leaves the sector chain alone.
+================
+*/
 int changespritestat(short spritenum, short newstatnum)
 {
 	if ((newstatnum < 0) || (newstatnum > MAXSTATUS)) return(-1);

@@ -63,6 +63,14 @@ static int32_t filehan[MAXOPENFILES] =
 
 
 
+/*
+================
+initgroupfile
+
+Index a GRP directory and build prefix offsets for its concatenated files.
+The directory stores 12-byte names and little-endian 32-bit lengths.
+================
+*/
 int32_t initgroupfile(const char *filename)
 {
 	char buf[16];
@@ -104,6 +112,7 @@ int32_t initgroupfile(const char *filename)
 			gfileoffs[numgroupfiles][i] = j;
 			j += k;
 		}
+		/* The extra offset is the end sentinel; adjacent offsets give each member's length. */
 		gfileoffs[numgroupfiles][gnumfiles[numgroupfiles]] = j;
 	}
 	numgroupfiles++;
@@ -126,6 +135,14 @@ void uninitgroupfile(void)
 
 
 
+/*
+================
+kopen4load
+
+Open a loose file or locate a GRP member behind a virtual file handle.
+Normal searches prefer loose files, then later GRPs; searchfirst restricts lookup to GRP zero.
+================
+*/
 int32_t kopen4load(const char *filename, char searchfirst)
 {
 	int32_t i, j, k, fil, newhandle;
@@ -179,6 +196,14 @@ int32_t kopen4load(const char *filename, char searchfirst)
 	return(-1);
 }
 
+/*
+================
+kread
+
+Read through a virtual handle, clipping GRP reads at the member boundary.
+Members keep separate logical positions even though they share the archive descriptor.
+================
+*/
 int32_t kread(int32_t handle, void *buffer, int32_t leng)
 {
 	int32_t i, filenum, groupnum;
@@ -189,6 +214,7 @@ int32_t kread(int32_t handle, void *buffer, int32_t leng)
 
 	if (groupfil[groupnum] != -1)
 	{
+		/* Member offsets are relative to the data area; the seek also skips the GRP directory. */
 		i = gfileoffs[groupnum][filenum]+filepos[handle];
 		if (i != groupfilpos[groupnum])
 		{
@@ -231,6 +257,14 @@ int kread8(int32_t handle, char *buffer)
     return(1);
 }
 
+/*
+================
+klseek
+
+Move a virtual file's position relative to its own contents.
+GRP seeks are logical; kread moves the shared archive descriptor when needed.
+================
+*/
 int32_t klseek(int32_t handle, int32_t offset, int32_t whence)
 {
 	int32_t i, groupnum;
@@ -293,6 +327,14 @@ static char *lzwbuf1, *lzwbuf4, *lzwbuf5;
 static unsigned char lzwbuflock[5];
 static short *lzwbuf2, *lzwbuf3;
 
+/*
+================
+kdfread
+
+Read LZW blocks through the virtual filesystem and reconstruct delta-coded records.
+The first record is literal; later records add byte deltas modulo 256.
+================
+*/
 void kdfread(void *buffer, size_t dasizeof, size_t count, int32_t fil)
 {
 	size_t i, j;
@@ -324,6 +366,7 @@ void kdfread(void *buffer, size_t dasizeof, size_t count, int32_t fil)
 			leng = 0; kread16(fil,&leng); n = lzwleng(leng); kread(fil,lzwbuf5,n);
 			k = 0; kgoal = n ? uncompress(lzwbuf5,n,lzwbuf4) : 0;
 		}
+		/* Unsigned byte addition reverses the writer's modulo-256 deltas. */
 		for(j=0;j<dasizeof;j++) ptr[j+dasizeof] = (unsigned char) ((ptr[j]+lzwbuf4[j+k])&255);
 		k += dasizeof;
 		ptr += dasizeof;
@@ -362,6 +405,14 @@ void kdfread32(int32_t *_buffer, size_t count, int32_t fil)
     #endif
 }
 
+/*
+================
+dfread
+
+Read LZW blocks from a stdio stream and reconstruct delta-coded records.
+dasizeof sets the predictor stride; oversized records fall back to a byte stride.
+================
+*/
 void dfread(void *buffer, size_t dasizeof, size_t count, FILE *fil)
 {
 	size_t i, j;
@@ -435,6 +486,14 @@ void dfread32(int32_t *_buffer, size_t count, FILE *fil)
 }
 
 
+/*
+================
+dfwrite
+
+Delta-code adjacent records byte by byte, then write bounded LZW blocks.
+The first record is literal; later records subtract corresponding bytes.
+================
+*/
 void dfwrite(void *buffer, size_t dasizeof, size_t count, FILE *fil)
 {
 	size_t i, j, k;
@@ -463,6 +522,7 @@ void dfwrite(void *buffer, size_t dasizeof, size_t count, FILE *fil)
 
 	for(i=1;i<count;i++)
 	{
+		/* Subtract corresponding bytes of consecutive records, not whole native integers. */
 		for(j=0;j<dasizeof;j++) lzwbuf4[j+k] = (unsigned char) ((ptr[j+dasizeof]-ptr[j])&255);
 		k += dasizeof;
 		if (k > LZWSIZE-dasizeof)
@@ -525,6 +585,14 @@ void dfwrite32(int32_t *_buffer, size_t count, FILE *fil)
 /* The LZW format before revision 19960820: codes start at 9 bits, and every
  * code takes its full width (no dropped bit). Duke Nukem 3D 1.3D wrote its
  * demos and saves this way. */
+/*
+================
+compress
+
+Encode one block with the revision's variable-width LZW code format.
+A zero dictionary-count header selects a literal block when compression is not smaller.
+================
+*/
 int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf)
 {
 	int32_t i, addr, newaddr, addrcnt, zx, *longptr;
@@ -589,6 +657,14 @@ int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf)
 	return(uncompleng+4);
 }
 
+/*
+================
+uncompress
+
+Expand one revision-specific LZW block into the bounded output buffer.
+The header supplies the requested output size and distinguishes literal blocks.
+================
+*/
 int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 {
 	int32_t strtot, currstr, numbits, oneupnumbits;
@@ -632,6 +708,14 @@ int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 	return(lzwgoal(BUILDSWAP_INTEL16(shortptr[0]))); /* uncompleng */
 }
 #else
+/*
+================
+compress
+
+Encode one block with the revision's variable-width LZW code format.
+A zero dictionary-count header selects a literal block when compression is not smaller.
+================
+*/
 int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf)
 {
 	int32_t i, addr, newaddr, addrcnt, zx, *longptr;
@@ -700,6 +784,14 @@ int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf)
 	return(uncompleng+4);
 }
 
+/*
+================
+uncompress
+
+Expand one revision-specific LZW block into the bounded output buffer.
+The header supplies the requested output size and distinguishes literal blocks.
+================
+*/
 int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 {
 	int32_t strtot, currstr, numbits, oneupnumbits;
