@@ -760,10 +760,13 @@ saves hold the state between a tic and its frame.
 | `e1l2door` | 2 | E1L2, map start | 1 | 40 | the start elevator (lotag 18) moving: `animatecnt` 2 |
 | `e1inv` | 3 | E1L1, `startnear` on the CHAINGUNSPRITE at (16000, 48256) (`which` 0 in 1.0, 2 in 1.1) | 13 (1.0), 3 (1.1) | 1200 (1.0), 700 (1.1) | pistol, shotgun, chaingun, RPG and pipebombs; the current weapon is the pistol (1.0) or the pipebombs (1.1) |
 | `e1l2inv` | 4 | E1L2, `startnear` on the STEROIDS at (3136, 40576) | 6 | 40 | inventory: steroids, holoduke, jetpack, and heat (1.0 only) |
+| `e1armor` | 0 | E1L1, `startnear` on the first SHIELD (54) | 1 | 7 | armor 100, health 100, pistol 48; DOS names `ARMORED 10` / `ARMORED 11` |
 
 No E1L1 spot the random walk could reach gave both several weapons and inventory items.
 The weapons room around (16000, 48256) has no reachable inventory item, so `e1l2inv` is
-an extra save that covers the inventory fields. No save has armor.
+an extra save that covers the inventory fields. The later `e1armor` captures
+exercise armor and nonempty names. They use a 30-tic generated demo and save at
+tic 7; the first SHIELD is map sprite 511 in 1.0 and sprite 94 in 1.1.
 
 MD5s of the `refsaves/` copies:
 
@@ -774,8 +777,9 @@ MD5s of the `refsaves/` copies:
 | `e1l2door` | `7f990ae1590ef8ce717aa4a78eacfe01` | `8fa72ba62440a628930e729093c1ff59` |
 | `e1inv` | `0ef80ba63a0ff3f375ee7a5d3aa943e9` | `028fdb3c94a2a5b920fef045c4c47d0b` |
 | `e1l2inv` | `6a204428db925ae4cda90422b4bc68d9` | `ec2dcb62d9e1c073e09d7d5a914ab049` |
+| `e1armor` | `b2a3783c7158fe692c635bb927471be3` | `a21955c38df6b680c82d80c5c345a3e7` |
 
-Every save was made twice. Both runs gave byte-identical `STATE.BIN` files, and the
+The initial five saves were each made twice. Both runs gave byte-identical `STATE.BIN` files, and the
 saves decode to the same blocks except for two that are not game state:
 
 - **The thumbnail.** Nothing renders the save-screen tile during playback, so

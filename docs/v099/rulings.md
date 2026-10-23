@@ -54,7 +54,7 @@ Each names what was decided, why, and what it costs if it turns out wrong.
 - **Task 7: reference saves use the demo-playback saveplayer hook.** Runtime capture
   confirms the beta can save directly after domovethings, so no AUTOTYPE save fallback
   is needed. The startup-banner Enter is still automated. Cost if wrong: regenerate the
-  four saves with another recording path.
+  reference saves with another recording path.
 - **Task 9: retain native single-player display/backend representation.** Redraw and
   help use the port globals; DOS save fields will be translated in Task 14. Native
   level/time tables retain eleven slots per episode, with beta E1 selecting equivalent

@@ -439,14 +439,16 @@ Tests that need game data are only registered when you point CMake at it:
 | `DUKE3D_V13D_DATA_DIR` | In 1.3D builds: CON compile, game boot, demo playback, multiplayer and edition checks against the 1.3D full release. With DOS reference saves in its `refsaves/` folder (listed in `tests/data/v13d_save_refs.cmake`), also `dos_save_v13d_*` and `save_refuse_v13d_*`; needs Python 3 |
 | `DUKE3D_V13D_SW_DATA_DIR` | The same for a 1.3D shareware build |
 | `DUKE3D_V11_SW_DATA_DIR`, `DUKE3D_V10_SW_DATA_DIR` | The same for a 1.1 or 1.0 shareware build, using that release's folder. DOS reference saves go in its `refsaves/` folder |
-| `DUKE3D_V099_SW_DATA_DIR` | Beta CON compile, boot, real-renderer camera, demo-format and DOS-save tests. Installed `refdemos/E1L<n>.DMO` files enable per-map sync checks; E1L5 also enables the 60-second episode-ending check; `refsaves/` holds the four DOS save references. No beta network tests; needs Python 3 |
+| `DUKE3D_V099_SW_DATA_DIR` | Beta CON compile, boot, real-renderer camera, demo-format and DOS-save tests. Installed `refdemos/E1L<n>.DMO` files enable per-map sync checks; E1L5 also enables the 60-second episode-ending check; `refsaves/` holds the listed DOS save references. No beta network tests; needs Python 3 |
 | `DUKE3D_NET_PEERS` | 1.3D, 1.1 and 1.0 builds: other builds, as `<exe>=<data folder>` entries, to check that multiplayer refuses mismatched versions |
 
-A 1.5 refusal peer can't run on the shareware data, so it needs a
-data folder of its own. Make one in a git-ignored build directory, for example
-`build-v15/netpeer`: a symlink to a 1.5 `DUKE3D.GRP`, plus copies of `testdata/*.con`.
-Then list the 1.5 executable with it in `DUKE3D_NET_PEERS`, for example
-`-DDUKE3D_NET_PEERS="build-v15/bin/duke3d=build-v15/netpeer"` (use absolute paths).
+Data-enabled 1.0, 1.1 and 1.3D builds automatically test refusals using small
+protocol peers for mismatched BYTEVERSIONs. Names ending in `_protocol_117`
+exercise the 1.5 full-version handshake; `_protocol_27` exercises the 1.5
+shareware handshake, which has no build configuration. These peers test the
+game's rejection path and require no other game's data. Optional
+`DUKE3D_NET_PEERS` entries additionally exercise complete external game builds;
+each entry needs the matching executable and data folder, using absolute paths.
 
 For example:
 

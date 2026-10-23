@@ -402,7 +402,7 @@ Trailing scalars: `earthquaketime` (1, `0x10aef1`, which domovethings counts dow
 - loadplayer then copies the value into `m_respawn_monsters` (`0xf0d18`).
 
 The native beta loader zero-extends the saved two bytes; see the Task14 ruling for
-this deliberate departure from the stale-buffer bug. All four reference saves have
+this deliberate departure from the stale-buffer bug. The initial four reference saves have
 zero upper halves in animatevel[0], so those references alone do not exercise the bug.
 
 After reading, loadplayer sets `gm = MODE_GAME`, zeroes `lockclock`, `totalclock`,
@@ -433,7 +433,7 @@ it as the immediate `0xe1018`, which DOS/4GW relocates.
   (`0x20515c`).
 
 A 0.99 loader takes the base from the save itself (the empty `actorscrptr[]` entries) and
-translates the `hittype` pointers, as for 1.0. All four DOS reference saves confirm
+translates the `hittype` pointers, as for 1.0. The initial four DOS reference saves confirm
 the relocated base `0x2be018`; the writer uses that base for compatible raw pointers.
 Each reference loads, writes back with matching simulation records, and reloads.
 The originals each have 44 dfwrite calls and 68 LZW blocks. Active redraw flags may
@@ -564,6 +564,7 @@ our game. All five original data checksums are checked after every DOS session.
 | e1l1fight | E1L1 first LIZTROOP (sprite103) via startnear | 3 | 120 | health75, pistol36, live combat |
 | e1l2door | E1L2 original start | 1 | 40 | health100, six active sector animations |
 | e1inv | E1L1 first STEROIDS (sprite38) via startnear | 1 | 40 | health90, steroids400 |
+| e1armor | E1L1 first SHIELD (sprite93) via startnear | 1 | 7 | health100, armor100, pistol48; name `ARMORED 099` |
 
 An initial combat capture at tic400 had a dead player; the reference was recaptured
 at tic120 so it exercises a live combat state. No cheats were used.
@@ -574,6 +575,12 @@ at tic120 so it exercises a live combat state. No cheats were used.
 | e1l1fight | `b9f87d0adb5b372a2a0aedd7672606a9` |
 | e1l2door | `28980abe1d58e1d7ed7720ba645200b9` |
 | e1inv | `4915806be9daf7dc5a64e4c425af78e3` |
+| e1armor | `78100e947155020abb3e3bfb9981a712` |
+
+The later armor capture uses a 30-tic generated demo and the optional final
+`mksave.py` name argument. It writes the name through the original DOS writer:
+`saveplayer` at `0x35599` multiplies the slot by `0x16`, `0x3559c` selects
+19 bytes, and `0x355a8` adds the slot-zero name base `0xf0bad` before `dfwrite`.
 
 ## Regenerating reference demos
 
