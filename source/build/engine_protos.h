@@ -118,7 +118,7 @@ extern void dfwrite32(int32_t *buffer, size_t count, FILE *fil);
 extern int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf);
 extern int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf);
 
-/* sdl_driver.c */
+/* SDL platform modules: sdl_main.c, sdl_input.c, sdl_window.c and sdl_sys.c. */
 extern void _handle_events(void);
 extern unsigned char _readlastkeyhit(void);
 extern void _platform_init(int argc, char **argv, const char *title, const char *icon);

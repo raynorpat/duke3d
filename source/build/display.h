@@ -82,9 +82,9 @@ int _joystick_button(int button);
 /*
  * VESA replacement code: The Unix (not-actually-VESA) version of this is
  *  originally using SDL (Simple Directmedia Layer: http://www.libsdl.org/),
- *  and is stored in sdl_driver.c, but there's no reason another driver
+ *  and is stored in sdl_window.c, but there's no reason another driver
  *  couldn't be dropped in, so long as it implements these functions. Please
- *  reference sdl_driver.c and ves2.h (the original code) for all the nuances
+ *  reference sdl_window.c and ves2.h (the original code) for all the nuances
  *  and global variables that need to get set up correctly.
  */
 void getvalidvesamodes(void);
@@ -104,7 +104,7 @@ void setactivepage(int32_t dapagenum);
 void clear2dscreen(void);
 void _updateScreenRect(int32_t x, int32_t y, int32_t w, int32_t h);
 
-/* mouse/keystuff stuff. Also implemented in sdl_driver.c ... */
+/* Mouse/key input is implemented in sdl_input.c; view dimensions in sdl_window.c. */
 int setupmouse(void);
 /* The size readmousexy's motion is in: the 8-bit mode's, or in OpenGL the
  *  window's points, which a high-DPI drawable (xdim, ydim) outnumbers; the
@@ -122,7 +122,7 @@ void uninittimer(void);
 /* this is implemented in the game, and your driver calls it. */
 void timerhandler(void);
 
-/* resolution inits. sdl_driver.c ... */
+/* Resolution initialization, in sdl_window.c. */
 int _setgamemode(char davidoption, int32_t daxdim, int32_t daydim);
 /* Switches to an OpenGL window for renderer 3. Returns 0, or -1 (and leaves
  *  the 8-bit modes usable) when SDL or OpenGL can't provide one. */

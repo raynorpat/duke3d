@@ -11,7 +11,10 @@ add_library(buildengine STATIC
   glsubmit.c
   network.c
   math.c
-  sdl_driver.c
+  sdl_main.c
+  sdl_input.c
+  sdl_window.c
+  sdl_sys.c
   ../videoopts.c)
 
 if(WIN32)

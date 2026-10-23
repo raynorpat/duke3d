@@ -27,11 +27,17 @@ and public header names:
 | `cache1d.c` | `cache.c` (allocator/aging/diagnostics), `filesystem.c` (GRP, file I/O and LZW) |
 | `pragmas.c` | `math.c`, together with the math/table helpers extracted from `engine.c` |
 | `engine.c` | `engine.c` (world/renderer core), `display.c` (views, pixels/text and palette operations), `tiles.c` (tile/voxel resources and sprite bookkeeping), plus the helpers in `math.c` |
+| `sdl_driver.c` | `sdl_main.c` (startup/events), `sdl_input.c` (devices/scancodes), `sdl_window.c` (video/presentation), `sdl_sys.c` (timing/diagnostics) |
 
 `engine_internal.h` supplies only the declarations needed between these
 modules. `engine.c` still owns the `ENGINE` definitions from `build.h`, includes
 `polymost.c`, and bridges its private GL state for extracted display operations.
-The SDL backend and `../videoopts.c` keep their existing ownership. The split
+The four SDL files compile separately and use `sdl_internal.h` for their private
+interfaces. Video resources stay in `sdl_window.c`, input accumulators and the
+scancode map in `sdl_input.c`, and timer/debug state in `sdl_sys.c`.
+`sdl_main.c` retains platform startup and synchronous event dispatch; the keyboard
+map is initialized at the same point in startup. `../videoopts.c` keeps its
+existing ownership. The split
 preserves the existing algorithms, release guards, public signatures, resource
 lifecycle and GL batch-flush behavior. Historical filenames below refer to
 those implementations before the split.
