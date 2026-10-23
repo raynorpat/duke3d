@@ -53,6 +53,15 @@ target_include_directories(buildeditor PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_link_libraries(buildeditor PRIVATE
   duke3d_game_options buildengine duke3d::SDL2main)
 
+if(WIN32)
+  target_sources(duke3d PRIVATE duke3d.rc)
+  target_sources(buildeditor PRIVATE build.rc)
+  set_source_files_properties(duke3d.rc PROPERTIES
+    OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/rsrc/duke3d.ico")
+  set_source_files_properties(build.rc PROPERTIES
+    OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/rsrc/build.ico")
+endif()
+
 # Shared SDL DLLs (vcpkg etc.) must sit next to the executables. Fetched SDL
 # is static, and an empty DLL list would make copy_if_different fail.
 if(WIN32 AND NOT DUKE3D_SDL2_FETCHED)
