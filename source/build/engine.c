@@ -38,6 +38,9 @@
 #include "cache1d.h"
 
 #include "engine.h"
+#include "engine_internal.h"
+
+#define LOGICSQRT(x) ksqrt(x)
 
 int32_t stereowidth = 23040, stereopixelwidth = 28, ostereopixelwidth = -1;
 volatile int32_t stereomode = 0, visualpage, activepage, whiteband, blackband;
@@ -135,21 +138,7 @@ int32_t tilefileoffs[MAXTILES];
 
 int32_t artsize = 0, cachesize = 0;
 
-static short radarang[1280], radarang2[MAXXDIM+1];
-static unsigned short sqrtable[4096], shlookup[4096+256];
-char pow2char[8] = {1,2,4,8,16,32,64,-128};
-int32_t pow2long[32] =
-{
-	1L,2L,4L,8L,
-	16L,32L,64L,128L,
-	256L,512L,1024L,2048L,
-	4096L,8192L,16384L,32768L,
-	65536L,131072L,262144L,524288L,
-	1048576L,2097152L,4194304L,8388608L,
-	16777216L,33554432L,67108864L,134217728L,
-	268435456L,536870912L,1073741824L,2147483647L,
-};
-int32_t reciptable[2048], fpuasm;
+static short radarang2[MAXXDIM+1];
 
 char kensmessage[128];
 
@@ -158,16 +147,12 @@ int has_altivec = 0;  /* PowerPC-specific. */
 
 /* rcg02132001 Cygwin support. */
 #if (defined C_IDENTIFIERS_UNDERSCORED)
-#define SYM_sqrtable   "_sqrtable"
 #define SYM_walock     "_walock"
-#define SYM_shlookup   "_shlookup"
 #define SYM_pow2char   "_pow2char"
 #define SYM_gotpic     "_gotpic"
 #define SYM_dmval      "_dmval"
 #else
-#define SYM_sqrtable   "sqrtable"
 #define SYM_walock     "walock"
-#define SYM_shlookup   "shlookup"
 #define SYM_pow2char   "pow2char"
 #define SYM_gotpic     "gotpic"
 #define SYM_dmval      "dmval"
@@ -236,7 +221,7 @@ int32_t globalx1, globaly1, globalx2, globaly2, globalx3, globaly3, globalzx;
 int32_t globalx, globaly, globalz;
 
 static short sectorborder[256], sectorbordercnt;
-static char tablesloaded = 0;
+
 int32_t pageoffset, ydim16, qsetmode = 0;
 int32_t startposx, startposy, startposz;
 short startang, startsectnum;
@@ -384,217 +369,6 @@ extern int32_t drawslab(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
 
 
 #if (defined USE_I386_ASM)
-    #if (defined __WATCOMC__)
-
-        int32_t nsqrtasm(int param);
-        #pragma aux nsqrtasm =\
-        "test eax, 0xff000000",\
-        "mov ebx, eax",\
-        "jnz short over24",\
-        "shr ebx, 12",\
-        "mov cx, word ptr shlookup[ebx*2]",\
-        "jmp short under24",\
-        "over24: shr ebx, 24",\
-        "mov cx, word ptr shlookup[ebx*2+8192]",\
-        "under24: shr eax, cl",\
-        "mov cl, ch",\
-        "mov ax, word ptr sqrtable[eax*2]",\
-        "shr eax, cl",\
-	    parm nomemory [eax]\
-	    modify exact [eax ebx ecx]\
-
-    #elif (defined __GNUC__) || (defined __ICC)
-        static __attribute__((noinline)) int32_t nsqrtasm(int i1)
-        {
-            int32_t retval;
-            __asm__ __volatile__ (
-                "\n\t"
-            	"testl $0xff000000, %%eax\n\t"
-	            "movl %%eax, %%ebx\n\t"
-    	        "jnz nsqrover24\n\t"
-        	    "shrl $12, %%ebx\n\t"
-            	"movw " SYM_shlookup "(, %%ebx, 2), %%cx\n\t"
-	            "jmp nsqrunder24\n\t"
-        	    "nsqrover24: shr $24, %%ebx\n\t"
-    	        "movw (" SYM_shlookup "+ 8192)(, %%ebx, 2), %%cx\n\t"
-        	    "nsqrunder24: shrl %%cl, %%eax\n\t"
-    	        "movb %%ch, %%cl\n\t"
-        	    "movw " SYM_sqrtable "(, %%eax, 2), %%ax\n\t"
-    	        "shrl %%cl, %%eax\n\t"
-            : "=a" (retval) : "a" (i1) : "ebx", "ecx", "cc");
-            return(retval);
-        } /* nsqrtasm */
-
-    #elif (defined _MSC_VER)
-        int32_t nsqrtasm(int param)
-		{
-            __asm
-            {
-                mov eax, param
-                test eax, 0xff000000
-                mov ebx, eax
-                jnz short over24
-                shr ebx, 12
-                mov cx, word ptr shlookup[ebx*2]
-                jmp short under24
-                over24: shr ebx, 24
-                mov cx, word ptr shlookup[ebx*2+8192]
-                under24: shr eax, cl
-                mov cl, ch
-                mov ax, word ptr sqrtable[eax*2]
-                shr eax, cl
-                mov param, eax
-            } /* asm */
-            return(param);
-        }
-    #else
-        #error Please write Assembly code for your platform!
-    #endif
-
-#else /* !defined USE_I386_ASM */
-        int32_t nsqrtasm(uint32_t param)
-	{
-	    unsigned short *shlookup_a = (unsigned short*)shlookup;
-	    unsigned short *sqrtable_a = (unsigned short*)sqrtable;
-	    unsigned short cx;
-
-	    if (param & 0xff000000)
-		    cx = shlookup_a[(param>>24)+4096];
-	    else
-		    cx = shlookup_a[param>>12];
-
-	    param = param >> (cx&0xff);
-	    param = ((param&0xffff0000)|sqrtable_a[param]);
-	    param = param >> ((cx&0xff00)>>8);
-
-	    return param;
-	}
-#endif /* defined USE_I386_ASM */
-
-
-#if (defined USE_I386_ASM)
-    #if (defined __WATCOMC__)
-        /* 0x007ff000 is (11<<13), 0x3f800000 is (127<<23) */
-        int32_t krecipasm(int32_t param);
-        #pragma aux krecipasm =\
-	    "mov fpuasm, eax",\
-	    "fild dword ptr fpuasm",\
-	    "add eax, eax",\
-	    "fstp dword ptr fpuasm",\
-	    "sbb ebx, ebx",\
-	    "mov eax, fpuasm",\
-	    "mov ecx, eax",\
-	    "and eax, 0x007ff000",\
-	    "shr eax, 10",\
-	    "sub ecx, 0x3f800000",\
-	    "shr ecx, 23",\
-	    "mov eax, dword ptr reciptable[eax]",\
-	    "sar eax, cl",\
-	    "xor eax, ebx",\
-	    parm [eax]\
-	    modify exact [eax ebx ecx]\
-
-    #elif (defined __GNUC__) || (defined __ICC)
-        static int32_t krecipasm(int32_t i1)
-        {
-            int32_t retval;
-            __asm__ __volatile__ (
-                "\n\t"
-                "call _asm_krecipasm\n\t"
-            : "=a" (retval) : "a" (i1)
-        	: "cc", "ebx", "ecx", "memory");
-            return(retval);
-        } /* krecipasm */
-
-    #elif (defined _MSC_VER)
-        /* 0x007ff000 is (11<<13), 0x3f800000 is (127<<23) */
-        int32_t krecipasm(int32_t param)
-        {
-            __asm
-            {
-                mov eax, param
-	            mov fpuasm, eax
-	            fild dword ptr fpuasm
-	            add eax, eax
-	            fstp dword ptr fpuasm
-	            sbb ebx, ebx
-	            mov eax, fpuasm
-	            mov ecx, eax
-	            and eax, 0x007ff000
-	            shr eax, 10
-	            sub ecx, 0x3f800000
-	            shr ecx, 23
-	            mov eax, dword ptr reciptable[eax]
-	            sar eax, cl
-	            xor eax, ebx
-                mov param,eax
-            } /* asm */
-            return(param);
-        } /* krecipasm */
-    #else
-        #error Please write Assembly for your platform!
-    #endif
-
-#else  /* USE_I386_ASM */
-
-        static int32_t krecipasm(int32_t param)
-        {
-		unsigned int xormask;
-		int mantissa;
-		int exponent;
-		int32_t recip;
-
-		union {
-		float f;
-		unsigned int i;
-		} fi;
-
-		fi.f = (float) param;
-
-		fpuasm = fi.i;
-
-		xormask = (param < 0) ? 0xffffffff : 0;
-
-		mantissa = (fi.i & 0x007ff000) >> 12;
-		exponent = (fi.i - 0x3f800000) >> 23;
-
-		recip = (reciptable[mantissa] >> exponent) ^ xormask;
-
-		return recip;
-        } /* krecipasm */
-/*
-    static long krecipasm(long x)
-    {
-        float xf;
-        int z;
-        int not;
-    
-        if (x & 0x80000000)
-            not = 0x0FFFFFFFF;
-        else
-            not = 0;
-  
-        xf = (float)x;
-    
-        
-        x = *((int*)(&xf));
-        z = x;
-      
-        x = x & 0x007FF000;
-        x = x >> 10;
-    
-        z = z - 0x03F800000;
-        z = z >> 23;
-    
-        x = shift_algebraic_right(reciptable[(x>>2)], z) ^ not;
-        return x;
-    } 
-    */
-#endif /* defined USE_I386_ASM */
-
-
-
-#if (defined USE_I386_ASM)
 
     #if (defined __WATCOMC__)
         int setgotpic(int32_t param);
@@ -671,90 +445,6 @@ extern int32_t drawslab(int32_t,int32_t,int32_t,int32_t,int32_t,int32_t);
         }
 #endif /* defined USE_I386_ASM */
 
-
-#if (defined USE_I386_ASM)
-    #if (defined __WATCOMC__)
-        int32_t getclipmask(int i1, int i2, int i3, int i4);
-        #pragma aux getclipmask =\
-        "sar eax, 31",\
-        "add ebx, ebx",\
-        "adc eax, eax",\
-        "add ecx, ecx",\
-        "adc eax, eax",\
-        "add edx, edx",\
-        "adc eax, eax",\
-        "mov ebx, eax",\
-        "shl ebx, 4",\
-        "or al, 0xf0",\
-        "xor eax, ebx",\
-        parm [eax][ebx][ecx][edx]\
-        modify exact [eax ebx ecx edx]\
-
-  #elif (defined __GNUC__) || (defined __ICC)
-        int32_t getclipmask(int i1, int i2, int i3, int i4)
-        {
-            int retval;
-            __asm__ __volatile__ (
-        		"\n\t"
-                "sarl $31, %%eax\n\t"
-        		"addl %%ebx, %%ebx\n\t"
-        		"adcl %%eax, %%eax\n\t"
-        		"addl %%ecx, %%ecx\n\t"
-        		"adcl %%eax, %%eax\n\t"
-        		"addl %%edx, %%edx\n\t"
-        		"adcl %%eax, %%eax\n\t"
-        		"movl %%eax, %%ebx\n\t"
-        		"shll $4, %%ebx\n\t"
-        		"orb $0xf0, %%al\n\t"
-        		"xorl %%ebx, %%eax\n\t"
-        	: "=a" (retval) : "a" (i1), "b" (i2), "c" (i3), "d" (i4)
-        	: "cc", "memory");
-            return(retval);
-        } /* getclipmask */
-
-    #elif (defined _MSC_VER)
-        int32_t getclipmask(int i1, int i2, int i3, int i4)
-        {
-            __asm
-            {
-                mov eax, i1
-                mov ebx, i2
-                mov ecx, i3
-                mov edx, i4
-                sar eax, 31
-                add ebx, ebx
-                adc eax, eax
-                add ecx, ecx
-                adc eax, eax
-                add edx, edx
-                adc eax, eax
-                mov ebx, eax
-                shl ebx, 4
-                or al, 0xf0
-                xor eax, ebx
-                mov i1, eax
-            } /* asm */
-            return(i1);
-        } /* getclipmask */
-
-    #else
-        #error Please write Assembly for your platform!
-    #endif
-
-#else  /* !defined USE_I386_ASM */
-        int32_t getclipmask(int i1, int i2, int i3, int i4)
-        {
-	    uint32_t eax;
-	    eax = i1 >> 31;
-	    eax = eax << 1; i2 *= 2;
-	    if (i2&0x80000000) { eax++; }
-	    eax = eax << 1; i3 *= 2;
-	    if (i3&0x80000000) { eax++; }
-	    eax = eax << 1; i4 *= 2;
-	    if (i4&0x80000000) { eax++; }
-	    return ((eax<<4)^(eax|0xf0));
-        }
-#endif /* defined USE_I386_ASM */
 
 static void scansector (short sectnum)
 {
@@ -1083,7 +773,7 @@ static void ceilscan (int32_t x1, int32_t x2, int32_t sectnum)
 		j = sec->wallptr;
 		ox = wall[wall[j].point2].x - wall[j].x;
 		oy = wall[wall[j].point2].y - wall[j].y;
-		i = nsqrtasm(ox*ox+oy*oy); if (i == 0) i = 1024; else i = 1048576/i;
+		i = engine_render_sqrt(ox*ox+oy*oy); if (i == 0) i = 1024; else i = 1048576/i;
 		globalx1 = mulscale10(dmulscale10(ox,singlobalang,-oy,cosglobalang),i);
 		globaly1 = mulscale10(dmulscale10(ox,cosglobalang,oy,singlobalang),i);
 		globalx2 = -globalx1;
@@ -1251,7 +941,7 @@ static void florscan (int32_t x1, int32_t x2, int32_t sectnum)
 		j = sec->wallptr;
 		ox = wall[wall[j].point2].x - wall[j].x;
 		oy = wall[wall[j].point2].y - wall[j].y;
-		i = nsqrtasm(ox*ox+oy*oy); if (i == 0) i = 1024; else i = 1048576/i;
+		i = engine_render_sqrt(ox*ox+oy*oy); if (i == 0) i = 1024; else i = 1048576/i;
 		globalx1 = mulscale10(dmulscale10(ox,singlobalang,-oy,cosglobalang),i);
 		globaly1 = mulscale10(dmulscale10(ox,cosglobalang,oy,singlobalang),i);
 		globalx2 = -globalx1;
@@ -1842,7 +1532,7 @@ static void grouscan (int32_t dax1, int32_t dax2, int32_t sectnum, char dastat)
 	wal = &wall[sec->wallptr];
 	wx = wall[wal->point2].x - wal->x;
 	wy = wall[wal->point2].y - wal->y;
-	dasqr = krecipasm(nsqrtasm(wx*wx+wy*wy));
+	dasqr = engine_recip(engine_render_sqrt(wx*wx+wy*wy));
 	i = mulscale21(daslope,dasqr);
 	wx *= i; wy *= i;
 
@@ -1862,7 +1552,7 @@ static void grouscan (int32_t dax1, int32_t dax2, int32_t sectnum, char dastat)
 		dx = mulscale14(wall[wal->point2].x-wal->x,dasqr);
 		dy = mulscale14(wall[wal->point2].y-wal->y,dasqr);
 
-		i = nsqrtasm(daslope*daslope+16777216);
+		i = engine_render_sqrt(daslope*daslope+16777216);
 
 		x = globalx; y = globaly;
 		globalx = dmulscale16(x,dx,y,dy);
@@ -1936,19 +1626,19 @@ static void grouscan (int32_t dax1, int32_t dax2, int32_t sectnum, char dastat)
 			nptr2 = &slopalookup[y2+(shoffs>>15)];
 			while (nptr1 <= mptr1)
 			{
-				*mptr1-- = fpalookup + (getpalookup((int32_t)mulscale24(krecipasm(m1),globvis),globalshade)<<8);
+				*mptr1-- = fpalookup + (getpalookup((int32_t)mulscale24(engine_recip(m1),globvis),globalshade)<<8);
 				m1 -= l;
 			}
 			while (nptr2 >= mptr2)
 			{
-				*mptr2++ = fpalookup + (getpalookup((int32_t)mulscale24(krecipasm(m2),globvis),globalshade)<<8);
+				*mptr2++ = fpalookup + (getpalookup((int32_t)mulscale24(engine_recip(m2),globvis),globalshade)<<8);
 				m2 += l;
 			}
 
 			globalx3 = (globalx2>>10);
 			globaly3 = (globaly2>>10);
 			asm3 = mulscale16(y2,globalzd) + (globalzx>>6);
-			slopevlin(ylookup[y2]+x+frameoffset,krecipasm((int32_t)asm3>>3),nptr2,y2-y1+1,globalx1,globaly1);
+			slopevlin(ylookup[y2]+x+frameoffset,engine_recip((int32_t)asm3>>3),nptr2,y2-y1+1,globalx1,globaly1);
 
 			if ((x&15) == 0) faketimerhandler();
 		}
@@ -2059,7 +1749,7 @@ static int wallmost(short *mostbuf, int32_t w, int32_t sectnum, char dastat)
 
 	fw = sector[sectnum].wallptr; i = wall[fw].point2;
 	dx = wall[i].x-wall[fw].x; dy = wall[i].y-wall[fw].y;
-	dasqr = krecipasm(nsqrtasm(dx*dx+dy*dy));
+	dasqr = engine_recip(engine_render_sqrt(dx*dx+dy*dy));
 
 	if (xb1[w] == 0)
 		{ xv = cosglobalang+sinviewingrangeglobalang; yv = singlobalang-cosviewingrangeglobalang; }
@@ -3230,110 +2920,6 @@ int saveboard(char *filename, int32_t *daposx, int32_t *daposy,
 }
 
 
-#if (BUILD_ENGINEREV < 19960427L)
-/* Before revision 19960427 the game logic took square roots with ksqrtasm
- * from a 2048-entry table built by Newton's method. Rendering keeps the
- * table above. */
-static unsigned short ksqrtable[2048];
-
-static void initksqrt1996(void)
-{
-	uint32_t i, root, num;
-	int32_t temp;
-
-	for(i=0;i<2048;i++)
-	{
-		root = 128;
-		num = i<<20;
-		do
-		{
-			temp = root;
-			root = (root+num/root)>>1;
-		} while((temp-root+1) > 2);
-		temp = root*root-num;
-		while (klabs(temp-2*root+1) < klabs(temp))
-		{
-			temp += -(2*root)+1;
-			root--;
-		}
-		while (klabs(temp+2*root+1) < klabs(temp))
-		{
-			temp += 2*root+1;
-			root++;
-		}
-		ksqrtable[i] = (unsigned short)root;
-	}
-}
-
-/* The 1996 ksqrtasm: below 2^11 a table lookup, above it the table at a
- * reduced precision, scaled back up. */
-static int32_t ksqrtasm(int32_t num)
-{
-	uint32_t a = (uint32_t)num;
-	int32_t b, r;
-
-	if (num < 0) a = 0u-a;
-	if (a < 2048) r = ksqrtable[a];
-	else
-	{
-		for(b=31;!(a>>b);b--);
-		b = (b-9)&~1;
-		r = ksqrtable[a>>b]<<(b>>1);
-	}
-	return(r>>10);
-}
-#define LOGICSQRT(x) ksqrtasm(x)
-#else
-#define LOGICSQRT(x) nsqrtasm(x)
-#endif
-
-static void initksqrt(void)
-{
-	int32_t i, j, k;
-
-	j = 1; k = 0;
-	for(i=0;i<4096;i++)
-	{
-		if (i >= j) { j <<= 2; k++; }
-		sqrtable[i] = (unsigned short)(msqrtasm((i<<18)+131072)<<1);
-		shlookup[i] = (k<<1)+((10-k)<<8);
-		if (i < 256) shlookup[i+4096] = ((k+6)<<1)+((10-(k+6))<<8);
-	}
-}
-
-
-static void loadtables(void)
-{
-	int32_t i, fil;
-
-	if (tablesloaded == 0)
-	{
-		initksqrt();
-#if (BUILD_ENGINEREV < 19960427L)
-		initksqrt1996();
-#endif
-
-		for(i=0;i<2048;i++) reciptable[i] = divscale30(2048L,i+2048);
-
-		if ((fil = kopen4load("tables.dat",0)) != -1)
-		{
-            for (i = 0; i < 2048; i++)
-				kread16(fil,&sintable[i]);
-
-            for (i = 0; i < 640; i++)
-				kread16(fil,&radarang[i]);
-
-			for(i=0;i<640;i++) radarang[1279-i] = -radarang[i];
-			kread(fil,textfont,1024);
-			kread(fil,smalltextfont,1024);
-			kread(fil,britable,1024);
-			kclose(fil);
-		}
-		tablesloaded = 1;
-	}
-}
-
-
 static void initfastcolorlookup(int32_t rscale, int32_t gscale, int32_t bscale)
 {
 	int32_t i, j, x, y, z;
@@ -3468,7 +3054,7 @@ void initengine(void)
 	if (dommxoverlay)
         mmxoverlay();
 
-	loadtables();
+	engine_loadtables();
 
 	xyaspect = -1;
 
@@ -4443,23 +4029,8 @@ int inside(int32_t x, int32_t y, short sectnum)
 }
 
 
-int getangle(int32_t xvect, int32_t yvect)
-{
-	if ((xvect|yvect) == 0) return(0);
-	if (xvect == 0) return(512+((yvect<0)<<10));
-	if (yvect == 0) return(((xvect<0)<<10));
-	if (xvect == yvect) return(256+((xvect<0)<<10));
-	if (xvect == -yvect) return(768+((xvect>0)<<10));
-	if (klabs(xvect) > klabs(yvect))
-		return(((radarang[640+scale(160,yvect,xvect)]>>6)+((xvect<0)<<10))&2047);
-	return(((radarang[640-scale(160,xvect,yvect)]>>6)+512+((yvect<0)<<10))&2047);
-}
 
 
-int ksqrt(int32_t num)
-{
-	return(LOGICSQRT(num));
-}
 
 
 void copytilepiece(int32_t tilenume1, int32_t sx1, int32_t sy1, int32_t xsiz, int32_t ysiz,
@@ -5167,12 +4738,12 @@ static void drawsprite (int32_t snum)
 		bot = mulscale11(xp1-xp2,xdimen) + mulscale2(xb1[MAXWALLSB-1]-halfxdimen,botinc);
 
 		j = xb2[MAXWALLSB-1]+3;
-		z = mulscale20(top,krecipasm(bot));
+		z = mulscale20(top,engine_recip(bot));
 		lwall[xb1[MAXWALLSB-1]] = (z>>8);
 		for(x=xb1[MAXWALLSB-1]+4;x<=j;x+=4)
 		{
 			top += topinc; bot += botinc;
-			zz = z; z = mulscale20(top,krecipasm(bot));
+			zz = z; z = mulscale20(top,engine_recip(bot));
 			lwall[x] = (z>>8);
 			i = ((z+zz)>>1);
 			lwall[x-2] = (i>>8);
@@ -5231,7 +4802,7 @@ static void drawsprite (int32_t snum)
 		owallmost(uwall,(int32_t)(MAXWALLSB-1),z1-globalposz);
 		owallmost(dwall,(int32_t)(MAXWALLSB-1),z2-globalposz);
 		for(i=xb1[MAXWALLSB-1];i<=xb2[MAXWALLSB-1];i++)
-			{ swall[i] = (krecipasm(hplc)<<2); hplc += hinc; }
+			{ swall[i] = (engine_recip(hplc)<<2); hplc += hinc; }
 
 		for(i=smostwallcnt-1;i>=0;i--)
 		{
@@ -7348,17 +6919,6 @@ void updatesector(int32_t x, int32_t y, short *sectnum)
 }
 
 
-void rotatepoint(int32_t xpivot, int32_t ypivot, int32_t x, int32_t y, short daang, int32_t *x2, int32_t *y2)
-{
-	int32_t dacos, dasin;
-
-	dacos = sintable[(daang+2560)&2047];
-	dasin = sintable[(daang+2048)&2047];
-	x -= xpivot;
-	y -= ypivot;
-	*x2 = dmulscale14(x,dacos,-y,dasin) + xpivot;
-	*y2 = dmulscale14(y,dacos,x,dasin) + ypivot;
-}
 
 
 int initmouse(void)
@@ -7739,11 +7299,6 @@ void printext256_noupdate(int32_t xpos, int32_t ypos, short col, short backcol, 
 }
 
 
-int krand(void)
-{
-	randomseed = (randomseed*27584621)+1;
-	return(((uint32_t)randomseed)>>16);
-}
 
 
 void getzrange(int32_t x, int32_t y, int32_t z, short sectnum,
@@ -8754,7 +8309,7 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 			{
 				ox = wall[wall[startwall].point2].x - wall[startwall].x;
 				oy = wall[wall[startwall].point2].y - wall[startwall].y;
-				i = nsqrtasm(ox*ox+oy*oy); if (i == 0) continue;
+				i = engine_render_sqrt(ox*ox+oy*oy); if (i == 0) continue;
 				i = 1048576/i;
 				globalx1 = mulscale10(dmulscale10(ox,bakgxvect,oy,bakgyvect),i);
 				globaly1 = mulscale10(dmulscale10(ox,bakgyvect,-oy,bakgxvect),i);
@@ -8765,7 +8320,7 @@ void drawmapview(int32_t dax, int32_t day, int32_t zoome, short ang)
 				globaly2 = -globaly1;
 
 				daslope = sector[s].floorheinum;
-				i = nsqrtasm(daslope*daslope+16777216);
+				i = engine_render_sqrt(daslope*daslope+16777216);
 				globalposy = mulscale12(globalposy,i);
 				globalx2 = mulscale12(globalx2,i);
 				globaly2 = mulscale12(globaly2,i);
@@ -9228,7 +8783,7 @@ int getceilzofslope(short sectnum, int32_t dax, int32_t day)
 #else
 	wal = &wall[sector[sectnum].wallptr];
 	dx = wall[wal->point2].x-wal->x; dy = wall[wal->point2].y-wal->y;
-	i = (nsqrtasm(dx*dx+dy*dy)<<5); if (i == 0) return(sector[sectnum].ceilingz);
+	i = (engine_render_sqrt(dx*dx+dy*dy)<<5); if (i == 0) return(sector[sectnum].ceilingz);
 	j = dmulscale3(dx,day-wal->y,-dy,dax-wal->x);
 	return(sector[sectnum].ceilingz+scale(sector[sectnum].ceilingheinum,j,i));
 #endif
@@ -9253,7 +8808,7 @@ int getflorzofslope(short sectnum, int32_t dax, int32_t day)
 #else
 	wal = &wall[sector[sectnum].wallptr];
 	dx = wall[wal->point2].x-wal->x; dy = wall[wal->point2].y-wal->y;
-	i = (nsqrtasm(dx*dx+dy*dy)<<5); if (i == 0) return(sector[sectnum].floorz);
+	i = (engine_render_sqrt(dx*dx+dy*dy)<<5); if (i == 0) return(sector[sectnum].floorz);
 	j = dmulscale3(dx,day-wal->y,-dy,dax-wal->x);
 	return(sector[sectnum].floorz+scale(sector[sectnum].floorheinum,j,i));
 #endif

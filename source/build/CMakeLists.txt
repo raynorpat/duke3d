@@ -8,7 +8,7 @@ add_library(buildengine STATIC
   glext.c
   glsubmit.c
   network.c
-  pragmas.c
+  math.c
   sdl_driver.c
   ../videoopts.c)
 
