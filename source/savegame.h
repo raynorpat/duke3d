@@ -91,8 +91,12 @@ void sg_read32s(int32_t fil, int32_t *a, int32_t dasizeof, int32_t count);
 void sg_writerecs(FILE *fil, void *recs, size_t stride, sg_rec fn, int32_t n, int32_t dasizeof, int32_t count);
 void sg_readrecs(int32_t fil, void *recs, size_t stride, sg_rec fn, int32_t n, int32_t dasizeof, int32_t count);
 
-/* Resolve an animation offset only when it names an animated map field. */
-int32_t *sg_animptr(int32_t offset);
+/* Resolve wall offsets independently of native linker placement. dos is true
+   when any script pointer bitmap entry is set; otherwise ambiguous offsets
+   are refused. Returns the byte offset within wall[], or -1. */
+int32_t sg_walloffset(int32_t offset, int64_t nativebase, int32_t dos);
+/* Resolve a live animation pointer with the same provenance. */
+int32_t *sg_animptr(int32_t offset, int32_t dos);
 
 /* LZW blocks dfwrite emits for one call. */
 int32_t sg_dfblocks(int32_t dasizeof, int32_t count);

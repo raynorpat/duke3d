@@ -493,21 +493,38 @@ static int32_t sg_calls(int32_t fil, const int32_t (*calls)[2], int32_t n)
     return 1;
 }
 
-/* Only fields animated by setanimation may become live pointers. Wall
-   offsets in native saves use the current arrays' relative addresses. */
-int32_t *sg_animptr(int32_t offset)
+/* A set script pointer flag proves DOS provenance. With no flags, accept
+   a wall offset only when the possible native/DOS interpretations agree. */
+int32_t sg_walloffset(int32_t offset, int64_t nativebase, int32_t dos)
 {
-    int64_t w = (int64_t)(intptr_t)sector + offset - (int64_t)(intptr_t)wall;
+    int64_t n = (int64_t)offset-nativebase, d = -1;
+    int32_t nv, dv;
+
+#if DUKE3D_GAMEVER < GAMEVER_14
+    d = (int64_t)offset+0x4b300;
+#elif DUKE3D_GAMEVER >= GAMEVER_15
+    d = (int64_t)offset+0x4b800; /* DOS 1.5: 0x251aa4 - 0x29d2a4. */
+#endif
+    nv = n >= 0 && n < SG_WALL_SIZE*MAXWALLS && (n%SG_WALL_SIZE == 0 || n%SG_WALL_SIZE == 4);
+    dv = d >= 0 && d < SG_WALL_SIZE*MAXWALLS && (d%SG_WALL_SIZE == 0 || d%SG_WALL_SIZE == 4);
+    if (dos) return dv ? (int32_t)d : -1;
+    if (!nv) return dv ? (int32_t)d : -1;
+    if (dv && n != d) return -1;
+    return (int32_t)n;
+}
+
+/* Only fields animated by setanimation may become live pointers.
+   DOS bases and the unverified 1.4 layout: docs/savegame-offsets.md. */
+int32_t *sg_animptr(int32_t offset, int32_t dos)
+{
+    int32_t w;
 
     if (offset >= 0 && offset < (int32_t)sizeof(sector) &&
         (offset%sizeof(sectortype) == offsetof(sectortype,ceilingz) ||
          offset%sizeof(sectortype) == offsetof(sectortype,floorz)))
         return (int32_t *)((char *)sector+offset);
-    if (w >= 0 && w < (int32_t)sizeof(wall) &&
-        (w%sizeof(walltype) == offsetof(walltype,x) ||
-         w%sizeof(walltype) == offsetof(walltype,y)))
-        return (int32_t *)((char *)wall+w);
-    return NULL;
+    w = sg_walloffset(offset,(int64_t)(intptr_t)wall-(int64_t)(intptr_t)sector,dos);
+    return w < 0 ? NULL : (int32_t *)((char *)wall+w);
 }
 
 #if DUKE3D_GAMEVER >= GAMEVER_11
@@ -551,7 +568,7 @@ int32_t sg_checksave(int32_t fil)
     static unsigned char flags[MAXSCRIPTSIZE];
     static const int32_t slots[3] = { 1, 4, 5 }, bytes[3] = { 8, 20, 12 }; /* move, action, AI */
     unsigned char b[4];
-    int32_t start = klseek(fil,0,SEEK_CUR), ok = 0, i, j, n, v;
+    int32_t start = klseek(fil,0,SEEK_CUR), ok = 0, dos = 0, i, j, n, v;
 
 #define CALL(size,count,buf) do { if (!sg_call(fil,size,count,buf)) goto done; } while (0)
     if (!sg_calls(fil,head,sizeof(head)/sizeof(head[0]))) goto done;
@@ -569,6 +586,7 @@ int32_t sg_checksave(int32_t fil)
     for (i = 0; i < SG_DOS_MAXSCRIPT; i++)
         if (flags[i])
         {
+            dos = 1;
             v = get32(sgbuf+i*4);
             if (v < 0 || v > SG_DOS_MAXSCRIPT*4-(i == 0 ? 0 : 4) || (v&3)) goto done;
         }
@@ -599,7 +617,7 @@ int32_t sg_checksave(int32_t fil)
     CALL(2,MAXANIMATES,NULL);
     CALL(4,MAXANIMATES,sgbuf);
     for (i = 0; i < n; i++)
-        if (sg_animptr(get32(sgbuf+i*4)) == NULL) goto done;
+        if (sg_animptr(get32(sgbuf+i*4),dos) == NULL) goto done;
     if (!sg_calls(fil,tail,sizeof(tail)/sizeof(tail[0]))) goto done;
     ok = klseek(fil,0,SEEK_CUR) == kfilelength(fil);
 done:
@@ -630,7 +648,6 @@ int32_t sg_check10(int32_t fil)
 #if DUKE3D_GAMEVER >= GAMEVER_10
         {1,MAXSECTORS>>3},
 #endif
-        {1,SG_DOS_MAXSCRIPT}, {4,SG_DOS_MAXSCRIPT}
     };
     static const int32_t tail[][2] =
     {
@@ -646,8 +663,9 @@ int32_t sg_check10(int32_t fil)
     static const int32_t bytes[3] = { 8, 20, 12 };
     static short picnum[SG_DOS_MAXHITTYPES];
     static unsigned char actors[SG_DOS_MAXTILES*4];
+    static unsigned char flags[SG_DOS_MAXSCRIPT], savedscript[SG_DOS_MAXSCRIPT*4];
     unsigned char b[4], anim[4*MAXANIMATES];
-    int32_t start = klseek(fil,0,SEEK_CUR), base = -1, n, i, k, v;
+    int32_t start = klseek(fil,0,SEEK_CUR), base = -1, dos = 0, n, i, k, v;
 
     if (!sg_calls(fil,head,5)) goto done;
     if (!sg_call(fil,2,1,b)) goto done;
@@ -662,13 +680,22 @@ int32_t sg_check10(int32_t fil)
     /* hittype[] comes raw, straight after po[] */
     if (!sg_call(fil,SG_WEAPONHIT_SIZE,SG_DOS_MAXHITTYPES,sgbuf)) goto done;
     if (!sg_calls(fil,mid,sizeof(mid)/sizeof(mid[0]))) goto done;
+    if (!sg_call(fil,1,SG_DOS_MAXSCRIPT,flags) ||
+        !sg_call(fil,4,SG_DOS_MAXSCRIPT,savedscript)) goto done;
+    for (i = 0; i < SG_DOS_MAXSCRIPT; i++)
+        if (flags[i])
+        {
+            dos = 1;
+            v = get32(savedscript+i*4);
+            if (v < 0 || v > SG_DOS_MAXSCRIPT*4-(i == 0 ? 0 : 4) || (v&3)) goto done;
+        }
     if (!sg_call(fil,4,SG_DOS_MAXTILES,actors)) goto done;
     for (i = 0; i < (int32_t)(sizeof(tail)/sizeof(tail[0])); i++)
         if (!sg_call(fil,tail[i][0],tail[i][1],i == 3 ? b : (i == 5 ? anim : NULL))) goto done;
     n = get32(b);
     if (n < 0 || n > MAXANIMATES) goto done;
     for (i = 0; i < n; i++)
-        if (sg_animptr(get32(anim+i*4)) == NULL) goto done;
+        if (sg_animptr(get32(anim+i*4),dos) == NULL) goto done;
     if (klseek(fil,0,SEEK_CUR) != kfilelength(fil)) goto done;
 
     /* actorscrptr[]: every entry is stored minus script's address, so the

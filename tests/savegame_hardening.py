@@ -150,8 +150,6 @@ def main():
         for value in (-4, 3, len(s.calls['script'])):
             v = struct.pack('<i', value)
             cases['actor_' + str(value)] = (replace(s, {'actors': (v + s.calls['actors'][4:], 4)}), 2)
-            cases['script_' + str(value)] = (replace(s, {'scriptflags': (s.calls['scriptflags'][:1] + b'\1' + s.calls['scriptflags'][2:], 1),
-                                                         'script': (s.calls['script'][:4] + v + s.calls['script'][8:], 4)}), 2)
             for bit, slot in enumerate((1, 4, 5)):
                 hit = bytearray(s.calls['hittype'])
                 hit[47 + slot * 4:51 + slot * 4] = v
@@ -167,6 +165,26 @@ def main():
             hit[47 + slot * 4:51 + slot * 4] = struct.pack('<i', end - size + 4)
             cases['hit_near_end_%d' % slot] = (replace(s, {'hitflags': (bytes([1 << bit]) + s.calls['hitflags'][1:], 1),
                                                          'hittype': (hit, 71)}), 2)
+    for value in (-4, 3, len(s.calls['script'])):
+        v = struct.pack('<i', value)
+        cases['script_' + str(value)] = (replace(s, {'scriptflags': (s.calls['scriptflags'][:1] + b'\1' + s.calls['scriptflags'][2:], 1),
+                                                     'script': (s.calls['script'][:4] + v + s.calls['script'][8:], 4)}), 2)
+    if a.version in ('0.99', '1.0'):
+        end = len(s.calls['script'])
+        cases['script_header_end'] = (replace(s, {'scriptflags': (b'\1' + s.calls['scriptflags'][1:], 1),
+                                                 'script': (struct.pack('<i', end) + s.calls['script'][4:], 4)}), 0)
+    if a.version != '1.4':
+        wallbase = -0x4b800 if a.version == '1.5' else -0x4b300
+        for name, value, want in [('dos_wall', wallbase + 17 * 32 + 4, 0),
+                                  ('dos_wall_badfield', wallbase + 8, 2),
+                                  ('dos_wall_below_array', wallbase - 32, 2)]:
+            fields = {'animatecnt': (struct.pack('<i', 1), 4),
+                      'animatesect': (b'\0\0' + s.calls['animatesect'][2:], 2),
+                      'animateptr': (struct.pack('<i', value) + s.calls['animateptr'][4:], 4)}
+            cases[name] = (replace(s, fields), want)
+            if want == 0:
+                fields['scriptflags'] = (bytes(len(s.calls['scriptflags'])), 1)
+                cases['dos_wall_zero_bitmap'] = (replace(s, fields), 0)
     failures = []
     for name, (data, want) in cases.items():
         (work / 'check.sav').write_bytes(data)

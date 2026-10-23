@@ -357,13 +357,50 @@ static void test_animation_offsets(void)
 {
     int32_t off = (int32_t)((intptr_t)&wall[MAXWALLS-1].y-(intptr_t)sector);
 
-    CHECK(sg_animptr(offsetof(sectortype,ceilingz)) == &sector[0].ceilingz);
-    CHECK(sg_animptr((MAXSECTORS-1)*sizeof(sectortype)+offsetof(sectortype,floorz)) == &sector[MAXSECTORS-1].floorz);
-    CHECK(sg_animptr(off) == &wall[MAXWALLS-1].y);
-    CHECK(sg_animptr(0) == NULL);
-    CHECK(sg_animptr(1) == NULL);
-    CHECK(sg_animptr(offsetof(sectortype,ceilingz)+1) == NULL);
-    CHECK(sg_animptr(INT32_MAX) == NULL);
+    CHECK(sg_animptr(offsetof(sectortype,ceilingz),0) == &sector[0].ceilingz);
+    CHECK(sg_animptr((MAXSECTORS-1)*sizeof(sectortype)+offsetof(sectortype,floorz),0) == &sector[MAXSECTORS-1].floorz);
+    CHECK(sg_animptr(off,0) == &wall[MAXWALLS-1].y);
+#if DUKE3D_GAMEVER < GAMEVER_14
+    /* Measured DOS wall base minus sector base, not native linker placement. */
+    CHECK(sg_animptr(-0x4b300,1) == &wall[0].x);
+    CHECK(sg_animptr(-0x4b300+17*32+4,1) == &wall[17].y);
+    {
+        int32_t *p = sg_animptr(-0x4b300+17*32+4,1);
+        if (p != NULL)
+            CHECK(sg_animptr((int32_t)((intptr_t)p-(intptr_t)sector),0) == p);
+    }
+    CHECK(sg_animptr(-0x4b300+(MAXWALLS-1)*32+4,1) == &wall[MAXWALLS-1].y);
+    CHECK(sg_animptr(-0x4b300-32,1) == NULL);
+    CHECK(sg_animptr(-0x4b300+8,1) == NULL);
+#elif DUKE3D_GAMEVER >= GAMEVER_15
+    CHECK(sg_animptr(-0x4b800,1) == &wall[0].x);
+    CHECK(sg_animptr(-0x4b800+17*32+4,1) == &wall[17].y);
+    {
+        int32_t *p = sg_animptr(-0x4b800+17*32+4,1);
+        if (p != NULL)
+            CHECK(sg_animptr((int32_t)((intptr_t)p-(intptr_t)sector),0) == p);
+    }
+    CHECK(sg_animptr(-0x4b800+(MAXWALLS-1)*32+4,1) == &wall[MAXWALLS-1].y);
+    CHECK(sg_animptr(-0x4b800-32,1) == NULL);
+    CHECK(sg_animptr(-0x4b800+8,1) == NULL);
+#endif
+    CHECK(sg_animptr(0,0) == NULL);
+    CHECK(sg_animptr(1,0) == NULL);
+    CHECK(sg_animptr(offsetof(sectortype,ceilingz)+1,0) == NULL);
+    CHECK(sg_animptr(INT32_MAX,0) == NULL);
+#if DUKE3D_GAMEVER < GAMEVER_14 || DUKE3D_GAMEVER >= GAMEVER_15
+#if DUKE3D_GAMEVER < GAMEVER_14
+    off = -0x4b300;
+#else
+    off = -0x4b800;
+#endif
+    CHECK(sg_walloffset(off+64,off+32,0) == -1); /* different valid walls */
+    CHECK(sg_walloffset(off+64,off+32,1) == 64);  /* positive DOS evidence */
+    CHECK(sg_walloffset(off+64,off,0) == 64);    /* identical interpretations */
+    CHECK(sg_walloffset(off+64,0,0) == 64);      /* only DOS fits */
+    CHECK(sg_walloffset(64,0,0) == 64);          /* only native fits */
+    CHECK(sg_walloffset(64,0,1) == -1);         /* DOS cannot use native fallback */
+#endif
 }
 
 int main(int argc, char **argv)

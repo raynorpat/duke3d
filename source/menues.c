@@ -258,7 +258,7 @@ int loadplayerfile(char *fnptr, signed char spot)
 {
      short k,music_changed;
      char scriptptrs[MAXSCRIPTSIZE];
-     int32_t fil, bv, i, j, x, animoffs[MAXANIMATES];
+     int32_t fil, bv, i, j, x, dos = 0, animoffs[MAXANIMATES];
      int32 nump;
 
      if ((fil = kopen4load(fnptr,0)) == -1) return(-1);
@@ -441,6 +441,8 @@ int loadplayerfile(char *fnptr, signed char spot)
 #endif
 
      kdfread(&scriptptrs[0],1,SG_DOS_MAXSCRIPT,fil);
+     for(i=0;i<SG_DOS_MAXSCRIPT;i++)
+         if(scriptptrs[i]) { dos = 1; break; }
      sg_read32s(fil,script,4,SG_DOS_MAXSCRIPT);
 
      clearbuf(actorscrptr,MAXTILES,0L);
@@ -473,7 +475,7 @@ int loadplayerfile(char *fnptr, signed char spot)
      animatecnt = clampcount(sg_read32(fil),MAXANIMATES);
      sg_read16s(fil,animatesect,2,MAXANIMATES);
      sg_read32s(fil,animoffs,4,MAXANIMATES);
-     for(i = animatecnt-1;i>=0;i--) animateptr[i] = sg_animptr(animoffs[i]);
+     for(i = animatecnt-1;i>=0;i--) animateptr[i] = sg_animptr(animoffs[i],dos);
      sg_read32s(fil,animategoal,4,MAXANIMATES);
      sg_read32s(fil,animatevel,4,MAXANIMATES);
 
