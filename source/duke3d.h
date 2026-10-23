@@ -102,31 +102,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define MAXSLEEPDIST (game_profile->gamever < GAMEVER_10 ? 8192 : 16384)
 #define SLEEPTIME (game_profile->gamever < GAMEVER_10 ? 6*64 : 24*64)
 
-#if DUKE3D_GAMEVER < GAMEVER_10
-    // 0.99: no version field in DOS; 9 distinguishes our net handshake.
-    #define BYTEVERSION 9
-#elif DUKE3D_GAMEVER < GAMEVER_11
-    // 1.0: the shareware release has no version field; 10 is unused by any
-    //  release and only guards this build's net handshake.
-    #define BYTEVERSION 10
-#elif DUKE3D_GAMEVER < GAMEVER_13D
-    // 1.1: the shareware release's own value, from its EXE.
-    #define BYTEVERSION 12
-#elif DUKE3D_GAMEVER < GAMEVER_14
-    // 1.3D: the shareware and full releases' own values.
-    #ifdef VOLUMEONE
-        #define BYTEVERSION 14
-    #else
-        #define BYTEVERSION 103
-    #endif
-#elif DUKE3D_GAMEVER < GAMEVER_15
-    #define BYTEVERSION 116
-#elif defined VOLUMEONE
-    #define BYTEVERSION 27
-#else
-    // 116 is Duke 1.4, 117 is 1.5.  --ryan.
-    #define BYTEVERSION 117
-#endif
+#define BYTEVERSION (game_profile->byteversion)
 
 #define NUMPAGES 1
 
@@ -180,13 +156,7 @@ struct player_struct;
 #define NUM_SOUNDS 450
 
 // Sounds the game logic may name: 1.1's sound table held 255, 1.3D's 348.
-#if DUKE3D_GAMEVER < GAMEVER_13D
-#define GAME_NUM_SOUNDS 255
-#elif DUKE3D_GAMEVER < GAMEVER_14
-#define GAME_NUM_SOUNDS 348
-#else
-#define GAME_NUM_SOUNDS NUM_SOUNDS
-#endif
+#define GAME_NUM_SOUNDS (game_sound_limit())
 
 #define    ALT_IS_PRESSED ( KB_KeyPressed( sc_RightAlt ) || KB_KeyPressed( sc_LeftAlt ) )
 #define    SHIFTS_IS_PRESSED ( KB_KeyPressed( sc_RightShift ) || KB_KeyPressed( sc_LeftShift ) )
@@ -427,11 +397,7 @@ void add_ammo( short, short, short, short );
 extern int32_t fricxv,fricyv;
 
 // Weapons a co-op player has picked up and can't take again.
-#if DUKE3D_GAMEVER < GAMEVER_14
-#define MAX_WEAPRECS 256
-#else
-#define MAX_WEAPRECS 16
-#endif
+#define MAX_WEAPRECS (game_weaprecs_limit())
 
 struct player_struct
 {
@@ -522,9 +488,7 @@ extern int32 VoiceToggle,AmbienceToggle;
 extern SOUNDOWNER SoundOwner[NUM_SOUNDS][4];
 
 extern char playerreadyflag[MAXPLAYERS],playerquitflag[MAXPLAYERS];
-#if DUKE3D_GAMEVER < GAMEVER_13D
 extern char waitabort;
-#endif
 extern char sounds[NUM_SOUNDS][14];
 
 extern int32_t script[GAME_SCRIPT_CAPACITY],*scriptptr,*insptr,*labelcode,labelcnt;

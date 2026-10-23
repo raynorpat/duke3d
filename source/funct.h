@@ -427,3 +427,4 @@ int game_weapon_case(int weapon);
 int game_forcesphere_tile(void);
 int game_scubamask_tile(void);
 int game_tile_case(int tile);
+int game_frameeffect_tile(void);

@@ -1062,9 +1062,15 @@ int game_forcesphere_tile(void) { return game_profile->id==GAME_099SW ? 1220 : 2
 int game_scubamask_tile(void) { return game_profile->id==GAME_099SW ? 2580 : 2581; }
 int game_tile_case(int tile)
 {
+    if(game_profile->gamever<GAMEVER_14) {
+        if(tile==3999) return FRAMEEFFECT1;
+        if(tile==FRAMEEFFECT1) return -1;
+    }
     if(game_profile->id==GAME_099SW) {
         if(tile==1220) return FORCESPHERE;
         if(tile==FORCESPHERE) return -1;
     }
     return tile;
 }
+
+int game_frameeffect_tile(void) { return game_profile->gamever<GAMEVER_14 ? 3999 : 4095; }

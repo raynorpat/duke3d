@@ -133,9 +133,9 @@ int main(int argc, char **argv)
     myaimmode = 0;
     CONTROL_PollDevices();
     getinput(0);
-#if DUKE3D_GAMEVER >= GAMEVER_13D
+if (game_profile->gamever >= GAMEVER_13D) {
     check("gamepad sends aim mode with mouse look off", (loc.bits >> 23) & 1, 1);
-#endif
+}
 
     SDL_JoystickSetVirtualAxis(pad, 0, 0);
     SDL_JoystickSetVirtualAxis(pad, 1, 0);
@@ -186,9 +186,9 @@ int main(int argc, char **argv)
     CONTROL_PollDevices();
     getinput(0);
     check("disconnect does not leave movement", loc.fvel != 0 || loc.svel != 0, 0);
-#if DUKE3D_GAMEVER >= GAMEVER_13D
+if (game_profile->gamever >= GAMEVER_13D) {
     check("disconnect restores mouse aim preference", (loc.bits >> 23) & 1, 0);
-#endif
+}
     SDL_JoystickClose(pad);
     device = SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER, 6, 15, 0);
     pad = device >= 0 ? SDL_JoystickOpen(device) : NULL;

@@ -44,7 +44,7 @@ int main(int argc, char **argv)
     qsetmode=0;
     showtwoscreens();
     check("quit ads before video setup",qsetmode,0);
-#if DUKE3D_GAMEVER >= GAMEVER_10 && DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever >= GAMEVER_10 && game_profile->gamever < GAMEVER_11) {
     {
         /* DOS 1.0's Watcom rand, initial seed 1 (sw10 0x97f61, 0xd0a8c). */
         static const int expected[] = {
@@ -56,14 +56,14 @@ int main(int argc, char **argv)
         {
             /* Native networking's host RNG must not reset the DOS game stream. */
             if(i == 8) { srand(123); (void)(rand)(); }
-            check("1.0 Watcom rand", i&1 ? game_rand() : rand(), expected[i]);
+            check("1.0 Watcom rand", game_rand(), expected[i]);
         }
         ud.multimode=1;
         ps[0].auto_run=1;
         newgame(0,0,2);
         check("1.0 new game preserves local auto-run",ps[0].auto_run,1);
     }
-#endif
+}
     /* On an axis the original returns the exact length, not the estimate. */
     check("FindDistance2D(1000,0)", FindDistance2D(1000, 0), 1000);
     check("FindDistance2D(0,-1000)", FindDistance2D(0, -1000), 1000);
@@ -80,10 +80,10 @@ int main(int argc, char **argv)
     check("clamprenderer(3)",  clamprenderer(3),  3);
     check("clamprenderer(7)",  clamprenderer(7),  3);
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
     /* 1.3D CONs have no definevolumename or defineskillname. */
     check_str("volume_names[0]", volume_names[0], "L.A. MELTDOWN");
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
     check_str("volume_names[1]", volume_names[1], "COSMIC WASTELAND");
     check_str("volume_names[2]", volume_names[2], "SHUTDOWN AT GROUND ZERO");
     check_str("skill_names[0]", skill_names[0], "EASY");
@@ -91,18 +91,14 @@ int main(int argc, char **argv)
     check_str("skill_names[2]", skill_names[2], "NORMAL");
     check_str("skill_names[3]", skill_names[3], "HARD");
     check_str("skill_names[4]", skill_names[4], "HEADACHE");
-#else
+} else {
     check_str("volume_names[1]", volume_names[1], "LUNAR APOCALYPSE");
-#if DUKE3D_GAMEVER < GAMEVER_13D
-    check_str("volume_names[2]", volume_names[2], "SCHRAPNEL CITY"); /* the 1.1 EXE's spelling */
-#else
-    check_str("volume_names[2]", volume_names[2], "SHRAPNEL CITY");
-#endif
+check_str ( "volume_names[2]" , volume_names [ 2 ] , (game_profile->gamever < GAMEVER_13D ? ("SCHRAPNEL CITY") : ("SHRAPNEL CITY")) ) ;
     check_str("skill_names[0]", skill_names[0], "PIECE OF CAKE");
     check_str("skill_names[1]", skill_names[1], "LET'S ROCK");
     check_str("skill_names[2]", skill_names[2], "COME GET SOME");
     check_str("skill_names[3]", skill_names[3], "DAMN I'M GOOD");
-#endif
+}
 
     /* 1.3D saves and loads locally even in a network game: a negative slot
        (the menu's multiplayer request) must not queue a request that 1.3D
@@ -116,30 +112,20 @@ int main(int argc, char **argv)
     loadplayer(-2);
     check("multiflag after loadplayer(-2)", multiflag, 0);
     rmdir("game0.sav");
-#endif
+}
 
     /* Command-line switches must not leave an episode or player count the
        game can't use: /v0 and /v4 gave episode -1, /q16 gave 0 players. */
     {
         static char *v0[] = { "duke3d", "/v0" }, *v9[] = { "duke3d", "/v9" };
         static char *q16[] = { "duke3d", "/q16" }, *q0[] = { "duke3d", "/q0" };
-#ifdef VOLUMEONE
-        int vols = 1;
-#elif defined(PLUTOPAK)
-        int vols = 4;
-#else
-        int vols = 3;
-#endif
+        int vols=game_profile->shareware?1:game_profile->plutopak?4:3;
         checkcommandline(2, v0);
         check("/v0 episode in range", ud.m_volume_number >= 0 && ud.m_volume_number < vols, 1);
         checkcommandline(2, v9);
         check("/v9 episode in range", ud.m_volume_number >= 0 && ud.m_volume_number < vols, 1);
         checkcommandline(2, q16);
-#if DUKE3D_GAMEVER < GAMEVER_13D
-        check("/q16 players", ud.multimode, 1); /* 1.1 reads one digit */
-#else
-        check("/q16 players", ud.multimode, MAXPLAYERS);
-#endif
+check ( "/q16 players" , ud . multimode , (game_profile->gamever < GAMEVER_13D ? (1) : (MAXPLAYERS)) ) ;
         checkcommandline(2, q0);
         check("/q0 players", ud.multimode, 1);
         ud.multimode = 1;
@@ -159,43 +145,51 @@ int main(int argc, char **argv)
     check("grpcrc32(\"123456789\")", (int)grpcrc32(0, (const unsigned char *)"123456789", 9), (int)0xCBF43926);
     check("unknown GRP", grpmismatch(123456, 0x12345678) != NULL, 0);
     check("modded GRP the size of a release", grpmismatch(26524524, 0x12345678) != NULL, 0);
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
     check("0.99 shareware GRP", grpmismatch(9690241, 0x02F18900) != NULL, 0);
     check("1.0 shareware GRP", grpmismatch(10429258, 0xA28AA589) != NULL, 1);
     check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
     check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
-#elif DUKE3D_GAMEVER < GAMEVER_11
+} else {
+if (game_profile->gamever < GAMEVER_11) {
     check("1.0 shareware GRP", grpmismatch(10429258, 0xA28AA589) != NULL, 0);
     check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
     check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
-#elif DUKE3D_GAMEVER < GAMEVER_13D
+} else {
+if (game_profile->gamever < GAMEVER_13D) {
     check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 0);
     check("1.0 shareware GRP", grpmismatch(10429258, 0xA28AA589) != NULL, 1);
     check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
-#elif DUKE3D_GAMEVER < GAMEVER_14
-#ifdef VOLUMEONE
+} else {
+if (game_profile->gamever < GAMEVER_14) {
+if ((game_profile->shareware)) {
     check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 0);
     check("1.3D full GRP", grpmismatch(26524524, 0xBBC9CE44) != NULL, 1);
-#else
+} else {
     check("1.3D full GRP", grpmismatch(26524524, 0xBBC9CE44) != NULL, 0);
     check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
-#endif
+}
     check("Atomic GRP", grpmismatch(44356548, 0xFD3DCFF1) != NULL, 1);
     check("1.4 GRP", grpmismatch(44348015, 0xF514A6AC) != NULL, 1);
-#elif DUKE3D_GAMEVER < GAMEVER_15
+} else {
+if (game_profile->gamever < GAMEVER_15) {
     check("1.4 GRP", grpmismatch(44348015, 0xF514A6AC) != NULL, 0);
     check("Atomic GRP", grpmismatch(44356548, 0xFD3DCFF1) != NULL, 1);
-#else
+} else {
     check("Atomic GRP", grpmismatch(44356548, 0xFD3DCFF1) != NULL, 0);
     check("1.4 GRP", grpmismatch(44348015, 0xF514A6AC) != NULL, 1);
     check("1.3D full GRP", grpmismatch(26524524, 0xBBC9CE44) != NULL, 1);
-#endif
-#if DUKE3D_GAMEVER >= GAMEVER_10
+}
+}
+}
+}
+}
+if (game_profile->gamever >= GAMEVER_10) {
     check("0.99 shareware GRP", grpmismatch(9690241, 0x02F18900) != NULL, 1);
-#endif
-#if DUKE3D_GAMEVER >= GAMEVER_13D
+}
+if (game_profile->gamever >= GAMEVER_13D) {
     check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
-#endif
+}
 
 #if PLATFORM_UNIX
     /* duke3d.cfg values out of range, or in capitals, are read and written

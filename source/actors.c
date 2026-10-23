@@ -6131,7 +6131,7 @@ actors_branch_5389_end:;
 
             case BOUNCEMINE:
             case MORTER:
-                j = spawn(i,FRAMEEFFECT1);
+                j = spawn(i,game_frameeffect_tile());
                 hittype[j].temp_data[0] = 3;
 
             case HEAVYHBOMB:
@@ -9207,17 +9207,11 @@ actors_branch_9224_0:;
                         case 1000077:
                             if(sprite[j].picnum == TRIPBOMB) break;
                         case 1000078:
-if (game_profile->gamever < GAMEVER_13D) goto actors_branch_9246_0;
-else goto actors_branch_9246_1;
-actors_branch_9246_0:;
-                            // 1.1 carries no statnum 0 sprites and has no cstat&16 test.
-                            if( !(sprite[j].picnum >= CRANE && sprite[j].picnum <= (CRANE+3)) )
-goto actors_branch_9246_end;
-actors_branch_9246_1:;
                         case 1000079:
-                            if( !(sprite[j].picnum >= CRANE && sprite[j].picnum <= (CRANE+3)) && !(sprite[j].cstat&16) )
-goto actors_branch_9246_end;
-actors_branch_9246_end:;
+                            // Early conveyors ignore wall alignment; cranes never move.
+                            if (!(sprite[j].picnum >= CRANE && sprite[j].picnum <= CRANE+3) &&
+                                (game_profile->gamever < GAMEVER_13D || !(sprite[j].cstat&16)))
+
                             {
                                 if( sprite[j].z > (hittype[j].floorz-(16<<8)) )
                                 {

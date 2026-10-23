@@ -12,9 +12,7 @@
 #if BUILD_ENGINEREV != EXPECT_ENGINEREV
 #error "BUILD_ENGINEREV"
 #endif
-#if BYTEVERSION != EXPECT_BYTEVERSION
-#error "BYTEVERSION"
-#endif
+
 
 #if EXPECT_PLUTOPAK
 #ifndef PLUTOPAK
@@ -38,7 +36,7 @@
 
 int main(void)
 {
-    printf("gamever %ld enginerev %ld byteversion %d\n",
-        (long)DUKE3D_GAMEVER, (long)BUILD_ENGINEREV, (int)BYTEVERSION);
+    printf("gamever %ld enginerev %ld \n",
+        (long)DUKE3D_GAMEVER, (long)BUILD_ENGINEREV);
     return 0;
 }

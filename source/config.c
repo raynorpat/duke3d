@@ -739,20 +739,18 @@ void CONFIG_ReadSetup( void )
    dummy = CheckParm("NAME");
    if( dummy ) strcpy(myname,_argv[dummy+1]);
    dummy = CheckParm("MAP");
-#ifndef VOLUMEONE
-   if( dummy )
+   boardfilename[0] = 0;
+   if (dummy)
    {
-       strcpy(boardfilename,_argv[dummy+1]);
-       if( strchr(boardfilename,'.') == 0)
-           strcat(boardfilename,".map");
-       printf("Using level: '%s'.\n",boardfilename);
+       if (game_profile->shareware)
+           puts("The -map option is available in the registered version only!");
+       else
+       {
+           strcpy(boardfilename,_argv[dummy+1]);
+           if (strchr(boardfilename,'.') == 0) strcat(boardfilename,".map");
+           printf("Using level: '%s'.\n",boardfilename);
+       }
    }
-   else
-#else
-    if( dummy )
-        puts("The -map option is available in the registered version only!");
-#endif
-       boardfilename[0] = 0;
 
    SCRIPT_GetString( scripthandle, "Comm Setup","RTSName",&ud.rtsname[0]);
 

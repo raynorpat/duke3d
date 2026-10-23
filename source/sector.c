@@ -2935,7 +2935,7 @@ if ((game_profile->gamever < GAMEVER_10 ? ( PN != RECON ) : ( PN != BOSS1 && PN 
 
                     if( sprite[sn].picnum == THROWFLAME )
                     {
-                        j = spawn(i,FRAMEEFFECT1);
+                        j = spawn(i,game_frameeffect_tile());
                         sprite[j].xrepeat += 10;
                         sprite[j].yrepeat += 10;
                     }

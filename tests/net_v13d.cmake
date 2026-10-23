@@ -85,7 +85,7 @@ execute_process(
   COMMAND "${CMAKE_COMMAND}" -DROLE=peer "-DEXE=${A}" "-DRUN=${WORK}/A"
           -DSECONDS=${_seconds} "-DARGS=${ARGS} ${A_ARGS}" -P "${CMAKE_CURRENT_LIST_FILE}"
   COMMAND "${CMAKE_COMMAND}" -DROLE=peer "-DEXE=${B}" "-DRUN=${WORK}/B"
-          -DSECONDS=${_seconds} "-DWAIT_FOR=${WORK}/A" "-DARGS=${_b_args}" -P "${CMAKE_CURRENT_LIST_FILE}"
+          -DSECONDS=${_seconds} "-DWAIT_FOR=${WORK}/A" "-DARGS=${_b_args} ${B_ARGS}" -P "${CMAKE_CURRENT_LIST_FILE}"
   RESULT_VARIABLE _ignored)
 
 set(_fail "")

@@ -22,6 +22,9 @@ int main(int argc,char **argv)
     ud.wchoice[0][0]=DEVISTATOR_WEAPON+1;
     checkavailweapon(&ps[0]);
     CHECK(ps[0].curr_weapon==(!game_profile->shareware || game_profile->id==GAME_099SW ? DEVISTATOR_WEAPON : KNEE_WEAPON));
+    CHECK(game_tile_case(game_profile->gamever<GAMEVER_14?3999:4095)==FRAMEEFFECT1);
+    CHECK(GAME_NUM_SOUNDS==(old?255:game_profile->gamever<GAMEVER_14?348:450));
+    CHECK(MAX_WEAPRECS==(game_profile->gamever<GAMEVER_14?256:16));
     CHECK(game_script_limit()==(game_profile->gamever<GAMEVER_14?20000:20460));
     CHECK(game_sound_limit()==(old?255:game_profile->gamever<GAMEVER_14?348:450));
     CHECK(game_weaprecs_limit()==(game_profile->gamever<GAMEVER_14?256:16));

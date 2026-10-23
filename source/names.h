@@ -626,12 +626,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define FEM9 3450
 #define FOOTPRINT 3701
 #define POOP 4094
-#include "gamever.h"
-#if DUKE3D_GAMEVER < GAMEVER_14
-#define FRAMEEFFECT1 3999 // its tile in 1.3D's art
-#else
 #define FRAMEEFFECT1 4095
-#endif
 #define PANNEL3 4099
 #define SCREENBREAK14 4120
 #define SCREENBREAK15 4123
