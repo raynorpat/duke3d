@@ -28,4 +28,19 @@ extern intptr_t voxoff[MAXVOXELS][MAXVOXMIPS];
 extern int32_t voxlock[MAXVOXELS][MAXVOXMIPS];
 #endif
 
+void engine_loadpalette(void);
+extern int32_t viewoffset, viewingrangerecip, pixelaspect;
+extern int32_t stereopixelwidth, ostereopixelwidth;
+extern char *transluc, paletteloaded;
+extern char *globalpalwritten;
+extern int32_t globalpal;
+extern char kensmessage[128];
+
+#if defined(POLYMOST) && defined(USE_OPENGL)
+int engine_gl_indexedtarget(void);
+void engine_gl_2dcolor(int32_t col);
+void engine_gl_lookupchanged(void);
+void engine_gl_resetview(void);
+#endif
+
 #endif
