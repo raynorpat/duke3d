@@ -56,13 +56,13 @@ int main(int argc, char **argv)
     check("bad sector", inside(0, 0, 2), -1);
 
     /* Outside the diamond, with x1*y2 near 2^34. */
-#if BUILD_ENGINEREV < 19960320L
+if (game_profile->enginerev < 19960320L) {
     check("outside, products overflow", inside(-130000, 50210, 1), 1);
     check("outside, products overflow 2", inside(-122081, -57916, 1), 1);
-#else
+} else {
     check("outside, products overflow", inside(-130000, 50210, 1), 0);
     check("outside, products overflow 2", inside(-122081, -57916, 1), 0);
-#endif
+}
 
     if (failures) return 1;
     printf("inside: ok\n");

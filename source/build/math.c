@@ -365,7 +365,6 @@ Polygon rejection combines these masks without testing each edge again.
 	    return ((eax<<4)^(eax|0xf0));
         }
 
-#if (BUILD_ENGINEREV < 19960427L)
 /* Before revision 19960427 the game logic took square roots with ksqrtasm
  * from a 2048-entry table built by Newton's method. Rendering keeps the
  * table above. */
@@ -417,10 +416,7 @@ static int32_t ksqrtasm(int32_t num)
 	}
 	return(r>>10);
 }
-#define LOGICSQRT(x) ksqrtasm(x)
-#else
-#define LOGICSQRT(x) nsqrtasm(x)
-#endif
+
 
 /*
 ================
@@ -460,9 +456,9 @@ void engine_loadtables(void)
 	if (tablesloaded == 0)
 	{
 		initksqrt();
-#if (BUILD_ENGINEREV < 19960427L)
+if ((game_profile->enginerev < 19960427L)) {
 		initksqrt1996();
-#endif
+}
 
 		for(i=0;i<2048;i++) reciptable[i] = divscale30(2048L,i+2048);
 
@@ -516,7 +512,7 @@ Early gameplay and rendering deliberately use different lookup tables.
 */
 int ksqrt(int32_t num)
 {
-	return(LOGICSQRT(num));
+	return(game_profile->enginerev < 19960427L ? ksqrtasm(num) : nsqrtasm(num));
 }
 
 /*

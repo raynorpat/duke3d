@@ -7,6 +7,7 @@
 
 #ifndef _INCLUDE_BUILD_H_
 #define _INCLUDE_BUILD_H_
+#include "gameprofile.h"
 #include <stdint.h>
 
 /* Engine revision as a date (gamesrc-ver-recreation's LIBVER_BUILDREV). This

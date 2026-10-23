@@ -3496,13 +3496,7 @@ int inside(int32_t x, int32_t y, short sectnum)
 {
 	walltype *wal;
 	int32_t i, x1, y1, x2, y2;
-#if (BUILD_ENGINEREV < 19960320L)
-	char cnt;
-#elif (BUILD_ENGINEREV < 19960427L)
-	int32_t cnt;
-#else
-	uint32_t cnt;
-#endif
+	uint32_t cnt; /* The early branch toggles only bit zero; later ones use bit 31. */
 
 	if ((sectnum < 0) || (sectnum >= numsectors)) return(-1);
 
@@ -3519,26 +3513,26 @@ int inside(int32_t x, int32_t y, short sectnum)
 			x1 = (int32_t)((uint32_t)wal->x-(uint32_t)x);
 			x2 = (int32_t)((uint32_t)wall[wal->point2].x-(uint32_t)x);
 			// Preserve the DOS 32-bit products and differences without signed overflow.
-#if (BUILD_ENGINEREV < 19960320L)
+if ((game_profile->enginerev < 19960320L)) {
 			if ((x1^x2) < 0)
 				cnt ^= ((int32_t)((uint32_t)x1*(uint32_t)y2)<(int32_t)((uint32_t)x2*(uint32_t)y1))^(y1<y2);
 			else if (x1 >= 0)
 				cnt ^= 1;
-#elif (BUILD_ENGINEREV < 19960427L)
+} else if ((game_profile->enginerev < 19960427L)) {
 			if ((x1^x2) < 0) cnt ^= (int32_t)(((uint32_t)x1*(uint32_t)y2-(uint32_t)x2*(uint32_t)y1)^((uint32_t)y1-(uint32_t)y2)); else cnt ^= ~x1;
-#else
+} else {
 			if ((x1^x2) >= 0) cnt ^= x1; else cnt ^= ((uint32_t)x1*(uint32_t)y2-(uint32_t)x2*(uint32_t)y1)^(uint32_t)y2;
-#endif
+}
 		}
 		wal++; i--;
 	} while (i);
-#if (BUILD_ENGINEREV < 19960320L)
+if ((game_profile->enginerev < 19960320L)) {
 	return(cnt);
-#elif (BUILD_ENGINEREV < 19960427L)
-	return(cnt<0);
-#else
+} else if ((game_profile->enginerev < 19960427L)) {
+	return((int32_t)cnt<0);
+} else {
 	return(cnt>>31);
-#endif
+}
 }
 
 
@@ -5045,15 +5039,13 @@ int cansee(int32_t x1, int32_t y1, int32_t z1, short sect1,
 	sectortype *sec;
 	walltype *wal, *wal2;
 	int32_t i, cnt, nexts, x, y, z, cz, fz, dasectnum, dacnt, danum;
-#if (BUILD_ENGINEREV >= 19960220L)
 	int32_t x21, y21, z21, x31, y31, x34, y34, bot, t;
-#endif
 
 	if ((x1 == x2) && (y1 == y2)) return(sect1 == sect2);
 
-#if (BUILD_ENGINEREV >= 19960220L)
+if ((game_profile->enginerev >= 19960220L)) {
 	x21 = x2-x1; y21 = y2-y1; z21 = z2-z1;
-#endif
+}
 
 	clipsectorlist[0] = sect1; danum = 1;
 	for(dacnt=0;dacnt<danum;dacnt++)
@@ -5062,14 +5054,14 @@ int cansee(int32_t x1, int32_t y1, int32_t z1, short sect1,
 		for(cnt=sec->wallnum,wal=&wall[sec->wallptr];cnt>0;cnt--,wal++)
 		{
 			wal2 = &wall[wal->point2];
-#if (BUILD_ENGINEREV < 19960220L)
+if ((game_profile->enginerev < 19960220L)) {
 			/* 1.0: a side test, then lintersect, which takes either sign of bot */
 			if ((wal->y-y1)*(wal2->x-x1) > (wal->x-x1)*(wal2->y-y1)) continue;
 			if (lintersect(x1,y1,z1,x2,y2,z2,wal->x,wal->y,wal2->x,wal2->y,&x,&y,&z) == 0) continue;
 
 			nexts = wal->nextsector;
 			if ((nexts < 0) || (wal->cstat&32)) return(0);
-#else
+} else {
 			x31 = wal->x-x1; x34 = wal->x-wal2->x;
 			y31 = wal->y-y1; y34 = wal->y-wal2->y;
 
@@ -5084,7 +5076,7 @@ int cansee(int32_t x1, int32_t y1, int32_t z1, short sect1,
 			x = x1 + mulscale24(x21,t);
 			y = y1 + mulscale24(y21,t);
 			z = z1 + mulscale24(z21,t);
-#endif
+}
 
 			/* The crossing must lie inside both vertical openings, not just the XY portal. */
 			getzsofslope((short)dasectnum,x,y,&cz,&fz);
@@ -5202,7 +5194,7 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 	short nextsector;
 	char clipyou;
 
-#if (BUILD_ENGINEREV < 19960220L)
+if ((game_profile->enginerev < 19960220L)) {
 	/* 1.0 has no cliptype (always CLIPMASK1), and resets only *hitsect */
 	*hitsect = -1;
 	if (sectnum < 0) return(-1);
@@ -5212,7 +5204,7 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 	dawalclipmask = 64;
 	dasprclipmask = 256;
 	(void)cliptype;
-#else
+} else {
 	*hitsect = -1; *hitwall = -1; *hitsprite = -1;
 	if (sectnum < 0) return(-1);
 
@@ -5220,7 +5212,7 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 
 	dawalclipmask = (cliptype&65535);
 	dasprclipmask = (cliptype>>16);
-#endif
+}
 
 	clipsectorlist[0] = sectnum;
 	tempshortcnt = 0; tempshortnum = 1;
@@ -5241,11 +5233,7 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 			if (j != 0)
 			{
 				i = ((sec->ceilingz-zs)<<8)+dmulscale15(dax,ys-wal->y,-day,xs-wal->x);
-#if (BUILD_ENGINEREV < 19960129L)
-				if (klabs(i>>1) < klabs(j))
-#else
-				if (((i^j) >= 0) && ((klabs(i)>>1) < klabs(j)))
-#endif
+				if (game_profile->enginerev < 19960129L ? (klabs(i>>1) < klabs(j)) : (((i^j) >= 0) && ((klabs(i)>>1) < klabs(j))))
 				{
 					i = divscale30(i,j);
 					x1 = xs + mulscale30(vx,i);
@@ -5257,11 +5245,7 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 		else if ((vz < 0) && (zs >= sec->ceilingz))
 		{
 			z1 = sec->ceilingz; i = z1-zs;
-#if (BUILD_ENGINEREV < 19960129L)
-			if (klabs(i>>1) < -vz)
-#else
-			if ((klabs(i)>>1) < -vz)
-#endif
+			if (game_profile->enginerev < 19960129L ? (klabs(i>>1) < -vz) : ((klabs(i)>>1) < -vz))
 			{
 				i = divscale30(i,vz);
 				x1 = xs + mulscale30(vx,i);
@@ -5288,11 +5272,7 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 			if (j != 0)
 			{
 				i = ((sec->floorz-zs)<<8)+dmulscale15(dax,ys-wal->y,-day,xs-wal->x);
-#if (BUILD_ENGINEREV < 19960129L)
-				if (klabs(i>>1) < klabs(j))
-#else
-				if (((i^j) >= 0) && ((klabs(i)>>1) < klabs(j)))
-#endif
+				if (game_profile->enginerev < 19960129L ? (klabs(i>>1) < klabs(j)) : (((i^j) >= 0) && ((klabs(i)>>1) < klabs(j))))
 				{
 					i = divscale30(i,j);
 					x1 = xs + mulscale30(vx,i);
@@ -5304,11 +5284,7 @@ int hitscan(int32_t xs, int32_t ys, int32_t zs, short sectnum,
 		else if ((vz > 0) && (zs <= sec->floorz))
 		{
 			z1 = sec->floorz; i = z1-zs;
-#if (BUILD_ENGINEREV < 19960129L)
-			if (klabs(i>>1) < vz)
-#else
-			if ((klabs(i)>>1) < vz)
-#endif
+			if (game_profile->enginerev < 19960129L ? (klabs(i>>1) < vz) : ((klabs(i)>>1) < vz))
 			{
 				i = divscale30(i,vz);
 				x1 = xs + mulscale30(vx,i);
@@ -5794,15 +5770,15 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 	int32_t x1, y1, x2, y2, cx, cy, rad, xmin, ymin, xmax, ymax, daz, daz2;
 	int32_t bsz, dax, day, xoff, yoff, xspan, yspan, cosang, sinang, tilenum;
 	int32_t xrepeat, yrepeat, gx, gy, dx, dy, dasprclipmask, dawalclipmask;
-	int32_t hitwall, cnt, clipyou;
+	int32_t hitwall, cnt, clipyou, pass;
 
-#if (BUILD_ENGINEREV < 19960220L)
+if ((game_profile->enginerev < 19960220L)) {
 	/* 1.0 doesn't refuse a bad sector: it gathers no clip lines, moves to the
 	 * goal, and searches the clipsectorlist the last call left (below) */
 	if ((xvect|yvect) == 0) return(0);
-#else
+} else {
 	if (((xvect|yvect) == 0) || (*sectnum < 0)) return(0);
-#endif
+}
 	retval = 0;
 
 	oxvect = xvect;
@@ -5827,15 +5803,19 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 	dawalclipmask = (cliptype&65535);        /* CLIPMASK0 = 0x00010001 */
 	dasprclipmask = (cliptype>>16);          /* CLIPMASK1 = 0x01000040 */
 
-#if (BUILD_ENGINEREV < 19960220L)
-	if (*sectnum >= 0)
+	if (game_profile->enginerev >= 19960220L || *sectnum >= 0)
 	{
-#endif
 	clipsectorlist[0] = (*sectnum);
-	clipsectcnt = 0; clipsectnum = 1;
+	clipsectnum = 1;
+    /* Early engines gather every wall before visiting sprites; later ones
+     * visit walls and sprites together in each sector. */
+    for (pass=0; pass < (game_profile->enginerev < 19960220L ? 2 : 1); pass++)
+    {
+    clipsectcnt = 0;
 	do
 	{
 		dasect = clipsectorlist[clipsectcnt++];
+        if (pass == 0) {
 		sec = &sector[dasect];
 		startwall = sec->wallptr; endwall = startwall + sec->wallnum;
 		for(j=startwall,wal=&wall[startwall];j<endwall;j++,wal++)
@@ -5900,15 +5880,8 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 			}
 		}
 
-#if (BUILD_ENGINEREV < 19960220L)
-	} while (clipsectcnt < clipsectnum);
-
-		/* 1.0 adds the walls of every sector first, then their sprites */
-	clipsectcnt = 0;
-	do
-	{
-		dasect = clipsectorlist[clipsectcnt++];
-#endif
+        }
+        if (game_profile->enginerev >= 19960220L || pass == 1) {
 		for(j=headspritesect[dasect];j>=0;j=nextspritesect[j])
 		{
 			spr = &sprite[j];
@@ -6032,10 +6005,10 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 					break;
 			}
 		}
+        }
 	} while (clipsectcnt < clipsectnum);
-#if (BUILD_ENGINEREV < 19960220L)
+    }
 	}
-#endif
 
 
 	hitwall = 0;
@@ -6068,9 +6041,9 @@ int clipmove (int32_t *x, int32_t *y, int32_t *z, short *sectnum,
 				templong2 = dmulscale6(clipit[j].x2-clipit[j].x1,oxvect,clipit[j].y2-clipit[j].y1,oyvect);
 				if ((templong1^templong2) < 0)
 				{
-#if (BUILD_ENGINEREV >= 19961112L)
+if ((game_profile->enginerev >= 19961112L)) {
 					updatesector(*x,*y,sectnum);
-#endif
+}
 					return(retval);
 				}
 			}
@@ -7594,7 +7567,7 @@ int getceilzofslope(short sectnum, int32_t dax, int32_t day)
 	walltype *wal;
 
 	if (!(sector[sectnum].ceilingstat&2)) return(sector[sectnum].ceilingz);
-#if (BUILD_ENGINEREV < 19960427L)
+if ((game_profile->enginerev < 19960427L)) {
 	j = sector[sectnum].wallptr;
 	i = wall[j].point2;
 	dx = wall[i].x-wall[j].x;
@@ -7603,13 +7576,13 @@ int getceilzofslope(short sectnum, int32_t dax, int32_t day)
 	i = divscale15(sector[sectnum].ceilingheinum,i);
 	dx *= i; dy *= i;
 	return(sector[sectnum].ceilingz+dmulscale23(dx,day-wall[j].y,-dy,dax-wall[j].x));
-#else
+} else {
 	wal = &wall[sector[sectnum].wallptr];
 	dx = wall[wal->point2].x-wal->x; dy = wall[wal->point2].y-wal->y;
 	i = (engine_render_sqrt(dx*dx+dy*dy)<<5); if (i == 0) return(sector[sectnum].ceilingz);
 	j = dmulscale3(dx,day-wal->y,-dy,dax-wal->x);
 	return(sector[sectnum].ceilingz+scale(sector[sectnum].ceilingheinum,j,i));
-#endif
+}
 }
 
 
@@ -7627,7 +7600,7 @@ int getflorzofslope(short sectnum, int32_t dax, int32_t day)
 	walltype *wal;
 
 	if (!(sector[sectnum].floorstat&2)) return(sector[sectnum].floorz);
-#if (BUILD_ENGINEREV < 19960427L)
+if ((game_profile->enginerev < 19960427L)) {
 	j = sector[sectnum].wallptr;
 	i = wall[j].point2;
 	dx = wall[i].x-wall[j].x;
@@ -7636,13 +7609,13 @@ int getflorzofslope(short sectnum, int32_t dax, int32_t day)
 	i = divscale15(sector[sectnum].floorheinum,i);
 	dx *= i; dy *= i;
 	return(sector[sectnum].floorz+dmulscale23(dx,day-wall[j].y,-dy,dax-wall[j].x));
-#else
+} else {
 	wal = &wall[sector[sectnum].wallptr];
 	dx = wall[wal->point2].x-wal->x; dy = wall[wal->point2].y-wal->y;
 	i = (engine_render_sqrt(dx*dx+dy*dy)<<5); if (i == 0) return(sector[sectnum].floorz);
 	j = dmulscale3(dx,day-wal->y,-dy,dax-wal->x);
 	return(sector[sectnum].floorz+scale(sector[sectnum].floorheinum,j,i));
-#endif
+}
 }
 
 

@@ -1081,3 +1081,12 @@ add_test(NAME game_version_args COMMAND game_version_args)
 add_executable(game_state game_state.c)
 target_link_libraries(game_state PRIVATE duke3d_game_options buildengine audiolib)
 add_test(NAME game_state COMMAND game_state)
+
+foreach(_profile 0.99 1.0 1.1 1.3d-shareware 1.3d 1.4 1.5)
+  foreach(_case engine_inside engine_trace lzw_roundtrip)
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${_case}_${_profile}")
+    add_test(NAME ${_case}_${_profile} COMMAND ${_case} -test-gameversion ${_profile})
+    set_tests_properties(${_case}_${_profile} PROPERTIES
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${_case}_${_profile}")
+  endforeach()
+endforeach()
