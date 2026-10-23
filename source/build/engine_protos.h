@@ -178,7 +178,7 @@ extern void set16color_palette(void);
 extern void restore256_palette(void);
 extern uint32_t getticks(void);
 
-/* mmulti.c */
+/* network.c */
 extern void callcommit(void);
 extern void initcrc(void);
 extern int32_t getcrc(char *buffer, short bufleng);

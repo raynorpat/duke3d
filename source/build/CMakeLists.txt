@@ -1,12 +1,12 @@
 # Ken Silverman's Build engine, as ported by icculus. See VENDORED.md.
 
 add_library(buildengine STATIC
-  a.c
+  draw.c
   cache1d.c
   engine.c
   glext.c
   glsubmit.c
-  mmulti.c
+  network.c
   pragmas.c
   sdl_driver.c
   ../videoopts.c)

@@ -1,5 +1,5 @@
 /*
- * Checks how many pixels the engine's C column drawers (build/a.c) write.
+ * Checks how many pixels the engine's C column drawers (build/draw.c) write.
  *  The original A.ASM loops end with "sub ecx,1 / jnc", so a count of n
  *  draws n+1 pixels, and the engine's callers pass the inclusive end of the
  *  column. A drawer that writes n pixels loses the bottom row of everything
@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 
-/* As defined in build/a.c. */
+/* As defined in build/draw.c. */
 void setvlinebpl(int32_t i1);
 void setupvlineasm(int32_t i1);
 void setupmvlineasm(int32_t i1);

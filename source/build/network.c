@@ -1543,5 +1543,5 @@ void callcommit(void)
 #error Please define a network transport for your platform.
 #endif
 
-/* end of mmulti.c ... */
+/* end of network.c ... */
 
