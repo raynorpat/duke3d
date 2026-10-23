@@ -43,7 +43,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #ifdef DUKE3D_ROUTEBOT
 #include "routebot.h"
 #endif
-#include "glext.h"
+#include "sdl_opengl_internal.h"
 #include "displaymode.h"
 #include "videoopts.h"
 extern int32_t qsetmode;

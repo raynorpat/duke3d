@@ -7,8 +7,8 @@
  *  before including this (after SDL_opengl.h) gets its GL state calls
  *  wrapped to do that.
  */
-#ifndef GLSUBMIT_H
-#define GLSUBMIT_H
+#ifndef POLYMOST_OPENGL_SUBMIT_H
+#define POLYMOST_OPENGL_SUBMIT_H
 
 #ifdef USE_OPENGL
 #include <stdint.h>

@@ -29,7 +29,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "mouse.h"
 #include "savegame.h"
 #include "animlib.h"
-#include "glext.h"
+#include "sdl_opengl_internal.h"
 #include "displaymode.h"
 #include "videoopts.h"
 #include "usermaps.h"

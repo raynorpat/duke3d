@@ -1,12 +1,12 @@
 /*
- * Renderer 3's vertex submission. See glsubmit.h.
+ * Renderer 3's vertex submission. See polymost_opengl_submit.h.
  */
 #ifdef USE_OPENGL
 #include <stddef.h>
 #include <stdint.h>
 #include "build.h"
-#include "glext.h"
-#include "glsubmit.h"
+#include "sdl_opengl_internal.h"
+#include "polymost_opengl_submit.h"
 
 int32_t glsubmode = GLSUB_IMMEDIATE;
 int32_t glsub_force = -1;

@@ -108,8 +108,8 @@
 #include "cache1d.h"
 #include "SDL.h"
 #include "SDL_opengl.h"
-#include "glext.h"
-#include "glsubmit.h"
+#include "sdl_opengl_internal.h"
+#include "polymost_opengl_submit.h"
 #include "videoopts.h"
 
 /* The game is linked in (for render_gl_game.c), so it provides the

@@ -79,7 +79,7 @@ Duke Lookup Table
 #include "build/display.h"  /* rcg05232001 need some "vesa" routines. */
 #include "names.h"
 #include "buildcfg.h"
-#include "build/glext.h"
+#include "build/sdl_opengl_internal.h"
 #include "editormode.h"
 
 

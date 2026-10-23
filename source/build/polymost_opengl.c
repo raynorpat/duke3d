@@ -8,8 +8,8 @@
 	//Drawing goes through glsub_*, which may batch vertices: GL state calls
 	//here and in engine.c below draw the batch first.
 #define GLSUB_WRAP
-#include "glsubmit.h"
-#include "glext.h"
+#include "polymost_opengl_submit.h"
+#include "sdl_opengl_internal.h"
 
 int32_t glredbluemode = 0;
 static int32_t lastglredbluemode = 0, redblueclearcnt = 0;

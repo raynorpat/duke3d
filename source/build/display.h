@@ -163,7 +163,7 @@ int getvideofade(void);
 int videofading(void);
 int videofade_at(uint32_t ms);
 /*
- * Renderer 3's supersampling (glext.h glsupersample) set to level now, the
+ * Renderer 3's supersampling (sdl_opengl_internal.h glsupersample) set to level now, the
  *  frame made again at its size, keeping the palette and fade as a resize
  *  does; 1 if it's in use. videosupersampleavailable: whether level can be
  *  used now (off always; the others on the shader path without an internal
@@ -172,7 +172,7 @@ int videofade_at(uint32_t ms);
 int setvideosupersample(int level);
 int videosupersampleavailable(int level);
 /*
- * Renderer 3's texture filter (glext.h gltexturefilter, videoopts.h
+ * Renderer 3's texture filter (sdl_opengl_internal.h gltexturefilter, videoopts.h
  *  TEXFILTER_*) set to filter now: the 1.1/1.5 paths' textures take it at
  *  once, the shader path draws with it from its next frame (a switch to or
  *  from nearest starts that frame black). 1 if it's in use now.

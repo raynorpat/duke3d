@@ -26,7 +26,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #include <stdint.h>
 #include "duke3d.h"
-#include "glext.h"
+#include "sdl_opengl_internal.h"
 
 extern char everyothertime;
 short which_palookup = 9;

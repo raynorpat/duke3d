@@ -11,7 +11,7 @@
 #include "SDL.h"
 #ifdef USE_OPENGL
 #include "SDL_opengl.h"
-#include "glext.h"
+#include "sdl_opengl_internal.h"
 #endif
 
 extern SDL_Surface *surface;

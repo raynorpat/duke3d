@@ -73,7 +73,7 @@ add_test(NAME pragmas_semantics COMMAND pragmas_semantics)
 
 # Renderer 3's draw path from what the driver has, and the setting's names.
 # Built without the engine (and OpenGL), as the settings readers use it.
-add_executable(gl_path gl_path.c "${PROJECT_SOURCE_DIR}/source/build/glext.c")
+add_executable(gl_path gl_path.c "${PROJECT_SOURCE_DIR}/source/build/sdl_opengl.c")
 target_include_directories(gl_path PRIVATE "${PROJECT_SOURCE_DIR}/source/build")
 target_link_libraries(gl_path PRIVATE duke3d_compile_options)
 add_test(NAME gl_path COMMAND gl_path)

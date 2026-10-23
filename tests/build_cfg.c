@@ -15,7 +15,7 @@
 #endif
 
 #include "buildcfg.h"
-#include "build/glext.h"
+#include "build/sdl_opengl_internal.h"
 #include "build/displaymode.h"
 #include "videoopts.h"
 

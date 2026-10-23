@@ -22,8 +22,8 @@
 #if defined(POLYMOST) && defined(USE_OPENGL)
 #include "SDL_opengl.h"
 #define GLSUB_WRAP
-#include "glsubmit.h"
-#include "glext.h"
+#include "polymost_opengl_submit.h"
+#include "sdl_opengl_internal.h"
 #endif
 
 /* used to be static. --ryan. */

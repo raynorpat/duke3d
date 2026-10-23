@@ -6,7 +6,7 @@
 #define SDL_MAIN_HANDLED  /* game.c's main() is renamed; this one is ours. */
 #include <sys/stat.h>
 #include "duke3d.h"
-#include "glext.h"
+#include "sdl_opengl_internal.h"
 #include "displaymode.h"
 #include "videoopts.h"
 #if PLATFORM_WIN32

@@ -19,9 +19,9 @@
 
 #ifdef USE_OPENGL
 #include "SDL_opengl.h"
-#include "glext.h"
+#include "sdl_opengl_internal.h"
 #define GLSUB_WRAP
-#include "glsubmit.h"
+#include "polymost_opengl_submit.h"
 #endif
 
 
@@ -42,7 +42,7 @@ static sdl_renderer_type renderer = RENDERER_SOFTWARE;
 #include "cache1d.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image_write.h"
+#include "../thirdparty/stb_image_write.h"
 
 
 #if (defined PLATFORM_WIN32)

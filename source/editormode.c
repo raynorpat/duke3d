@@ -6,7 +6,7 @@
 #include "build/build.h"
 #include "build/engine.h"
 #include "build/display.h"
-#include "build/glext.h"
+#include "build/sdl_opengl_internal.h"
 #include "editormode.h"
 #include "SDL.h"
 

@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-#include "glext.h"
+#include "sdl_opengl_internal.h"
 
 static int fails;
 

@@ -7,8 +7,8 @@ add_library(buildengine STATIC
   engine.c
   display.c
   tiles.c
-  glext.c
-  glsubmit.c
+  sdl_opengl.c
+  polymost_opengl_submit.c
   network.c
   math.c
   sdl_main.c

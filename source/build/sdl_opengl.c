@@ -1,9 +1,9 @@
 /*
- * Renderer 3's draw path and the OpenGL entry points past 1.1. See glext.h.
+ * Renderer 3's draw path and the OpenGL entry points past 1.1. See sdl_opengl_internal.h.
  */
 #include <stdio.h>
 #include <string.h>
-#include "glext.h"
+#include "sdl_opengl_internal.h"
 
 int32_t gldrawpathrequest = GLPATH_AUTO;
 int32_t gldrawpath = GLPATH_IMMEDIATE;

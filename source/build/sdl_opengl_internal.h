@@ -3,8 +3,8 @@
  *  run time so the binary still runs on a 1.1 driver. The path names and
  *  gl_choosepath need no OpenGL: the game's and editor's settings use them.
  */
-#ifndef GLEXT_H
-#define GLEXT_H
+#ifndef SDL_OPENGL_INTERNAL_H
+#define SDL_OPENGL_INTERNAL_H
 
 #include <stdint.h>
 

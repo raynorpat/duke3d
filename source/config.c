@@ -37,7 +37,7 @@ extern int stricmp(const char *x, const char *y);
 #include <time.h>
 #include "duke3d.h"
 #include "scriplib.h"
-#include "glext.h"
+#include "sdl_opengl_internal.h"
 #include "displaymode.h"
 #include "videoopts.h"
 

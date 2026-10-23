@@ -9,7 +9,7 @@
 #include "build.h"
 #include "display.h"
 #include "engine.h"
-#include "glext.h"
+#include "sdl_opengl_internal.h"
 #include "editormode.h"
 
 /* Callbacks the game normally provides to the engine. */

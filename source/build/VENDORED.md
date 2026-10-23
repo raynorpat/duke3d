@@ -217,7 +217,7 @@ are retained.
 - `rendmode` is defined in `engine.c`, not here.
 - `glinfo` (`struct glinfo_t { float maxanisotropy; char bgra, clamptoedge,
   texcompr, texnpot, vbo, glsl, fbo; }`, which upstream got from
-  `baselayer.h`; `vbo`/`glsl`/`fbo` are set by `glext.c`) is declared in
+  `baselayer.h`; `vbo`/`glsl`/`fbo` are set by `sdl_opengl.c`) is declared in
   `build.h` under `USE_OPENGL`, not here. `sdl_driver.c` defines it, filled in
   by `setgamemode_gl`, and `nofog` (which upstream declares but no JFBuild
   file of that commit defines), set to 0.
@@ -424,7 +424,7 @@ Ported from later JFBuild commits, retyped as above:
   window's size again and reuse them. It sets JFBuild's GL state, fills `glinfo` from whole
   `GL_EXTENSIONS` tokens, sets `bpp = 32`, `xdim`/`ydim` to the drawable
   size clamped to `MAXXDIM`x`MAXYDIM` (on the shader path with an internal
-  size, that size: see `glext.c`), `qsetmode = 200` and `frameplace = 0`,
+  size, that size: see `sdl_opengl.c`), `qsetmode = 200` and `frameplace = 0`,
   then calls `setrendermode(3)` and `polymost_glreset()`. Without
   `USE_OPENGL` it returns -1 with an SDL error set.
 - `init_new_res_vars` is split: `init_res_lookups` (`ylookup`,
@@ -483,7 +483,7 @@ Ported from later JFBuild commits, retyped as above:
   `polymost_present_shader` shows through (its new `dark` argument).
   Black held over 2 * `VIDEOFADE_MS` with no `setvideofadein` fades back
   in by itself. Captures leave it out, except a front-buffer read.
-- `glext.c`/`glext.h` (ours, not JFBuild's): renderer 3's draw paths
+- `sdl_opengl.c`/`sdl_opengl_internal.h` (ours, not JFBuild's): renderer 3's draw paths
   (`GLPATH_AUTO`, `IMMEDIATE`, `VBO`, `SHADER`) and their setting names,
   the pure `gl_choosepath`, and the GL entry points past 1.1 as `bgl…`
   pointers from `SDL_GL_GetProcAddress` (`glActiveTexture` at GL 1.3 or
@@ -560,7 +560,7 @@ Ported from later JFBuild commits, retyped as above:
   supersampled colour present (`glshcdownfrag`) that doesn't link takes
   filtering only while supersampled, so supersampling keeps working at
   nearest (`gl_forcefail` 6, 7 and 8 test them).
-- `glsubmit.c`/`glsubmit.h` (ours): renderer 3's vertex submission.
+- `polymost_opengl_submit.c`/`polymost_opengl_submit.h` (ours): renderer 3's vertex submission.
   `polymost.c`'s and `engine.c`'s `glBegin`/`glTexCoord`/`glColor`/
   `glVertex`/`glEnd` (drawpoly, `drawtrap`/`tessectrap`, the tile picker,
   `drawline256`, `printext256`, `plotpixel`) are `glsub_*` calls, as floats
@@ -664,13 +664,13 @@ Ported from later JFBuild commits, retyped as above:
     `glredrawlastframe` and screenshots; `VBE_setPalette` doesn't
     retexture; `_glframereplayed` binds the window's framebuffer again.
 
-# Vendored: stb_image_write.h
+# Vendored: ../thirdparty/stb_image_write.h
 
 - Upstream: <https://github.com/nothings/stb>, `stb_image_write.h`
 - Commit: `a7d4c2175630e1ea5b6f8dd00ab96fed0b97b96d` (2026-10-19), v1.16
 - License: public domain / MIT (the file's choice), unchanged.
 
-Unmodified. `sdl_driver.c` defines `STB_IMAGE_WRITE_IMPLEMENTATION` and
+Unmodified. `sdl_window.c` defines `STB_IMAGE_WRITE_IMPLEMENTATION` and
 includes it. `screencapture` replaces the icculus port's PCX writer (the
 `pcxheader`, `write_pcx_plane` and the run-length loop are gone): it builds
 top-down 24-bit RGB, and the file name's extension picks `stbi_write_jpg`
