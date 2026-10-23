@@ -228,6 +228,7 @@ void CONTROL_GetInput( ControlInfo *info )
     int32 sens = CONTROL_GetMouseSensitivity() >> 9;
     int32 mx, my;
     int i, j;
+    GAMEPAD_Poll();
     memset(info, '\0', sizeof (ControlInfo));
 
     mx = my = 0;
@@ -278,7 +279,7 @@ void CONTROL_GetInput( ControlInfo *info )
     lastmousebuttons = mouseButtons;
 
     // update stick state.
-    if ((CONTROL_JoystickEnabled) && (_joystick_update()))
+    if ((CONTROL_JoystickEnabled) && !GAMEPAD_Connected() && (_joystick_update()))
     {
                // Check the hats
                JOYSTICK_UpdateHats();
@@ -375,6 +376,7 @@ void CONTROL_GetInput( ControlInfo *info )
 void CONTROL_ClearButton( int32 whichbutton )
 {
 	RESBUTTON(whichbutton);
+    GAMEPAD_ClearButton(whichbutton);
 }
 
 void CONTROL_ClearUserInput( UserInput *info )
@@ -425,6 +427,7 @@ void CONTROL_Startup
     int i;
 
     _joystick_init();
+    GAMEPAD_Init();
 
     for (i=0; i < MAXJOYHATS; i++)
     {
@@ -435,6 +438,7 @@ void CONTROL_Startup
 
 void CONTROL_Shutdown( void )
 {
+    GAMEPAD_Shutdown();
     _joystick_deinit();
 }
 

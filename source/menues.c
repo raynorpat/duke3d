@@ -2229,6 +2229,7 @@ void menus(void)
 //  int tenerr;
 // CTW END - REMOVED
 
+    GAMEPAD_Poll();
     getpackets();
 
     if(ControllerType == 1 && CONTROL_MousePresent)

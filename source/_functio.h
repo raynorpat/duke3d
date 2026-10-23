@@ -98,23 +98,23 @@ char * gamefunctions[] =
 
 static char * keydefaults[] =
    {
-   "Move_Forward", "Up", "Kpad8", 
-   "Move_Backward", "Down", "Kpad2", 
+   "Move_Forward", "W", "Up",
+   "Move_Backward", "S", "Down",
    "Turn_Left", "Left", "Kpad4", 
    "Turn_Right", "Right", "KPad6", 
    "Strafe", "LAlt", "RAlt", 
-   "Fire", "LCtrl", "RCtrl", 
-   "Open", "Space", "", 
+   "Fire", "RCtrl", "",
+   "Open", "E", "",
    "Run", "LShift", "RShift", 
    "AutoRun", "CapLck", "", 
-   "Jump", "A", "/", 
-   "Crouch", "Z", "", 
+   "Jump", "Space", "/",
+   "Crouch", "LCtrl", "C",
    "Look_Up", "PgUp", "Kpad9", 
    "Look_Down", "PgDn", "Kpad3", 
    "Look_Left", "Insert", "Kpad0", 
    "Look_Right", "Delete", "Kpad.", 
-   "Strafe_Left", ",", "", 
-   "Strafe_Right", ".", "", 
+   "Strafe_Left", "A", ",",
+   "Strafe_Right", "D", ".",
    "Aim_Up", "Home", "KPad7", 
    "Aim_Down", "End", "Kpad1", 
    "Weapon_1", "1", "", 
@@ -141,7 +141,7 @@ static char * keydefaults[] =
    "Enlarge_Screen", "=", "Kpad+", 
    "Center_View", "KPad5", "", 
    "Holster_Weapon", "ScrLck", "", 
-   "Show_Opponents_Weapon", "W", "", 
+   "Show_Opponents_Weapon", "", "",
    "Map_Follow_Mode", "F", "", 
    "See_Coop_View", "K", "", 
    "Mouse_Aiming", "U", "", 
@@ -156,8 +156,10 @@ static char * keydefaults[] =
 static char * mousedefaults[] =
    {
    "Fire",
-   "Strafe",
-   "Move_Forward",
+   "Quick_Kick",
+   "Open",
+   "Previous_Weapon",
+   "Next_Weapon",
    };
 
 

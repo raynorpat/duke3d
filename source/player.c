@@ -2731,7 +2731,7 @@ void getinput(short snum)
 #if DUKE3D_GAMEVER < GAMEVER_13D
     loc.bits |=   aimtoggle<<23;
 #else
-    loc.bits |=   myaimmode<<23;
+    loc.bits |=   (myaimmode || GAMEPAD_Connected())<<23;
 #endif
     loc.bits |=   BUTTON(gamefunc_Holo_Duke)<<24;
     loc.bits |=   BUTTON(gamefunc_Jetpack)<<25;
@@ -2884,6 +2884,8 @@ void getinput(short snum)
 
     if ( BUTTON(gamefunc_Move_Backward) )
         vel += -keymove;
+
+    GAMEPAD_AddInput(running, &vel, &svel, &angvel, &horiz);
 
     if(vel < -MAXVEL) vel = -MAXVEL;
     if(vel > MAXVEL) vel = MAXVEL;

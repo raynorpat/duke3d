@@ -407,6 +407,12 @@ its default.
 ### Config and saves
 
 Without a `duke3d.cfg` the game starts with default settings and writes one.
+The defaults use WASD to move and strafe, the mouse to look, Space to jump,
+E to use, Ctrl or C to crouch, and Shift to run. Left mouse fires, right mouse
+kicks, middle mouse uses, and the wheel changes weapons. Mouse look and the
+crosshair start enabled; U toggles mouse look and I toggles the crosshair.
+Existing configurations keep their saved bindings and settings.
+
 Config, saves and screenshots go to:
 
 | OS | Folder |
@@ -432,6 +438,32 @@ doesn't.
 macOS arm64; Linux and Windows are built and tested in CI. Demo recording and
 playback and the editor's map saving are verified on 64-bit. Network play
 builds but hasn't been verified on 64-bit.
+
+### Gamepads
+
+SDL2-compatible gamepads work automatically alongside keyboard and mouse,
+including when connected after startup. SDL's controller mappings provide the
+same layout on supported Xbox, PlayStation and other pads. Button names below
+use the Xbox layout; A is the bottom face button and X is the left face button.
+
+| Control | Action |
+|---|---|
+| Left stick | Move and strafe |
+| Right stick | Look, with a dead zone to prevent drift |
+| Right / left trigger | Fire / quick kick |
+| A / B / X / Y | Jump / crouch / use / use inventory item |
+| Left / right bumper | Previous / next weapon |
+| Left / right stick click | Run / crouch |
+| D-pad left / right | Previous / next inventory item |
+| D-pad up / down | Medkit / jetpack |
+| Back (View/Select) | Map |
+| Start | Open or close the menu |
+
+In menus, use the D-pad or left stick to navigate, A to confirm, and B or
+Start to go back. The first supported controller is used. Set
+`BUILD_SDLJOYSTICK` to a controller's SDL name to select it, or `none` to
+disable controller detection. Existing raw joystick configuration remains
+available for devices SDL does not recognize as game controllers.
 
 ### Command-line switches
 

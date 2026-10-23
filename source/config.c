@@ -333,14 +333,19 @@ void CONFIG_SetDefaults( void )
    FXVolume = 192;
    MusicVolume = 192;
    ReverseStereo = 0;
-   ps[0].aim_mode = 0;
+   ControllerType = controltype_keyboardandmouse;
+   MouseAiming = 0;
+   myaimmode = 1;
+   ps[0].aim_mode = 1;
+   ud.mouseflip = 1;  // SDL's positive Y is down; Build's positive horizon is up.
+   CONTROL_SetMouseSensitivity(32768);
    ud.screen_size = 8;
    ud.screen_tilting = 1;
    ud.shadows = 1;
    ud.detail = 1;
    ud.lockout = 0;
    ud.pwlockout[0] = '\0';
-   ud.crosshair = 0;
+   ud.crosshair = 1;
    ud.m_marker = 1;
    ud.m_ffire = 1;
    ScreenMode = 2;
@@ -475,6 +480,7 @@ void CONFIG_SetupMouse( int32 scripthandle )
       */
       }
 
+   function = CONTROL_GetMouseSensitivity();
    SCRIPT_GetNumber( scripthandle, "Controls","MouseSensitivity",&function);
    CONTROL_SetMouseSensitivity(function);
    }

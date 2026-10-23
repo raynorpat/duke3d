@@ -364,6 +364,22 @@ add_executable(game_helpers game_helpers.c "${_game_c}")
 target_link_libraries(game_helpers PRIVATE duke3d_game)
 add_test(NAME game_helpers COMMAND game_helpers)
 
+add_executable(gamepad gamepad.c "${_game_c}")
+target_link_libraries(gamepad PRIVATE duke3d_game duke3d::SDL2main)
+add_test(NAME gamepad COMMAND gamepad)
+set_tests_properties(gamepad PROPERTIES
+  ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS=1"
+  SKIP_RETURN_CODE 77 TIMEOUT 30)
+
+if(UNIX)
+  add_executable(input_defaults input_defaults.c "${_game_c}")
+  target_link_libraries(input_defaults PRIVATE duke3d_game)
+  add_test(NAME input_defaults COMMAND input_defaults)
+  set_tests_properties(input_defaults PROPERTIES
+    ENVIRONMENT "SDL_VIDEODRIVER=dummy;SDL_AUDIODRIVER=dummy;BUILD_WINDOWED=1"
+    TIMEOUT 30)
+endif()
+
 # The small full-screen HUD (screen_size 4) at several 8-bit modes: in
 # widescreen modes health sits at the screen's left edge and ammo and the
 # inventory at its right; 4:3 and tall modes keep their layout. Then a
