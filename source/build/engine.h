@@ -43,6 +43,14 @@ void faketimerhandler(void);
  *  information on using these functions that may or may not be accurate. :)
  */
 int initmouse(void);
+union SDL_Event;
+void setinputcallback(void (*poll)(void), void (*reset)(void),
+                      void (*event)(const union SDL_Event *));
+int readmousewheel(void);
+void clearmouseinput(void);
+void getmousevalues32(int32_t *x, int32_t *y, short *buttons);
+void setviewanglefraction(int32_t yaw, int32_t horizon);
+double getviewhorizscale(void);
 
 /**@brief Set the video mode.
  *

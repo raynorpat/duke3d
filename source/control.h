@@ -45,6 +45,9 @@ extern "C" {
 
 #define MaxJoys             2
 #define MAXGAMEBUTTONS      64
+/* Distinct from the DOS 11/12 cycle commands, whose demo semantics remain. */
+#define CONTROL_WEAPON_PREVIOUS 13
+#define CONTROL_WEAPON_NEXT     14
 
 #include "gamepad.h"
 
@@ -172,6 +175,15 @@ boolean CONTROL_FlagActive( int32 which );
 void CONTROL_ClearAssignments( void );
 void CONTROL_GetUserInput( UserInput *info );
 void CONTROL_GetInput( ControlInfo *info );
+void CONTROL_PollDevices(void);
+void CONTROL_ResetInput(void);
+void CONTROL_EndInput(void);
+int CONTROL_GetWheelDirection(void);
+int CONTROL_ImmediateLook(void);
+void CONTROL_ConsumeLook(int32 *turn, int32 *look, int maxturn, int maxlook);
+void CONTROL_GetView(int32 *yaw, int32 *horizon);
+void CONTROL_AcknowledgeInput(int32 sequence);
+void CONTROL_QueueInput(int32 sequence, int turn, int look);
 void CONTROL_ClearButton( int32 whichbutton );
 void CONTROL_ClearUserInput( UserInput *info );
 void CONTROL_WaitRelease( void );

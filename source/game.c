@@ -708,6 +708,10 @@ void faketimerhandler()
      {
           copybufbyte(&inputfifo[(movefifoend[myconnectindex]-1)&(MOVEFIFOSIZ-1)][myconnectindex],
                           &inputfifo[movefifoend[myconnectindex]&(MOVEFIFOSIZ-1)][myconnectindex],sizeof(input));
+          if (CONTROL_ImmediateLook()) {
+              input *queued = &inputfifo[movefifoend[myconnectindex]&(MOVEFIFOSIZ-1)][myconnectindex];
+              CONTROL_QueueInput(movefifoend[myconnectindex], queued->avel, queued->horz);
+          }
           movefifoend[myconnectindex]++;
           return;
      }
@@ -718,6 +722,8 @@ void faketimerhandler()
      nsyn[0].horz = avghorz/movesperpacket;
      nsyn[0].bits = avgbits;
      avgfvel = avgsvel = avgavel = avghorz = avgbits = 0;
+     if (CONTROL_ImmediateLook())
+         CONTROL_QueueInput(movefifoend[myconnectindex], nsyn[0].avel, nsyn[0].horz);
      movefifoend[myconnectindex]++;
 
      if (numplayers < 2)
@@ -3538,9 +3544,11 @@ void displayrooms(short snum,int32_t smoothratio)
     struct player_struct *p;
     int32_t tposx,tposy,tposz,dx,dy,thoriz,i;
     int32_t xfov, tiltw, b;
+    int32_t yawfraction = 0, pitchfraction = 0;
     short tang;
 
     p = &ps[snum];
+    setviewanglefraction(0, 0);
 
 //    if(screencapt == 0 && (p->gm&MODE_MENU) && ( (current_menu/100) == 3 ) || (current_menu >= 1000 && current_menu < 2999 ) )
   //      return;
@@ -3692,6 +3700,17 @@ void displayrooms(short snum,int32_t smoothratio)
                                 cang = p->oang+mulscale16((int32_t)(((p->ang+1024-p->oang)&2047)-1024),smoothratio);
                                 choriz = p->ohoriz+p->ohorizoff+mulscale16((int32_t)(p->horiz+p->horizoff-p->ohoriz-p->ohorizoff),smoothratio);
                   }
+                  if (snum == myconnectindex && CONTROL_ImmediateLook()) {
+                      int32 yaw, pitch;
+                      CONTROL_GetView(&yaw, &pitch);
+                      yaw += (numplayers > 1 ? myang : p->ang) * 65536;
+                      pitch += (numplayers > 1 ? myhoriz : p->horiz) * 65536;
+                      cang = (yaw / 65536) & 2047;
+                      choriz = pitch / 65536 + (numplayers > 1 ? myhorizoff : p->horizoff);
+                      yawfraction = yaw % 65536;
+                      pitchfraction = pitch % 65536;
+                      setviewanglefraction(yawfraction, pitchfraction);
+                  }
                   cang += p->look_ang;
 
 #if DUKE3D_GAMEVER < GAMEVER_10
@@ -3782,6 +3801,7 @@ void displayrooms(short snum,int32_t smoothratio)
                 j = visibility;
                 visibility = (j>>1) + (j>>2);
 
+                setviewanglefraction(-yawfraction, pitchfraction);
                 drawrooms(tposx,tposy,cposz,tang,choriz,mirrorsector[i]+MAXSECTORS);
 
                 display_mirror = 1;
@@ -3805,6 +3825,7 @@ void displayrooms(short snum,int32_t smoothratio)
         else if(choriz < -99) choriz = -99;
 #endif
 
+        setviewanglefraction(yawfraction, pitchfraction);
         drawrooms(cposx,cposy,cposz,cang,choriz,sect);
         animatesprites(cposx,cposy,cang,smoothratio);
         drawmasks();
@@ -3833,6 +3854,7 @@ void displayrooms(short snum,int32_t smoothratio)
     }
 
     restoreinterpolations();
+    setviewanglefraction(0, 0);
 
     if (totalclock < lastvisinc)
     {
@@ -9714,6 +9736,7 @@ int main(int argc,char **argv)
 #endif
     while ( !(ps[myconnectindex].gm&MODE_END) ) //The whole loop!!!!!!!!!!!!!!!!!!
     {
+        _handle_events();
         if( ud.recstat == 2 || ud.multimode > 1 || ( ud.show_help == 0 && (ps[myconnectindex].gm&MODE_MENU) != MODE_MENU ) )
             if( ps[myconnectindex].gm&MODE_GAME )
                 if( moveloop() ) continue;
@@ -11020,6 +11043,7 @@ ENDFAKEPROCESSINPUT:
         myzbak[fakemovefifoplc&(MOVEFIFOSIZ-1)] = myz;
         myangbak[fakemovefifoplc&(MOVEFIFOSIZ-1)] = myang;
         myhorizbak[fakemovefifoplc&(MOVEFIFOSIZ-1)] = myhoriz;
+        if (CONTROL_ImmediateLook()) CONTROL_AcknowledgeInput(fakemovefifoplc);
         fakemovefifoplc++;
 
         sprite[p->i].cstat = backcstat;
@@ -11204,6 +11228,8 @@ char domovethings(void)
         if( ud.pause_on == 0 )
         {
             processinput(i);
+            if (i == myconnectindex && numplayers < 2 && CONTROL_ImmediateLook())
+                CONTROL_AcknowledgeInput(movefifoplc - 1);
             checksectors(i);
         }
     }

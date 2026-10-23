@@ -2598,6 +2598,7 @@ void getinput(short snum)
     boolean running;
     int32 turnamount;
     int32 keymove;
+    int cycle;
     int32 momx,momy;
     struct player_struct *p;
 #if DUKE3D_GAMEVER < GAMEVER_13D
@@ -2625,6 +2626,7 @@ void getinput(short snum)
          loc.bits = (((int32_t)gamequit)<<26);
 #endif
          info.dz = info.dyaw = 0;
+         CONTROL_EndInput();
          return;
     }
 
@@ -2669,9 +2671,11 @@ void getinput(short snum)
         loc.bits |=   multiwhat<<18;
         loc.bits |=   multipos<<19;
         multiflag = 0;
+        CONTROL_EndInput();
         return;
     }
 
+    cycle = CONTROL_GetWheelDirection();
     loc.bits =   BUTTON(gamefunc_Jump);
     loc.bits |=   BUTTON(gamefunc_Crouch)<<1;
     loc.bits |=   BUTTON(gamefunc_Fire)<<2;
@@ -2695,10 +2699,15 @@ void getinput(short snum)
     if (BUTTON(gamefunc_Weapon_6))
        j = 6;
 
-    if (BUTTON(gamefunc_Previous_Weapon))
-        j = 11;
-    if (BUTTON(gamefunc_Next_Weapon))
-        j = 12;
+    if (BUTTON(gamefunc_Previous_Weapon)) {
+        j = CONTROL_WEAPON_PREVIOUS;
+        CONTROL_ClearButton(gamefunc_Previous_Weapon);
+    }
+    if (BUTTON(gamefunc_Next_Weapon)) {
+        j = CONTROL_WEAPON_NEXT;
+        CONTROL_ClearButton(gamefunc_Next_Weapon);
+    }
+    if (cycle) j = cycle < 0 ? CONTROL_WEAPON_PREVIOUS : CONTROL_WEAPON_NEXT;
 
     #ifndef VOLUMEONE
     if (BUTTON(gamefunc_Weapon_7))
@@ -2757,7 +2766,7 @@ void getinput(short snum)
     if( BUTTON(gamefunc_Strafe) )
        svel = -info.dyaw/8;
 #if DUKE3D_GAMEVER < GAMEVER_11
-    else angvel = info.dyaw>>8; // 1.0 (G10-L02)
+    else angvel = info.dyaw / 256; // 1.0 (G10-L02)
 #else
     else angvel = info.dyaw/64;
 #endif
@@ -2817,7 +2826,7 @@ void getinput(short snum)
     */
 
     svel -= info.dx;
-    vel = -info.dz>>6;
+    vel = -info.dz / 64;
 
     if (running)
     {
@@ -2886,6 +2895,9 @@ void getinput(short snum)
         vel += -keymove;
 
     GAMEPAD_AddInput(running, &vel, &svel, &angvel, &horiz);
+    if (CONTROL_ImmediateLook()) {
+        CONTROL_ConsumeLook(&angvel, &horiz, MAXANGVEL, MAXHORIZ);
+    }
 
     if(vel < -MAXVEL) vel = -MAXVEL;
     if(vel > MAXVEL) vel = MAXVEL;
@@ -2907,6 +2919,7 @@ void getinput(short snum)
         loc.svel = 0;
         loc.avel = 0;
         loc.horz = 0;
+        CONTROL_EndInput();
         return;
     }
 
@@ -2930,6 +2943,7 @@ void getinput(short snum)
     loc.svel = momy;
     loc.avel = angvel;
     loc.horz = horiz;
+    CONTROL_EndInput();
 }
 
 

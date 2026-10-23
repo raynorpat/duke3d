@@ -266,6 +266,7 @@ int loadplayerfile(char *fnptr, signed char spot)
 
      if ((fil = kopen4load(fnptr,0)) == -1) return(-1);
 
+     CONTROL_ResetInput();
      ready2send = 0;
 
 #if DUKE3D_GAMEVER < GAMEVER_11
@@ -2200,7 +2201,7 @@ void menus(void)
 //  int tenerr;
 // CTW END - REMOVED
 
-    GAMEPAD_Poll();
+    _handle_events();
     getpackets();
 
     if(ControllerType == 1 && CONTROL_MousePresent)

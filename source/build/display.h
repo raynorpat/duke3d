@@ -111,6 +111,7 @@ int setupmouse(void);
  *  frame's part of them when the shader path draws at an internal size. */
 void getmousearea(int *w, int *h);
 void readmousexy(short *x, short *y);
+void readmousexy32(int32_t *x, int32_t *y);
 void readmousebstatus(short *bstatus);
 void keyhandler(void);
 unsigned char _readlastkeyhit(void);

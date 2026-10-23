@@ -75,6 +75,22 @@ static uint32_t distrecip[16384];
 /* used to be static. --ryan. */
 char moustat = 0;
 
+/* Fractional camera orientation supplements the original integer API. */
+static int32_t viewyawfraction, viewhorizonfraction;
+static double renderangle, renderhorizon;
+
+double getviewhorizscale(void)
+{
+    return halfxdimen > 0 && xdimenscale > 0 ?
+        halfxdimen * 65536.0 / xdimenscale : 128.0;
+}
+
+void setviewanglefraction(int32_t yaw, int32_t horizon)
+{
+    viewyawfraction = yaw;
+    viewhorizonfraction = horizon;
+}
+
 int32_t transarea = 0, totalarea = 0, beforedrawrooms = 1;
 
 /* used to be static. --ryan. */
@@ -2110,8 +2126,14 @@ void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
 
 	globalposx = daposx; globalposy = daposy; globalposz = daposz;
 	globalang = (daang&2047);
+    renderangle = globalang + viewyawfraction / 65536.0;
+    renderhorizon = (dahoriz - 100 + viewhorizonfraction / 65536.0) *
+        xdimenscale / 65536.0 + (ydimen >> 1);
 
-	globalhoriz = mulscale16(dahoriz-100,xdimenscale)+(ydimen>>1);
+    if (viewhorizonfraction)
+        globalhoriz = (int32_t)renderhorizon;
+    else
+        globalhoriz = mulscale16(dahoriz-100,xdimenscale)+(ydimen>>1);
 	globaluclip = (0-globalhoriz)*xdimscale;
 	globaldclip = (ydimen-globalhoriz)*xdimscale;
 
@@ -2126,6 +2148,12 @@ void drawrooms(int32_t daposx, int32_t daposy, int32_t daposz,
 
 	cosglobalang = sintable[(globalang+512)&2047];
 	singlobalang = sintable[globalang&2047];
+    if (viewyawfraction) {
+        int next = (globalang + (viewyawfraction > 0 ? 1 : -1)) & 2047;
+        int fraction = abs(viewyawfraction);
+        cosglobalang += (int32_t)((int64_t)(sintable[(next+512)&2047] - cosglobalang) * fraction / 65536);
+        singlobalang += (int32_t)((int64_t)(sintable[next] - singlobalang) * fraction / 65536);
+    }
 	cosviewingrangeglobalang = mulscale16(cosglobalang,viewingrange);
 	sinviewingrangeglobalang = mulscale16(singlobalang,viewingrange);
 
@@ -6098,6 +6126,13 @@ int initmouse(void)
 	return(moustat = setupmouse());
 }
 
+
+void getmousevalues32(int32_t *x, int32_t *y, short *buttons)
+{
+    if (moustat == 0) { *x = *y = *buttons = 0; return; }
+    readmousexy32(x, y);
+    readmousebstatus(buttons);
+}
 
 void getmousevalues(short *mousx, short *mousy, short *bstatus)
 {

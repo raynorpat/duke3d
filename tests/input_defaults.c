@@ -43,17 +43,25 @@ int main(int argc, char **argv)
     GetPathFromEnvironment(cfg, sizeof(cfg), "duke3d.cfg");
     CONFIG_GetSetupFilename();
     CONFIG_ReadSetup();
+    CONTROL_Startup(ControllerType, NULL, TICRATE);
     check("fresh config uses keyboard and mouse", ControllerType, controltype_keyboardandmouse);
     check("fresh config has usable mouse sensitivity", CONTROL_GetMouseSensitivity() > 0, 1);
     check("fresh config enables mouse look", myaimmode, 1);
     check("fresh config enables player mouse aim", ps[0].aim_mode, 1);
     check("fresh config uses toggle mouse aim", MouseAiming, 0);
     check("fresh config enables crosshair", ud.crosshair, 1);
+    check("mouse aim toggle is unbound", CONTROL_GetMappingName(gamefunc_Mouse_Aiming) == NULL ||
+        strcmp(CONTROL_GetMappingName(gamefunc_Mouse_Aiming), "None") == 0, 1);
+    ud.last_level = -1;
+    resetplayerstats(0);
+    check("new level keeps configured mouse look", ps[0].aim_mode, 1);
+    ps[0].horiz = 100;
     for (i = 0; i < sizeof(bindings)/sizeof(bindings[0]); i++) {
         CONTROL_UpdateKeyboardState(bindings[i].key, 1);
         for (j = 0; j < NUMGAMEFUNCTIONS; j++)
             check("default key activates only its action", BUTTON(j), j == bindings[i].function);
         CONTROL_UpdateKeyboardState(bindings[i].key, 0);
+        CONTROL_EndInput();
         check("default key releases its action", BUTTON(bindings[i].function), 0);
     }
     {
@@ -111,6 +119,7 @@ int main(int argc, char **argv)
     CONTROL_UpdateKeyboardState(sc_X, 1);
     check("saved config keeps custom forward key", BUTTON(j), 1);
     CONTROL_UpdateKeyboardState(sc_X, 0);
+    CONTROL_EndInput();
     CONTROL_UpdateKeyboardState(sc_W, 1);
     check("saved config replaces default forward key", BUTTON(j), 0);
     CONTROL_UpdateKeyboardState(sc_W, 0);

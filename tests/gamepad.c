@@ -17,7 +17,9 @@ static void pollpad(void)
 {
     ControlInfo info;
     SDL_PumpEvents();
+    CONTROL_PollDevices();
     CONTROL_GetInput(&info);
+    CONTROL_EndInput();
 }
 
 int main(int argc, char **argv)
@@ -109,6 +111,7 @@ int main(int argc, char **argv)
     SDL_JoystickSetVirtualAxis(pad, 1, -1000);
     SDL_JoystickSetVirtualAxis(pad, 2, 1000);
     SDL_JoystickSetVirtualAxis(pad, 3, 1000);
+    CONTROL_PollDevices();
     getinput(0);
     check("stick drift does not move", loc.fvel != 0 || loc.svel != 0, 0);
     check("stick drift does not look", loc.avel != 0 || loc.horz != 0, 0);
@@ -117,6 +120,7 @@ int main(int argc, char **argv)
     SDL_JoystickSetVirtualAxis(pad, 2, 32767);
     SDL_JoystickSetVirtualAxis(pad, 3, 32767);
     SDL_PumpEvents();
+    CONTROL_PollDevices();
     getinput(0);
     check("left stick moves forward", loc.fvel > 0, 1);
     check("left stick strafes right", loc.svel > 0, 1);
@@ -124,6 +128,7 @@ int main(int argc, char **argv)
     check("right stick looks down", loc.horz < 0, 1);
     /* A saved mouse-look-off preference must not disable the right stick. */
     myaimmode = 0;
+    CONTROL_PollDevices();
     getinput(0);
 #if DUKE3D_GAMEVER >= GAMEVER_13D
     check("gamepad sends aim mode with mouse look off", (loc.bits >> 23) & 1, 1);
@@ -175,6 +180,7 @@ int main(int argc, char **argv)
     SDL_JoystickDetachVirtual(device);
     pollpad();
     check("disconnect releases controller action", BUTTON(action), 0);
+    CONTROL_PollDevices();
     getinput(0);
     check("disconnect does not leave movement", loc.fvel != 0 || loc.svel != 0, 0);
 #if DUKE3D_GAMEVER >= GAMEVER_13D
@@ -188,6 +194,46 @@ int main(int argc, char **argv)
     SDL_JoystickSetVirtualButton(pad, 0, 1);
     pollpad();
     check("reconnected controller works", BUTTON(action), 1);
+    ps[0].newowner = -1; ps[0].horiz = 100;
+    CONTROL_ResetInput(); _handle_events();
+    SDL_JoystickSetVirtualButton(pad, 0, 0); _handle_events();
+    SDL_JoystickSetVirtualButton(pad, 0, 1); _handle_events();
+    SDL_JoystickSetVirtualButton(pad, 0, 0); _handle_events();
+    check("short gamepad press survives frame polling", BUTTON(action), 1);
+    getinput(0);
+    check("tick sees short gamepad press", loc.bits & 1, 1);
+    check("short gamepad press consumed once", BUTTON(action), 0);
+    SDL_JoystickSetVirtualButton(pad, 0, 1); SDL_JoystickUpdate();
+    SDL_JoystickSetVirtualButton(pad, 0, 0); SDL_JoystickUpdate();
+    _handle_events();
+    check("batched gamepad press survives event pump", BUTTON(action), 1);
+    getinput(0);
+    check("batched gamepad press consumed once", BUTTON(action), 0);
+    SDL_JoystickSetVirtualAxis(pad, 5, 32767); SDL_JoystickUpdate();
+    SDL_JoystickSetVirtualAxis(pad, 5, -32768); SDL_JoystickUpdate();
+    _handle_events();
+    action = gamefunc_Fire;
+    check("batched trigger press survives event pump", BUTTON(action), 1);
+    getinput(0);
+    check("batched trigger press consumed once", BUTTON(action), 0);
+    SDL_JoystickSetVirtualAxis(pad, 2, 32767); _handle_events();
+    SDL_Delay(40); _handle_events();
+    {
+        int32 yaw, pitch;
+        CONTROL_GetView(&yaw, &pitch);
+        check("gamepad look reaches camera before tick", yaw > 0, 1);
+        getinput(0);
+        check("sampled gamepad look reaches tick", loc.avel > 0, 1);
+        CONTROL_GetView(&yaw, &pitch);
+        {
+            int32 before = yaw;
+            movefifoend[0]++;
+            getinput(0);
+            CONTROL_GetView(&yaw, &pitch);
+            check("tick does not resample gamepad rotation", yaw, before);
+            check("quantization cannot reverse held gamepad turn", loc.avel >= 0, 1);
+        }
+    }
     SDL_JoystickDetachVirtual(device);
     CONTROL_Shutdown();
     SDL_JoystickClose(pad);
