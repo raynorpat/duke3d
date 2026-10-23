@@ -622,6 +622,24 @@ only the data-free tests run there.
 | `docs/v13d/` | Notes on the 1.3D and 1.4 variants |
 | `docs/v10-v11/` | Reference, rulings and notes for the 1.0 and 1.1 shareware variants |
 
+The engine files in `source/build/` are grouped by responsibility:
+
+| File | Contents |
+|---|---|
+| `engine.c` | World rendering, geometry, collision, map I/O and engine initialization |
+| `display.c` | View setup, pixel/text drawing, palettes, brightness and fades |
+| `draw.c` | Low-level C scanline, column and slab drawing |
+| `tiles.c` | ART/voxel loading, tile operations, animation and sprite lists |
+| `filesystem.c` | GRP access, file reads/seeks and compressed reads/writes |
+| `cache.c` | Cache allocation, eviction, aging and diagnostics |
+| `math.c` | Fixed-point and memory helpers, math tables, angles and square roots |
+| `network.c` | Multiplayer transport |
+
+`polymost.c` remains included by `engine.c`; `sdl_driver.c` owns the SDL
+window, input, timer and presentation backend. `engine_internal.h` contains
+private declarations between engine modules. Existing public header names,
+including `a.h`, `cache1d.h` and `pragmas.h`, are retained.
+
 # Duke Nukem 3D (v1.5 CD Version) Source Code Release - April 1, 2003
 
 ## LEGAL STUFF

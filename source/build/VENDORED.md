@@ -14,6 +14,28 @@ sdl_driver.c unix_compat.c unix_compat.h win32_compat.h
 BUILDLIC.TXT LICENSE.md
 ```
 
+## Current source layout
+
+The import list above records the original filenames. The local module split
+moves their implementations as follows, retaining the original license notices
+and public header names:
+
+| Imported file | Current files |
+|---|---|
+| `a.c` | `draw.c` |
+| `mmulti.c` | `network.c` |
+| `cache1d.c` | `cache.c` (allocator/aging/diagnostics), `filesystem.c` (GRP, file I/O and LZW) |
+| `pragmas.c` | `math.c`, together with the math/table helpers extracted from `engine.c` |
+| `engine.c` | `engine.c` (world/renderer core), `display.c` (views, pixels/text and palette operations), `tiles.c` (tile/voxel resources and sprite bookkeeping), plus the helpers in `math.c` |
+
+`engine_internal.h` supplies only the declarations needed between these
+modules. `engine.c` still owns the `ENGINE` definitions from `build.h`, includes
+`polymost.c`, and bridges its private GL state for extracted display operations.
+The SDL backend and `../videoopts.c` keep their existing ownership. The split
+preserves the existing algorithms, release guards, public signatures, resource
+lifecycle and GL batch-flush behavior. Historical filenames below refer to
+those implementations before the split.
+
 ## Local changes
 
 - `VENDORED.md`: added (this file).

@@ -449,7 +449,7 @@ static void polymost_setfog (int32_t shade, float zero)
 	//   see-through when a is 1 (masked), drawn as the others when it's 0 (opaque).
 	//   The translucent program (glshtprog) is the same but for its end: a is 2 or 3,
 	//   classic's two translucent levels, masked too, and it draws the index under
-	//   it (from the copy, dest) and its own through transluc, as a.c's tvlineasm1
+	//   it (from the copy, dest) and its own through transluc, as draw.c's tvlineasm1
 	//   does, transluc[(under<<8)+own] at 2 and transluc[(own<<8)+under] at 3.
 static const char glshidxvert[] =
 	"#version 120\n"

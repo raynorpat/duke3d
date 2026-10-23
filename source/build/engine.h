@@ -1,5 +1,5 @@
 /*
- * A list of all symbols exported from engine.c for a game's use.
+ * Build engine symbols available to a game.
  *
  *  Put together by Ryan C. Gordon (icculus@clutteredmind.org)
  *
@@ -17,7 +17,7 @@
 /**@file engine.h
  * @brief Main engine include file.
  *
- * A list of all symbols exported from engine.c for a game's use.
+ * Build engine symbols available to a game.
  */
 
 #ifndef _INCLUDE_ENGINE_H_

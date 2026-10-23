@@ -195,7 +195,7 @@ extern short getpacket(short *other, char *bufptr);
 extern void flushpackets(void);
 extern void genericmultifunction(int32_t other, char *bufptr, int32_t messleng, int32_t command);
 
-/* engine.c */
+/* engine.c, display.c, math.c and tiles.c */
 extern int setgotpic(int32_t i1);
 extern int32_t getclipmask(int i1, int i2, int i3, int i4);
 extern int wallfront(int32_t l1, int32_t l2);

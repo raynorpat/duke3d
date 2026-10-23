@@ -37,6 +37,7 @@ extern int32_t globalpal;
 extern char kensmessage[128];
 
 #if defined(POLYMOST) && defined(USE_OPENGL)
+/* Binds the shader frame as needed before checking its colour representation. */
 int engine_gl_indexedtarget(void);
 void engine_gl_2dcolor(int32_t col);
 void engine_gl_lookupchanged(void);
