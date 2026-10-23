@@ -1,6 +1,6 @@
 # User maps from the episode menu
 
-Status: proposed design; layout and navigation approved, awaiting design approval.
+Status: approved by the user on 2026-10-23.
 
 ## Intent and scope
 
