@@ -235,11 +235,11 @@ Define bridges after polymost.c is included. Keep public setpolymost2dview in en
 
 **Interfaces:** Final CMake list contains draw.c/cache.c/filesystem.c/math.c/tiles.c/display.c/network.c/engine.c plus the unchanged support/backend sources and ../videoopts.c. All existing public symbols/declaration surfaces remain available.
 
-- [ ] **Step 1:** Document final module responsibilities and upstream filename mapping without rewriting historical provenance. Confirm no active build path still compiles a.c, cache1d.c, pragmas.c or mmulti.c; polymost.c remains HEADER_FILE_ONLY and included once by engine.c. Inspect compile_commands.json for the actual compiler inputs, not just filenames in the source tree.
-- [ ] **Step 2:** Repeat the shared recipe with stage=after, the GL run, and image/symbol comparisons. Compare normalized registered test names to the baseline; no existing tests may disappear. Report exact pass/failure/skip totals per configuration and matching unpinned checksums on the same compiler/platform. Keep any baseline failures distinct from regressions.
-- [ ] **Step 3:** Exercise the registered protocol peers first. For DUKE3D_NET_PEERS, use only the external executable/data pairs frozen in Task 1; compare those same inputs before/after rather than adding peers after the baseline. Do not claim beta multiplayer, original 1.4 DOS validation, or unavailable GL tiers were checked. Existing optional routebot code is retained; if validating its enabled build, use a separate 0.99 build with DUKE3D_ROUTEBOT=ON and run its existing tests without creating new DOS references.
-- [ ] **Step 4:** Run `git diff --check` and review `git diff --color-moved=plain 3d73ca1 -- source/build` plus the test/docs diffs. Require each changed body line to be a boundary/linkage/buffer substitution described above. Audit BUILD_ENGINEREV guards, initializers, signedness, intptr_t, licensing and duplicate storage. The original checkout remains untouched.
-- [ ] **Step 5:** Record tested platforms and the remaining Linux/Windows CI requirement. Obtain whole-branch code review through the execution workflow chosen by the user, address findings within scope, and rerun the owning checks for any resulting changes. Commit documentation/results: `engine: document extracted module ownership`.
+- [x] **Step 1:** Document final module responsibilities and upstream filename mapping without rewriting historical provenance. Confirm no active build path still compiles a.c, cache1d.c, pragmas.c or mmulti.c; polymost.c remains HEADER_FILE_ONLY and included once by engine.c. Inspect compile_commands.json for the actual compiler inputs, not just filenames in the source tree.
+- [x] **Step 2:** Repeat the shared recipe with stage=after, the GL run, and image/symbol comparisons. Compare normalized registered test names to the baseline; no existing tests may disappear. Report exact pass/failure/skip totals per configuration and matching unpinned checksums on the same compiler/platform. Keep any baseline failures distinct from regressions.
+- [x] **Step 3:** Exercise the registered protocol peers first. For DUKE3D_NET_PEERS, use only the external executable/data pairs frozen in Task 1; compare those same inputs before/after rather than adding peers after the baseline. Do not claim beta multiplayer, original 1.4 DOS validation, or unavailable GL tiers were checked. Existing optional routebot code is retained; if validating its enabled build, use a separate 0.99 build with DUKE3D_ROUTEBOT=ON and run its existing tests without creating new DOS references.
+- [x] **Step 4:** Run `git diff --check` and review `git diff --color-moved=plain 3d73ca1 -- source/build` plus the test/docs diffs. Require each changed body line to be a boundary/linkage/buffer substitution described above. Audit BUILD_ENGINEREV guards, initializers, signedness, intptr_t, licensing and duplicate storage. The original checkout remains untouched.
+- [x] **Step 5:** Record tested platforms and the remaining Linux/Windows CI requirement. Obtain whole-branch code review through the execution workflow chosen by the user, address findings within scope, and rerun the owning checks for any resulting changes. Commit documentation/results: `engine: document extracted module ownership`.
 
 ## Plan Review and Execution Handoff
 
@@ -249,10 +249,47 @@ After plan review and execution-method selection, use the corresponding required
 
 ## Execution record
 
-Execution method: Native, selected by the user on 2026-10-22. Source moves
-through Task 6 are committed and their named checks have run. Final full-suite,
-artifact/symbol comparison and independent review results are recorded below
-when those gates finish. Local evidence is in ignored `build-split-evidence/`.
+Execution method: Native, selected by the user on 2026-10-22. All seven tasks
+are complete. Each extraction passed its named checks; the final full matrix
+ran on source snapshot `0f14ffc`. Local raw evidence, the independent review,
+comparison scripts/results and the execution ledger are retained in ignored
+`build-split-evidence/`.
+
+| Configuration | Before passed/total | After passed/total | Skipped |
+|---|---:|---:|---:|
+| v15 | 97/97 | 97/97 | 0 |
+| v14 | 29/29 | 29/29 | 0 |
+| v13 | 52/52 | 52/52 | 0 |
+| v13sw | 51/51 | 51/51 | 0 |
+| v11sw | 51/53 | 51/53 | 0 |
+| v10sw | 50/52 | 50/52 | 0 |
+| v099sw | 52/52 | 52/52 | 0 |
+| v15-off | 92/92 | 92/92 | 0 |
+| v099sw-off | 52/52 | 52/52 | 0 |
+| Real OpenGL | 4/4 | 4/4 | 0 |
+
+Final aggregate: 530/534 passed, four unchanged baseline failures, zero skips.
+CTest retains its failure status for the two affected configurations; the
+comparison gate accepts only their exact existing names and initialized-peer
+Out Of Sync signatures. No new failure was observed. An additional boot check
+using matching Atomic data also passed.
+
+All nine registered test-name sets are unchanged. Compiler manifests confirm
+each split implementation is compiled once, no retired source is compiled,
+and polymost.c remains included by engine.c rather than compiled separately.
+All 654 original defined external symbol names/types remain, with 11 planned
+private helper/table additions. All 257 saved renderer images are byte-for-byte
+identical: v15 42, v15-off 38, GL 177. Recorded checksums, including the unpinned
+software Polymost outputs, match baseline on this compiler/platform.
+
+Independent whole-branch review (`3d73ca1..0f14ffc`) found no Critical or
+Important issue in supported configurations. Its body comparisons confirmed
+preserved arithmetic, state ownership, initialization order and GL side
+effects. The one Minor and all four declined areas are recorded below; no
+production fix pass was needed. The reviewer read evidence before the last
+rows/artifact comparisons finished; the final comparator subsequently checked
+those completed gates. Working-tree `git diff --check` passed; whole-range
+`git diff --check 3d73ca1..0f14ffc` exits 2 for the deferred whitespace warnings.
 
 Baseline: v15 97/97; v14 29/29; v13 52/52; v13sw 51/51; v11sw 51/53;
 v10sw 50/52; v099sw 52/52; v15-off 92/92; v099sw-off 52/52; GL 4/4.
@@ -276,3 +313,50 @@ Platforms: local macOS arm64. Linux/Windows validation remains the existing CI
 matrix requirement; original 1.4 DOS captures and beta multiplayer are not
 claimed. Built-in protocol peers are tested; no external peer binaries are
 configured. Existing routebot source remains unchanged.
+
+Source baseline: `3d73ca1`; completed source snapshot: `0f14ffc`. During
+execution the original checkout advanced independently to `a999f4e` via
+`e223d62`. This work did not write to or reset that checkout; its pre-existing
+untracked `tests/__pycache__/` remains. Integrating newer main changes is a
+separate step and has not been claimed as validated here.
+
+Rulings made during execution, in ledger order (including the final review's
+four declined areas):
+
+1. Use the approved baseline-green to extraction-green process for this
+   behavior-preserving move. Cost if wrong: an uncovered dependency must be
+   caught by the regression suite or independent review.
+2. Correct the renderer fixture to 1.3D while retaining Atomic data for its
+   separate save/GL checks. Cost if wrong: misleading fixture validation;
+   existing checksums and data fingerprints verify the choice. Initial fixture
+   errors remain in evidence; no checksum or tolerance was changed.
+3. Keep the four baseline network failures enabled and reject new names or
+   signatures. Cost if wrong: another defect in an already failing path might
+   escape; unchanged networking bodies and move review reduce that risk.
+4. Defer root-cause repairs of those same four desyncs to their own task.
+   Cost if wrong: a second fault could remain hidden behind the baseline desync.
+5. Do not certify unsupported Watcom/DOS/I386 runtime or calling conventions.
+   In particular, getclipmask's Watcom register annotation now lives in math.c
+   while callers see the private prototype. Current CMake does not select
+   that compiler/path. Cost if wrong: legacy builds may need ABI/declaration
+   work before they run correctly; retained assembly text proves no runtime
+   compatibility.
+6. Do not certify the dormant PhysicsFS configuration. Cost if wrong: an
+   optional-build integration fault remains undetected until it is enabled
+   and tested, despite preserving its implementation.
+7. Preserve existing repeated-init allocation and sprite-list boundary
+   policies. Cost if wrong: existing resource or invalid-input defects remain;
+   supported initialization and sprite-list contracts have baseline assertions.
+8. Make the Bash 3.2 optional-array recipe compatible with nounset by using
+   `extra=(-DDUKE3D_GRP=)`. Cost if wrong: an unintended default fixture option;
+   configured paths and pinned outputs verify the corrected invocation.
+9. After the actual full final run, use the evidence comparator as the
+   task-completion command rather than repeat the same suite solely inside
+   its bookkeeping wrapper. Cost if wrong: stale evidence could be accepted;
+   the comparator requires all nine final rows and unchanged source/tests
+   relative to the tested source snapshot.
+
+Deferred minor: the whole-range whitespace check reports inherited whitespace
+in moved math/tiles implementations and EOF blank lines in cache.c/display.c.
+These have no runtime effect; no formatting churn is included. The range check
+must not be described as clean.
