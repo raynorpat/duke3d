@@ -710,11 +710,12 @@ if (game_profile->gamever < GAMEVER_11) {
     }
     GAMEPAD_GetLook(&padturn, &padpitch);
     turn_rate = padturn;
-    if (!BUTTON(gamefunc_Strafe))
+    if (!BUTTON(gamefunc_Strafe)) {
 if (game_profile->gamever < GAMEVER_11) {
         turn_rate += (int32_t)((int64_t)sample.dyaw * 65536 / 256);
 } else {
         turn_rate += (int32_t)((int64_t)sample.dyaw * 65536 / 64);
+}
 }
     pitch_rate = padpitch + (int32_t)((int64_t)sample.dpitch * 65536 / 186 * (ud.mouseflip ? -1 : 1));
     if (active) {

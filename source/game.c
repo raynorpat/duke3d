@@ -1507,7 +1507,7 @@ void weapon_amounts(struct player_struct *p,int32_t x,int32_t y,int32_t u)
          weaponnum(HANDBOMB_WEAPON,x+39,y+6,
                      p->ammo_amount[HANDBOMB_WEAPON],max_ammo_amount[HANDBOMB_WEAPON],
                      (((!p->ammo_amount[HANDBOMB_WEAPON])|(!p->gotweapon[HANDBOMB_WEAPON]))*9)+12-19*
-                     ((cw == HANDBOMB_WEAPON) || (cw == HANDREMOTE_WEAPON)));
+                     ((cw == HANDBOMB_WEAPON) || (cw == game_remote_weapon())));
      }
      if (u&128)
      {
@@ -1568,14 +1568,14 @@ void weapon_amounts(struct player_struct *p,int32_t x,int32_t y,int32_t u)
          if ((uint32_t)u != 0xffffffff) patchstatusbar(166,190,166+8,190+6);
 #ifdef VOLUMEONE
         orderweaponnum(-1,x+70,y+12,
-                     p->ammo_amount[FREEZE_WEAPON],max_ammo_amount[FREEZE_WEAPON],
-                     (!p->gotweapon[FREEZE_WEAPON]*9)+12-18*
-                     (cw == FREEZE_WEAPON) );
+                     p->ammo_amount[game_freeze_weapon()],max_ammo_amount[game_freeze_weapon()],
+                     (!p->gotweapon[game_freeze_weapon()]*9)+12-18*
+                     (cw == game_freeze_weapon()) );
 #else
          weaponnum(-1,x+70,y+12,
-                     p->ammo_amount[FREEZE_WEAPON],max_ammo_amount[FREEZE_WEAPON],
-                     (!p->gotweapon[FREEZE_WEAPON]*9)+12-18*
-                     (cw == FREEZE_WEAPON) );
+                     p->ammo_amount[game_freeze_weapon()],max_ammo_amount[game_freeze_weapon()],
+                     (!p->gotweapon[game_freeze_weapon()]*9)+12-18*
+                     (cw == game_freeze_weapon()) );
 #endif
      }
 }
@@ -1787,7 +1787,7 @@ void coolgaugetext(short snum)
 
         rotatesprite((37+ax)<<16,(200-28)<<16,65536L,0,AMMOBOX,0,21,10+16,0,0,xdim-1,ydim-1);
 
-        if (p->curr_weapon == HANDREMOTE_WEAPON) i = HANDBOMB_WEAPON; else i = p->curr_weapon;
+        if (p->curr_weapon == game_remote_weapon()) i = HANDBOMB_WEAPON; else i = p->curr_weapon;
         digitalnumber(53+ax,200-17,p->ammo_amount[i],-16,10+16);
 
         o = 158; permbit = 0;
@@ -1882,7 +1882,7 @@ void coolgaugetext(short snum)
     //13 - update inventory %
     //14 - update keys
     //15 - update kills
-    //16 - update FREEZE_WEAPON ammo
+    //16 - update game_freeze_weapon() ammo
 
     if ((uint32_t)u == 0xffffffff)
     {
@@ -1928,7 +1928,7 @@ void coolgaugetext(short snum)
         if ((uint32_t)u != 0xffffffff) patchstatusbar(196,183,219,193);
         if (p->curr_weapon != KNEE_WEAPON)
         {
-            if (p->curr_weapon == HANDREMOTE_WEAPON) i = HANDBOMB_WEAPON; else i = p->curr_weapon;
+            if (p->curr_weapon == game_remote_weapon()) i = HANDBOMB_WEAPON; else i = p->curr_weapon;
             digitalnumber(230-22,200-17,p->ammo_amount[i],-16,10+16+128+512);
         }
     }
@@ -4206,7 +4206,7 @@ short spawn( short j, short pn )
     sp = &sprite[i];
     sect = sp->sectnum;
 
-    switch(sp->picnum)
+    switch(game_tile_case(sp->picnum))
     {
             default:
 
@@ -6552,7 +6552,7 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
         sect = s->sectnum;
         t1 = T2;t3 = T4;t4 = T5;
 
-        switch(s->picnum)
+        switch(game_tile_case(s->picnum))
         {
             case DUKELYINGDEAD:
                 t->z += (24<<8);
@@ -6700,7 +6700,7 @@ void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
                     tsprite[spritesortcnt].shade = t->shade;
                     tsprite[spritesortcnt].cstat = 0;
 
-                    switch(ps[p].curr_weapon)
+                    switch(game_weapon_case(ps[p].curr_weapon))
                     {
                         case PISTOL_WEAPON:      tsprite[spritesortcnt].picnum = FIRSTGUNSPRITE;       break;
                         case SHOTGUN_WEAPON:     tsprite[spritesortcnt].picnum = SHOTGUNSPRITE;        break;
@@ -10728,11 +10728,7 @@ void fakedomovethings(void)
         omyz = myz;
         omyang = myang;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
-        getzrange(myx,myy,myz,psect,&cz,&hz,&fz,&lz,163L,CLIPMASK1); // as 1.1's processinput
-#else
-        getzrange(myx,myy,myz,psect,&cz,&hz,&fz,&lz,163L,CLIPMASK0);
-#endif
+getzrange ( myx , myy , myz , psect , & cz , & hz , & fz , & lz , 163L , (game_profile->gamever < GAMEVER_13D ? (CLIPMASK1) : (CLIPMASK0)) ) ;
 
         j = getflorzofslope(psect,myx,myy);
 
@@ -10778,13 +10774,13 @@ void fakedomovethings(void)
                  if(badguy(&sprite[j]) && sprite[j].xrepeat > 24 && klabs(sprite[p->i].z-sprite[j].z) < (84<<8) )
                  {
                     j = getangle( sprite[j].x-myx,sprite[j].y-myy);
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
                     myxvel -= sintable[(j+512)&2047]<<6; // 1.3D's prediction pushes harder
                     myyvel -= sintable[j&2047]<<6;
-#else
+} else {
                     myxvel -= sintable[(j+512)&2047]<<4;
                     myyvel -= sintable[j&2047]<<4;
-#endif
+}
                 }
         }
 
@@ -10903,11 +10899,7 @@ void fakedomovethings(void)
                             {
                                      myonground = 0;
 
-#if DUKE3D_GAMEVER < GAMEVER_14
-                                     myzvel += 256; // 1.3D's prediction uses fixed gravity
-#else
-                                     myzvel += (gc+80);
-#endif
+myzvel += (game_profile->gamever < GAMEVER_14 ? (256) : ((gc+80)));
 
                                      if(myzvel >= (4096+2048)) myzvel = (4096+2048);
                             }
@@ -10954,10 +10946,10 @@ void fakedomovethings(void)
                                                 myjumpingtoggle = 1;
                                              }
                             }
-#if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D's prediction doesn't cancel a jump on release
+if (game_profile->gamever >= GAMEVER_14) {
                             if( myjumpingcounter && (sb_snum&1) == 0 )
                                 myjumpingcounter = 0;
-#endif
+}
                  }
 
                  if(myjumpingcounter)
@@ -10992,9 +10984,9 @@ void fakedomovethings(void)
                  if(myz < (cz+(4<<8)) )
                  {
                             myjumpingcounter = 0;
-#if DUKE3D_GAMEVER >= GAMEVER_14 // 1.3D's prediction keeps moving after a ceiling bump
+if (game_profile->gamever >= GAMEVER_14) {
                             if(myzvel < 0) myxvel = myyvel = 0;
-#endif
+}
                             myzvel = 128;
                             myz = cz+(4<<8);
                  }
@@ -11041,14 +11033,12 @@ void fakedomovethings(void)
                  }
                  else
                  {
-#if DUKE3D_GAMEVER >= GAMEVER_13D // Match processinput: early versions have no water friction.
-                    if(psectlotag == 2)
-                    {
+if ((game_profile->gamever >= GAMEVER_13D) && (psectlotag == 2)) {
+
                         myxvel = mulscale16(myxvel,dukefriction-0x1400);
                         myyvel = mulscale16(myyvel,dukefriction-0x1400);
-                    }
-                    else
-#endif
+
+} else
                     {
                         myxvel = mulscale16(myxvel,dukefriction);
                         myyvel = mulscale16(myyvel,dukefriction);
@@ -11060,15 +11050,15 @@ void fakedomovethings(void)
 
                  if( shrunk )
                  {
-#if DUKE3D_GAMEVER < GAMEVER_13D
+if (game_profile->gamever < GAMEVER_13D) {
                      myxvel = mulscale16(myxvel,dukefriction-0x2900);
                      myyvel = mulscale16(myyvel,dukefriction-0x2900);
-#else
+} else {
                      myxvel =
                          mulscale16(myxvel,(dukefriction)-(dukefriction>>1)+(dukefriction>>2));
                      myyvel =
                          mulscale16(myyvel,(dukefriction)-(dukefriction>>1)+(dukefriction>>2));
-#endif
+}
                  }
         }
 

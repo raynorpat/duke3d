@@ -290,15 +290,9 @@ struct player_struct;
 #define SHRINKER_WEAPON      6
 #define DEVISTATOR_WEAPON    7
 #define TRIPBOMB_WEAPON      8
-#if DUKE3D_GAMEVER < GAMEVER_13D
-// 1.1's DEFS.CON numbering: 7 is the flamethrower and 9 the remote. 1.1 has
-//  no freezer, so it gets slot 10, which nothing gives.
-#define HANDREMOTE_WEAPON    9
-#define FREEZE_WEAPON        10
-#else
-#define FREEZE_WEAPON        9
-#define HANDREMOTE_WEAPON    10
-#endif
+/* Semantic switch labels; raw slots come from game_*_weapon(). */
+#define FREEZE_WEAPON 9
+#define HANDREMOTE_WEAPON 10
 #define GROW_WEAPON          11
 
 #define T1  hittype[i].temp_data[0]

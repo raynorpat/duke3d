@@ -1930,11 +1930,12 @@ short furthestangle(short i,short angs)
     greatestd = -(1<<30);
     angincs = 2048/angs;
 
-    if(s->picnum != APLAYER)
+    if(s->picnum != APLAYER) {
 if (game_profile->gamever < GAMEVER_13D) {
         if( (g_t[0]&63) ) return( s->ang + 64 );
 } else {
         if( (g_t[0]&63) > 2 ) return( s->ang + 1024 );
+}
 }
 
     for(j=s->ang;j<(2048+s->ang);j+=angincs)
@@ -2025,7 +2026,7 @@ void alterang(short a)
     /* Approach the scripted velocity by one fifth of the remaining difference
      * each tick rather than replacing it outright. */
     g_sp->xvel += (*moveptr-g_sp->xvel)/5;
-if ((game_profile->gamever >= GAMEVER_10 ? (g_sp->zvel < 648) : (0)))
+if ((game_profile->gamever >= GAMEVER_10 ? (g_sp->zvel < 648) : (1)))
         g_sp->zvel += ((*(moveptr+1)<<4)-g_sp->zvel)/5;
 
     if(a&seekplayer)
@@ -2314,13 +2315,14 @@ if (game_profile->gamever < GAMEVER_13D) {
 }
             }
         }
-        else if(g_sp->picnum == APLAYER)
+        else if(g_sp->picnum == APLAYER) {
 if (game_profile->gamever < GAMEVER_10) {
             if( (g_sp->z-sector[g_sp->sectnum].ceilingz) < (32<<8) )
                 g_sp->z = sector[g_sp->sectnum].ceilingz+(32<<8);
 } else {
             if( (g_sp->z-hittype[g_i].ceilingz) < (32<<8) )
                 g_sp->z = hittype[g_i].ceilingz+(32<<8);
+}
 }
 
         /* Keep scripted velocity separate from the displacement used this tick;
@@ -3079,7 +3081,7 @@ if (game_profile->gamever < GAMEVER_10) {
             break;
         case 31:
             insptr++;
-if ((game_profile->gamever >= GAMEVER_13D ? (g_sp->sectnum >= 0 && g_sp->sectnum < MAXSECTORS) : (0)))
+if ((game_profile->gamever >= GAMEVER_13D ? (g_sp->sectnum >= 0 && g_sp->sectnum < MAXSECTORS) : (1)))
                 spawn(g_i,*insptr);
             insptr++;
             break;

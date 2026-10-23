@@ -26,14 +26,32 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 #include <stdint.h>
 #include "duke3d.h"
+
+/* Map version-dependent case labels without changing raw game IDs. */
+static int premap_dispatch_1(int value)
+{
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (CLOUDYOCEAN)) return 1000001;
+    return value;
+}
+
+static int premap_dispatch_2(int value)
+{
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK14)) return 1000002;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK15)) return 1000003;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK16)) return 1000004;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK17)) return 1000005;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK18)) return 1000006;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK19)) return 1000007;
+    return value;
+}
+
+
 #include "glext.h"
 
 extern char everyothertime;
 short which_palookup = 9;
-#if DUKE3D_GAMEVER < GAMEVER_14
 // 1.3D keeps each player's colour from the first level of a game.
 static char savedpal[MAXPLAYERS];
-#endif
 
 
 /*
@@ -270,11 +288,14 @@ char getsound(unsigned short num)
     short fp;
     int32_t   l;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
-    if(num >= GAME_NUM_SOUNDS || SoundToggle == 0) return 0;
-#else
-    if(num >= NUM_SOUNDS || SoundToggle == 0) return 0;
-#endif
+if ((game_profile->gamever < GAMEVER_13D ? (num >= GAME_NUM_SOUNDS || SoundToggle == 0) : (num >= NUM_SOUNDS || SoundToggle == 0))) {
+if (game_profile->gamever < GAMEVER_13D) {
+return 0;
+}
+else {
+return 0;
+}
+}
     if (FXDevice == NumSoundCards) return 0;
 
     fp = kopen4load(sounds[num],loadfromgrouponly);
@@ -283,22 +304,11 @@ char getsound(unsigned short num)
     l = kfilelength( fp );
     soundsiz[num] = l;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
-    // 1.1 locks fewer sounds, and at lock level 1.
-    if( (ud.level_number == 0 && ud.volume_number == 0 && (num == 189 || num == 232 || num == 17 ) ) ||
-        ( l < 10240 ) )
+    if ((ud.level_number==0 && ud.volume_number==0 &&
+         (num==189 || num==232 || num==17 || (game_profile->gamever>=GAMEVER_13D && (num==99 || num==233)))) ||
+        l < (game_profile->gamever<GAMEVER_13D ? 10240 : game_profile->gamever<GAMEVER_15 ? 12800 : 12288))
     {
-        Sound[num].lock = 1;
-#else
-    if( (ud.level_number == 0 && ud.volume_number == 0 && (num == 189 || num == 232 || num == 99 || num == 233 || num == 17 ) ) ||
-#if DUKE3D_GAMEVER < GAMEVER_15
-        ( l < 12800 ) )
-#else
-        ( l < 12288 ) )
-#endif
-    {
-        Sound[num].lock = 2;
-#endif
+        Sound[num].lock=game_profile->gamever<GAMEVER_13D ? 1 : 2;
         allocache((intptr_t *)&Sound[num].ptr,l,(unsigned char *)&Sound[num].lock);
         if(Sound[num].ptr != NULL)
             kread( fp, Sound[num].ptr , l);
@@ -319,19 +329,19 @@ void precachenecessarysounds(void)
 {
     short i, j;
 
-#if DUKE3D_GAMEVER >= GAMEVER_13D
+if (game_profile->gamever >= GAMEVER_13D) {
     if (FXDevice == NumSoundCards) return;
-#endif
+}
     j = 0;
 
     for(i=0;i<GAME_NUM_SOUNDS;i++)
         if(Sound[i].ptr == 0)
         {
-#if DUKE3D_GAMEVER >= GAMEVER_15
+if (game_profile->gamever >= GAMEVER_15) {
             j++;
             if( (j&7) == 0 )
                 getpackets();
-#endif
+}
             getsound(i);
         }
 }
@@ -511,7 +521,7 @@ void pickrandomspot(short snum)
 
     p = &ps[snum];
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
     // 1.3D starts every co-op player at the first player's spot.
     if( ud.multimode > 1 )
     {
@@ -519,11 +529,11 @@ void pickrandomspot(short snum)
         else i = TRAND%numplayersprites;
     }
     else i = snum;
-#else
+} else {
     if( ud.multimode > 1 && ud.coop != 1)
         i = TRAND%numplayersprites;
     else i = snum;
-#endif
+}
 
     p->bobposx = p->oposx = p->posx = po[i].ox;
     p->bobposy = p->oposy = p->posy = po[i].oy;
@@ -547,10 +557,10 @@ void resetplayerstats(short snum)
 
     p = &ps[snum];
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
     if(ud.last_level == -1 || ud.recstat == 2)
         p->aim_mode = ud.recstat == 2 ? 0 : myaimmode;
-#endif
+}
 
     ud.show_help        = 0;
     ud.showallmap       = 0;
@@ -577,10 +587,10 @@ void resetplayerstats(short snum)
     p->weapon_sway      = 0;
 //    p->select_dir       = 0;
     p->extra_extra8     = 0;
-#if DUKE3D_GAMEVER < GAMEVER_13D
+if (game_profile->gamever < GAMEVER_13D) {
     p->spacesuit_used   = 0;
     p->burn_time        = 0;
-#endif
+}
     p->show_empty_weapon= 0;
     p->dummyplayersprite=-1;
     p->crack_time       = 0;
@@ -597,29 +607,22 @@ void resetplayerstats(short snum)
     p->bobcounter       = 0;
     p->on_ground        = 0;
     p->player_par       = 0;
-#if DUKE3D_GAMEVER < GAMEVER_10
-    p->return_to_center = 4;
-#else
-    p->return_to_center = 9;
-#endif
+p->return_to_center = (game_profile->gamever < GAMEVER_10 ? (4) : (9));
     p->airleft          = 15*26;
     p->rapid_fire_hold  = 0;
     p->toggle_key_flag  = 0;
     p->access_spritenum = -1;
-#if DUKE3D_GAMEVER < GAMEVER_13D
-    if(ud.multimode > 1 && ud.coop == 0 ) // 1.1: dukematch only
-#else
-    if(ud.multimode > 1 && ud.coop != 1 )
-#endif
+if ((game_profile->gamever < GAMEVER_13D ? (ud.multimode > 1 && ud.coop == 0 ) : (ud.multimode > 1 && ud.coop != 1 )))
         p->got_access = 7;
     else p->got_access      = 0;
     p->random_club_frame= 0;
     pus = 1;
     p->on_warping_sector = 0;
     p->spritebridge      = 0;
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
     p->over_shoulder_on = 0;
-#elif DUKE3D_GAMEVER < GAMEVER_13D
+} else {
+if (game_profile->gamever < GAMEVER_13D) {
     // 1.1 keeps the third-person view across levels, with the camera reset.
     if(p->over_shoulder_on)
     {
@@ -627,7 +630,8 @@ void resetplayerstats(short snum)
         cameraclock = totalclock;
         p->over_shoulder_on = 1;
     }
-#endif
+}
+}
     p->palette = (char *) &palette[0];
 
     if(p->steroids_amount < 400 )
@@ -639,12 +643,7 @@ void resetplayerstats(short snum)
     p->jetpack_on =         0;
     p->holoduke_on =       -1;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
-    // 1.1 starts a level looking 256 aside, not 512.
-    p->look_ang          = 256 - ((ud.level_number&1)<<9);
-#else
-    p->look_ang          = 512 - ((ud.level_number&1)<<10);
-#endif
+p->look_ang = (game_profile->gamever < GAMEVER_13D ? (256 - ((ud.level_number&1)<<9)) : (512 - ((ud.level_number&1)<<10)));
 
     p->rotscrnang        = 0;
     p->newowner          =-1;
@@ -703,10 +702,10 @@ void resetweapons(short snum)
     p->gotweapon[PISTOL_WEAPON] = 1;
     p->gotweapon[KNEE_WEAPON] = 1;
     p->ammo_amount[PISTOL_WEAPON] = 48;
-    p->gotweapon[HANDREMOTE_WEAPON] = 1;
-#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 does it in resetinventory (G10-P02)
+    p->gotweapon[game_remote_weapon()] = 1;
+if (game_profile->gamever >= GAMEVER_11) {
     p->last_weapon = -1;
-#endif
+}
 
     p->show_empty_weapon= 0;
     p->last_pissed_time = 0;
@@ -736,17 +735,17 @@ void resetinventory(short snum)
     p->holoduke_on = -1;
     p->holoduke_amount =    0;
     p->firstaid_amount = 0;
-#if DUKE3D_GAMEVER >= GAMEVER_10
+if (game_profile->gamever >= GAMEVER_10) {
     p->steroids_amount = 0;
-#endif
-#if DUKE3D_GAMEVER < GAMEVER_13D
+}
+if (game_profile->gamever < GAMEVER_13D) {
     p->spacesuit_amount = 0;
     p->spacesuit_on = 0;
-#endif
+}
     p->inven_icon = 0;
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
     p->last_weapon = -1; // 1.0 (G10-P02)
-#endif
+}
 }
 
 
@@ -779,9 +778,9 @@ void resetprestat(short snum,char g)
     p->lastrandomspot = 0;
     p->weapon_pos = 6;
     p->kickback_pic = 5;
-#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 clears it only with the inventory or the remote (G10-P01)
+if (game_profile->gamever >= GAMEVER_11) {
     p->last_weapon = -1;
-#endif
+}
     p->weapreccnt = 0;
     p->show_empty_weapon= 0;
     p->holster_weapon = 0;
@@ -806,12 +805,12 @@ void resetprestat(short snum,char g)
     numinterpolations = 0;
     startofdynamicinterpolations = 0;
 
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
     // 1.0: a level left with timebeforeexit at 1 loses the pistol and keeps
     // the inventory (G10-P01).
     if( (g&MODE_EOL) == MODE_EOL && p->timebeforeexit != 1 )
     {
-        if(p->curr_weapon == HANDREMOTE_WEAPON)
+        if(p->curr_weapon == game_remote_weapon())
         {
             p->ammo_amount[HANDBOMB_WEAPON]++;
             p->curr_weapon = HANDBOMB_WEAPON;
@@ -829,23 +828,18 @@ void resetprestat(short snum,char g)
         }
         else resetinventory(snum);
     }
-#else
-#if DUKE3D_GAMEVER < GAMEVER_13D
-    // 1.1 tests only for the end of a level, so dukematch keeps the weapons.
-    if( (g&MODE_EOL) != MODE_EOL )
-#else
-    if( ( (g&MODE_EOL) != MODE_EOL && numplayers < 2) || (ud.coop != 1 && numplayers > 1) )
-#endif
+} else {
+if ((game_profile->gamever < GAMEVER_13D ? ( (g&MODE_EOL) != MODE_EOL ) : ( ( (g&MODE_EOL) != MODE_EOL && numplayers < 2) || (ud.coop != 1 && numplayers > 1) )))
     {
         resetweapons(snum);
         resetinventory(snum);
     }
-    else if(p->curr_weapon == HANDREMOTE_WEAPON)
+    else if(p->curr_weapon == game_remote_weapon())
     {
         p->ammo_amount[HANDBOMB_WEAPON]++;
         p->curr_weapon = HANDBOMB_WEAPON;
     }
-#endif
+}
 
     p->timebeforeexit   = 0;
     p->customexitsound  = 0;
@@ -863,25 +857,18 @@ void setupbackdrop(short sky)
 {
     short i;
 
-#if DUKE3D_GAMEVER < GAMEVER_14
-    for(i=0;i<8;i++) pskyoff[i]=0;
-
-    parallaxyscale = 32768;
-
-    switch(sky)
+    for(i=0;i<(game_profile->gamever<GAMEVER_14 ? 8 : MAXPSKYTILES);i++) pskyoff[i]=0;
+    if(game_profile->gamever<GAMEVER_14 || parallaxyscale!=65536L) parallaxyscale=32768;
+    switch(premap_dispatch_1(sky))
     {
-#else
-    for(i=0;i<MAXPSKYTILES;i++) pskyoff[i]=0;
-
-    if(parallaxyscale != 65536L)
-        parallaxyscale = 32768;
-
-    switch(sky)
-    {
-        case CLOUDYOCEAN:
-            parallaxyscale = 65536L;
+if (game_profile->gamever >= GAMEVER_14) goto premap_branch_857_0;
+else goto premap_branch_857_end;
+premap_branch_857_0:;
+        case 1000001:
+            parallaxyscale=65536L;
             break;
-#endif
+goto premap_branch_857_end;
+premap_branch_857_end:;
         case MOONSKY1 :
             pskyoff[6]=1; pskyoff[1]=2; pskyoff[4]=2; pskyoff[2]=3;
             break;
@@ -917,9 +904,9 @@ void prelevel(char g)
     clearbufbyte(show2dsprite,sizeof(show2dsprite),0L);
 
     resetprestat(0,g);
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
     numclouds = 0;
-#endif
+}
 
     for(i=0;i<numsectors;i++)
     {
@@ -945,10 +932,10 @@ void prelevel(char g)
             }
             setupbackdrop(sector[i].ceilingpicnum);
 
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
             if(sector[i].ceilingpicnum == CLOUDYSKIES && numclouds < 127)
                 clouds[numclouds++] = i;
-#endif
+}
 
             if(ps[0].one_parallax_sectnum == -1)
                 ps[0].one_parallax_sectnum = i;
@@ -1124,11 +1111,16 @@ void prelevel(char g)
             case W_FORCEFIELD+2:
                 if(wal->shade > 31)
                     wal->cstat = 0;
-#if DUKE3D_GAMEVER < GAMEVER_13D
-                else wal->cstat |= 85;
-#else
-                else wal->cstat |= 85+256;
-#endif
+else {
+if (game_profile->gamever < GAMEVER_13D) {
+ wal->cstat |= 85;
+
+}
+else {
+ wal->cstat |= 85+256;
+
+}
+}
 
 
                 if(wal->lotag && wal->nextwall >= 0)
@@ -1145,7 +1137,7 @@ void prelevel(char g)
 
         wal->extra = -1;
 
-        switch(wal->picnum)
+        switch(premap_dispatch_2(wal->picnum))
         {
             case WATERTILE2:
                 for(j=0;j<3;j++)
@@ -1185,13 +1177,13 @@ void prelevel(char g)
                 animwall[numanimwalls].tag = -1;
                 if(ud.lockout)
                 {
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
                     wal->picnum = VIEWSCREENBROKE;
-#else
+} else {
                     if(wal->picnum == FEMPIC1)
                         wal->picnum = BLANKSCREEN;
                     else wal->picnum = SCREENBREAK6;
-#endif
+}
                 }
 
                 animwall[numanimwalls].wallnum = i;
@@ -1210,14 +1202,12 @@ void prelevel(char g)
             case SCREENBREAK11:
             case SCREENBREAK12:
             case SCREENBREAK13:
-#if DUKE3D_GAMEVER >= GAMEVER_14
-            case SCREENBREAK14:
-            case SCREENBREAK15:
-            case SCREENBREAK16:
-            case SCREENBREAK17:
-            case SCREENBREAK18:
-            case SCREENBREAK19:
-#endif
+            case 1000002:
+            case 1000003:
+            case 1000004:
+            case 1000005:
+            case 1000006:
+            case 1000007:
 
                 animwall[numanimwalls].wallnum = i;
                 animwall[numanimwalls].tag = wal->picnum;
@@ -1256,23 +1246,23 @@ void newgame(char vn,char ln,char sk)
     CONTROL_ResetInput();
     video_flushpending();  // shows frames of its own
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
     if(ud.multimode < 2) p->aim_mode = ud.recstat == 2 ? 0 : myaimmode;
-#else
+} else {
     if(globalskillsound >= 0)
         while(Sound[globalskillsound].lock>=200);
     globalskillsound = -1;
 
     waitforeverybody();
-#endif
+}
     ready2send = 0;
 
-#if DUKE3D_GAMEVER >= GAMEVER_13D
+if (game_profile->gamever >= GAMEVER_13D) {
     if( ud.m_recstat != 2 && ud.last_level >= 0 && ud.multimode > 1 && ud.coop != 1)
         dobonus(1);
-#endif
+}
 
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
     if( ln == 0 && vn == 3 && ud.multimode < 2 && ud.lockout == 0)
     {
         playmusic(&env_music_fn[1][0]);
@@ -1294,49 +1284,49 @@ void newgame(char vn,char ln,char sk)
 
         FX_StopAllSounds();
     }
-#endif
+}
 
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
     p->auto_run = 0;
     p->frag = p->fraggedself = 0;
-#else
+} else {
     show_shareware = 26*34;
-#endif
+}
 
     ud.level_number =   ln;
     ud.volume_number =  vn;
     ud.player_skill =   sk;
-#if DUKE3D_GAMEVER >= GAMEVER_13D
+if (game_profile->gamever >= GAMEVER_13D) {
     // 1.1 resets neither, so from_bonus carries into a new game.
     ud.secretlevel =    0;
     ud.from_bonus = 0;
-#endif
-#if DUKE3D_GAMEVER >= GAMEVER_14
+}
+if (game_profile->gamever >= GAMEVER_14) {
     parallaxyscale = 0;
-#endif
+}
 
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
     p->last_weapon = -1; // 1.0 keeps last_level (G10-P02)
-#else
+} else {
     ud.last_level = -1;
-#endif
-#if DUKE3D_GAMEVER >= GAMEVER_14
+}
+if (game_profile->gamever >= GAMEVER_14) {
     lastsavedpos = -1;
-#endif
+}
     p->zoom            = 768;
     p->gm              = 0;
 
-#if DUKE3D_GAMEVER >= GAMEVER_13D
+if (game_profile->gamever >= GAMEVER_13D) {
     if(ud.m_coop != 1)
     {
         p->curr_weapon = PISTOL_WEAPON;
         p->gotweapon[PISTOL_WEAPON] = 1;
         p->gotweapon[KNEE_WEAPON] = 1;
         p->ammo_amount[PISTOL_WEAPON] = 48;
-        p->gotweapon[HANDREMOTE_WEAPON] = 1;
+        p->gotweapon[game_remote_weapon()] = 1;
         p->last_weapon = -1;
     }
-#endif
+}
 
     display_mirror =        0;
 
@@ -1349,13 +1339,10 @@ void newgame(char vn,char ln,char sk)
             connectpoint2[ud.multimode-1] = -1;
         }
     }
-#if DUKE3D_GAMEVER >= GAMEVER_13D
-    else
-    {
+else if (game_profile->gamever >= GAMEVER_13D) {
         connecthead = 0;
         connectpoint2[0] = -1;
     }
-#endif
 }
 
 
@@ -1373,9 +1360,7 @@ void resetpspritevars(char g)
     int32_t firstx,firsty;
     spritetype *s;
     char aimmode[MAXPLAYERS];
-#if DUKE3D_GAMEVER >= GAMEVER_13D
     STATUSBARTYPE tsbar[MAXPLAYERS];
-#endif
 
     EGS(ps[0].cursectnum,ps[0].posx,ps[0].posy,ps[0].posz,
         APLAYER,0,0,0,ps[0].ang,0,0,0,10);
@@ -1383,7 +1368,7 @@ void resetpspritevars(char g)
     if(ud.recstat != 2) for(i=0;i<MAXPLAYERS;i++)
     {
         aimmode[i] = ps[i].aim_mode;
-#if DUKE3D_GAMEVER >= GAMEVER_13D
+if (game_profile->gamever >= GAMEVER_13D) {
         // 1.1 doesn't carry the co-op weapons and inventory to the next level.
         if(ud.multimode > 1 && ud.coop == 1 && ud.last_level >= 0)
         {
@@ -1405,7 +1390,7 @@ void resetpspritevars(char g)
             tsbar[i].scuba_amount = ps[i].scuba_amount;
             tsbar[i].boot_amount = ps[i].boot_amount;
         }
-#endif
+}
     }
 
     resetplayerstats(0);
@@ -1416,7 +1401,7 @@ void resetpspritevars(char g)
     if(ud.recstat != 2) for(i=0;i<MAXPLAYERS;i++)
     {
         ps[i].aim_mode = aimmode[i];
-#if DUKE3D_GAMEVER >= GAMEVER_13D
+if (game_profile->gamever >= GAMEVER_13D) {
         if(ud.multimode > 1 && ud.coop == 1 && ud.last_level >= 0)
         {
             for(j=0;j<MAX_WEAPONS;j++)
@@ -1436,7 +1421,7 @@ void resetpspritevars(char g)
             ps[i].scuba_amount= tsbar[i].scuba_amount;
             ps[i].boot_amount = tsbar[i].boot_amount;
         }
-#endif
+}
     }
 
     numplayersprites = 0;
@@ -1470,13 +1455,13 @@ void resetpspritevars(char g)
         {
             s->owner = i;
             s->shade = 0;
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
             s->xrepeat = 48;
             s->yrepeat = 44;
-#else
+} else {
             s->xrepeat = 42;
             s->yrepeat = 36;
-#endif
+}
             s->cstat = 1+256;
             s->xoffset = 0;
             s->clipdist = 64;
@@ -1490,7 +1475,7 @@ void resetpspritevars(char g)
 
             s->yvel = j;
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
             if(ud.last_level == -1)
             {
                 s->pal = ps[j].palookup = which_palookup;
@@ -1499,7 +1484,7 @@ void resetpspritevars(char g)
                 if( which_palookup == 17 ) which_palookup = 9;
             }
             else s->pal = ps[j].palookup = savedpal[j];
-#else
+} else {
             if(s->pal == 0)
             {
                 s->pal = ps[j].palookup = which_palookup;
@@ -1507,7 +1492,7 @@ void resetpspritevars(char g)
                 if( which_palookup >= 17 ) which_palookup = 9;
             }
             else ps[j].palookup = s->pal;
-#endif
+}
 
             ps[j].i = i;
             ps[j].frag_ps = j;
@@ -1605,9 +1590,7 @@ void genspriteremaps(void)
     kclose(fp);
 }
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
 char waitabort; // 1.1: Escape ended the last wait for players
-#endif
 
 /*
 ================
@@ -1622,9 +1605,9 @@ void waitforeverybody()
     int32_t i;
 
     if (numplayers < 2) return;
-#if DUKE3D_GAMEVER < GAMEVER_13D
+if (game_profile->gamever < GAMEVER_13D) {
     waitabort = 0;
-#endif
+}
     packbuf[0] = 250;
     for(i=connecthead;i>=0;i=connectpoint2[i])
     {
@@ -1636,13 +1619,13 @@ void waitforeverybody()
     do
     {
         _idle();  /* let input queue run... */
-#if DUKE3D_GAMEVER < GAMEVER_13D
+if (game_profile->gamever < GAMEVER_13D) {
         if(KB_KeyPressed(sc_Escape))
         {
             waitabort = 1;
             return;
         }
-#endif
+}
         getpackets();
         for(i=connecthead;i>=0;i=connectpoint2[i])
         {
@@ -1667,11 +1650,7 @@ void dofrontscreens(void)
 
         rotatesprite(320<<15,200<<15,65536L,0,LOADSCREEN,0,0,2+8+64,0,0,xdim-1,ydim-1);
 
-#if DUKE3D_GAMEVER < GAMEVER_10
-        if(boardfilename[0] != 0)
-#else
-        if( boardfilename[0] != 0 && ud.level_number == 7 && ud.volume_number == 0 )
-#endif
+if ((game_profile->gamever < GAMEVER_10 ? (boardfilename[0] != 0) : ( boardfilename[0] != 0 && ud.level_number == 7 && ud.volume_number == 0 )))
         {
             menutext(160,90,0,0,"ENTERING USER MAP");
             gametextpal(160,90+10,boardfilename,14,2);
@@ -1679,11 +1658,7 @@ void dofrontscreens(void)
         else
         {
             menutext(160,90,0,0,"ENTERING");
-#if DUKE3D_GAMEVER < GAMEVER_10
-            menutext(160,90+16+8,0,0,level_names[ud.volume_number*9+(ud.from_bonus ? 5 : ud.level_number)]);
-#else
-            menutext(160,90+16+8,0,0,level_names[(ud.volume_number*11) + ud.level_number]);
-#endif
+menutext ( 160 , 90 + 16 + 8 , 0 , 0 , level_names [ (game_profile->gamever < GAMEVER_10 ? (ud . volume_number * 9 + ( ud . from_bonus ? 5 : ud . level_number )) : (( ud . volume_number * 11 ) + ud . level_number)) ] ) ;
         }
 
         nextpage();
@@ -1700,11 +1675,7 @@ void dofrontscreens(void)
         palto(0,0,0,0);
         if (widescreen) clearallviews(0L);
         rotatesprite(320<<15,200<<15,65536L,0,LOADSCREEN,0,0,2+8+64,0,0,xdim-1,ydim-1);
-#if DUKE3D_GAMEVER < GAMEVER_10
-        menutext(160,105,0,0,"LOADING DEMO...");
-#else
-        menutext(160,105,0,0,"LOADING...");
-#endif
+menutext ( 160 , 105 , 0 , 0 , (game_profile->gamever < GAMEVER_10 ? ("LOADING DEMO...") : ("LOADING...")) ) ;
         nextpage();
     }
 }
@@ -1789,40 +1760,41 @@ void enterlevel(char g)
     ud.monsters_off = ud.m_monsters_off;
     ud.coop = ud.m_coop;
     ud.marker = ud.m_marker;
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
     ud.ffire = ud.m_ffire;
-#endif
+}
 
     if( (g&MODE_DEMO) == 0 && ud.recstat == 2)
         ud.recstat = 0;
 
-#if DUKE3D_GAMEVER >= GAMEVER_15
+if (game_profile->gamever >= GAMEVER_15) {
     FX_StopAllSounds();
     clearsoundlocks();
     FX_SetReverb(0);
-#endif
+}
 
     i = ud.screen_size;
     ud.screen_size = 0;
     dofrontscreens();
-#if DUKE3D_GAMEVER < GAMEVER_13D
+if (game_profile->gamever < GAMEVER_13D) {
     if(ud.recstat != 2)
     {
         MUSIC_StopSong();
         FX_StopAllSounds();
     }
-#endif
+}
     vscrn();
     ud.screen_size = i;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+if (game_profile->gamever < GAMEVER_13D) {
     // 1.1 picks the song even for a demo and frees no sound locks. Its index
     // is volume*10+level into 10 songs per volume; ours keeps 11, same song.
     music_select = (ud.volume_number*11) + ud.level_number;
     if(ud.recstat != 2)
         playmusic(&music_fn[0][(int)music_select][0]);
     FX_SetReverb(0);
-#elif DUKE3D_GAMEVER < GAMEVER_14
+} else {
+if (game_profile->gamever < GAMEVER_14) {
     // 1.3D starts the level music before loading the map.
     if(ud.recstat != 2)
     {
@@ -1830,9 +1802,10 @@ void enterlevel(char g)
         music_select = (ud.volume_number*11) + ud.level_number;
         playmusic(&music_fn[0][(int)music_select][0]);
     }
-#endif
+}
+}
 
-#ifndef VOLUMEONE
+if (!((game_profile->shareware))) {
 
     if( boardfilename[0] != 0 && ud.m_level_number == 7 && ud.m_volume_number == 0 )
     {
@@ -1848,32 +1821,32 @@ void enterlevel(char g)
         gameexit(tempbuf);
     }
 
-#else
+} else {
 
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
     strcpy(levname,boardfilename[0] ? boardfilename : level_file_names[(ud.volume_number*11)+ud.level_number]);
-#else
+} else {
     l = (int32_t)strlen(level_file_names[ (ud.volume_number*11)+ud.level_number]);
     copybufbyte( level_file_names[ (ud.volume_number*11)+ud.level_number],&levname[0],l);
     levname[l] = 255;
     levname[l+1] = 0;
-#endif
+}
 
     if ( loadboard( levname,&ps[0].posx, &ps[0].posy, &ps[0].posz, &ps[0].ang,&ps[0].cursectnum ) == -1)
     {
         sprintf(tempbuf,"Map %s not found!",level_file_names[(ud.volume_number*11)+ud.level_number]);
         gameexit(tempbuf);
     }
-#endif
-#if DUKE3D_GAMEVER < GAMEVER_10
+}
+if (game_profile->gamever < GAMEVER_10) {
     boardfilename[0] = 0;
-#endif
+}
 
-#if DUKE3D_GAMEVER >= GAMEVER_13D && DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever >= GAMEVER_13D && game_profile->gamever < GAMEVER_14) {
     FX_StopAllSounds();
     clearsoundlocks();
     FX_SetReverb(0);
-#endif
+}
 
     clearbufbyte(gotpic,sizeof(gotpic),0L);
 
@@ -1883,30 +1856,26 @@ void enterlevel(char g)
     resetpspritevars(g);
 
     cachedebug = 0;
-#if DUKE3D_GAMEVER < GAMEVER_10
-    automapping = 1;
-#else
-    automapping = 0;
-#endif
+automapping = (game_profile->gamever < GAMEVER_10 ? (1) : (0));
 
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
     if(ud.recstat != 2) MUSIC_StopSong();
-#endif
+}
 
     cacheit();
     docacheit();
 
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
     if(ud.recstat != 2)
     {
         music_select = (ud.volume_number*11) + ud.level_number;
         playmusic(&music_fn[0][(int)music_select][0]);
     }
-#endif
-#if DUKE3D_GAMEVER >= GAMEVER_14 && DUKE3D_GAMEVER < GAMEVER_15
+}
+if (game_profile->gamever >= GAMEVER_14 && game_profile->gamever < GAMEVER_15) {
     clearsoundlocks();
     FX_SetReverb(0);
-#endif
+}
 
     if( (g&MODE_GAME) || (g&MODE_EOL) )
         ps[myconnectindex].gm = MODE_GAME;
@@ -1920,13 +1889,16 @@ void enterlevel(char g)
     if( (ud.recstat == 1) && (g&MODE_RESTART) != MODE_RESTART )
         opendemowrite();
 
-#ifdef VOLUMEONE
-#if DUKE3D_GAMEVER < GAMEVER_10
-    if(ud.recstat != 2) FTA(40,&ps[myconnectindex]);
-#else
-    if(ud.level_number == 0 && ud.recstat != 2) FTA(40,&ps[myconnectindex]);
-#endif
-#endif
+if ((game_profile->shareware)) {
+if ((game_profile->gamever < GAMEVER_10 ? (ud.recstat != 2) : (ud.level_number == 0 && ud.recstat != 2))) {
+if (game_profile->gamever < GAMEVER_10) {
+FTA(40,&ps[myconnectindex]);
+}
+else {
+FTA(40,&ps[myconnectindex]);
+}
+}
+}
 
     for(i=connecthead;i>=0;i=connectpoint2[i])
         switch(sector[sprite[ps[i].i].sectnum].floorpicnum)
@@ -1935,9 +1907,9 @@ void enterlevel(char g)
             case FLOORSLIME:
             case FLOORPLASMA:
                 resetweapons(i);
-#if DUKE3D_GAMEVER >= GAMEVER_10
+if (game_profile->gamever >= GAMEVER_10) {
                 resetinventory(i);
-#endif
+}
                 ps[i].gotweapon[PISTOL_WEAPON] = 0;
                 ps[i].ammo_amount[PISTOL_WEAPON] = 0;
                 ps[i].curr_weapon = KNEE_WEAPON;
@@ -1966,9 +1938,9 @@ void enterlevel(char g)
 
      restorepalette = 1;
 
-#if DUKE3D_GAMEVER >= GAMEVER_14 && DUKE3D_GAMEVER < GAMEVER_15
+if (game_profile->gamever >= GAMEVER_14 && game_profile->gamever < GAMEVER_15) {
      FX_StopAllSounds();
-#endif
+}
      flushpackets();
      waitforeverybody();
 
@@ -1978,24 +1950,24 @@ void enterlevel(char g)
      drawbackground();
 
      clearbufbyte(playerquitflag,MAXPLAYERS,0x01010101);
-#if DUKE3D_GAMEVER >= GAMEVER_13D
+if (game_profile->gamever >= GAMEVER_13D) {
      ps[myconnectindex].over_shoulder_on = 0;
-#endif
+}
 
      clearfrags();
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+if (game_profile->gamever < GAMEVER_13D) {
      // 1.1: after an Escape out of the wait, the level opens on the main menu.
      if(waitabort == 1)
      {
          current_menu = 0;
          ps[myconnectindex].gm |= MODE_MENU;
      }
-#endif
+}
 
      resettimevars();  // Here we go
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+if (game_profile->gamever < GAMEVER_13D) {
      // 1.1 keeps the third-person view and resets its camera.
      if(ps[myconnectindex].over_shoulder_on)
      {
@@ -2003,7 +1975,7 @@ void enterlevel(char g)
          cameraclock = totalclock;
          ps[myconnectindex].over_shoulder_on = 1;
      }
-#endif
+}
 
 
 }

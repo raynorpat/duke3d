@@ -1049,3 +1049,22 @@ void game_init_release_defaults(void)
     dukefriction=game_profile->gamever<GAMEVER_11 ? 0xcb00 : 0xcc00;
     game_init_keywords();
 }
+
+int game_weapon_case(int weapon)
+{
+    if(game_profile->gamever<GAMEVER_13D) {
+        if(weapon==9) return HANDREMOTE_WEAPON;
+        if(weapon==10) return FREEZE_WEAPON;
+    }
+    return weapon;
+}
+int game_forcesphere_tile(void) { return game_profile->id==GAME_099SW ? 1220 : 2590; }
+int game_scubamask_tile(void) { return game_profile->id==GAME_099SW ? 2580 : 2581; }
+int game_tile_case(int tile)
+{
+    if(game_profile->id==GAME_099SW) {
+        if(tile==1220) return FORCESPHERE;
+        if(tile==FORCESPHERE) return -1;
+    }
+    return tile;
+}

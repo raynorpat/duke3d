@@ -55,12 +55,12 @@ int main(int argc, char **argv)
     int i,j,k;
     initengine();
     p=setup(); sync[0].avel=-64; doincrements(p);
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
     check("G10-L14 negative turn",p->weapon_ang,12);
     sync[0].avel=64; doincrements(p); check("G10-L14 positive turn",p->weapon_ang,-12);
-#else
+} else {
     check("1.1 weapon angle stays zero",p->weapon_ang,0);
-#endif
+}
     p=setup(); p->burn_time=2; processinput(0);
     check("burn countdown",p->burn_time,1); check("burn damage fraction",p->extra_extra8,48);
     check("burn draws one random",randomseed,468938558);

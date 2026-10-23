@@ -207,10 +207,10 @@ int main(int argc, char **argv)
     ps[0].ammo_amount[SHOTGUN_WEAPON]=10; sync[0].bits=3<<8; cheatkeys(0);
     check("shrunk toilet player can select weapon",ps[0].curr_weapon,SHOTGUN_WEAPON);
     setup(); ps[0].curr_weapon=PISTOL_WEAPON; ps[0].gotweapon[HANDBOMB_WEAPON]=1;
-    ps[0].gotweapon[HANDREMOTE_WEAPON]=1; i=add(0,1,HEAVYHBOMB); sprite[i].owner=player;
+    ps[0].gotweapon[game_remote_weapon()]=1; i=add(0,1,HEAVYHBOMB); sprite[i].owner=player;
     sync[0].bits=6<<8; cheatkeys(0);
     check("no live bomb remote selection",ps[0].curr_weapon,PISTOL_WEAPON);
-    setup(); ps[0].curr_weapon=PISTOL_WEAPON; ps[0].gotweapon[HANDREMOTE_WEAPON]=1;
+    setup(); ps[0].curr_weapon=PISTOL_WEAPON; ps[0].gotweapon[game_remote_weapon()]=1;
     sync[0].bits=10<<8; cheatkeys(0);
     check("key10 does nothing",ps[0].curr_weapon,PISTOL_WEAPON);
     setup(); sprite[player].extra=50; ps[0].firstaid_amount=10; ps[0].jetpack_amount=100;

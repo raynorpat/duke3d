@@ -423,3 +423,7 @@ int game_script_limit(void);
 int game_sound_limit(void);
 int game_weaprecs_limit(void);
 int game_rand(void);
+int game_weapon_case(int weapon);
+int game_forcesphere_tile(void);
+int game_scubamask_tile(void);
+int game_tile_case(int tile);

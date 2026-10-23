@@ -27,6 +27,164 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <stdint.h>
 #include "duke3d.h"
 
+/* Map version-dependent case labels without changing raw game IDs. */
+static int sector_dispatch_1(int value)
+{
+    if (((game_profile->gamever < GAMEVER_14)) && value == (36)) return 1000001;
+    if (((game_profile->gamever < GAMEVER_14)) && value == (32)) return 1000002;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (32)) return 1000003;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (18)) return 1000004;
+    return value;
+}
+
+static int sector_dispatch_2(int value)
+{
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (DOORTILE23)) return 1000005;
+    return value;
+}
+
+static int sector_dispatch_3(int value)
+{
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (22)) return 1000006;
+    return value;
+}
+
+static int sector_dispatch_4(int value)
+{
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK14)) return 1000007;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK15)) return 1000008;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK16)) return 1000009;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK17)) return 1000010;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK18)) return 1000011;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK19)) return 1000012;
+    return value;
+}
+
+static int sector_dispatch_5(int value)
+{
+    if (((game_profile->gamever < GAMEVER_13D)) && value == (36)) return 1000013;
+    if (((!((game_profile->gamever < GAMEVER_13D)))) && value == (36)) return 1000014;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (18)) return 1000015;
+    return value;
+}
+
+static int sector_dispatch_6(int value)
+{
+    if (((game_profile->gamever >= GAMEVER_11)) && value == (TECHSWITCH)) return 1000016;
+    if (((game_profile->gamever >= GAMEVER_11)) && value == (TECHSWITCH+1)) return 1000017;
+    return value;
+}
+
+static int sector_dispatch_7(int value)
+{
+    if (((game_profile->gamever >= GAMEVER_11)) && value == (TECHSWITCH)) return 1000018;
+    if (((game_profile->gamever >= GAMEVER_11)) && value == (TECHSWITCH+1)) return 1000019;
+    return value;
+}
+
+static int sector_dispatch_8(int value)
+{
+    if (((game_profile->gamever >= GAMEVER_11)) && value == (TECHSWITCH)) return 1000020;
+    if (((game_profile->gamever >= GAMEVER_11)) && value == (TECHSWITCH+1)) return 1000021;
+    return value;
+}
+
+static int sector_dispatch_9(int value)
+{
+    if (((game_profile->gamever >= GAMEVER_10)) && value == (HYDRENT)) return 1000022;
+    if (((game_profile->gamever >= GAMEVER_13D)) && value == (OOZFILTER)) return 1000023;
+    return value;
+}
+
+static int sector_dispatch_10(int value)
+{
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK14)) return 1000024;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK15)) return 1000025;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK16)) return 1000026;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK17)) return 1000027;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK18)) return 1000028;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (SCREENBREAK19)) return 1000029;
+    if (((game_profile->gamever >= GAMEVER_13D)) && value == (BORNTOBEWILDSCREEN)) return 1000030;
+    if (((game_profile->gamever < GAMEVER_14)) && value == (W_TECHWALL1)) return 1000031;
+    if (((game_profile->gamever < GAMEVER_14)) && value == (W_TECHWALL2)) return 1000032;
+    if (((game_profile->gamever < GAMEVER_14)) && value == (W_TECHWALL3)) return 1000033;
+    if (((game_profile->gamever < GAMEVER_14)) && value == (W_TECHWALL4)) return 1000034;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL5)) return 1000035;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL6)) return 1000036;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL7)) return 1000037;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL8)) return 1000038;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL9)) return 1000039;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_MILKSHELF)) return 1000040;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL10)) return 1000041;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL1)) return 1000042;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL11)) return 1000043;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL12)) return 1000044;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL13)) return 1000045;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL14)) return 1000046;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL15)) return 1000047;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL16)) return 1000048;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL2)) return 1000049;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL3)) return 1000050;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (W_TECHWALL4)) return 1000051;
+    return value;
+}
+
+static int sector_dispatch_11(int value)
+{
+    if (((game_profile->gamever < GAMEVER_11)) && value == (MONK)) return 1000052;
+    if (((!((game_profile->gamever < GAMEVER_11)))) && value == (MONK)) return 1000053;
+    if (((!((game_profile->gamever < GAMEVER_11)))) && value == (SPACEMARINE)) return 1000054;
+    if (((game_profile->gamever >= GAMEVER_10)) && value == (PODFEM1)) return 1000055;
+    if (((game_profile->gamever >= GAMEVER_10)) && value == (FEM4)) return 1000056;
+    if (((game_profile->gamever >= GAMEVER_11)) && value == (CHAIR3)) return 1000057;
+    return value;
+}
+
+static int sector_dispatch_12(int value)
+{
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (GENERICPOLE2)) return 1000058;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (PANNEL3)) return 1000059;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (JURYGUY)) return 1000060;
+    if (((game_profile->gamever < GAMEVER_14)) && value == (CLOCK)) return 1000061;
+    if (((!((game_profile->gamever < GAMEVER_14)))) && value == (TRIPODCAMERA)) return 1000062;
+    return value;
+}
+
+static int sector_dispatch_13(int value)
+{
+    if (((game_profile->gamever < GAMEVER_11)) && value == (2)) return 1000063;
+    if (((!((game_profile->gamever < GAMEVER_11)))) && value == (2)) return 1000064;
+    return value;
+}
+
+static int sector_dispatch_14(int value)
+{
+    if (((game_profile->gamever >= GAMEVER_10)) && value == (HANDREMOTE_WEAPON)) return 1000065;
+    return value;
+}
+
+static int sector_dispatch_15(int value)
+{
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (FEM10)) return 1000066;
+    if (((game_profile->gamever >= GAMEVER_14)) && value == (TOUGHGAL)) return 1000067;
+    return value;
+}
+
+static int sector_dispatch_16(int value)
+{
+    if (((game_profile->gamever < GAMEVER_13D)) && value == (FEM1)) return 1000068;
+    if (((game_profile->gamever < GAMEVER_13D)) && value == (FEM2)) return 1000069;
+    if (((game_profile->gamever < GAMEVER_13D)) && value == (FEM3)) return 1000070;
+    if (((game_profile->gamever < GAMEVER_13D)) && value == (VIEWSCREEN)) return 1000071;
+    if (((game_profile->gamever < GAMEVER_13D) && (game_profile->gamever >= GAMEVER_10)) && value == (PODFEM1)) return 1000072;
+    if (((game_profile->gamever < GAMEVER_13D) && (game_profile->gamever >= GAMEVER_10)) && value == (FEM4)) return 1000073;
+    if (((!((game_profile->gamever < GAMEVER_13D)))) && value == (VIEWSCREEN)) return 1000074;
+    if (((!((game_profile->gamever < GAMEVER_13D)))) && value == (VIEWSCREEN2)) return 1000075;
+    return value;
+}
+
+
+
 // PRIMITIVE
 
 
@@ -58,9 +216,7 @@ short callsound(short sn,short whatsprite)
 
             if(T1 == 0)
             {
-#if DUKE3D_GAMEVER >= GAMEVER_10
-                if( (soundm[SLT]&16) == 0)
-#endif
+if ((game_profile->gamever >= GAMEVER_10 ? ( (soundm[SLT]&16) == 0) : (1)))
                 {
                     if(SLT)
                     {
@@ -69,28 +225,22 @@ short callsound(short sn,short whatsprite)
                             stopsound(SHT);
                     }
 
-#if DUKE3D_GAMEVER >= GAMEVER_10
-                    if( (sector[SECT].lotag&0xff) != 22)
-#endif
+if ((game_profile->gamever >= GAMEVER_10 ? ( (sector[SECT].lotag&0xff) != 22) : (1)))
                         T1 = 1;
                 }
             }
             else if(SHT < GAME_NUM_SOUNDS)
             {
                 if(SHT) spritesound(SHT,whatsprite);
-#if DUKE3D_GAMEVER < GAMEVER_10
-                if( (soundm[SLT]&1) || SHT )
-#else
-                if( (soundm[SLT]&1) || ( SHT && SHT != SLT ) )
-#endif
+if ((game_profile->gamever < GAMEVER_10 ? ( (soundm[SLT]&1) || SHT ) : ( (soundm[SLT]&1) || ( SHT && SHT != SLT ) )))
                     stopsound(SLT);
                 T1 = 0;
             }
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
             return sn;
-#else
+} else {
             return SLT;
-#endif
+}
         }
         i = nextspritesect[i];
     }
@@ -126,7 +276,7 @@ short check_activator_motion( short lotag )
             while ( j >= 0 )
             {
                 if(s->sectnum == sprite[j].sectnum)
-                    switch(sprite[j].lotag)
+                    switch(sector_dispatch_1(sprite[j].lotag))
                     {
                         case 11:
                         case 30:
@@ -135,13 +285,10 @@ short check_activator_motion( short lotag )
                             break;
                         case 20:
                         case 31:
-#if DUKE3D_GAMEVER < GAMEVER_14
-                        case 36:
-                        case 32:
-#else
-                        case 32:
-                        case 18:
-#endif
+                        case 1000001:
+                        case 1000002:
+                        case 1000003:
+                        case 1000004:
                             if ( hittype[j].temp_data[0] )
                                 return( 1 );
                             break;
@@ -157,7 +304,7 @@ short check_activator_motion( short lotag )
 
 char isadoorwall(short dapic)
 {
-    switch(dapic)
+    switch(sector_dispatch_2(dapic))
     {
         case DOORTILE1:
         case DOORTILE2:
@@ -180,9 +327,7 @@ char isadoorwall(short dapic)
         case DOORTILE20:
         case DOORTILE21:
         case DOORTILE22:
-#if DUKE3D_GAMEVER >= GAMEVER_14
-        case DOORTILE23:
-#endif
+        case 1000005:
             return 1;
     }
     return 0;
@@ -191,16 +336,14 @@ char isadoorwall(short dapic)
 
 char isanunderoperator(short lotag)
 {
-    switch(lotag&0xff)
+    switch(sector_dispatch_3(lotag&0xff))
     {
         case 15:
         case 16:
         case 17:
         case 18:
         case 19:
-#if DUKE3D_GAMEVER >= GAMEVER_14
-        case 22:
-#endif
+        case 1000006:
         case 26:
             return 1;
     }
@@ -250,11 +393,11 @@ int32_t ldist(spritetype *s1,spritetype *s2)
     int32_t vx,vy;
     vx = s1->x - s2->x;
     vy = s1->y - s2->y;
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
     return(FindDistance2D(vx,vy));
-#else
+} else {
     return(FindDistance2D(vx,vy) + 1);
-#endif
+}
 }
 
 /*
@@ -376,12 +519,12 @@ void doanimations(void)
                 if(animateptr[i] == &sector[animatesect[i]].ceilingz)
                     continue;
 
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
             callsound(animatesect[i],-1);
-#else
+} else {
            if( (sector[dasect].lotag&0xff) != 22 )
                 callsound(dasect,-1);
-#endif
+}
 
             continue;
         }
@@ -523,17 +666,12 @@ void animatewalls(void)
 {
     int32_t i, j, p, t;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
-    for(p=numanimwalls-1;p>=0;p--)
-#else
-    for(p=0;p < numanimwalls ;p++)
-//    for(p=numanimwalls-1;p>=0;p--)
-#endif
+for ((game_profile->gamever < GAMEVER_13D ? (p=numanimwalls-1) : (p=0));(game_profile->gamever < GAMEVER_13D ? (p>=0) : (p < numanimwalls ));(game_profile->gamever < GAMEVER_13D ? (p--) : (p++)))
     {
         i = animwall[p].wallnum;
         j = wall[i].picnum;
 
-            switch(j)
+            switch(sector_dispatch_4(j))
             {
                 case SCREENBREAK1:
                 case SCREENBREAK2:
@@ -546,14 +684,12 @@ void animatewalls(void)
                 case SCREENBREAK11:
                 case SCREENBREAK12:
                 case SCREENBREAK13:
-#if DUKE3D_GAMEVER >= GAMEVER_14
-                case SCREENBREAK14:
-                case SCREENBREAK15:
-                case SCREENBREAK16:
-                case SCREENBREAK17:
-                case SCREENBREAK18:
-                case SCREENBREAK19:
-#endif
+                case 1000007:
+                case 1000008:
+                case 1000009:
+                case 1000010:
+                case 1000011:
+                case 1000012:
 
                     if( (TRAND&255) < 16)
                     {
@@ -568,9 +704,7 @@ void animatewalls(void)
                 case SCREENBREAK8:
 
                     if(animwall[p].tag >= 0
-#if DUKE3D_GAMEVER < GAMEVER_10
-                       && wall[i].extra != FEMPIC1
-#endif
+&& (!(game_profile->gamever < GAMEVER_10) || (wall[i].extra != FEMPIC1))
                        && wall[i].extra != FEMPIC2 && wall[i].extra != FEMPIC3 )
                         wall[i].picnum = animwall[p].tag;
                     else
@@ -873,15 +1007,12 @@ void operatesectors(short sn,short ii)
                 }
                 callsound(sn,ii);
             }
-#if DUKE3D_GAMEVER < GAMEVER_10
-            else
-            {
+else if (game_profile->gamever < GAMEVER_10) {
                 q = nextsectorneighborz(sn,sptr->floorz,1,animatevel[i] < 0 ? 1 : -1);
                 if(q == -1) return;
                 setanimation(sn,&sptr->floorz,sector[q].floorz,sptr->extra);
                 callsound(sn,ii);
             }
-#endif
 
             return;
 
@@ -902,9 +1033,7 @@ void operatesectors(short sn,short ii)
                 setanimation(sn,&sptr->ceilingz,j+l,q);
                 callsound(sn,ii);
             }
-#if DUKE3D_GAMEVER < GAMEVER_10
-            else
-            {
+else if (game_profile->gamever < GAMEVER_10) {
                 q = nextsectorneighborz(sn,sptr->floorz,1,animatevel[i] < 0 ? 1 : -1);
                 if(q == -1) return;
                 j = sector[q].floorz;
@@ -915,7 +1044,6 @@ void operatesectors(short sn,short ii)
                 callsound(sn,ii);
                 callsound(sn,ii);
             }
-#endif
             return;
 
         case 29:
@@ -978,14 +1106,14 @@ void operatesectors(short sn,short ii)
                 }
             }
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
             // 1.3D sets the bit from the door's position instead of toggling it.
             if(sptr->ceilingz == sptr->floorz || j == sptr->ceilingz)
                 sptr->lotag |= 0x8000;
             else sptr->lotag &= ~0x8000;
-#else
+} else {
             sptr->lotag ^= 0x8000;
-#endif
+}
 
             setanimation(sn,&sptr->ceilingz,j,sptr->extra);
             callsound(sn,ii);
@@ -1034,9 +1162,9 @@ void operatesectors(short sn,short ii)
 
             sptr->lotag ^= 0x8000;
 
-#if DUKE3D_GAMEVER < GAMEVER_10 || DUKE3D_GAMEVER >= GAMEVER_13D // 1.0/1.1 open split doors silently
+if (game_profile->gamever < GAMEVER_10 || game_profile->gamever >= GAMEVER_13D) {
             callsound(sn,ii);
-#endif
+}
 
             return;
 
@@ -1067,18 +1195,18 @@ void operatesectors(short sn,short ii)
                     {
                         if(sector[SECT].lotag&0x8000) sector[SECT].lotag &= 0x7fff;
                         else sector[SECT].lotag |= 0x8000;
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
                         callsound(sn,ii);
-#endif
+}
                         T5 = 1;
                         T4 = -T4;
-#if DUKE3D_GAMEVER >= GAMEVER_10
+if (game_profile->gamever >= GAMEVER_10) {
                         if(q == 0)
                         {
                             callsound(sn,i);
                             q = 1;
                         }
-#endif
+}
                     }
                     i = nextspritestat[i];
                 }
@@ -1184,27 +1312,29 @@ void operaterespawns(short low)
         if(SLT == low) switch(PN)
         {
             case RESPAWN:
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
                 sprite[i].shade = 54;
                 j = spawn(i,TRANSPORTERSTAR);
                 sprite[j].z -= (32<<8);
-#elif DUKE3D_GAMEVER < GAMEVER_13D
+} else {
+if (game_profile->gamever < GAMEVER_13D) {
                 // 1.1 shows the star only for monsters, and only with monsters on.
                 if( ud.monsters_off == 0 && badguypic(SHT) )
                 {
                     j = spawn(i,TRANSPORTERSTAR);
                     sprite[j].z -= (32<<8);
                 }
-#else
+} else {
                 if( badguypic(SHT) && ud.monsters_off ) break;
 
                 j = spawn(i,TRANSPORTERSTAR);
                 sprite[j].z -= (32<<8);
-#endif
+}
+}
 
-#if DUKE3D_GAMEVER >= GAMEVER_10
+if (game_profile->gamever >= GAMEVER_10) {
                 sprite[i].extra = 66-12;   // Just a way to killit
-#endif
+}
                 break;
         }
         i = nexti;
@@ -1223,9 +1353,9 @@ void operateactivators(short low,short snum)
 {
     short i, j, k, *p, nexti;
     walltype *wal;
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
     snum = 0; // The beta's one-argument function quotes to the global player (single player).
-#endif
+}
 
     for(i=numcyclers-1;i>=0;i--)
     {
@@ -1264,7 +1394,7 @@ void operateactivators(short low,short snum)
             }
             else
             {
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
                 switch(SHT)
                 {
                     case 0:
@@ -1284,27 +1414,29 @@ void operateactivators(short low,short snum)
                         }
                         break;
                 }
-#endif
+}
 
                 if( sector[sprite[i].sectnum].lotag < 3 )
                 {
                     j = headspritesect[sprite[i].sectnum];
                     while(j >= 0)
                     {
-                        if( sprite[j].statnum == 3 ) switch(sprite[j].lotag)
+                        if( sprite[j].statnum == 3 ) switch(sector_dispatch_5(sprite[j].lotag))
                         {
-#if DUKE3D_GAMEVER < GAMEVER_13D
-                            case 36: // 1.1 only switches SE36 on
+if (game_profile->gamever < GAMEVER_13D) goto sector_branch_1296_0;
+else goto sector_branch_1296_1;
+sector_branch_1296_0:;
+                            case 1000013: // 1.1 only switches SE36 on
                                 hittype[j].temp_data[0] = 1;
                                 break;
-#else
-                            case 36:
-#endif
+goto sector_branch_1296_end;
+sector_branch_1296_1:;
+                            case 1000014:
+goto sector_branch_1296_end;
+sector_branch_1296_end:;
                             case 31:
                             case 32:
-#if DUKE3D_GAMEVER >= GAMEVER_14
-                            case 18:
-#endif
+                            case 1000015:
                                 hittype[j].temp_data[0] = 1-hittype[j].temp_data[0];
                                 callsound(SECT,j);
                                 break;
@@ -1313,10 +1445,10 @@ void operateactivators(short low,short snum)
                     }
                 }
 
-#if DUKE3D_GAMEVER >= GAMEVER_10
+if (game_profile->gamever >= GAMEVER_10) {
                 if( k == -1 && (sector[SECT].lotag&0xff) == 22 )
                     k = callsound(SECT,i);
-#endif
+}
 
                 operatesectors(SECT,i);
             }
@@ -1361,11 +1493,7 @@ void operateforcefields(short s, short low)
 {
     short i, p;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
-    for(p=numanimwalls-1;p>=0;p--)
-#else
-    for(p=numanimwalls;p>=0;p--)
-#endif
+for ((game_profile->gamever < GAMEVER_13D ? (p=numanimwalls-1) : (p=numanimwalls));p>=0;p--)
     {
         i = animwall[p].wallnum;
 
@@ -1379,7 +1507,7 @@ void operateforcefields(short s, short low)
 
                 animwall[p].tag = 0;
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
+if (game_profile->gamever < GAMEVER_13D) {
                 // 1.1 ignores s (it takes only the lotag) and tints the sector
                 // beyond the field: pal 0 off, 2 on. 1.1 writes the pals with no
                 // nextsector test; a one-sided wall is skipped here.
@@ -1388,7 +1516,7 @@ void operateforcefields(short s, short low)
                 if( wall[i].nextsector >= 0 )
                     sector[wall[i].nextsector].ceilingpal =
                         sector[wall[i].nextsector].floorpal = wall[i].cstat ? 2 : 0;
-#else
+} else {
                 if( wall[i].cstat )
                 {
                     wall[i].cstat   = 0;
@@ -1399,7 +1527,7 @@ void operateforcefields(short s, short low)
                 }
                 else
                     wall[i].cstat = 85;
-#endif
+}
                 break;
         }
     }
@@ -1407,11 +1535,7 @@ void operateforcefields(short s, short low)
 
 
 // 1.3D played the switch sounds at the viewed player's height.
-#if DUKE3D_GAMEVER < GAMEVER_14
-#define SWITCHSOUNDZ ps[screenpeek].posz
-#else
-#define SWITCHSOUNDZ ps[snum].posz
-#endif
+#define SWITCHSOUNDZ (game_profile->gamever<GAMEVER_14 ? ps[screenpeek].posz : ps[snum].posz)
 
 /*
 ================
@@ -1450,14 +1574,12 @@ char checkhitswitch(short snum,int32_t w,char switchtype)
         switchpal = wall[w].pal;
     }
 
-    switch(picnum)
+    switch(sector_dispatch_6(picnum))
     {
         case DIPSWITCH:
         case DIPSWITCH+1:
-#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no TECHSWITCH (G10-S01)
-        case TECHSWITCH:
-        case TECHSWITCH+1:
-#endif
+        case 1000016:
+        case 1000017:
         case ALIENSWITCH:
         case ALIENSWITCH+1:
             break;
@@ -1536,20 +1658,16 @@ char checkhitswitch(short snum,int32_t w,char switchtype)
     i = headspritestat[0];
     while(i >= 0)
     {
-        if( lotag == SLT ) switch(PN)
+        if( lotag == SLT ) switch(sector_dispatch_7(PN))
         {
             case DIPSWITCH:
-#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no TECHSWITCH (G10-S01)
-            case TECHSWITCH:
-#endif
+            case 1000018:
             case ALIENSWITCH:
                 if( switchtype == 1 && w == i ) PN++;
                 else if( SHT == 0 ) correctdips++;
                 numdips++;
                 break;
-#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no TECHSWITCH (G10-S01)
-            case TECHSWITCH+1:
-#endif
+            case 1000019:
             case DIPSWITCH+1:
             case ALIENSWITCH+1:
                 if( switchtype == 1 && w == i ) PN--;
@@ -1604,21 +1722,17 @@ char checkhitswitch(short snum,int32_t w,char switchtype)
     {
         x = i;
         if(lotag == wall[x].lotag)
-            switch(wall[x].picnum)
+            switch(sector_dispatch_8(wall[x].picnum))
         {
             case DIPSWITCH:
-#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no TECHSWITCH (G10-S01)
-            case TECHSWITCH:
-#endif
+            case 1000020:
             case ALIENSWITCH:
                 if( switchtype == 0 && i == w ) wall[x].picnum++;
                 else if( wall[x].hitag == 0 ) correctdips++;
                 numdips++;
                 break;
             case DIPSWITCH+1:
-#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no TECHSWITCH (G10-S01)
-            case TECHSWITCH+1:
-#endif
+            case 1000021:
             case ALIENSWITCH+1:
                 if( switchtype == 0 && i == w ) wall[x].picnum--;
                 else if( wall[x].hitag == 1 ) correctdips++;
@@ -1677,10 +1791,10 @@ char checkhitswitch(short snum,int32_t w,char switchtype)
         else
         {
             ud.level_number++;
-#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 doesn't wrap; main ends the episode at level 5
+if (game_profile->gamever >= GAMEVER_13D) {
             if( (ud.volume_number && ud.level_number > 10 ) || ( ud.volume_number == 0 && ud.level_number > 5 ) )
                 ud.level_number = 0;
-#endif
+}
             ud.m_level_number = ud.level_number;
         }
         return 1;
@@ -1770,15 +1884,15 @@ char checkhitswitch(short snum,int32_t w,char switchtype)
                            case 34:
                            case 25:
                                hittype[x].temp_data[4] = !hittype[x].temp_data[4];
-#if DUKE3D_GAMEVER < GAMEVER_13D // 1.1 has the two quotes the other way round
+if (game_profile->gamever < GAMEVER_13D) {
                                if(hittype[x].temp_data[4])
                                    FTA(2,&ps[snum]);
                                else FTA(15,&ps[snum]);
-#else
+} else {
                                if(hittype[x].temp_data[4])
                                    FTA(15,&ps[snum]);
                                else FTA(2,&ps[snum]);
-#endif
+}
                                break;
                            case 21:
                                FTA(2,&ps[screenpeek]);
@@ -1804,15 +1918,15 @@ char checkhitswitch(short snum,int32_t w,char switchtype)
                 }
                 else if(hitag != 0)
                 {
-#if DUKE3D_GAMEVER < GAMEVER_13D // 1.1 plays both at the viewed player's height
+if (game_profile->gamever < GAMEVER_13D) {
                     if(switchtype == 1 && (soundm[hitag]&4) == 0)
                         xyzsound(hitag,w,sx,sy,SWITCHSOUNDZ);
                     else xyzsound(hitag,ps[snum].i,sx,sy,SWITCHSOUNDZ);
-#else
+} else {
                     if(switchtype == 1 && (soundm[hitag]&4) == 0)
                         xyzsound(hitag,w,sx,sy,ps[snum].posz);
                     else spritesound(hitag,ps[snum].i);
-#endif
+}
                 }
 
                return 1;
@@ -1842,9 +1956,9 @@ void activatebysector(short sect,short j)
         {
             operateactivators(SLT,-1);
             didit = 1;
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
             return;
-#endif
+}
 //            return;
         }
         i = nextspritesect[i];
@@ -1862,7 +1976,6 @@ void breakwall(short newpn,short spr,short dawallnum)
     lotsofglass(spr,dawallnum,10);
 }
 
-#if DUKE3D_GAMEVER < GAMEVER_14
 // 1.3D's broken techwalls play a lighter glass sound, apart from the first.
 static void breaktechwall13(short newpn,short spr,short dawallnum,short glasssound)
 {
@@ -1871,7 +1984,6 @@ static void breaktechwall13(short newpn,short spr,short dawallnum,short glasssou
     spritesound(glasssound,spr);
     lotsofglass(spr,dawallnum,10);
 }
-#endif
 
 /*
 ================
@@ -1892,18 +2004,14 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
 
     if(wal->overpicnum == MIRROR)
     {
-        switch(atwith)
+        switch(sector_dispatch_9(atwith))
         {
             case HEAVYHBOMB:
             case RADIUSEXPLOSION:
             case RPG:
-#if DUKE3D_GAMEVER >= GAMEVER_10
-            case HYDRENT:
-#endif
+            case 1000022:
             case SEENINE:
-#if DUKE3D_GAMEVER >= GAMEVER_13D
-            case OOZFILTER:
-#endif
+            case 1000023:
             case EXPLODINGBARREL:
                 lotsofglass(spr,dawallnum,70);
                 wal->cstat &= ~16;
@@ -1913,14 +2021,8 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
         }
     }
 
-#if DUKE3D_GAMEVER < GAMEVER_11
-   if( (wal->cstat&16) && wal->nextsector >= 0 ) // 1.0 (G10-S03)
-#else
-   if( ( (wal->cstat&16) || wal->overpicnum == BIGFORCE ) && wal->nextsector >= 0 )
-#endif
-#if DUKE3D_GAMEVER < GAMEVER_13D
-       if( wal->overpicnum >= 0 )
-#endif
+if ((game_profile->gamever < GAMEVER_11 ? ( (wal->cstat&16) && wal->nextsector >= 0 ) : ( ( (wal->cstat&16) || wal->overpicnum == BIGFORCE ) && wal->nextsector >= 0 )))
+if ((game_profile->gamever < GAMEVER_13D ? ( wal->overpicnum >= 0 ) : (1)))
        if( sector[wal->nextsector].floorz > z )
            if( sector[wal->nextsector].floorz-sector[wal->nextsector].ceilingz )
                switch(wal->overpicnum)
@@ -1928,9 +2030,9 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
         case W_FORCEFIELD:
         case W_FORCEFIELD+1:
         case W_FORCEFIELD+2:
-#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 sets it after the ripple (G10-S03)
+if (game_profile->gamever >= GAMEVER_11) {
             wal->extra = 1; // tell the forces to animate
-#endif
+}
         case BIGFORCE:
             updatesector(x,y,&sn);
             if( sn < 0 ) return;
@@ -1948,16 +2050,16 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
             SA = getangle(wal->x-wall[wal->point2].x,
                 wal->y-wall[wal->point2].y)-512;
 
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
             wal->extra = 1; // 1.0: BIGFORCE too, and no sound (G10-S03)
-#else
+} else {
             spritesound(SOMETHINGHITFORCE,i);
-#endif
+}
 
             return;
 
         case FANSPRITE:
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
             // 1.3D breaks the wall's own picnum and throws scrap instead of
             // playing sounds. Its scrap owner was whatever a register held;
             // the hitting sprite stands in for it.
@@ -1970,14 +2072,10 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
 
                 EGS(sprite[spr].sectnum,sprite[spr].x,sprite[spr].y,sprite[spr].z-(12<<8),
                     pn,-8,48,48,ang,vel,zv,
-#if DUKE3D_GAMEVER < GAMEVER_10
-                    j,
-#else
-                    spr,
-#endif
+(game_profile->gamever < GAMEVER_10 ? (j) : (spr)) ,
                     5);
             }
-#else
+} else {
             wal->overpicnum = FANSPRITEBROKE;
             wal->cstat &= 65535-65;
             if(wal->nextwall >= 0)
@@ -1987,7 +2085,7 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
             }
             spritesound(VENT_BUST,spr);
             spritesound(GLASS_BREAKING,spr);
-#endif
+}
             return;
 
         case GLASS:
@@ -1996,16 +2094,17 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
             lotsofglass(spr,dawallnum,10);
             wal->cstat = 0;
 
-            if(wal->nextwall >= 0)
-#if DUKE3D_GAMEVER < GAMEVER_10
+            if(wal->nextwall >= 0) {
+if (game_profile->gamever < GAMEVER_10) {
             {
                 /* Beta uses wal, rather than wall, as the second wall's base. */
                 int other = dawallnum + wal->nextwall;
                 if(other < MAXWALLS) wall[other].cstat = 0;
             }
-#else
+} else {
                 wall[wal->nextwall].cstat = 0;
-#endif
+}
+}
 
             i = EGS(sn,x,y,z,SECTOREFFECTOR,0,0,0,ps[0].ang,0,0,spr,3);
             SLT = 128; T2 = 5; T3 = dawallnum;
@@ -2022,18 +2121,18 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
             return;
     }
 
-    switch(wal->picnum)
+    switch(sector_dispatch_10(wal->picnum))
     {
             case COLAMACHINE:
             case VENDMACHINE:
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
                 wal->picnum += 2;
                 spritesound(VENT_BUST,spr);
                 spritesound(GLASS_BREAKING,spr);
-#else
+} else {
                 breakwall(wal->picnum+2,spr,dawallnum);
                 spritesound(VENT_BUST,spr);
-#endif
+}
                 return;
 
             case OJ:
@@ -2055,88 +2154,86 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
             case SCREENBREAK11:
             case SCREENBREAK12:
             case SCREENBREAK13:
-#if DUKE3D_GAMEVER >= GAMEVER_14
-            case SCREENBREAK14:
-            case SCREENBREAK15:
-            case SCREENBREAK16:
-            case SCREENBREAK17:
-            case SCREENBREAK18:
-            case SCREENBREAK19:
-#endif
-#if DUKE3D_GAMEVER >= GAMEVER_13D
-            case BORNTOBEWILDSCREEN:
-#endif
+            case 1000024:
+            case 1000025:
+            case 1000026:
+            case 1000027:
+            case 1000028:
+            case 1000029:
+            case 1000030:
 
                 lotsofglass(spr,dawallnum,30);
-#if DUKE3D_GAMEVER < GAMEVER_10
-                if(wal->picnum == FEMPIC2 || wal->picnum == FEMPIC3)
-                    wal->picnum = VIEWSCREENBROKE;
-                else
-#endif
+if ((game_profile->gamever < GAMEVER_10) && (wal->picnum == FEMPIC2 || wal->picnum == FEMPIC3)) {
+wal->picnum = VIEWSCREENBROKE;
+} else
                 wal->picnum=W_SCREENBREAK+(TRAND%3);
                 spritesound(GLASS_HEAVYBREAK,spr);
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
                 lotsofglass(spr,dawallnum,10);
-#endif
+}
                 return;
 
-#if DUKE3D_GAMEVER < GAMEVER_14
-            case W_TECHWALL1:
+if (game_profile->gamever < GAMEVER_14) goto sector_branch_2077_0;
+else goto sector_branch_2077_1;
+sector_branch_2077_0:;
+            case 1000031:
                 breaktechwall13(W_HITTECHWALL1,spr,dawallnum,GLASS_HEAVYBREAK);
                 return;
-            case W_TECHWALL2:
+            case 1000032:
                 breaktechwall13(W_HITTECHWALL2,spr,dawallnum,GLASS_BREAKING);
                 return;
-            case W_TECHWALL3:
+            case 1000033:
                 breaktechwall13(W_HITTECHWALL3,spr,dawallnum,GLASS_BREAKING);
                 return;
-            case W_TECHWALL4:
+            case 1000034:
                 breaktechwall13(W_HITTECHWALL4,spr,dawallnum,GLASS_BREAKING);
                 return;
-#else
-            case W_TECHWALL5:
-            case W_TECHWALL6:
-            case W_TECHWALL7:
-            case W_TECHWALL8:
-            case W_TECHWALL9:
+goto sector_branch_2077_end;
+sector_branch_2077_1:;
+            case 1000035:
+            case 1000036:
+            case 1000037:
+            case 1000038:
+            case 1000039:
                 breakwall(wal->picnum+1,spr,dawallnum);
                 return;
-            case W_MILKSHELF:
+            case 1000040:
                 breakwall(W_MILKSHELFBROKE,spr,dawallnum);
                 return;
 
-            case W_TECHWALL10:
+            case 1000041:
                 breakwall(W_HITTECHWALL10,spr,dawallnum);
                 return;
 
-            case W_TECHWALL1:
-            case W_TECHWALL11:
-            case W_TECHWALL12:
-            case W_TECHWALL13:
-            case W_TECHWALL14:
+            case 1000042:
+            case 1000043:
+            case 1000044:
+            case 1000045:
+            case 1000046:
                 breakwall(W_HITTECHWALL1,spr,dawallnum);
                 return;
 
-            case W_TECHWALL15:
+            case 1000047:
                 breakwall(W_HITTECHWALL15,spr,dawallnum);
                 return;
 
-            case W_TECHWALL16:
+            case 1000048:
                 breakwall(W_HITTECHWALL16,spr,dawallnum);
                 return;
 
-            case W_TECHWALL2:
+            case 1000049:
                 breakwall(W_HITTECHWALL2,spr,dawallnum);
                 return;
 
-            case W_TECHWALL3:
+            case 1000050:
                 breakwall(W_HITTECHWALL3,spr,dawallnum);
                 return;
 
-            case W_TECHWALL4:
+            case 1000051:
                 breakwall(W_HITTECHWALL4,spr,dawallnum);
                 return;
-#endif
+goto sector_branch_2077_end;
+sector_branch_2077_end:;
 
             case ATM:
                 wal->picnum = ATMBROKE;
@@ -2151,13 +2248,13 @@ void checkhitwall(short spr,short dawallnum,int32_t x,int32_t y,int32_t z,short 
             case TECHLIGHT2:
             case TECHLIGHT4:
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
                 spritesound(GLASS_HEAVYBREAK,spr);
-#else
+} else {
                 if( rnd(128) )
                     spritesound(GLASS_HEAVYBREAK,spr);
                 else spritesound(GLASS_BREAKING,spr);
-#endif
+}
                 lotsofglass(spr,dawallnum,30);
 
                 if(wal->picnum == WALLLIGHT1)
@@ -2228,19 +2325,11 @@ void checkplayerhurt(struct player_struct *p,short j)
                     sprite[p->i].extra -= 5;
 
                     p->hurt_delay = 16;
-#if DUKE3D_GAMEVER < GAMEVER_10
-                    p->pals_time = totalclock+32;
-#else
-                    p->pals_time = 32;
-#endif
+p->pals_time = (game_profile->gamever < GAMEVER_10 ? (totalclock+32) : (32));
                     p->pals[0] = 32;
                     p->pals[1] = 0;
                     p->pals[2] = 0;
-#if DUKE3D_GAMEVER < GAMEVER_10
-                    spritesound(204,p->i);
-#else
-                    spritesound(DUKE_LONGTERM_PAIN,p->i);
-#endif
+spritesound ( (game_profile->gamever < GAMEVER_10 ? (204) : (DUKE_LONGTERM_PAIN)) , p -> i ) ;
                 }
                 break;
         }
@@ -2251,11 +2340,7 @@ void checkplayerhurt(struct player_struct *p,short j)
     j &= (MAXWALLS-1);
 
     if( p->hurt_delay > 0 ) p->hurt_delay--;
-#if DUKE3D_GAMEVER < GAMEVER_13D // 1.1 hurts with the field off too
-    else switch(wall[j].overpicnum)
-#else
-    else if( wall[j].cstat&85 ) switch(wall[j].overpicnum)
-#endif
+    else if(game_profile->gamever<GAMEVER_13D || (wall[j].cstat&85)) switch(wall[j].overpicnum)
     {
         case W_FORCEFIELD:
         case W_FORCEFIELD+1:
@@ -2263,22 +2348,14 @@ void checkplayerhurt(struct player_struct *p,short j)
              sprite[p->i].extra -= 5;
 
              p->hurt_delay = 16;
-#if DUKE3D_GAMEVER < GAMEVER_10
-             p->pals_time = totalclock+32;
-#else
-             p->pals_time = 32;
-#endif
+p->pals_time = (game_profile->gamever < GAMEVER_10 ? (totalclock+32) : (32));
              p->pals[0] = 32;
              p->pals[1] = 0;
              p->pals[2] = 0;
 
              p->posxv = -(sintable[(p->ang+512)&2047]<<8);
              p->posyv = -(sintable[(p->ang)&2047]<<8);
-#if DUKE3D_GAMEVER < GAMEVER_10
-             spritesound(204,p->i);
-#else
-             spritesound(DUKE_LONGTERM_PAIN,p->i);
-#endif
+spritesound ( (game_profile->gamever < GAMEVER_10 ? (204) : (DUKE_LONGTERM_PAIN)) , p -> i ) ;
 
              checkhitwall(p->i,j,
                  p->posx+(sintable[(p->ang+512)&2047]>>9),
@@ -2288,11 +2365,7 @@ void checkplayerhurt(struct player_struct *p,short j)
             break;
 
         case BIGFORCE:
-#if DUKE3D_GAMEVER < GAMEVER_11
-            p->hurt_delay = 32; // 1.0 (G10-S04)
-#else
-            p->hurt_delay = 26;
-#endif
+p -> hurt_delay = (game_profile->gamever < GAMEVER_11 ? (32) : (26)) ;
             checkhitwall(p->i,j,
                 p->posx+(sintable[(p->ang+512)&2047]>>9),
                 p->posy+(sintable[p->ang&2047]>>9),
@@ -2386,7 +2459,6 @@ char checkhitceiling(short sn)
     return 0;
 }                                     
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
 // 1.1's checkhitsprite (G11-S10..S12). Its case set, the stripper damage case,
 // the THROWFLAME reactions and the default knockback differ throughout, so it
 // is a separate copy.
@@ -2398,14 +2470,14 @@ Apply tile-specific hit reactions and record pending actor damage
 from the impacting sprite.
 ================
 */
-void checkhitsprite(short i,short sn)
+static void checkhitsprite_early(short i,short sn)
 {
     short j, k, p;
     spritetype *s;
 
     i &= (MAXSPRITES-1);
 
-    switch(PN)
+    switch(sector_dispatch_11(game_tile_case(PN)))
     {
         case OCEANSPRITE1:
         case OCEANSPRITE2:
@@ -2427,17 +2499,9 @@ void checkhitsprite(short i,short sn)
             }
             else
             {
-#if DUKE3D_GAMEVER < GAMEVER_10
-                if(sprite[sn].picnum == KNEE || (TRAND&3))
-#else
-                if( TRAND&3 )
-#endif
+if ((game_profile->gamever < GAMEVER_10 ? (sprite[sn].picnum == KNEE || (TRAND&3)) : ( TRAND&3 )))
                 {
-#if DUKE3D_GAMEVER < GAMEVER_10
-                    sprite[i].xvel = 128;
-#else
-                    sprite[i].xvel = 164;
-#endif
+sprite[i].xvel = (game_profile->gamever < GAMEVER_10 ? (128) : (164));
                     sprite[i].ang = sprite[sn].ang;
                 }
                 else
@@ -2658,10 +2722,12 @@ void checkhitsprite(short i,short sn)
             sprite[j].z = sector[SECT].floorz-(32<<8);
             break;
 
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) goto sector_branch_2650_0;
+else goto sector_branch_2650_1;
+sector_branch_2650_0:;
         // 1.0's MONK gibs on the first hit; its sound and spawn come after
         // the blood. No SPACEMARINE case (G10-S02).
-        case MONK:
+        case 1000052:
             SA = TRAND&2047;
             shoot(i,BLOODSPLAT1);
             SA = TRAND&2047;
@@ -2684,19 +2750,16 @@ void checkhitsprite(short i,short sn)
             guts(&sprite[i],JIBS2,2,-1);
             guts(&sprite[i],JIBS3,3,-1);
             guts(&sprite[i],JIBS4,4,-1);
-#if DUKE3D_GAMEVER < GAMEVER_10
-            guts(&sprite[i],JIBS5,7,-1);
-#else
-            guts(&sprite[i],JIBS5,1,-1);
-#endif
+guts ( & sprite [ i ] , JIBS5 , (game_profile->gamever < GAMEVER_10 ? (7) : (1)) , - 1 ) ;
             guts(&sprite[i],JIBS3,6,-1);
             deletesprite(i);
             break;
-#else
-        case MONK:
+goto sector_branch_2650_end;
+sector_branch_2650_1:;
+        case 1000053:
             spritesound(SLT,i);
             spawn(i,SHT);
-        case SPACEMARINE:
+        case 1000054:
             sprite[i].extra -= sprite[sn].extra;
             if(sprite[i].extra > 0) break;
             SA = TRAND&2047;
@@ -2723,19 +2786,16 @@ void checkhitsprite(short i,short sn)
             guts(&sprite[i],JIBS3,6,-1);
             deletesprite(i);
             break;
-#endif
+goto sector_branch_2650_end;
+sector_branch_2650_end:;
 
         // The strippers take damage, scream and die here (G11-S10).
         case NAKED1:
-#if DUKE3D_GAMEVER >= GAMEVER_10
-        case PODFEM1:
-#endif
+        case 1000055:
         case FEM1:
         case FEM2:
         case FEM3:
-#if DUKE3D_GAMEVER >= GAMEVER_10
-        case FEM4:
-#endif
+        case 1000056:
             sprite[i].extra -= sprite[sn].extra;
             if(ud.lockout == 0)
                 spritesound(LADY_SCREAM,i);
@@ -2801,11 +2861,14 @@ void checkhitsprite(short i,short sn)
             PN = BROKENCHAIR;
             CS = 0;
             break;
-#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no CHAIR3 case (G10-S02)
-        case CHAIR3:
+if (game_profile->gamever >= GAMEVER_11) goto sector_branch_2793_0;
+else goto sector_branch_2793_end;
+sector_branch_2793_0:;
+        case 1000057:
             deletesprite(i);
             break;
-#endif
+goto sector_branch_2793_end;
+sector_branch_2793_end:;
         case CLOCK:
             PN = BROKENCLOCK;
             spritesound(GLASS_BREAKING,i);
@@ -2817,14 +2880,12 @@ void checkhitsprite(short i,short sn)
             {
                 if( badguy(&sprite[i]) == 1)
                 {
-#if DUKE3D_GAMEVER >= GAMEVER_10
+if (game_profile->gamever >= GAMEVER_10) {
                     if(sprite[sn].picnum == RPG) sprite[sn].extra <<= 1;
-#endif
+}
 
                     if( (PN < GREENSLIME || PN > GREENSLIME+7)
-#if DUKE3D_GAMEVER >= GAMEVER_10
-                        && PN != ROTATEGUN
-#endif
+&& (!(game_profile->gamever >= GAMEVER_10) || (PN != ROTATEGUN))
                       )
                     {
                         j = spawn(sn,JIBS6);
@@ -2837,13 +2898,11 @@ void checkhitsprite(short i,short sn)
                     j = sprite[sn].owner;
 
                     if( j >= 0 && sprite[j].picnum == APLAYER
-#if DUKE3D_GAMEVER >= GAMEVER_10
-                        && PN != ROTATEGUN
-#endif
+&& (!(game_profile->gamever >= GAMEVER_10) || (PN != ROTATEGUN))
                       )
                         if( ps[sprite[j].yvel].curr_weapon == SHOTGUN_WEAPON )
                     {
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
                         shoot(i,BLOODSPLAT1);
                         shoot(i,BLOODSPLAT2);
                         shoot(i,BLOODSPLAT3);
@@ -2852,19 +2911,15 @@ void checkhitsprite(short i,short sn)
                         shoot(i,BLOODSPLAT2);
                         shoot(i,BLOODSPLAT3);
                         shoot(i,BLOODSPLAT4);
-#else
+} else {
                         shoot(i,BLOODSPLAT3);
                         shoot(i,BLOODSPLAT1);
                         shoot(i,BLOODSPLAT2);
                         shoot(i,BLOODSPLAT4);
-#endif
+}
                     }
 
-#if DUKE3D_GAMEVER < GAMEVER_10
-                    if( PN != RECON )
-#else
-                    if( PN != BOSS1 && PN != BOSS2 && PN != RECON && PN != ROTATEGUN )
-#endif
+if ((game_profile->gamever < GAMEVER_10 ? ( PN != RECON ) : ( PN != BOSS1 && PN != BOSS2 && PN != RECON && PN != ROTATEGUN )))
                     {
                         SA = (sprite[sn].ang+1024)&2047;
                         if(sprite[i].xvel > 0) sprite[i].xvel = 0;
@@ -2886,8 +2941,7 @@ void checkhitsprite(short i,short sn)
                     }
                 }
 
-#if DUKE3D_GAMEVER < GAMEVER_10
-                else if(sprite[i].statnum == 10)
+else if ((game_profile->gamever < GAMEVER_10) && (sprite[i].statnum == 10))
                 {
                     p = sprite[i].yvel;
                     ps[p].newowner = -1;
@@ -2899,7 +2953,6 @@ void checkhitsprite(short i,short sn)
                         if(sprite[j].picnum == CAMERA1) sprite[j].yvel = 0;
                     if(RX < 48 && sprite[sn].picnum == SHRINKSPARK) return;
                 }
-#endif
 
                 if( sprite[i].statnum != 2 )
                 {
@@ -2909,7 +2962,7 @@ void checkhitsprite(short i,short sn)
                     hittype[i].owner = sprite[sn].owner;
                 }
 
-#if DUKE3D_GAMEVER >= GAMEVER_10
+if (game_profile->gamever >= GAMEVER_10) {
                 if(sprite[i].statnum == 10)
                 {
                     p = sprite[i].yvel;
@@ -2937,13 +2990,13 @@ void checkhitsprite(short i,short sn)
                             if(ud.player_skill >= 3)
                                 sprite[sn].extra += (sprite[sn].extra>>1);
                 }
-#endif
+}
 
             }
             break;
     }
 }
-#else
+
 /*
 ================
 checkhitsprite
@@ -2952,14 +3005,14 @@ Apply tile-specific hit reactions and record pending actor damage
 from the impacting sprite.
 ================
 */
-void checkhitsprite(short i,short sn)
+static void checkhitsprite_later(short i,short sn)
 {
     short j, k, l, nextj, p;
     spritetype *s;
 
     i &= (MAXSPRITES-1);
 
-    switch(PN)
+    switch(sector_dispatch_12(game_tile_case(PN)))
     {
         case OCEANSPRITE1:
         case OCEANSPRITE2:
@@ -3046,9 +3099,7 @@ void checkhitsprite(short i,short sn)
             break;
 
         case HANGLIGHT:
-#if DUKE3D_GAMEVER >= GAMEVER_14
-        case GENERICPOLE2:
-#endif
+        case 1000058:
             for(k=0;k<6;k++)
                 {
                     // Fix: draw the random numbers in the DOS executable's (Watcom's) argument order.
@@ -3069,9 +3120,9 @@ void checkhitsprite(short i,short sn)
             if( sector[SECT].floorpicnum == FANSHADOW )
                 sector[SECT].floorpicnum = FANSHADOWBROKE;
 
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
             spritesound(GLASS_HEAVYBREAK,i);
-#endif
+}
             s = &sprite[i];
             for(j=0;j<16;j++) RANDOMSCRAP;
 
@@ -3232,13 +3283,16 @@ void checkhitsprite(short i,short sn)
             CS &= (65535-256-1);
             spritesound(VENT_BUST,i);
             break;
-#if DUKE3D_GAMEVER >= GAMEVER_14
-        case PANNEL3:
+if (game_profile->gamever >= GAMEVER_14) goto sector_branch_3224_0;
+else goto sector_branch_3224_end;
+sector_branch_3224_0:;
+        case 1000059:
             PN = BPANNEL3;
             CS &= (65535-256-1);
             spritesound(VENT_BUST,i);
             break;
-#endif
+goto sector_branch_3224_end;
+sector_branch_3224_end:;
         case PIPE1:
         case PIPE2:
         case PIPE3:
@@ -3262,9 +3316,7 @@ void checkhitsprite(short i,short sn)
         case MONK:
         case LUKE:
         case INDY:
-#if DUKE3D_GAMEVER >= GAMEVER_14
-        case JURYGUY:
-#endif
+        case 1000060:
             spritesound(SLT,i);
             spawn(i,SHT);
         case SPACEMARINE:
@@ -3309,31 +3361,35 @@ void checkhitsprite(short i,short sn)
         case POT1:
         case POT2:
         case POT3:
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) goto sector_branch_3301_0;
+else goto sector_branch_3301_1;
+sector_branch_3301_0:;
             spritesound(GLASS_HEAVYBREAK,i);
             s = &sprite[i];
             for(j=0;j<16;j++) RANDOMSCRAP;
             deletesprite(i);
             break;
-        case CLOCK:
+        case 1000061:
             PN = BROKENCLOCK;
             spritesound(GLASS_BREAKING,i);
             break;
-#else
-        case TRIPODCAMERA:
+goto sector_branch_3301_end;
+sector_branch_3301_1:;
+        case 1000062:
             spritesound(GLASS_HEAVYBREAK,i);
             s = &sprite[i];
             for(j=0;j<16;j++) RANDOMSCRAP;
             deletesprite(i);
             break;
-#endif
+goto sector_branch_3301_end;
+sector_branch_3301_end:;
         case PLAYERONWATER:
             i = OW;
         default:
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
             if( (sprite[i].cstat&16) && SHT == 0 && SLT == 0 && sprite[i].statnum == 0)
                 break;
-#endif
+}
 
             if( ( sprite[sn].picnum == FREEZEBLAST || sprite[sn].owner != i ) && sprite[i].statnum != 4)
             {
@@ -3343,15 +3399,13 @@ void checkhitsprite(short i,short sn)
 
                     if( (PN != DRONE) && (PN != ROTATEGUN) && (PN != COMMANDER) && (PN < GREENSLIME || PN > GREENSLIME+7) )
                         if(sprite[sn].picnum != FREEZEBLAST )
-#if DUKE3D_GAMEVER >= GAMEVER_14
-                            if( actortype[PN] == 0 )
-#endif
+if ((game_profile->gamever >= GAMEVER_14 ? ( actortype[PN] == 0 ) : (1)))
                     {
                         j = spawn(sn,JIBS6);
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
                         if(sprite[sn].pal == 6)
                             sprite[j].pal = 6;
-#endif
+}
                         sprite[j].z += (4<<8);
                         sprite[j].xvel = 16;
                         sprite[j].xrepeat = sprite[j].yrepeat = 24;
@@ -3369,16 +3423,15 @@ void checkhitsprite(short i,short sn)
                         shoot(i,BLOODSPLAT4);
                     }
 
-#if DUKE3D_GAMEVER < GAMEVER_14
-                    if( PN != BOSS1 && PN != BOSS2 && PN != BOSS3 && PN != RECON && PN != ROTATEGUN )
-                    {
+if ((game_profile->gamever < GAMEVER_14 ? ( PN != BOSS1 && PN != BOSS2 && PN != BOSS3 && PN != RECON && PN != ROTATEGUN ) : ( PN != TANK && PN != BOSS1 && PN != BOSS4 && PN != BOSS2 && PN != BOSS3 && PN != RECON && PN != ROTATEGUN ))) {
+if (game_profile->gamever < GAMEVER_14) {
+
                         SA = (sprite[sn].ang+1024)&2047;
-#else
-                    if( PN != TANK && PN != BOSS1 && PN != BOSS4 && PN != BOSS2 && PN != BOSS3 && PN != RECON && PN != ROTATEGUN )
-                    {
+} else {
+
                         if( (sprite[i].cstat&48) == 0 )
                             SA = (sprite[sn].ang+1024)&2047;
-#endif
+}
                         sprite[i].xvel = -(sprite[sn].extra<<2);
                         j = SECT;
                         pushmove(&SX,&SY,&SZ,&j,128L,(4L<<8),(4L<<8),CLIPMASK0);
@@ -3389,22 +3442,14 @@ void checkhitsprite(short i,short sn)
                     if(sprite[i].statnum == 2)
                     {
                         changespritestat(i,1);
-#if DUKE3D_GAMEVER < GAMEVER_14
-                        hittype[i].timetosleep = 0;
-#else
-                        hittype[i].timetosleep = SLEEPTIME;
-#endif
+hittype[i].timetosleep = (game_profile->gamever < GAMEVER_14 ? (0) : (SLEEPTIME));
                     }
                     if( ( RX < 24 || PN == SHARK) && sprite[sn].picnum == SHRINKSPARK) return;
                 }
 
                 if( sprite[i].statnum != 2 )
                 {
-#if DUKE3D_GAMEVER < GAMEVER_14
-                    if( sprite[sn].picnum == FREEZEBLAST && freezerhurtowner == 0 && sprite[sn].owner == i )
-#else
-                    if( sprite[sn].picnum == FREEZEBLAST && ( (PN == APLAYER && sprite[i].pal == 1 ) || ( freezerhurtowner == 0 && sprite[sn].owner == i ) ) )
-#endif
+if ((game_profile->gamever < GAMEVER_14 ? ( sprite[sn].picnum == FREEZEBLAST && freezerhurtowner == 0 && sprite[sn].owner == i ) : ( sprite[sn].picnum == FREEZEBLAST && ( (PN == APLAYER && sprite[i].pal == 1 ) || ( freezerhurtowner == 0 && sprite[sn].owner == i ) ) )))
                         return;
 
                     hittype[i].picnum = sprite[sn].picnum;
@@ -3447,7 +3492,12 @@ void checkhitsprite(short i,short sn)
             break;
     }
 }
-#endif
+
+void checkhitsprite(short i,short sn)
+{
+    if (game_profile->gamever < GAMEVER_13D) checkhitsprite_early(i,sn);
+    else checkhitsprite_later(i,sn);
+}
 
 
 /*
@@ -3500,24 +3550,27 @@ static void cycleweapon(short snum, uint32_t *bits)
     if (ud.pause_on || p->newowner >= 0 || p->cheat_phase || p->show_empty_weapon ||
         p->kickback_pic || p->quick_kick || p->access_incs || p->knee_incs ||
         sprite[p->i].xrepeat <= 32) return;
-#if DUKE3D_GAMEVER < GAMEVER_10
-    if (p->last_pissed_time >= 26*58) return;
-#else
-    if (p->last_pissed_time > 26*218) return;
-#endif
+if ((game_profile->gamever < GAMEVER_10 ? (p->last_pissed_time >= 26*58) : (p->last_pissed_time > 26*218))) {
+if (game_profile->gamever < GAMEVER_10) {
+return;
+}
+else {
+return;
+}
+}
     step = command == CONTROL_WEAPON_PREVIOUS ? -1 : 1;
     weapon = p->curr_weapon;
-#if DUKE3D_GAMEVER >= GAMEVER_10
-    if (weapon == HANDREMOTE_WEAPON) weapon = HANDBOMB_WEAPON;
-#endif
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_10) {
+    if (weapon == game_remote_weapon()) weapon = HANDBOMB_WEAPON;
+}
+if (game_profile->gamever >= GAMEVER_14) {
     if (weapon == GROW_WEAPON) weapon = SHRINKER_WEAPON;
-#endif
+}
     for (count = 0; count < 10; count++) {
         int candidate;
         weapon = (weapon + step + 10) % 10;
         candidate = weapon;
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
         if (weapon == SHRINKER_WEAPON) {
             if ((p->subweapon & (1 << GROW_WEAPON)) &&
                 p->gotweapon[GROW_WEAPON] && p->ammo_amount[GROW_WEAPON] > 0)
@@ -3526,17 +3579,17 @@ static void cycleweapon(short snum, uint32_t *bits)
                      p->gotweapon[GROW_WEAPON] && p->ammo_amount[GROW_WEAPON] > 0)
                 candidate = GROW_WEAPON;
         }
-#endif
+}
         if (p->gotweapon[candidate] && p->ammo_amount[candidate] > 0) {
             selected = candidate;
             break;
         }
     }
     if (selected == p->curr_weapon) return;
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
     if (selected == GROW_WEAPON) p->subweapon |= 1 << GROW_WEAPON;
     else if (selected == SHRINKER_WEAPON) p->subweapon &= ~(1 << GROW_WEAPON);
-#endif
+}
     oldpos = p->weapon_pos;
     oldweapon = p->last_weapon;
     addweapon(p, selected);
@@ -3546,12 +3599,12 @@ static void cycleweapon(short snum, uint32_t *bits)
     }
 }
 
-#if DUKE3D_GAMEVER < GAMEVER_13D
 // 1.1's cheatkeys (G11-S13): bit 23 toggles the aim mode, any key from bit 8
 // up is debounced, the quick kick switches to the boot, and the inventory
 // has the space suit as item 7 and the boots as item 8.
-void cheatkeys(short snum)
+static void cheatkeys_early(short snum)
 {
+    int quickkick_allowed=game_profile->gamever<GAMEVER_10;
     short i, k;
     char dainv;
     uint32_t sb_snum;
@@ -3562,20 +3615,23 @@ void cheatkeys(short snum)
     p = &ps[snum];
     cycleweapon(snum, &sb_snum);
 
-#if DUKE3D_GAMEVER < GAMEVER_10
-    if(p->cheat_phase != 0) return;
-#else
-    if(p->cheat_phase == 1) return;
-#endif
+if ((game_profile->gamever < GAMEVER_10 ? (p->cheat_phase != 0) : (p->cheat_phase == 1))) {
+if (game_profile->gamever < GAMEVER_10) {
+return;
+}
+else {
+return;
+}
+}
 
-#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 has no aim mode (G10-S06)
+if (game_profile->gamever >= GAMEVER_11) {
     if( sb_snum&(1<<23) )
     {
         p->aim_mode = !p->aim_mode;
         if(p->aim_mode == 0)
             p->return_to_center = 9;
     }
-#endif
+}
 
     if( sb_snum < 0xff )
     {
@@ -3610,29 +3666,33 @@ void cheatkeys(short snum)
 
     if( sb_snum&(1<<30) && p->newowner == -1 )
     {
-        switch(p->inven_icon)
+        switch(sector_dispatch_13(p->inven_icon))
         {
             case 4: sb_snum |= (1<<25);break;
             case 3: sb_snum |= (1<<24);break;
             case 5: sb_snum |= (1<<15);break;
             case 1: sb_snum |= (1<<16);break;
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) goto sector_branch_3612_0;
+else goto sector_branch_3612_1;
+sector_branch_3612_0:;
             // 1.0: steroids only from the inventory, with no icon store,
             // quote or return; no Steroids bit (G10-S06).
-            case 2:
+            case 1000063:
                 if(p->steroids_amount == 400 )
                 {
                     p->steroids_amount--;
                     spritesound(DUKE_TAKEPILLS,p->i);
                 }
                 break;
-#else
-            case 2: sb_snum |= (1<<12);break;
-#endif
+goto sector_branch_3612_end;
+sector_branch_3612_1:;
+            case 1000064: sb_snum |= (1<<12);break;
+goto sector_branch_3612_end;
+sector_branch_3612_end:;
         }
     }
 
-#if DUKE3D_GAMEVER >= GAMEVER_11
+if (game_profile->gamever >= GAMEVER_11) {
     if( (sb_snum&(1<<12)) )
     {
         if(p->steroids_amount == 400 )
@@ -3644,7 +3704,7 @@ void cheatkeys(short snum)
         }
         return;
     }
-#endif
+}
 
     if(p->newowner == -1)
         if( sb_snum&(1<<20) || sb_snum&(1<<27) || p->refresh_inventory)
@@ -3733,12 +3793,9 @@ void cheatkeys(short snum)
         }
     }
 
-#if DUKE3D_GAMEVER < GAMEVER_10
-    if(p->show_empty_weapon == 0 && p->quick_kick == 0 && p->access_incs == 0 && p->knee_incs == 0)
-#else
-    if(p->last_pissed_time <= (26*218) && p->show_empty_weapon == 0 && p->kickback_pic == 0 && p->quick_kick == 0 && sprite[p->i].xrepeat > 32 && p->access_incs == 0 && p->knee_incs == 0 )
-#endif
+if ((game_profile->gamever < GAMEVER_10 ? (p->show_empty_weapon == 0 && p->quick_kick == 0 && p->access_incs == 0 && p->knee_incs == 0) : (p->last_pissed_time <= (26*218) && p->show_empty_weapon == 0 && p->kickback_pic == 0 && p->quick_kick == 0 && sprite[p->i].xrepeat > 32 && p->access_incs == 0 && p->knee_incs == 0 )))
     {
+        quickkick_allowed=1;
         if(  ( p->weapon_pos == 0 || ( p->holster_weapon && p->weapon_pos == -9 ) ) )
         {
             j = ( (sb_snum&(15<<8))>>8 ) - 1;
@@ -3746,7 +3803,7 @@ void cheatkeys(short snum)
             // 1.1 leaves k at 0 unless it looks for a live pipe bomb.
             k = 0;
 
-#if DUKE3D_GAMEVER >= GAMEVER_10
+if (game_profile->gamever >= GAMEVER_10) {
             if( j == HANDBOMB_WEAPON && p->ammo_amount[HANDBOMB_WEAPON] == 0 )
             {
                 k = headspritestat[1];
@@ -3755,24 +3812,22 @@ void cheatkeys(short snum)
                     if( sprite[k].picnum == HEAVYHBOMB && sprite[k].owner == p->i )
                     {
                         p->gotweapon[HANDBOMB_WEAPON] = 1;
-                        j = HANDREMOTE_WEAPON;
+                        j = game_remote_weapon();
                         break;
                     }
                     k = nextspritestat[k];
                 }
             }
 
-#endif
+}
             if(p->holster_weapon)
             {
                 sb_snum |= 1<<19;
                 p->weapon_pos = -9;
             }
             else if(
-#if DUKE3D_GAMEVER < GAMEVER_10
-                j >= 0 && j <= TRIPBOMB_WEAPON &&
-#endif
-                p->gotweapon[j] && p->curr_weapon != j ) switch(j)
+(!(game_profile->gamever < GAMEVER_10) || (j >= 0 && j <= TRIPBOMB_WEAPON)) &&
+                p->gotweapon[j] && p->curr_weapon != j ) switch(sector_dispatch_14(game_weapon_case(j)))
             {
                 case KNEE_WEAPON:
                     addweapon( p, KNEE_WEAPON );
@@ -3790,16 +3845,19 @@ void cheatkeys(short snum)
                     }
                     addweapon( p, j );
                     break;
-#if DUKE3D_GAMEVER >= GAMEVER_10
-                case HANDREMOTE_WEAPON:
+if (game_profile->gamever >= GAMEVER_10) goto sector_branch_3787_0;
+else goto sector_branch_3787_end;
+sector_branch_3787_0:;
+                case 1000065:
                     if(k >= 0) // Found in list of [1]'s
                     {
-                        p->curr_weapon = HANDREMOTE_WEAPON;
+                        p->curr_weapon = game_remote_weapon();
                         p->last_weapon = -1;
                         p->weapon_pos = 10;
                     }
                     break;
-#endif
+goto sector_branch_3787_end;
+sector_branch_3787_end:;
                 case HANDBOMB_WEAPON:
                     if( p->ammo_amount[HANDBOMB_WEAPON] > 0 && p->gotweapon[HANDBOMB_WEAPON] )
                         addweapon( p, HANDBOMB_WEAPON );
@@ -3811,15 +3869,11 @@ void cheatkeys(short snum)
             }
         }
 
-#if DUKE3D_GAMEVER < GAMEVER_10
     }
-#endif
+    if(quickkick_allowed)
+    {
         // The quick kick swaps to the boot; doincrements swaps back.
-#if DUKE3D_GAMEVER < GAMEVER_10
-        if( (sb_snum&(1<<22)) && p->quick_kick == 0 && p->kickback_pic == 0 )
-#else
-        if( sb_snum&(1<<22) )
-#endif
+if ((game_profile->gamever < GAMEVER_10 ? ( (sb_snum&(1<<22)) && p->quick_kick == 0 && p->kickback_pic == 0 ) : ( sb_snum&(1<<22) )))
         {
             if(p->holster_weapon == 0)
             {
@@ -3829,9 +3883,9 @@ void cheatkeys(short snum)
                 {
                     p->last_full_weapon = p->curr_weapon;
                     p->quick_kick = 24;
-#if DUKE3D_GAMEVER >= GAMEVER_10
+if (game_profile->gamever >= GAMEVER_10) {
                     FTA(80,p);
-#endif
+}
                     addweapon( p, KNEE_WEAPON );
                 }
             }
@@ -3857,17 +3911,15 @@ void cheatkeys(short snum)
                 FTA(74,p);
             }
         }
-#if DUKE3D_GAMEVER >= GAMEVER_10
     }
-#endif
 
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
     if( sb_snum&(1<<17) ) // 1.0's per-player AutoRun (G10-S06)
     {
         p->auto_run = !p->auto_run;
         FTA(85+p->auto_run,p);
     }
-#endif
+}
 
     if( sb_snum&(1<<24) && p->newowner == -1 )
     {
@@ -3925,11 +3977,11 @@ void cheatkeys(short snum)
             {
                 sprite[p->i].extra += p->firstaid_amount;
                 p->firstaid_amount = 0;
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
                 p->inven_icon = 0;
-#else
+} else {
                 checkavailinven(p);
-#endif
+}
             }
             spritesound(DUKE_USEMEDKIT,p->i);
         }
@@ -3962,8 +4014,8 @@ void cheatkeys(short snum)
     if(sb_snum&(1<<28) && p->one_eighty_count == 0)
         p->one_eighty_count = -1024;
 }
-#else
-void cheatkeys(short snum)
+
+static void cheatkeys_later(short snum)
 {
     short i, k;
     char dainv;
@@ -3983,9 +4035,7 @@ void cheatkeys(short snum)
         p->return_to_center = 9;
 
     if( (sb_snum&(1<<22)) && p->quick_kick == 0)
-#if DUKE3D_GAMEVER >= GAMEVER_14
-        if( p->curr_weapon != KNEE_WEAPON || p->kickback_pic == 0 )
-#endif
+if ((game_profile->gamever >= GAMEVER_14 ? ( p->curr_weapon != KNEE_WEAPON || p->kickback_pic == 0 ) : (1)))
     {
         p->quick_kick = 14;
         FTA(80,p);
@@ -3993,11 +4043,7 @@ void cheatkeys(short snum)
 
     if( !(sb_snum&((15<<8)|(1<<12)|(1<<15)|(1<<16)|(1<<22)|(1<<19)|(1<<20)|(1<<21)|(1<<24)|(1<<25)|(1<<27)|(1<<28)|(1<<29)|(1<<30)|(1<<31))) )
         p->interface_toggle_flag = 0;
-#if DUKE3D_GAMEVER < GAMEVER_14
-    else if(p->interface_toggle_flag == 0)
-#else
-    else if(p->interface_toggle_flag == 0 && ( sb_snum&(1<<17) ) == 0)
-#endif
+else if ((game_profile->gamever < GAMEVER_14 ? (p->interface_toggle_flag == 0) : (p->interface_toggle_flag == 0 && ( sb_snum&(1<<17) ) == 0)))
     {
         p->interface_toggle_flag = 1;
 
@@ -4036,7 +4082,7 @@ void cheatkeys(short snum)
             }
         }
 
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
         if( sb_snum&(1<<15) && p->heat_amount > 0 )
         {
             p->heat_on = !p->heat_on;
@@ -4045,7 +4091,7 @@ void cheatkeys(short snum)
             spritesound(NITEVISION_ONOFF,p->i);
             FTA(106+(!p->heat_on),p);
         }
-#endif
+}
 
         if( (sb_snum&(1<<12)) )
         {
@@ -4141,10 +4187,10 @@ void cheatkeys(short snum)
 
         j = ( (sb_snum&(15<<8))>>8 ) - 1;
 
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
         if( j > 0 && p->kickback_pic > 0)
             p->wantweaponfire = j;
-#endif
+}
 
         if(p->last_pissed_time <= (26*218) && p->show_empty_weapon == 0 && p->kickback_pic == 0 && p->quick_kick == 0 && sprite[p->i].xrepeat > 32 && p->access_incs == 0 && p->knee_incs == 0 )
         {
@@ -4156,7 +4202,7 @@ void cheatkeys(short snum)
                     j = ( j == 10 ? -1 : 1 );
                     i = 0;
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
                     // 1.3D has no expander to cycle through.
                     while( k >= 0 && k < 10 )
                     {
@@ -4178,7 +4224,7 @@ void cheatkeys(short snum)
                             break;
                         }
                     }
-#else
+} else {
                     while( ( k >= 0 && k < 10 ) || ( k == GROW_WEAPON && (p->subweapon&(1<<GROW_WEAPON) ) ) )
                     {
                         if(k == GROW_WEAPON)
@@ -4227,7 +4273,7 @@ void cheatkeys(short snum)
                             break;
                         }
                     }
-#endif
+}
                 }
 
                 k = -1;
@@ -4241,14 +4287,14 @@ void cheatkeys(short snum)
                         if( sprite[k].picnum == HEAVYHBOMB && sprite[k].owner == p->i )
                         {
                             p->gotweapon[HANDBOMB_WEAPON] = 1;
-                            j = HANDREMOTE_WEAPON;
+                            j = game_remote_weapon();
                             break;
                         }
                         k = nextspritestat[k];
                     }
                 }
 
-#if DUKE3D_GAMEVER >= GAMEVER_14
+if (game_profile->gamever >= GAMEVER_14) {
                 if(j == SHRINKER_WEAPON)
                 {
                     if(screenpeek == snum) pus = NUMPAGES;
@@ -4276,14 +4322,14 @@ void cheatkeys(short snum)
                     else
                         p->subweapon &= ~(1<<GROW_WEAPON);
                 }
-#endif
+}
 
                 if(p->holster_weapon)
                 {
                     sb_snum |= 1<<19;
                     p->weapon_pos = -9;
                 }
-                else if( p->gotweapon[j] && p->curr_weapon != j ) switch(j)
+                else if( p->gotweapon[j] && p->curr_weapon != j ) switch(game_weapon_case(j))
                 {
                     case KNEE_WEAPON:
                         addweapon( p, KNEE_WEAPON );
@@ -4331,12 +4377,12 @@ void cheatkeys(short snum)
                         addweapon( p, DEVISTATOR_WEAPON );
                         break;
                     case FREEZE_WEAPON:
-                        if( p->ammo_amount[FREEZE_WEAPON] == 0 && p->show_empty_weapon == 0)
+                        if( p->ammo_amount[game_freeze_weapon()] == 0 && p->show_empty_weapon == 0)
                         {
                             p->last_full_weapon = p->curr_weapon;
                             p->show_empty_weapon = 32;
                         }
-                        addweapon( p, FREEZE_WEAPON );
+                        addweapon( p, game_freeze_weapon() );
                         break;
                     case GROW_WEAPON:
                     case SHRINKER_WEAPON:
@@ -4352,7 +4398,7 @@ void cheatkeys(short snum)
                     case HANDREMOTE_WEAPON:
                         if(k >= 0) // Found in list of [1]'s
                         {
-                            p->curr_weapon = HANDREMOTE_WEAPON;
+                            p->curr_weapon = game_remote_weapon();
                             p->last_weapon = -1;
                             p->weapon_pos = 10;
                         }
@@ -4419,7 +4465,7 @@ void cheatkeys(short snum)
             }
         }
 
-#if DUKE3D_GAMEVER < GAMEVER_14
+if (game_profile->gamever < GAMEVER_14) {
         // 1.3D toggles the goggles here, and not while a cheat is typed.
         if( sb_snum&(1<<15) && p->heat_amount > 0 && p->cheat_phase == 0 )
         {
@@ -4429,7 +4475,7 @@ void cheatkeys(short snum)
             spritesound(NITEVISION_ONOFF,p->i);
             FTA(106+(!p->heat_on),p);
         }
-#endif
+}
 
         if( sb_snum&(1<<16) )
         {
@@ -4437,11 +4483,7 @@ void cheatkeys(short snum)
             {
                 j = max_player_health-sprite[p->i].extra;
 
-#if DUKE3D_GAMEVER < GAMEVER_14
-                if(p->firstaid_amount >= j)
-#else
-                if(p->firstaid_amount > j)
-#endif
+if ((game_profile->gamever < GAMEVER_14 ? (p->firstaid_amount >= j) : (p->firstaid_amount > j)))
                 {
                     p->firstaid_amount -= j;
                     sprite[p->i].extra = max_player_health;
@@ -4493,7 +4535,12 @@ void cheatkeys(short snum)
             p->one_eighty_count = -1024;
     }
 }
-#endif
+
+void cheatkeys(short snum)
+{
+    if (game_profile->gamever < GAMEVER_13D) cheatkeys_early(snum);
+    else cheatkeys_later(snum);
+}
 
 /*
 ================
@@ -4532,10 +4579,10 @@ void checksectors(short snum)
             else
             {
                 ud.level_number++;
-#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 doesn't wrap; main ends the episode at level 5
+if (game_profile->gamever >= GAMEVER_13D) {
                 if( (ud.volume_number && ud.level_number > 10 ) || ud.level_number > 5 )
                     ud.level_number = 0;
-#endif
+}
                 ud.m_level_number = ud.level_number;
             }
             return;
@@ -4545,17 +4592,9 @@ void checksectors(short snum)
             p->customexitsound = sector[p->cursectnum].hitag;
             return;
         default:
-#if DUKE3D_GAMEVER < GAMEVER_14
-            if(sector[p->cursectnum].lotag > 9999)
-#else
-            if(sector[p->cursectnum].lotag >= 10000 && sector[p->cursectnum].lotag < 16383)
-#endif
+if ((game_profile->gamever < GAMEVER_14 ? (sector[p->cursectnum].lotag > 9999) : (sector[p->cursectnum].lotag >= 10000 && sector[p->cursectnum].lotag < 16383)))
             {
-#if DUKE3D_GAMEVER < GAMEVER_13D
-                if(snum == screenpeek || ud.coop != 0 )
-#else
-                if(snum == screenpeek || ud.coop == 1 )
-#endif
+if ((game_profile->gamever < GAMEVER_13D ? (snum == screenpeek || ud.coop != 0 ) : (snum == screenpeek || ud.coop == 1 )))
                     spritesound(sector[p->cursectnum].lotag-10000,p->i);
                 sector[p->cursectnum].lotag = 0;
             }
@@ -4570,20 +4609,16 @@ void checksectors(short snum)
     if( ud.cashman && sync[snum].bits&(1<<29) )
         lotsofmoney(&sprite[p->i],2);
 
-#if DUKE3D_GAMEVER >= GAMEVER_11 // 1.0 leaves the camera by the open key only (G10-S05)
+if (game_profile->gamever >= GAMEVER_11) {
     if(p->newowner >= 0)
     {
-#if DUKE3D_GAMEVER < GAMEVER_13D // 1.1 leaves the camera only on forward motion
-        if( klabs(sync[snum].fvel) > 768 )
-#else
-        if( klabs(sync[snum].svel) > 768 || klabs(sync[snum].fvel) > 768 )
-#endif
+if ((game_profile->gamever < GAMEVER_13D ? ( klabs(sync[snum].fvel) > 768 ) : ( klabs(sync[snum].svel) > 768 || klabs(sync[snum].fvel) > 768 )))
         {
             i = -1;
             goto CLEARCAMERAS;
         }
     }
-#endif
+}
 
     if( !(sync[snum].bits&(1<<29)) && !(sync[snum].bits&(1<<31)))
         p->toggle_key_flag = 0;
@@ -4605,22 +4640,18 @@ void checksectors(short snum)
         p->toggle_key_flag = 1;
         hitscanwall = -1;
 
-#if DUKE3D_GAMEVER >= GAMEVER_10
+if (game_profile->gamever >= GAMEVER_10) {
         i = hitawall(p,&hitscanwall);
 
-#if DUKE3D_GAMEVER < GAMEVER_14
-        if(hitscanwall >= 0 && wall[hitscanwall].overpicnum == MIRROR)
-#else
-        if(i < 1280 && hitscanwall >= 0 && wall[hitscanwall].overpicnum == MIRROR)
-#endif
+if ((game_profile->gamever < GAMEVER_14 ? (hitscanwall >= 0 && wall[hitscanwall].overpicnum == MIRROR) : (i < 1280 && hitscanwall >= 0 && wall[hitscanwall].overpicnum == MIRROR)))
             if( wall[hitscanwall].lotag > 0 && Sound[wall[hitscanwall].lotag].num == 0 && snum == screenpeek)
         {
             spritesound(wall[hitscanwall].lotag,p->i);
             return;
         }
-#endif
+}
 
-#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 lets the use action reach past masked walls
+if (game_profile->gamever >= GAMEVER_13D) {
         if(hitscanwall >= 0 && (wall[hitscanwall].cstat&16) )
             switch(wall[hitscanwall].overpicnum)
         {
@@ -4628,7 +4659,7 @@ void checksectors(short snum)
                 if(wall[hitscanwall].lotag)
                     return;
         }
-#endif
+}
 
         if(p->newowner >= 0)
             neartag(p->oposx,p->oposy,p->oposz,sprite[p->i].sectnum,p->oang,&neartagsector,&neartagwall,&neartagsprite,&neartaghitdist,1280L,1);
@@ -4639,13 +4670,13 @@ void checksectors(short snum)
                 neartag(p->posx,p->posy,p->posz+(8<<8),sprite[p->i].sectnum,p->oang,&neartagsector,&neartagwall,&neartagsprite,&neartaghitdist,1280L,1);
             if(neartagsprite == -1 && neartagwall == -1 && neartagsector == -1)
                 neartag(p->posx,p->posy,p->posz+(16<<8),sprite[p->i].sectnum,p->oang,&neartagsector,&neartagwall,&neartagsprite,&neartaghitdist,1280L,1);
-#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 tries three times only
+if (game_profile->gamever >= GAMEVER_13D) {
             if(neartagsprite == -1 && neartagwall == -1 && neartagsector == -1)
             {
                 neartag(p->posx,p->posy,p->posz+(16<<8),sprite[p->i].sectnum,p->oang,&neartagsector,&neartagwall,&neartagsprite,&neartaghitdist,1280L,3);
                 if(neartagsprite >= 0)
                 {
-                    switch(sprite[neartagsprite].picnum)
+                    switch(sector_dispatch_15(sprite[neartagsprite].picnum))
                     {
                         case FEM1:
                         case FEM2:
@@ -4656,15 +4687,11 @@ void checksectors(short snum)
                         case FEM7:
                         case FEM8:
                         case FEM9:
-#if DUKE3D_GAMEVER >= GAMEVER_14
-                        case FEM10:
-#endif
+                        case 1000066:
                         case PODFEM1:
                         case NAKED1:
                         case STATUE:
-#if DUKE3D_GAMEVER >= GAMEVER_14
-                        case TOUGHGAL:
-#endif
+                        case 1000067:
                             return;
                     }
                 }
@@ -4673,7 +4700,7 @@ void checksectors(short snum)
                 neartagwall = -1;
                 neartagsector = -1;
             }
-#endif
+}
         }
 
         if(p->newowner == -1 && neartagsprite == -1 && neartagsector == -1 && neartagwall == -1 )
@@ -4694,7 +4721,7 @@ void checksectors(short snum)
         {
             if( checkhitswitch(snum,neartagsprite,1) ) return;
 
-            switch(sprite[neartagsprite].picnum)
+            switch(sector_dispatch_16(sprite[neartagsprite].picnum))
             {
                 case TOILET:
                 case STALL:
@@ -4702,7 +4729,7 @@ void checksectors(short snum)
                     {
                         if(ud.lockout == 0) spritesound(DUKE_URINATE,p->i);
 
-#if DUKE3D_GAMEVER < GAMEVER_10
+if (game_profile->gamever < GAMEVER_10) {
                         p->last_pissed_time = 26*60;
                         p->transporter_hold = 29*2;
                         if(p->holster_weapon) return;
@@ -4710,7 +4737,7 @@ void checksectors(short snum)
                         if(sprite[p->i].extra <= max_player_health-max_player_health/10)
                             sprite[p->i].extra += max_player_health/10;
                         p->weapon_pos = -1;
-#else
+} else {
                         p->last_pissed_time = 26*220;
                         p->transporter_hold = 29*2;
                         if(p->holster_weapon == 0)
@@ -4725,18 +4752,23 @@ void checksectors(short snum)
                         }
                         else if(sprite[p->i].extra < max_player_health )
                              sprite[p->i].extra = max_player_health;
-#endif
+}
                     }
-#if DUKE3D_GAMEVER < GAMEVER_10
-                    else
+else {
+if (game_profile->gamever < GAMEVER_10) {
+
                     {
                         spritesound(FLUSH_TOILET,p->i);
                         p->last_pissed_time = 26;
                     }
-#else
-                    else if(Sound[FLUSH_TOILET].num == 0)
+
+}
+else {
+ if(Sound[FLUSH_TOILET].num == 0)
                         spritesound(FLUSH_TOILET,p->i);
-#endif
+
+}
+}
                     return;
 
                 case NUKEBUTTON:
@@ -4749,11 +4781,11 @@ void checksectors(short snum)
                         hittype[neartagsprite].temp_data[0] = 1;
                         sprite[neartagsprite].owner = p->i;
                         p->buttonpalette = sprite[neartagsprite].pal;
-#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1's secret exit is fixed (G11-G30)
+if (game_profile->gamever >= GAMEVER_13D) {
                         if(p->buttonpalette)
                             ud.secretlevel = sprite[neartagsprite].lotag;
                         else ud.secretlevel = 0;
-#endif
+}
                     }
                     return;
                 case WATERFOUNTAIN:
@@ -4762,13 +4794,13 @@ void checksectors(short snum)
                         hittype[neartagsprite].temp_data[0] = 1;
                         sprite[neartagsprite].owner = p->i;
 
-#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 gives no health here
+if (game_profile->gamever >= GAMEVER_13D) {
                         if(sprite[p->i].extra < max_player_health)
                         {
                             sprite[p->i].extra++;
                             spritesound(DUKE_DRINKING,p->i);
                         }
-#endif
+}
                     }
                     return;
                 case PLUG:
@@ -4777,30 +4809,25 @@ void checksectors(short snum)
                     p->pals[0] = 48;
                     p->pals[1] = 48;
                     p->pals[2] = 64;
-#if DUKE3D_GAMEVER < GAMEVER_10
-                    p->pals_time = totalclock+32;
-#else
-                    p->pals_time = 32;
-#endif
+p->pals_time = (game_profile->gamever < GAMEVER_10 ? (totalclock+32) : (32));
                     break;
-#if DUKE3D_GAMEVER < GAMEVER_13D
-#if DUKE3D_GAMEVER >= GAMEVER_10
-                case PODFEM1:
-#if DUKE3D_GAMEVER < GAMEVER_11
-                    if(Sound[KILLME].num == 0) // 1.0: no lockout test (G10-S05)
-#else
-                    if(ud.lockout == 0 && Sound[KILLME].num == 0)
-#endif
+if (game_profile->gamever < GAMEVER_13D) goto sector_branch_4783_0;
+else goto sector_branch_4783_1;
+sector_branch_4783_0:;
+if (game_profile->gamever >= GAMEVER_10) goto sector_branch_4784_0;
+else goto sector_branch_4784_end;
+sector_branch_4784_0:;
+                case 1000072:
+if ((game_profile->gamever < GAMEVER_11 ? (Sound[KILLME].num == 0) : (ud.lockout == 0 && Sound[KILLME].num == 0)))
                         spritesound(KILLME,neartagsprite);
                     break;
-#endif
+goto sector_branch_4784_end;
+sector_branch_4784_end:;
                 // 1.1 lets the player tip the strippers (G11-S15).
-                case FEM1:
-                case FEM2:
-                case FEM3:
-#if DUKE3D_GAMEVER >= GAMEVER_10
-                case FEM4:
-#endif
+                case 1000068:
+                case 1000069:
+                case 1000070:
+                case 1000073:
                     if(p->tipincs == 0)
                     {
                         p->tipincs = 26;
@@ -4810,11 +4837,13 @@ void checksectors(short snum)
                         else spritesound(DUKE_TIP2,p->i);
                     }
                     return;
-                case VIEWSCREEN:
-#else
-                case VIEWSCREEN:
-                case VIEWSCREEN2:
-#endif
+                case 1000071:
+goto sector_branch_4783_end;
+sector_branch_4783_1:;
+                case 1000074:
+                case 1000075:
+goto sector_branch_4783_end;
+sector_branch_4783_end:;
                     {
                         i = headspritestat[1];
 
@@ -4823,13 +4852,7 @@ void checksectors(short snum)
                             if( PN == CAMERA1 && SP == 0 && sprite[neartagsprite].hitag == SLT )
                             {
                                 SP = 1; //Using this camera
-#if DUKE3D_GAMEVER < GAMEVER_10
-                                spritesound(MONITOR_ACTIVE,i);
-#elif DUKE3D_GAMEVER < GAMEVER_13D
-                                spritesound(MONITOR_ACTIVE,p->i);
-#else
-                                spritesound(MONITOR_ACTIVE,neartagsprite);
-#endif
+spritesound ( MONITOR_ACTIVE , (game_profile->gamever < GAMEVER_10 ? (i) : ((game_profile->gamever < GAMEVER_13D ? (p -> i) : (neartagsprite)))) ) ;
 
                                 sprite[neartagsprite].owner = i;
                                 sprite[neartagsprite].yvel = 1;
@@ -4837,9 +4860,9 @@ void checksectors(short snum)
 
                                 j = p->cursectnum;
                                 p->cursectnum = SECT;
-#if DUKE3D_GAMEVER >= GAMEVER_10
+if (game_profile->gamever >= GAMEVER_10) {
                                 setpal(p);
-#endif
+}
                                 p->cursectnum = j;
 
                                 // parallaxtype = 2;
@@ -4860,12 +4883,12 @@ void checksectors(short snum)
                         p->ang = p->oang;
                         p->newowner = -1;
 
-#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 keeps the cursectnum it had
+if (game_profile->gamever >= GAMEVER_13D) {
                         updatesector(p->posx,p->posy,&p->cursectnum);
-#endif
-#if DUKE3D_GAMEVER >= GAMEVER_10
+}
+if (game_profile->gamever >= GAMEVER_10) {
                         setpal(p);
-#endif
+}
 
 
                         i = headspritestat[1];
@@ -4901,9 +4924,7 @@ void checksectors(short snum)
         {
             if( wall[neartagwall].lotag > 0 && isadoorwall(wall[neartagwall].picnum) )
             {
-#if DUKE3D_GAMEVER >= GAMEVER_13D // 1.1 doesn't check that the door wall was the one aimed at
-                if(hitscanwall == neartagwall || hitscanwall == -1)
-#endif
+if ((game_profile->gamever >= GAMEVER_13D ? (hitscanwall == neartagwall || hitscanwall == -1) : (1)))
                     checkhitswitch(snum,neartagwall,0);
                 return;
             }
