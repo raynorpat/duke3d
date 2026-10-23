@@ -3311,12 +3311,12 @@ void checkweapons(struct player_struct *p)
         spawn(p->i,EXPLOSION2);
         quickkill(p);
     }
-    return;
-#endif
+#else
     if(cw)
     {
         if(TRAND&1)
             spawn(p->i,weapon_sprites11[cw]);
+#endif
 #elif DUKE3D_GAMEVER < GAMEVER_14
     // 1.3D drops a freezer as a FREEZEBLAST, and has no range check.
     if(cw)
@@ -3331,6 +3331,7 @@ void checkweapons(struct player_struct *p)
         if(TRAND&1)
             spawn(p->i,weapon_sprites[cw]);
 #endif
+#if DUKE3D_GAMEVER >= GAMEVER_11
         else switch(cw)
         {
             case RPG_WEAPON:
@@ -3339,6 +3340,7 @@ void checkweapons(struct player_struct *p)
                 break;
         }
     }
+#endif
 }
 
 void processinput(short snum)
@@ -3503,6 +3505,9 @@ void processinput(short snum)
     }
 
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+    p->on_sector_effector = 0; // Beta processinput 0x40586.
+#endif
     if ( s->extra > 0 ) incur_damage( p );
     else
     {
@@ -3690,12 +3695,14 @@ void processinput(short snum)
     {
         if(p->dead_flag == 0)
         {
+            int death_side;
 #if DUKE3D_GAMEVER < GAMEVER_13D
             // 1.1 has no pal 1 tests and doesn't lift the body.
             checkweapons(p);
 #if DUKE3D_GAMEVER < GAMEVER_10
             p->fraggedself++;
-            p->dead_flag = 256-((TRAND&1)<<9)+(TRAND&127)-64;
+            death_side = TRAND&1;
+            p->dead_flag = 256-(death_side<<9)+(TRAND&127)-64;
             if(p->dead_flag == 0) p->dead_flag = 1;
 #else
             p->pals[0] = 63;
@@ -3706,7 +3713,8 @@ void processinput(short snum)
             if(ud.recstat == 1 && ud.multimode < 2)
                 closedemowrite();
 
-            p->dead_flag = (512-((TRAND&1)<<10)+(TRAND&255)-512)&2047;
+            death_side = TRAND&1;
+            p->dead_flag = (512-(death_side<<10)+(TRAND&255)-512)&2047;
             if(p->dead_flag == 0) p->dead_flag = -512;
 #endif
 #else
@@ -3728,7 +3736,10 @@ void processinput(short snum)
                 closedemowrite();
 
             if(s->pal != 1)
-                p->dead_flag = (512-((TRAND&1)<<10)+(TRAND&255)-512)&2047;
+            {
+                death_side = TRAND&1;
+                p->dead_flag = (512-(death_side<<10)+(TRAND&255)-512)&2047;
+            }
 #endif
 
             p->jetpack_on = 0;

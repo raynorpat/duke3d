@@ -15,6 +15,8 @@
 #endif
 
 static int failures;
+void showtwoscreens(void);
+extern int32_t qsetmode;
 
 static void check(const char *what, int got, int want)
 {
@@ -34,6 +36,10 @@ static void check_str(const char *what, const char *got, const char *want)
 
 int main(void)
 {
+    /* Early CON failures can exit before any video mode or framebuffer exists. */
+    qsetmode=0;
+    showtwoscreens();
+    check("quit ads before video setup",qsetmode,0);
 #if DUKE3D_GAMEVER >= GAMEVER_10 && DUKE3D_GAMEVER < GAMEVER_11
     {
         /* DOS 1.0's Watcom rand, initial seed 1 (sw10 0x97f61, 0xd0a8c). */
@@ -48,6 +54,10 @@ int main(void)
             if(i == 8) { srand(123); (void)(rand)(); }
             check("1.0 Watcom rand", i&1 ? game_rand() : rand(), expected[i]);
         }
+        ud.multimode=1;
+        ps[0].auto_run=1;
+        newgame(0,0,2);
+        check("1.0 new game preserves local auto-run",ps[0].auto_run,1);
     }
 #endif
     /* On an axis the original returns the exact length, not the estimate. */

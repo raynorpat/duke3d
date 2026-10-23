@@ -62,7 +62,9 @@ int main(void)
     p=setup(); p->fist_incs=42; ud.level_number=5;
     check("fist exit returns",doincrements(p),1); check("fist level six exit",ud.level_number,6);
     p=setup(); p->pals_time=132; p->horiz=102; p->horizoff=12;
+    p->on_sector_effector=1;
     processinput(0); check("flash clock retained",p->pals_time,132);
+    check("moving sector flag resets before actor movement",p->on_sector_effector,0);
     check("flat horizon offset decay",p->horizoff,9); check("horizon no snap",p->horiz,102);
     p=setup(); sync[0].bits=1<<3; processinput(0); check("aim up",p->horiz,112);
     p=setup(); sync[0].bits=(1<<4)|(1<<5); processinput(0); check("running aim down",p->horiz,68);

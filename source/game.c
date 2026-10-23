@@ -44,6 +44,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "routebot.h"
 #endif
 #include "glext.h"
+extern int32_t qsetmode;
 
 #ifdef DUKE3D_EPISODE_TEST
 void episode_test_fail(const char *reason);
@@ -1025,6 +1026,7 @@ void caches(void)
 void checksync(void)
 {
       int32_t i, k;
+      static char sync_checked;
 
       for(i=connecthead;i>=0;i=connectpoint2[i])
             if (syncvalhead[i] == syncvaltottail) break;
@@ -1034,9 +1036,17 @@ void checksync(void)
              do
              {
                      for(i=connectpoint2[connecthead];i>=0;i=connectpoint2[i])
+                     {
+                            if (!sync_checked)
+                            {
+                                sync_checked = 1;
+                                puts("Multiplayer sync checked.");
+                                fflush(stdout);
+                            }
                             if (syncval[i][syncvaltottail&(MOVEFIFOSIZ-1)] !=
                                 syncval[connecthead][syncvaltottail&(MOVEFIFOSIZ-1)])
                                  syncstat = 1;
+                     }
                      syncvaltottail++;
                      for(i=connecthead;i>=0;i=connectpoint2[i])
                             if (syncvalhead[i] == syncvaltottail) break;
@@ -2139,6 +2149,8 @@ void FTA(short q,struct player_struct *p)
 void showtwoscreens(void)
 {
     short i;
+
+    if(qsetmode != 200) return; // CON errors can exit before video is initialized.
 
 #ifndef VOLUMEALL
     setview(0,0,xdim-1,ydim-1);
@@ -3297,13 +3309,22 @@ void displayrooms(short snum,int32_t smoothratio)
                   }
                   cang += p->look_ang;
 
+#if DUKE3D_GAMEVER < GAMEVER_10
+                  // Beta 0x21cee/0x21f70: moving sectors use the current view.
+                  if (p->newowner >= 0 || (p->over_shoulder_on <= 0 &&
+                      (p->on_sector_effector || p->on_crane >= 0)))
+#else
                   if (p->newowner >= 0)
+#endif
                   {
                                 cang = p->ang+p->look_ang;
                                 choriz = p->horiz+p->horizoff;
                                 cposx = p->posx;
                                 cposy = p->posy;
                                 cposz = p->posz;
+#if DUKE3D_GAMEVER < GAMEVER_10
+                                if(p->newowner >= 0)
+#endif
                                 sect = sprite[p->newowner].sectnum;
                                 smoothratio = 65536L;
                   }
@@ -10547,12 +10568,14 @@ void fakedomovethings(void)
                  }
                  else
                  {
+#if DUKE3D_GAMEVER >= GAMEVER_13D // Match processinput: early versions have no water friction.
                     if(psectlotag == 2)
                     {
                         myxvel = mulscale16(myxvel,dukefriction-0x1400);
                         myyvel = mulscale16(myyvel,dukefriction-0x1400);
                     }
                     else
+#endif
                     {
                         myxvel = mulscale16(myxvel,dukefriction);
                         myyvel = mulscale16(myyvel,dukefriction);
@@ -10564,10 +10587,15 @@ void fakedomovethings(void)
 
                  if( shrunk )
                  {
+#if DUKE3D_GAMEVER < GAMEVER_13D
+                     myxvel = mulscale16(myxvel,dukefriction-0x2900);
+                     myyvel = mulscale16(myyvel,dukefriction-0x2900);
+#else
                      myxvel =
                          mulscale16(myxvel,(dukefriction)-(dukefriction>>1)+(dukefriction>>2));
                      myyvel =
                          mulscale16(myyvel,(dukefriction)-(dukefriction>>1)+(dukefriction>>2));
+#endif
                  }
         }
 
@@ -10654,6 +10682,8 @@ char domovethings(void)
 {
     short i, j;
     char ch;
+
+
 
 #if DUKE3D_GAMEVER >= GAMEVER_14
     for(i=connecthead;i>=0;i=connectpoint2[i])
@@ -10870,6 +10900,11 @@ char domovethings(void)
     fakedomovethingscorrect();
 #endif
 
+
+#ifdef DUKE3D_BOOT_TEST
+    extern void boot_test_frame(void);
+    boot_test_frame();
+#endif
 
     return 0;
 }
