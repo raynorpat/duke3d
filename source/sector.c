@@ -31,6 +31,14 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 
 
 char haltsoundhack;
+/*
+================
+callsound
+
+Drive the sector MUSICANDSFX start/stop latch and its paired sounds.
+Sound/latch rules and return values follow the selected game version.
+================
+*/
 short callsound(short sn,short whatsprite)
 {
     short i;
@@ -221,6 +229,14 @@ short checkcursectnums(short sect)
     return -1;
 }
 
+/*
+================
+ldist
+
+Estimate horizontal sprite distance with the game's integer distance helper.
+Later versions add one so this distance is never zero.
+================
+*/
 int32_t ldist(spritetype *s1,spritetype *s2)
 {
     int32_t vx,vy;
@@ -233,6 +249,14 @@ int32_t ldist(spritetype *s1,spritetype *s2)
 #endif
 }
 
+/*
+================
+dist
+
+Estimate 3D sprite distance after scaling z into the XY coordinate range.
+Build stores vertical positions at a finer scale, hence the z difference shifted by four.
+================
+*/
 int32_t dist(spritetype *s1,spritetype *s2)
 {
     int32_t vx,vy,vz;
@@ -242,6 +266,14 @@ int32_t dist(spritetype *s1,spritetype *s2)
     return(FindDistance3D(vx,vy,vz>>4));
 }
 
+/*
+================
+findplayer
+
+Choose a player by the old-position metric; multiplayer skips dead candidates.
+Single-player uses the local player; no eligible multiplayer target leaves index 0.
+================
+*/
 short findplayer(spritetype *s,int32_t *d)
 {
     short j, closest_player;
@@ -270,6 +302,14 @@ short findplayer(spritetype *s,int32_t *d)
     return closest_player;
 }
 
+/*
+================
+findotherplayer
+
+Find the nearest live connected player other than p using the game's proximity metric.
+If none qualifies, return p with the distance sentinel unchanged.
+================
+*/
 short findotherplayer(short p,int32_t *d)
 {
     short j, closest_player;
@@ -296,6 +336,14 @@ short findotherplayer(short p,int32_t *d)
 
 
 
+/*
+================
+doanimations
+
+Step registered world coordinates toward their goals and retire completed animations.
+Moving floors also carry eligible players and sector sprites.
+================
+*/
 void doanimations(void)
 {
 	int32_t i, j, a, p, v, dasect;
@@ -311,6 +359,7 @@ void doanimations(void)
             stopinterpolation(animateptr[i]);
 
             animatecnt--;
+            /* Remove completed entries by swapping in the last slot; slot numbers are not stable. */
             animateptr[i] = animateptr[animatecnt];
             animategoal[i] = animategoal[animatecnt];
             animatevel[i] = animatevel[animatecnt];
@@ -332,6 +381,7 @@ void doanimations(void)
         if (v > 0) { a = min(a+v,animategoal[i]); }
               else { a = max(a+v,animategoal[i]); }
 
+        /* A moving floor carries occupants as well as changing the plane itself. */
         if( animateptr[i] == &sector[animatesect[i]].floorz)
         {
             for(p=connecthead;p>=0;p=connectpoint2[p])
@@ -362,6 +412,14 @@ void doanimations(void)
 	}
 }
 
+/*
+================
+getanimationgoal
+
+Find an animation slot by its coordinate pointer, or return -1.
+The result is a slot index, despite the function's name.
+================
+*/
 int32_t getanimationgoal(int32_t *animptr)
 {
 	int32_t i, j;
@@ -376,6 +434,14 @@ int32_t getanimationgoal(int32_t *animptr)
 	return(j);
 }
 
+/*
+================
+setanimation
+
+Create or retarget a coordinate animation and register it for render interpolation.
+Choose the velocity sign from the current value and requested goal.
+================
+*/
 static int32_t setanimation(short animsect,int32_t *animptr, int32_t thegoal, int32_t thevel)
 {
 	int32_t i, j;
@@ -394,6 +460,7 @@ static int32_t setanimation(short animsect,int32_t *animptr, int32_t thegoal, in
     animatesect[j] = animsect;
 	animateptr[j] = animptr;
 	animategoal[j] = thegoal;
+    /* Velocity is stored with direction already applied, so the tick only clamps to the goal. */
     if (thegoal >= *animptr)
        animatevel[j] = thevel;
     else
@@ -583,6 +650,14 @@ char activatewarpelevators(short s,short d) //Parm = sectoreffectornum
 
 
 
+/*
+================
+operatesectors
+
+Dispatch a sector's operator tag to its door, lift or other mechanism.
+Goal coordinates and linked controls are interpreted according to the sector type.
+================
+*/
 void operatesectors(short sn,short ii)
 {
     int32_t j=0l, l=0l, q=0l, startwall=0l, endwall=0l;
@@ -1099,6 +1174,14 @@ void operaterespawns(short low)
     }
 }
 
+/*
+================
+operateactivators
+
+Activate matching tagged controls, cyclers and linked sector mechanisms.
+Locked activators toggle the sector lock bit and report it to the triggering player.
+================
+*/
 void operateactivators(short low,short snum)
 {
     short i, j, k, *p, nexti;
@@ -1278,6 +1361,14 @@ void operateforcefields(short s, short low)
 #define SWITCHSOUNDZ ps[snum].posz
 #endif
 
+/*
+================
+checkhitswitch
+
+Handle a wall or sprite switch, including access locks and linked switch states.
+Dispatch the matching activators only when the switch's rules allow operation.
+================
+*/
 char checkhitswitch(short snum,int32_t w,char switchtype)
 {
     char switchpal;
@@ -4238,6 +4329,14 @@ void cheatkeys(short snum)
 }
 #endif
 
+/*
+================
+checksectors
+
+Process the player's tagged-sector effects and nearby use interactions.
+Secrets, exits and operator lookup share this per-player simulation path.
+================
+*/
 void checksectors(short snum)
 {
     int32_t i = -1,oldz;

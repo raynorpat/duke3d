@@ -402,6 +402,14 @@ static void adduserquote(char *daquote)
 }
 
 
+/*
+================
+getpackets
+
+Drain incoming game packets and update synchronized input or control state.
+Input packets reconstruct changed fields against the preceding FIFO record.
+================
+*/
 void getpackets(void)
 {
     int32_t i, j, k, l;
@@ -676,6 +684,14 @@ void getpackets(void)
     }
 }
 
+/*
+================
+faketimerhandler
+
+Sample controls at the fixed input cadence and queue or transmit the resulting commands.
+Average movement over movesperpacket while OR-ing action bits across those samples.
+================
+*/
 void faketimerhandler()
 {
     int32_t i, j, k, l;
@@ -711,6 +727,7 @@ void faketimerhandler()
           movefifoend[myconnectindex]++;
           return;
      }
+     /* FIFO cursors advance continuously; masking selects their power-of-two ring slots. */
      nsyn = &inputfifo[movefifoend[myconnectindex]&(MOVEFIFOSIZ-1)][myconnectindex];
      nsyn[0].fvel = avgfvel/movesperpacket;
      nsyn[0].svel = avgsvel/movesperpacket;
@@ -1002,6 +1019,14 @@ void caches(void)
 
 
 
+/*
+================
+checksync
+
+Compare queued checksum bytes once every player has supplied that position.
+Advance the shared checksum tail in simulation order and report mismatches.
+================
+*/
 void checksync(void)
 {
       int32_t i, k;
@@ -3880,6 +3905,14 @@ void randomscrap(spritetype *s, short i)
 #endif
 }
 
+/*
+================
+EGS
+
+Allocate a sprite and seed its render, owner and actor bookkeeping.
+A CON actor header supplies strength, action and movement defaults when present.
+================
+*/
 short EGS(short whatsect,int32_t s_x,int32_t s_y,int32_t s_z,short s_pn,signed char s_s,signed char s_xr,signed char s_yr,short s_a,short s_ve,int32_t s_zv,short s_ow,signed char s_ss)
 {
     short i;
@@ -4028,6 +4061,14 @@ char wallswitchcheck(short i)
 
 
 int32_t tempwallptr;
+/*
+================
+spawn
+
+Initialize a runtime-spawned actor or an existing map sprite through the same tile dispatch.
+With j negative, pn is an existing sprite index rather than a tile number.
+================
+*/
 short spawn( short j, short pn )
 {
     short i=0, s=0, startwall=0, endwall=0, sect=0, clostest=0;
@@ -4042,6 +4083,7 @@ short spawn( short j, short pn )
     }
     else
     {
+        /* Map loading reuses the sprite already read by the engine instead of allocating another slot. */
         i = pn;
 
         hittype[i].picnum = PN;
@@ -6278,6 +6320,14 @@ short spawn( short j, short pn )
 }
 
 
+/*
+================
+animatesprites
+
+Choose view-dependent sprite frames, palettes and shadows for the render list.
+Use saved simulation positions and the 16.16 smoothratio for interpolation.
+================
+*/
 void animatesprites(int32_t x,int32_t y,short a,int32_t smoothratio)
 {
     short i, j, k, p, sect;
@@ -9822,6 +9872,14 @@ int main(int argc,char **argv)
 	return(0);
 }
 
+/*
+================
+opendemoread
+
+Open a demo and load its revision-specific header and game settings.
+The stored count is input records, not necessarily one record per rendered frame.
+================
+*/
 char opendemoread(char which_demo) // 0 = mine
 {
     char d[] = "demo_.dmo";
@@ -10006,6 +10064,14 @@ char opendemoread(char which_demo) // 0 = mine
 }
 
 
+/*
+================
+opendemowrite
+
+Start a demo in the current game revision's on-disk format.
+Write a placeholder record count that closedemowrite patches after recording.
+================
+*/
 void opendemowrite(void)
 {
     char d[] = "demo1.dmo";
@@ -10116,6 +10182,14 @@ static void demo10_todos(input *in, int32_t n)
 }
 #endif
 
+/*
+================
+record
+
+Append this simulation step's synchronized controls to the demo buffer.
+Records follow connection-list player order and full buffers are compressed to disk.
+================
+*/
 void record(void)
 {
     short i;
@@ -10146,6 +10220,14 @@ void record(void)
     }
 }
 
+/*
+================
+closedemowrite
+
+Flush remaining demo input records, patch the total count and close the file.
+Apply the revision's input layout and byte order before compressed writes.
+================
+*/
 void closedemowrite(void)
 {
     int32_t val32;
@@ -10511,6 +10593,14 @@ int32_t playback(void)
     return 1;
 }
 
+/*
+================
+moveloop
+
+Advance simulation only while every connected player has the next input available.
+Local prediction may run ahead, while bufferjitter delays confirmed multiplayer steps.
+================
+*/
 char moveloop()
 {
     int32_t i;
@@ -10531,6 +10621,14 @@ char moveloop()
     return 0;
 }
 
+/*
+================
+fakedomovethingscorrect
+
+Rebase local prediction on the confirmed player state and replay pending inputs.
+A matching saved position/view avoids the replay.
+================
+*/
 void fakedomovethingscorrect(void)
 {
      int32_t i;
@@ -10557,12 +10655,21 @@ void fakedomovethingscorrect(void)
      myhardlanding = p->hard_landing;
      myreturntocenter = p->return_to_center;
 
+     /* Replay starts after the confirmed commands, using the rebased local prediction state. */
      fakemovefifoplc = movefifoplc;
      while (fakemovefifoplc < movefifoend[myconnectindex])
           fakedomovethings();
 
 }
 
+/*
+================
+fakedomovethings
+
+Predict one queued local movement command without running the actor simulation passes.
+Save the result in the prediction ring for later comparison with confirmed movement.
+================
+*/
 void fakedomovethings(void)
 {
         input *syn;
@@ -11026,6 +11133,14 @@ ENDFAKEPROCESSINPUT:
 }
 
 
+/*
+================
+domovethings
+
+Consume one synchronized simulation step and update players, actors and world mechanisms.
+Pass order and random calls are part of the demo/network simulation contract.
+================
+*/
 char domovethings(void)
 {
     short i, j;
@@ -11210,6 +11325,7 @@ char domovethings(void)
 
     if( ud.pause_on == 0 )
     {
+        /* Keep these passes in revision order: later passes see objects earlier ones moved, spawned or removed. */
         movefta();//ST 2
         moveweapons();          //ST 5 (must be last)
         movetransports();       //ST 9

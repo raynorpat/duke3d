@@ -49,6 +49,14 @@ extern char numenvsnds,actor_tog;
 
 // this should be a proper prototype included from a header file
 
+/*
+================
+updateinterpolations
+
+Snapshot registered positions at the start of a simulation step.
+Rendering interpolates from these old values to the completed step's values.
+================
+*/
 void updateinterpolations()  //Stick at beginning of domovethings
 {
 	int32_t i;
@@ -57,6 +65,14 @@ void updateinterpolations()  //Stick at beginning of domovethings
 }
 
 
+/*
+================
+setinterpolation
+
+Register a world coordinate for render interpolation without adding duplicates.
+Keep its initial value so the first rendered step has a valid starting point.
+================
+*/
 void setinterpolation(int32_t *posptr)
 {
 	int32_t i;
@@ -69,6 +85,14 @@ void setinterpolation(int32_t *posptr)
 	numinterpolations++;
 }
 
+/*
+================
+stopinterpolation
+
+Remove a coordinate from the dynamic interpolation range.
+Entries before startofdynamicinterpolations belong to the fixed level setup.
+================
+*/
 void stopinterpolation(int32_t *posptr)
 {
 	int32_t i;
@@ -83,6 +107,14 @@ void stopinterpolation(int32_t *posptr)
 		}
 }
 
+/*
+================
+dointerpolations
+
+Temporarily replace registered coordinates using the 16.16 interpolation fraction.
+Back up the simulation values for restoreinterpolations after drawing.
+================
+*/
 void dointerpolations(int32_t smoothratio)       //Stick at beginning of drawscreen
 {
 	int32_t i, j, odelta, ndelta;
@@ -92,11 +124,20 @@ void dointerpolations(int32_t smoothratio)       //Stick at beginning of drawscr
 	{
 		bakipos[i] = *curipos[i];
 		odelta = ndelta; ndelta = (*curipos[i])-oldipos[i];
+		/* Coordinates with the same displacement can reuse the previous fixed-point multiply. */
 		if (odelta != ndelta) j = mulscale16(ndelta,smoothratio);
 		*curipos[i] = oldipos[i]+j;
 	}
 }
 
+/*
+================
+restoreinterpolations
+
+Restore the simulation coordinates that drawing temporarily interpolated.
+Gameplay must not continue with render-only positions installed.
+================
+*/
 void restoreinterpolations()  //Stick at end of drawscreen
 {
 	int32_t i;
@@ -642,6 +683,14 @@ int32_t ifsquished(short i, short p)
     return 0;
 }
 
+/*
+================
+hitradius
+
+Apply an explosion's effects to nearby geometry and eligible sprites.
+Visibility, distance bands and target exclusions follow the selected game version.
+================
+*/
 void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, int32_t  hp4 )
 {
     spritetype *s,*sj;
@@ -911,6 +960,14 @@ void hitradius( short i, int32_t  r, int32_t  hp1, int32_t  hp2, int32_t  hp3, i
 }
 
 
+/*
+================
+movesprite
+
+Move an actor or effect using its version-specific clearances and sector restrictions.
+Ordinary movement checks XY through clipmove and z against cached plane heights.
+================
+*/
 short movesprite(short spritenum, int32_t xchange, int32_t ychange, int32_t zchange, uint32_t cliptype)
 {
     int32_t daz,h, oldx, oldy;
@@ -932,6 +989,7 @@ short movesprite(short spritenum, int32_t xchange, int32_t ychange, int32_t zcha
     dasectnum = sprite[spritenum].sectnum;
 
 	daz = sprite[spritenum].z;
+    /* Sample collision at z minus half the drawn tile height, rather than at the bottom anchor. */
     h = ((tilesizy[sprite[spritenum].picnum]*sprite[spritenum].yrepeat)<<1);
     daz -= h;
 
@@ -1052,6 +1110,14 @@ short movesprite(short spritenum, int32_t xchange, int32_t ychange, int32_t zcha
 }
 
 
+/*
+================
+ssp
+
+Turn a sprite's angle and forward speed into XY components, then move it.
+Return true only when movesprite reports no collision.
+================
+*/
 short ssp(short i,uint32_t cliptype) //The set sprite function
 {
     spritetype *s;
@@ -1067,6 +1133,14 @@ short ssp(short i,uint32_t cliptype) //The set sprite function
     return (movetype==0);
 }
 
+/*
+================
+insertspriteq
+
+Put a transient sprite in the bounded visibility queue.
+Reusing a slot hides the previous sprite rather than deleting its list entry.
+================
+*/
 void insertspriteq(short i)
 {
     if(spriteqamount > 0)
@@ -1229,6 +1303,14 @@ void gutsdir(spritetype *s,short gtype, short n, short p)
     }
 }
 
+/*
+================
+setsectinterpolate
+
+Register moving-sector wall coordinates, including the adjoining wall vertices.
+Both sides of a shared boundary must render at matching interpolated positions.
+================
+*/
 void setsectinterpolate(short i)
 {
     int32_t j, k, startwall,endwall;
@@ -1252,6 +1334,14 @@ void setsectinterpolate(short i)
     }
 }
 
+/*
+================
+clearsectinterpolate
+
+Remove the sector's wall coordinates and partner-wall coordinates from dynamic interpolation.
+Fixed entries remain registered through stopinterpolation's lower bound.
+================
+*/
 void clearsectinterpolate(short i)
 {
     short j,startwall,endwall;
@@ -1270,6 +1360,14 @@ void clearsectinterpolate(short i)
     }
 }
 
+/*
+================
+ms
+
+Move a sector effector and rebuild its walls from saved local coordinates.
+T2 selects the saved wall offsets and T3 supplies the rotation angle.
+================
+*/
 void ms(short i)
 {
     //T1,T2 and T3 are used for all the sector moving stuff!!!
@@ -1301,6 +1399,14 @@ void ms(short i)
     }
 }
 
+/*
+================
+movefta
+
+Check dormant actors for player proximity and visibility before waking them.
+Save the next status-list link before an actor can change status.
+================
+*/
 void movefta(void)
 {
     int32_t x, px, py, sx, sy;
@@ -1422,6 +1528,14 @@ short ifhitsectors(short sectnum)
     return -1;
 }
 
+/*
+================
+ifhitbyweapon
+
+Apply and consume an accepted pending weapon hit from hittype.
+Return the weapon tile when a hit is accepted, or -1 when no hit is applied.
+================
+*/
 short ifhitbyweapon(short sn)
 {
     short j, k, p;
@@ -3156,6 +3270,14 @@ void movestandables(void)
     }
 }
 
+/*
+================
+bounce
+
+Reflect a moving sprite's velocity against its sector's floor or ceiling slope.
+Convert the reflected vector back to forward speed, angle and z velocity.
+================
+*/
 void bounce(short i)
 {
     int32_t k, l, daang, dax, day, daz, xvect, yvect, zvect;
@@ -3180,6 +3302,7 @@ void bounce(short i)
     day = mulscale14(k,sintable[(daang+1536)&2047]);
     daz = 4096;
 
+    /* Reflect in the unnormalized slope normal: v -= 2*n*dot(v,n)/dot(n,n). */
     k = xvect*dax+yvect*day+zvect*daz;
     l = dax*dax+day*day+daz*daz;
     if ((klabs(k)>>14) < l)
@@ -3198,6 +3321,14 @@ void bounce(short i)
 #if DUKE3D_GAMEVER < GAMEVER_13D
 // 1.1's projectiles. 1.1 has THROWFLAME and CHAINGUN in place of FREEZEBLAST,
 // and differs from 1.3D throughout (G11-A15 to A18), so it is a separate function.
+/*
+================
+moveweapons
+
+Advance the projectile status list through movement, impacts and weapon-specific effects.
+The early and later implementations retain their different physics and random-call order.
+================
+*/
 void moveweapons(void)
 {
     short i, j, k, nexti, p, q;
@@ -3527,6 +3658,14 @@ void moveweapons(void)
     }
 }
 #else
+/*
+================
+moveweapons
+
+Advance the projectile status list through movement, impacts and weapon-specific effects.
+The early and later implementations retain their different physics and random-call order.
+================
+*/
 void moveweapons(void)
 {
     short i, j, k, nexti, p, q, tempsect;
@@ -4619,6 +4758,14 @@ void movetransports(void)
 
 
 
+/*
+================
+moveactors
+
+Advance active actors through built-in behavior and CON execution.
+Save the next status-list link before updates can delete or reclassify the current actor.
+================
+*/
 void moveactors(void)
 {
     int32_t x, m, l, *t;
@@ -7036,6 +7183,14 @@ void moveexplosions(void)  // STATNUM 5
     }
 }
 
+/*
+================
+moveeffectors
+
+Advance tagged sector effectors such as moving geometry, lighting and timed mechanisms.
+The meaning of T1..T6 depends on the effector's lotag.
+================
+*/
 void moveeffectors(void)   //STATNUM 3
 {
     int32_t q=0l, l=0l, m=0l, x=0l, st=0l, j=0l, *t=NULL, *zp=NULL;

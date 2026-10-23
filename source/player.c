@@ -50,6 +50,14 @@ void setpal(struct player_struct *p)
     restorepalette = 1;
 }
 
+/*
+================
+incur_damage
+
+Apply pending fractional damage and account for the shield's absorbed share.
+Health changes are measured from last_extra, with the game's random armor percentage.
+================
+*/
 void incur_damage( struct player_struct *p )
 {
     int32_t  damage = 0L, shield_damage = 0L;
@@ -57,6 +65,7 @@ void incur_damage( struct player_struct *p )
 
     sprite[p->i].extra -= p->extra_extra8>>8;
 
+    /* Damage is a negative health delta here; subtracting the absorbed share restores health. */
     damage = sprite[p->i].extra - p->last_extra;
 
     if ( damage < 0 )
@@ -84,6 +93,14 @@ void incur_damage( struct player_struct *p )
     }
 }
 
+/*
+================
+quickkill
+
+Apply an immediate lethal player state and the version-specific flash/gib effects.
+This bypasses the ordinary damage-and-shield calculation.
+================
+*/
 void quickkill(struct player_struct *p)
 {
 #if DUKE3D_GAMEVER < GAMEVER_13D
@@ -113,6 +130,14 @@ void quickkill(struct player_struct *p)
     return;
 }
 
+/*
+================
+forceplayerangle
+
+Kick the player view upward with a small random roll/look offset.
+The return-to-center counter brings the view back over subsequent ticks.
+================
+*/
 void forceplayerangle(struct player_struct *p)
 {
     short n;
@@ -166,6 +191,14 @@ void tracers(int32_t x1,int32_t y1,int32_t z1,int32_t x2,int32_t y2,int32_t z2,i
 	 }
 }
 
+/*
+================
+hits
+
+Measure forward horizontal hitscan distance from a sprite's firing height.
+Use the weapon clip mask rather than the movement mask.
+================
+*/
 int32_t hits(short i)
 {
     int32_t sx,sy,sz;
@@ -183,6 +216,14 @@ int32_t hits(short i)
     return ( FindDistance2D( sx-SX,sy-SY ) );
 }
 
+/*
+================
+hitasprite
+
+Trace forward and return distance while reporting a sprite hit through hitsp.
+Masked walls in front of enemies use the large-distance sentinel.
+================
+*/
 int32_t hitasprite(short i,short *hitsp)
 {
     int32_t sx,sy,sz,zoff;
@@ -251,6 +292,14 @@ int32_t hitawall(struct player_struct *p,short *hitw)
 // 1.1's aim (G11-L26): other stat lists, and any blocking sprite but a few is a
 // target, with no badguy or weapon filters. 1.1's player no_autoaim flag, which
 // would return -1 here, is never set, so it is left out.
+/*
+================
+aim
+
+Choose an autoaim target inside the facing cone using projected forward distance.
+Status-list priority and weapon exclusions follow the selected game version.
+================
+*/
 short aim(spritetype *s,short aang)
 {
     short i, j, a, k, cans;
@@ -310,6 +359,14 @@ short aim(spritetype *s,short aang)
     return j;
 }
 #else
+/*
+================
+aim
+
+Choose an autoaim target inside the facing cone using projected forward distance.
+Status-list priority and weapon exclusions follow the selected game version.
+================
+*/
 short aim(spritetype *s,short aang)
 {
     char gotshrinker,gotfreezer;
@@ -420,6 +477,14 @@ short aim(spritetype *s,short aang)
 // 1.1's shoot (G11-L27..L32). It has the flamethrower and no freezer or
 // expander, and its hitscan, spit, RPG and shrinker code differ throughout,
 // so it is a separate copy.
+/*
+================
+shoot
+
+Dispatch a fired weapon tile to its hitscan, projectile or melee behavior.
+Keep the version-specific spread, effects and random-number consumption in place.
+================
+*/
 void shoot(short i,short atwith)
 {
     short sect, hitsect, hitspr = -1, hitwall = -1, l, sa, p, j, k, scount; // -1: 1.0's hitscan leaves this unwritten on a miss (DOS read stack garbage)
@@ -1052,6 +1117,14 @@ void shoot(short i,short atwith)
     return;
 }
 #else
+/*
+================
+shoot
+
+Dispatch a fired weapon tile to its hitscan, projectile or melee behavior.
+Keep the version-specific spread, effects and random-number consumption in place.
+================
+*/
 void shoot(short i,short atwith)
 {
     short sect, hitsect, hitspr = -1, hitwall = -1, l, sa, p, j, k, scount; // -1: 1.0's hitscan leaves this unwritten on a miss (DOS read stack garbage)
@@ -2588,6 +2661,14 @@ void displayweapon(short snum)
 
 int32_t myaimmode = 0, myaimstat = 0, omyaimstat = 0;
 
+/*
+================
+getinput
+
+Gather local controls into the synchronized input record.
+Pack movement, view and action state into the selected version's input bits.
+================
+*/
 void getinput(short snum)
 {
 
@@ -2933,6 +3014,14 @@ void getinput(short snum)
 }
 
 
+/*
+================
+doincrements
+
+Advance player counters and timed inventory/view effects for one simulation step.
+Some counters also trigger sounds, item expiration or interaction animations.
+================
+*/
 char doincrements(struct player_struct *p)
 {
     int32_t /*j,*/i,snum;
@@ -3345,6 +3434,14 @@ void checkweapons(struct player_struct *p)
 #endif
 }
 
+/*
+================
+processinput
+
+Advance one player from synchronized controls for one simulation step.
+Movement, vertical clearance, inventory and weapon state consume the same fixed tick.
+================
+*/
 void processinput(short snum)
 {
     int32_t j, i, k, doubvel, fz, cz, hz, lz, truefdist, x, y;
@@ -3363,6 +3460,7 @@ void processinput(short snum)
 
     kb = &p->kickback_pic;
 
+    /* Read synchronized action bits, not live device state, so demos and peers simulate the same input. */
     if(p->cheat_phase <= 0) sb_snum = sync[snum].bits;
 #if DUKE3D_GAMEVER < GAMEVER_10
     else sb_snum = sync[snum].bits&~3u;

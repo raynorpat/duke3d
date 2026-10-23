@@ -207,6 +207,14 @@ char *keyw[NUMKEYWORDS] =
 };
 
 
+/*
+================
+getincangle
+
+Return the signed shortest turn between two Build angles.
+Wrap both inputs to the 2048-unit circle before comparing them.
+================
+*/
 short getincangle(short a,short na)
 {
     a &= 2047;
@@ -244,6 +252,14 @@ char isaltok(char c)
     return ( isalnum(c) || c == '{' || c == '}' || c == '/' || c == '*' || c == '-' || c == '_' || c == '.');
 }
 
+/*
+================
+getglobalz
+
+Update the actor's cached ceiling and floor limits for its current position.
+Sprite-supported floors and actor push-off rules depend on the game revision.
+================
+*/
 void getglobalz(short i)
 {
     int32_t hz,lz,zr;
@@ -333,6 +349,14 @@ void getglobalz(short i)
 }
 
 
+/*
+================
+makeitfall
+
+Apply gravity with the sector's space/water rules and clamp the sprite to its floor.
+Refresh the cached vertical limits before integrating z velocity.
+================
+*/
 void makeitfall(short i)
 {
     spritetype *s = &sprite[i];
@@ -391,6 +415,14 @@ void getlabel(void)
     label[(labelcnt<<6)+i] = 0;
 }
 
+/*
+================
+keyword
+
+Look ahead at the next CON token without advancing the source cursor.
+Recognize only the keyword range supported by the selected game version.
+================
+*/
 int32_t keyword(void)
 {
     int32_t i;
@@ -420,6 +452,14 @@ int32_t keyword(void)
     return -1;
 }
 
+/*
+================
+transword
+
+Consume a CON token and translate it to its keyword number.
+Track source lines and report unrecognized words through the compiler diagnostics.
+================
+*/
 int32_t transword(void) //Returns its code #
 {
     int32_t i, l;
@@ -469,6 +509,14 @@ int32_t transword(void) //Returns its code #
     return -1;
 }
 
+/*
+================
+transnum
+
+Resolve a numeric literal or defined label into the next compiled script word.
+Advance the source cursor after the operand has been handled.
+================
+*/
 void transnum(void)
 {
     int32_t i, l;
@@ -525,6 +573,14 @@ void transnum(void)
 }
 
 
+/*
+================
+parsecommand
+
+Compile one CON command or nested construct into script words and definition tables.
+Compiler state tracks braces, conditionals and the current actor/state definition.
+================
+*/
 char parsecommand(void)
 {
     int32_t i, j, k, *tempscrptr;
@@ -1662,6 +1718,14 @@ void copydefaultcons(void)
     }
 }
 
+/*
+================
+loadefs
+
+Load and compile CON definitions using the selected revision's keyword set.
+Prepare the compiled script and actor lookup tables used during gameplay.
+================
+*/
 void loadefs(char *filenam,char *mptr)
 {
     int i;
@@ -1979,6 +2043,14 @@ void alterang(short a)
     }
 }
 
+/*
+================
+move
+
+Apply the current CON actor's movement flags and scripted speed/turn state.
+The interpreter globals identify the actor, player and temporary state being updated.
+================
+*/
 void move()
 {
     int32_t l, *moveptr;
@@ -2300,6 +2372,14 @@ void move()
 
 char parse(void);
 
+/*
+================
+parseifelse
+
+Execute or skip a compiled conditional using its stored branch target.
+A false branch may enter the following else body instead of advancing linearly.
+================
+*/
 void parseifelse(int32_t condition)
 {
     if( condition )
@@ -2309,6 +2389,7 @@ void parseifelse(int32_t condition)
     }
     else
     {
+        /* Branch operands are byte offsets into script; resolve them before using a native pointer. */
         insptr = SCRIPT_PTR(*(insptr+1));
         if(*insptr == 10)
         {
@@ -2320,6 +2401,14 @@ void parseifelse(int32_t condition)
 
 // long *it = 0x00589a04;
 
+/*
+================
+parse
+
+Execute the CON opcode at insptr, advancing or branching as that opcode requires.
+A nonzero return ends the current interpreter loop or nested construct.
+================
+*/
 char parse(void)
 {
     int32_t j, l, s;
@@ -3661,6 +3750,14 @@ char parse(void)
     return 0;
 }
 
+/*
+================
+execute
+
+Bind the global CON context to an actor and run its scripted simulation step.
+Finish with movement and the revision-specific sleep or deletion handling.
+================
+*/
 void execute(short i,short p,int32_t x)
 {
     char done;
@@ -3669,6 +3766,7 @@ void execute(short i,short p,int32_t x)
     g_p = p;
     g_x = x;
     g_sp = &sprite[g_i];
+    /* These globals form one execution context; T1..T6 are this actor's persistent script state. */
     g_t = &hittype[g_i].temp_data[0];
 
     if( actorscrptr[g_sp->picnum] == 0 ) return;
