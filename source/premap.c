@@ -27,6 +27,32 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include <stdint.h>
 #include "duke3d.h"
 
+/* A NULL name validates selection markers before a filename is available. */
+int game_map_allowed(int volume,int level,const char *map_name,int custom)
+{
+    static const char *const campaign[] = {
+        "E1L1.MAP", "E1L2.MAP", "E1L3.MAP", "E1L4.MAP", "E1L5.MAP", "E1L6.MAP"
+    };
+    if (!game_profile->shareware) return 1;
+    if (custom || volume != 0 || level < 0 || level >= 6) return 0;
+    return map_name == NULL || !stricmp(map_name,campaign[level]);
+}
+
+int game_load_campaign_map(char *filename,int32_t *x,int32_t *y,int32_t *z,short *ang,short *sector)
+{
+    char base_name[16];
+    size_t length;
+    if (!game_map_allowed(ud.volume_number,ud.level_number,filename,boardfilename[0] != 0))
+        return -1;
+    if (!game_profile->shareware) return loadboard(filename,x,y,z,ang,sector);
+    /* The allowlist bounds the name. The suffix asks Build for GRP zero only. */
+    length = strlen(filename);
+    memcpy(base_name,filename,length);
+    base_name[length] = (char)255;
+    base_name[length+1] = 0;
+    return loadboard(base_name,x,y,z,ang,sector);
+}
+
 /* Map version-dependent case labels without changing raw game IDs. */
 static int premap_dispatch_1(int value)
 {
@@ -1751,6 +1777,9 @@ void enterlevel(char g)
     int32_t l;
     char levname[256];
 
+    if (!game_map_allowed(ud.volume_number,ud.level_number,NULL,boardfilename[0] != 0))
+        gameexit("Shareware profiles cannot load custom maps or extra episodes.");
+
     CONTROL_ResetInput();
     video_flushpending();  // shows frames of its own
     if( (g&MODE_DEMO) != MODE_DEMO ) ud.recstat = ud.m_recstat;
@@ -1805,39 +1834,17 @@ if (game_profile->gamever < GAMEVER_14) {
 }
 }
 
-if (!((game_profile->shareware))) {
-
-    if( boardfilename[0] != 0 && ud.m_level_number == 7 && ud.m_volume_number == 0 )
+    if (boardfilename[0] != 0 && ud.m_level_number == 7 && ud.m_volume_number == 0)
+        strcpy(levname,boardfilename);
+    else
+        strcpy(levname,level_file_names[ud.volume_number*11+ud.level_number]);
+    if (game_load_campaign_map(levname,&ps[0].posx,&ps[0].posy,&ps[0].posz,&ps[0].ang,&ps[0].cursectnum) == -1)
     {
-        if ( loadboard( boardfilename,&ps[0].posx, &ps[0].posy, &ps[0].posz, &ps[0].ang,&ps[0].cursectnum ) == -1 )
-        {
-            sprintf(tempbuf,"Map %s not found!",boardfilename);
-            gameexit(tempbuf);
-        }
-    }
-    else if ( loadboard( level_file_names[ (ud.volume_number*11)+ud.level_number],&ps[0].posx, &ps[0].posy, &ps[0].posz, &ps[0].ang,&ps[0].cursectnum ) == -1)
-    {
-        sprintf(tempbuf,"Map %s not found!",level_file_names[(ud.volume_number*11)+ud.level_number]);
+        if (game_profile->shareware)
+            gameexit("Shareware profiles can load only their base GRP campaign maps.");
+        sprintf(tempbuf,"Map %s not found!",levname);
         gameexit(tempbuf);
     }
-
-} else {
-
-if (game_profile->gamever < GAMEVER_10) {
-    strcpy(levname,boardfilename[0] ? boardfilename : level_file_names[(ud.volume_number*11)+ud.level_number]);
-} else {
-    l = (int32_t)strlen(level_file_names[ (ud.volume_number*11)+ud.level_number]);
-    copybufbyte( level_file_names[ (ud.volume_number*11)+ud.level_number],&levname[0],l);
-    levname[l] = 255;
-    levname[l+1] = 0;
-}
-
-    if ( loadboard( levname,&ps[0].posx, &ps[0].posy, &ps[0].posz, &ps[0].ang,&ps[0].cursectnum ) == -1)
-    {
-        sprintf(tempbuf,"Map %s not found!",level_file_names[(ud.volume_number*11)+ud.level_number]);
-        gameexit(tempbuf);
-    }
-}
 if (game_profile->gamever < GAMEVER_10) {
     boardfilename[0] = 0;
 }

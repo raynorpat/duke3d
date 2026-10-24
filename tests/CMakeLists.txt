@@ -1141,3 +1141,45 @@ target_link_libraries(conveyor_runtime PRIVATE duke3d_game)
 foreach(_profile 0.99 1.0 1.1 1.3d-shareware 1.3d 1.4 1.5)
   add_test(NAME conveyor_runtime_${_profile} COMMAND conveyor_runtime -test-gameversion ${_profile})
 endforeach()
+
+if(Python3_Interpreter_FOUND)
+  set(_cli_fixtures "")
+  foreach(_pair "0.99|${DUKE3D_V099_SW_DATA_DIR}" "1.0|${DUKE3D_V10_SW_DATA_DIR}"
+                "1.1|${DUKE3D_V11_SW_DATA_DIR}" "1.3d-shareware|${DUKE3D_V13D_SW_DATA_DIR}"
+                "1.3d|${DUKE3D_V13D_DATA_DIR}")
+    string(REPLACE "|" ";" _parts "${_pair}")
+    list(GET _parts 0 _profile)
+    list(GET _parts 1 _folder)
+    if(EXISTS "${_folder}/DUKE3D.GRP")
+      list(APPEND _cli_fixtures --fixture "${_profile}=${_folder}/DUKE3D.GRP")
+    endif()
+  endforeach()
+  if(EXISTS "${DUKE3D_ATOMIC_GRP}")
+    list(APPEND _cli_fixtures --fixture "1.5=${DUKE3D_ATOMIC_GRP}")
+  endif()
+  add_test(NAME game_version_cli COMMAND "${CMAKE_COMMAND}"
+    "-DDUKE3D=$<TARGET_FILE:duke3d>" "-DPYTHON=${Python3_EXECUTABLE}"
+    "-DWORK=${CMAKE_BINARY_DIR}/version_cli" "-DFIXTURES=${_cli_fixtures}" -P "${CMAKE_CURRENT_SOURCE_DIR}/game_version_cli.cmake")
+  set_tests_properties(game_version_cli PROPERTIES TIMEOUT 180)
+endif()
+add_executable(shareware_maps shareware_maps.c "${_game_c}")
+target_link_libraries(shareware_maps PRIVATE duke3d_game)
+foreach(_profile 0.99 1.0 1.1 1.3d-shareware 1.3d 1.4 1.5)
+  add_test(NAME shareware_maps_${_profile} COMMAND "${CMAKE_COMMAND}"
+    "-DEXE=$<TARGET_FILE:shareware_maps>" "-DPROFILE=${_profile}"
+    "-DWORK=${CMAKE_BINARY_DIR}/maps_${_profile}" -P "${CMAKE_CURRENT_SOURCE_DIR}/shareware_maps.cmake")
+endforeach()
+
+function(add_shareware_map_network profile data byteversion port)
+  if(EXISTS "${data}/DUKE3D.GRP")
+    add_test(NAME net_shareware_map_${profile} COMMAND "${CMAKE_COMMAND}"
+      "-DA=$<TARGET_FILE:net_game>" "-DA_DATA=${data}"
+      "-DB=$<TARGET_FILE:net_protocol_peer>" "-DB_VERSION=${byteversion}"
+      "-DPORT=${port}" -DMODE=maprefuse "-DWORK=${CMAKE_BINARY_DIR}/nm_${profile}"
+      -P "${CMAKE_CURRENT_SOURCE_DIR}/net_v13d.cmake")
+    set_tests_properties(net_shareware_map_${profile} PROPERTIES TIMEOUT 60)
+  endif()
+endfunction()
+add_shareware_map_network(1.0 "${DUKE3D_V10_SW_DATA_DIR}" 10 27200)
+add_shareware_map_network(1.1 "${DUKE3D_V11_SW_DATA_DIR}" 12 27208)
+add_shareware_map_network(1.3d-shareware "${DUKE3D_V13D_SW_DATA_DIR}" 14 27216)

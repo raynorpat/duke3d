@@ -137,6 +137,12 @@ def main():
              'truncated_header': (original[:3], 2),
              'truncated_middle': (original[:len(original) // 2], 2),
              'truncated_tail': (original[:-1], 2)}
+    if a.duke3d and (a.version in ('0.99', '1.0', '1.1') or
+                      struct.unpack('<i', s.calls['version'])[0] == 14):
+        # The save-name, volume and level calls follow the optional version call.
+        first = 0 if a.version in ('0.99', '1.0') else 1
+        cases['custom_map_slot'] = (replace(s, {str(first + 2): (struct.pack('<i', 7), 4)}), 2)
+        cases['extra_episode'] = (replace(s, {str(first + 1): (struct.pack('<i', 1), 4)}), 2)
     for value in (-1, 1, 0x7fffffff):
         ptrs = struct.pack('<i', value) + s.calls['animateptr'][4:]
         cases['animation_' + str(value)] = (replace(s, {'animatecnt': (struct.pack('<i', 1), 4), 'animateptr': (ptrs, 4)}), 2)

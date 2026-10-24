@@ -743,7 +743,7 @@ void CONFIG_ReadSetup( void )
    if (dummy)
    {
        if (game_profile->shareware)
-           puts("The -map option is available in the registered version only!");
+           gameexit("Shareware profiles cannot load custom maps.");
        else
        {
            strcpy(boardfilename,_argv[dummy+1]);

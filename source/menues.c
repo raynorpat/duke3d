@@ -414,6 +414,14 @@ nump = (game_profile->gamever < GAMEVER_14 ? (1) : (sg_read32(fil)));
          ud.volume_number = sg_read32(fil);
      ud.level_number = sg_read32(fil);
          ud.player_skill = sg_read32(fil);
+     if (!game_map_allowed(ud.volume_number,ud.level_number,NULL,0))
+     {
+         printf("Shareware profiles cannot load custom-map saves or extra episodes; refused.\n");
+         kclose(fil);
+         ready2send = 1;
+         return 1;
+     }
+
 
          ud.m_level_number = ud.level_number;
          ud.m_volume_number = ud.volume_number;
@@ -2347,6 +2355,13 @@ void menus(void)
 // CTW - REMOVED
 //  int tenerr;
 // CTW END - REMOVED
+
+    if (game_profile->shareware && (current_menu == 602 || current_menu == 603))
+    {
+        puts("Shareware profiles cannot load custom maps.");
+        cmenu(600);
+        return;
+    }
 
     _handle_events();
     getpackets();

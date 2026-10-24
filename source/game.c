@@ -783,6 +783,8 @@ void getpackets(void)
                 break;
 
             case 5:
+                if (!game_map_allowed(packbuf[2],packbuf[1],NULL,0))
+                    gameexit("Shareware profiles cannot select extra campaign maps over the network.");
                 ud.m_level_number = ud.level_number = packbuf[1];
                 ud.m_volume_number = ud.volume_number = packbuf[2];
                 ud.m_player_skill = ud.player_skill = packbuf[3];
@@ -838,6 +840,8 @@ void getpackets(void)
                 rtsplaying = 7;
                 break;
             case 8:
+                if (game_profile->shareware)
+                    gameexit("Shareware profiles cannot load custom network maps.");
                 ud.m_level_number = ud.level_number = packbuf[1];
                 ud.m_volume_number = ud.volume_number = packbuf[2];
                 ud.m_player_skill = ud.player_skill = packbuf[3];
@@ -9281,25 +9285,6 @@ void copyprotect(void)
 }
 
 
-// Which build plays a GRP: none, 1.0 or 1.1 shareware, 1.3D full, 1.3D shareware, 1.4 or 1.5.
-enum { GRP_NONE, GRP_099SW, GRP_10SW, GRP_11SW, GRP_13D, GRP_13DSW, GRP_14, GRP_15 };
-
-// The release DUKE3D.GRPs, by size and CRC-32 (the EDuke32 wiki FAQ's table;
-// the 1.3D and Atomic values were also measured from the original files).
-static const struct { int32_t size; uint32_t crc; int build; const char *name; } knowngrps[] =
-{
-    {  9690241, 0x02F18900, GRP_099SW,  "the 0.99 shareware release" },
-    { 10429258, 0xA28AA589, GRP_10SW,  "the 1.0 shareware release" },
-    { 10442980, 0x912E1E8D, GRP_11SW,  "the 1.1 shareware release" },
-    { 11035779, 0x983AD923, GRP_13DSW, "the 1.3D shareware release" },
-    { 10444391, 0xC5F71561, GRP_NONE,  "the 1.5 Mac shareware release" },
-    { 26524524, 0xBBC9CE44, GRP_13D,   "the 1.3D full release" },
-    { 44348015, 0xF514A6AC, GRP_14,    "the 1.4 Plutonium Pak" },
-    { 44356548, 0xFD3DCFF1, GRP_15,    "the 1.5 Atomic Edition" },
-};
-
-#define OWNGRP (game_profile->gamever < GAMEVER_10 ? (GRP_099SW) : ((game_profile->gamever < GAMEVER_11 ? (GRP_10SW) : ((game_profile->gamever < GAMEVER_13D ? (GRP_11SW) : ((game_profile->gamever < GAMEVER_14 ? (((game_profile->shareware) ? (GRP_13DSW) : (GRP_13D))) : ((game_profile->gamever < GAMEVER_15 ? (GRP_14) : (GRP_15))))))))))
-
 // A renderer number from duke3d.cfg or -renderer, limited to 0 (classic)
 // through 3 (Polymost OpenGL).
 int clamprenderer(int32_t r)
@@ -9309,55 +9294,29 @@ int clamprenderer(int32_t r)
     return r;
 }
 
-// Names the release a GRP comes from when it's a known one other than this build's.
-const char *grpmismatch(int32_t size, uint32_t crc)
+static int shareware_args_allowed(int argc,char **argv)
 {
     int i;
-
-    for (i = 0; i < (int)(sizeof(knowngrps)/sizeof(knowngrps[0])); i++)
-        if (knowngrps[i].size == size && knowngrps[i].crc == crc)
-            return (knowngrps[i].build == OWNGRP) ? NULL : knowngrps[i].name;
-    return NULL;
-}
-
-// Warns when the GRP is another release's: that shows up later as CON errors or desyncs.
-static void checkgrp(const char *path)
-{
-    static unsigned char buf[65536];
-    FILE *fp = fopen(path, "rb");
-    int32_t size;
-    uint32_t crc = 0;
-    size_t n;
-    const char *other;
-    int i;
-
-    if (fp == NULL) return;
-    fseek(fp, 0, SEEK_END);
-    size = (int32_t) ftell(fp);
-    for (i = 0; i < (int)(sizeof(knowngrps)/sizeof(knowngrps[0])); i++)
-        if (knowngrps[i].size == size) break;
-    if (i == (int)(sizeof(knowngrps)/sizeof(knowngrps[0]))) { fclose(fp); return; }
-
-    fseek(fp, 0, SEEK_SET);
-    while ((n = fread(buf, 1, sizeof(buf), fp)) > 0) crc = grpcrc32(crc, buf, n);
-    fclose(fp);
-
-    if ((other = grpmismatch(size, crc)) != NULL)
+    if (!game_profile->shareware) return 1;
+    for (i=1;i<argc;i++)
     {
-printf ( ((game_profile->shareware) ? ("\nWARNING: %s is from %s, but this is a Duke Nukem 3D %s shareware build.\n") : ("\nWARNING: %s is from %s, but this is a Duke Nukem 3D %s build.\n")) , path , other , game_version ( ) ) ;
-        printf("Use the data from the matching release.\n\n");
+        const char *arg=argv[i], *ext=strrchr(arg,'.');
+        if (!stricmp(arg,"-map") || !stricmp(arg,"/map") || (ext && !stricmp(ext,".map")))
+            return 0;
+        if ((*arg == '-' || *arg == '/') && (arg[1] == 'v' || arg[1] == 'V' || arg[1] == 'l' || arg[1] == 'L'))
+        {
+            char *end;
+            long number=strtol(arg+2,&end,10);
+            if (end != arg+2 && !*end && ((arg[1] == 'v' || arg[1] == 'V') ? number != 1 : number < 1 || number > 6))
+                return 0;
+        }
+        /* These values name diagnostics, configuration or other non-map files. */
+        if (!stricmp(arg,"-loadverify") || !stricmp(arg,"-saveverify") ||
+            !stricmp(arg,"-demodump") || !stricmp(arg,"-routebot") ||
+            !stricmp(arg,"-net") || !stricmp(arg,"-name")) i++;
     }
-}
-
-static int load_duke3d_groupfile(void)
-{
-    char groupfile[] = "duke3d.grp";
-    FixFilePath(groupfile);
-    if (initgroupfile(groupfile) == -1) return 0;
-    checkgrp(groupfile);
     return 1;
 }
-
 
 /* Author dumps append geometry to the existing demo diagnostic prefix. */
 static int writedemostate(const char *name,int geometry)
@@ -9419,28 +9378,69 @@ int main(int argc,char **argv)
     int32_t i, j, k, l;
     int32 tempautorun;
 
-    const GameProfile *forced = NULL;
+    const GameProfile *forced = NULL, *selected = NULL;
+    const GameGrp *detected;
+    GameResolveResult selection;
+    uint64_t grp_size;
+    uint32_t grp_crc;
     int help;
-    char version_error[256];
+    char version_error[256], groupfile[]="duke3d.grp";
     if (!gameversion_parse_args(&argc,argv,&forced,&help,version_error,sizeof(version_error)))
     {
         fprintf(stderr,"%s\n",version_error);
         return 2;
     }
-    if (forced && !game_profile_select(forced)) return 2;
-    game_profile_select_build_default();
-    game_init_release_defaults();
-
+    if (help)
+    {
+        puts("Duke Nukem 3D\nUsage: duke3d [options]\n"
+             "  -gameversion TOKEN  Override an unknown or modified base GRP\n"
+             "  Tokens: 0.99, 1.0, 1.1, 1.3d-shareware, 1.3d, 1.4, 1.5\n"
+             "  /v# /l# /s#        Episode, level and skill\n"
+             "  /gFILE.GRP         Load an add-on after the base archive\n"
+             "  -map FILE.MAP      Custom map (full versions only)\n"
+             "  --help             Show this help without game data");
+        return 0;
+    }
 #ifdef DC
     platform_init(&argc,&argv);
 #endif
+    /* Bundle-directory resolution and argument capture are release-independent. */
+    _platform_init(argc,argv,"Duke Nukem 3D","Duke3D");
+    FixFilePath(groupfile);
+    if (!game_grp_inspect(groupfile,&grp_size,&grp_crc,version_error,sizeof(version_error)))
+    {
+        fprintf(stderr,"Invalid GRP '%s': %s\n",groupfile,version_error);
+        return 2;
+    }
+    detected = game_grp_find(grp_size,grp_crc);
+    printf("Base GRP '%s': size %llu, CRC32 %08x; detected %s\n",groupfile,(unsigned long long)grp_size,(unsigned)grp_crc,detected?detected->name:"unrecognized");
+    selection = game_profile_resolve(detected,forced,&selected);
+    if (selection != GAME_RESOLVE_OK)
+    {
+        if (selection == GAME_RESOLVE_SHAREWARE_CONFLICT)
+            fputs("Shareware GRPs cannot use a full-version override.\n",stderr);
+        else if (selection == GAME_RESOLVE_UNSUPPORTED)
+            fprintf(stderr,"Unsupported GRP '%s'; use a compatible shareware -gameversion override.\n",detected->name);
+        else
+            fputs("Unrecognized GRP; specify an override such as -gameversion 1.5 (see --help for supported releases).\n",stderr);
+        return 2;
+    }
+    if (!game_profile_select(selected)) return 2;
+    game_init_release_defaults();
+    printf("Selected game profile: %s (%s%s)\n",game_profile->token,game_profile->name,forced?"; forced":"");
+    fflush(stdout);
+    if (!shareware_args_allowed(argc,argv))
+    {
+        fputs("Shareware profiles cannot load custom maps or extra episodes.\n",stderr);
+        return 2;
+    }
 
     copyprotect();
 
     setvmode(0x03);
 
 // This is needed for the icculus.org ported Build Engine.
-    _platform_init(argc, argv, "Duke Nukem 3D", "Duke3D");
+
 
 	setmmxoverlay(getenv("BUILD_NOPENTIUM") == NULL);
 
@@ -9479,7 +9479,7 @@ if (game_profile->gamever < GAMEVER_10) {
     puts("Press any key to continue.");
 }
 
-    if (!load_duke3d_groupfile())
+    if (initgroupfile(groupfile) == -1)
     {
         printf("ERROR: Could not initialize group file \"duke3d.grp\"\n");
         exit(EXIT_FAILURE);
@@ -9985,6 +9985,12 @@ if (((game_profile->shareware) ? ( vol != 0 || lev > 10 || skill > 4 || mm < 1 |
      ud.clipping = ud.scrollmode = ud.overhead_on = 0;
      ud.showweapons =  ud.pause_on = ud.auto_run = 0;
 
+     if (!game_map_allowed(ud.volume_number,ud.level_number,NULL,boardfilename[0] != 0))
+     {
+         printf("Shareware profiles cannot load custom demo maps or extra episodes; refused.\n");
+         kclose(recfilep);
+         return 0;
+     }
      newgame(ud.volume_number,ud.level_number,ud.player_skill);
      return(1);
 } else {
@@ -10057,6 +10063,12 @@ if (((game_profile->shareware) ? ( vol != 0 || lev > 10 || skill > 4 || mm < 1 |
      ud.clipping = ud.scrollmode = ud.overhead_on = 0;
      ud.showweapons =  ud.pause_on = ud.auto_run = 0;
 
+     if (!game_map_allowed(ud.volume_number,ud.level_number,NULL,boardfilename[0] != 0))
+     {
+         printf("Shareware profiles cannot load custom demo maps or extra episodes; refused.\n");
+         kclose(recfilep);
+         return 0;
+     }
      newgame(ud.volume_number,ud.level_number,ud.player_skill);
      return(1);
 }

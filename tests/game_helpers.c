@@ -139,58 +139,6 @@ check ( "/q16 players" , ud . multimode , (game_profile->gamever < GAMEVER_13D ?
         check("diagnostic paths don't select a map",boardfilename[0],0);
     }
 
-    /* The GRP check: a known release GRP that isn't this build's release
-       gets a warning; this build's own GRP, a modded one and an unknown one
-       don't. CRC-32 is the standard (zlib) one. */
-    check("grpcrc32(\"123456789\")", (int)grpcrc32(0, (const unsigned char *)"123456789", 9), (int)0xCBF43926);
-    check("unknown GRP", grpmismatch(123456, 0x12345678) != NULL, 0);
-    check("modded GRP the size of a release", grpmismatch(26524524, 0x12345678) != NULL, 0);
-if (game_profile->gamever < GAMEVER_10) {
-    check("0.99 shareware GRP", grpmismatch(9690241, 0x02F18900) != NULL, 0);
-    check("1.0 shareware GRP", grpmismatch(10429258, 0xA28AA589) != NULL, 1);
-    check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
-    check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
-} else {
-if (game_profile->gamever < GAMEVER_11) {
-    check("1.0 shareware GRP", grpmismatch(10429258, 0xA28AA589) != NULL, 0);
-    check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
-    check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
-} else {
-if (game_profile->gamever < GAMEVER_13D) {
-    check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 0);
-    check("1.0 shareware GRP", grpmismatch(10429258, 0xA28AA589) != NULL, 1);
-    check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
-} else {
-if (game_profile->gamever < GAMEVER_14) {
-if ((game_profile->shareware)) {
-    check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 0);
-    check("1.3D full GRP", grpmismatch(26524524, 0xBBC9CE44) != NULL, 1);
-} else {
-    check("1.3D full GRP", grpmismatch(26524524, 0xBBC9CE44) != NULL, 0);
-    check("1.3D shareware GRP", grpmismatch(11035779, 0x983AD923) != NULL, 1);
-}
-    check("Atomic GRP", grpmismatch(44356548, 0xFD3DCFF1) != NULL, 1);
-    check("1.4 GRP", grpmismatch(44348015, 0xF514A6AC) != NULL, 1);
-} else {
-if (game_profile->gamever < GAMEVER_15) {
-    check("1.4 GRP", grpmismatch(44348015, 0xF514A6AC) != NULL, 0);
-    check("Atomic GRP", grpmismatch(44356548, 0xFD3DCFF1) != NULL, 1);
-} else {
-    check("Atomic GRP", grpmismatch(44356548, 0xFD3DCFF1) != NULL, 0);
-    check("1.4 GRP", grpmismatch(44348015, 0xF514A6AC) != NULL, 1);
-    check("1.3D full GRP", grpmismatch(26524524, 0xBBC9CE44) != NULL, 1);
-}
-}
-}
-}
-}
-if (game_profile->gamever >= GAMEVER_10) {
-    check("0.99 shareware GRP", grpmismatch(9690241, 0x02F18900) != NULL, 1);
-}
-if (game_profile->gamever >= GAMEVER_13D) {
-    check("1.1 shareware GRP", grpmismatch(10442980, 0x912E1E8D) != NULL, 1);
-}
-
 #if PLATFORM_UNIX
     /* duke3d.cfg values out of range, or in capitals, are read and written
        back as the game uses them. (Elsewhere the setup file is picked from a
