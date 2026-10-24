@@ -1213,3 +1213,9 @@ foreach(_test IN LISTS _render_tests)
     set_tests_properties(${_test} PROPERTIES SKIP_RETURN_CODE 77)
   endif()
 endforeach()
+
+add_executable(con_script_limits con_script_limits.c "${_game_c}")
+target_link_libraries(con_script_limits PRIVATE duke3d_game)
+add_test(NAME con_script_limits COMMAND "${CMAKE_COMMAND}"
+  "-DEXE=$<TARGET_FILE:con_script_limits>" "-DWORK=${CMAKE_CURRENT_BINARY_DIR}"
+  -P "${CMAKE_CURRENT_SOURCE_DIR}/con_script_limits.cmake")

@@ -456,6 +456,15 @@ int32_t keyword(void)
     return -1;
 }
 
+static void check_script_space(int32_t words)
+{
+    if (scriptptr-script > game_script_limit()-words)
+    {
+        fprintf(stderr,"Script exceeds selected profile capacity (%d words).\n",game_script_limit());
+        exit(1);
+    }
+}
+
 /*
 ================
 transword
@@ -489,6 +498,7 @@ int32_t transword(void) //Returns its code #
         if( strcmp( tempbuf,keyw[i]) == 0 )
         {
             /* Emit the keyword index directly as the interpreter opcode. */
+            check_script_space(1);
             *scriptptr = i;
             textptr += l;
             scriptptr++;
@@ -558,6 +568,7 @@ void transnum(void)
     {
         if( strcmp(tempbuf,label+(i<<6)) == 0 )
         {
+            check_script_space(1);
             *scriptptr = labelcode[i];
             scriptptr++;
             textptr += l;
@@ -573,7 +584,9 @@ void transnum(void)
         return;
     }
 
+    check_script_space(1);
     *scriptptr = (int32_t)atol(textptr);
+    check_script_space(1);
     scriptptr++;
 
     textptr += l;
@@ -656,6 +669,7 @@ if (game_profile->gamever >= GAMEVER_13D && game_profile->gamever < GAMEVER_14) 
             {
                 if( strcmp(label+(j<<6),label+(labelcnt<<6)) == 0 )
                 {
+                    check_script_space(1);
                     *scriptptr = labelcode[j];
                     break;
                 }
@@ -666,6 +680,7 @@ if (game_profile->gamever >= GAMEVER_13D && game_profile->gamever < GAMEVER_14) 
                 printf("  * ERROR!(L%d) State '%s' not found.\n",line_number,label+(labelcnt<<6));
                 error++;
             }
+            check_script_space(1);
             scriptptr++;
             return 0;
 
@@ -740,6 +755,7 @@ if (game_profile->gamever < GAMEVER_10) {
 
             while(j < k)
             {
+                check_script_space(1);
                 *scriptptr = 0;
                 scriptptr++;
                 j++;
@@ -758,6 +774,7 @@ if (game_profile->gamever < GAMEVER_10) {
                     scriptptr--;
                     j |= *scriptptr;
                 }
+                check_script_space(1);
                 *scriptptr = j;
                 scriptptr++;
             }
@@ -791,6 +808,7 @@ if (game_profile->gamever < GAMEVER_10) {
                 }
                 for(k=j;k<2;k++)
                 {
+                    check_script_space(1);
                     *scriptptr = 0;
                     scriptptr++;
                 }
@@ -946,6 +964,7 @@ if (game_profile->gamever < GAMEVER_10) {
                             scriptptr--;
                             k |= *scriptptr;
                         }
+                        check_script_space(1);
                         *scriptptr = k;
                         scriptptr++;
                         return 0;
@@ -954,6 +973,7 @@ if (game_profile->gamever < GAMEVER_10) {
                 }
                 for(k=j;k<3;k++)
                 {
+                    check_script_space(1);
                     *scriptptr = 0;
                     scriptptr++;
                 }
@@ -995,6 +1015,7 @@ if (game_profile->gamever < GAMEVER_10) {
                 }
                 for(k=j;k<5;k++)
                 {
+                    check_script_space(1);
                     *scriptptr = 0;
                     scriptptr++;
                 }
@@ -1034,6 +1055,7 @@ if (game_profile->gamever < GAMEVER_10) {
                         scriptptr--;
                         j |= *scriptptr;
                     }
+                    check_script_space(1);
                     *scriptptr = j;
                     scriptptr++;
                     break;
@@ -1042,6 +1064,7 @@ if (game_profile->gamever < GAMEVER_10) {
                 {
                     if(keyword() >= 0)
                     {
+                        check_script_space(4-j);
                         scriptptr += (4-j);
                         break;
                     }
@@ -1094,6 +1117,7 @@ if (game_profile->gamever < GAMEVER_10) {
                         scriptptr--;
                         j |= *scriptptr;
                     }
+                    check_script_space(1);
                     *scriptptr = j;
                     scriptptr++;
                     break;
@@ -1102,6 +1126,7 @@ if (game_profile->gamever < GAMEVER_10) {
                 {
                     if(keyword() >= 0)
                     {
+                        check_script_space(4-j);
                         scriptptr += (4-j);
                         break;
                     }
@@ -1163,6 +1188,7 @@ if (game_profile->gamever < GAMEVER_10) {
                  * the nested command or block has been compiled. */
                 checking_ifelse--;
                 tempscrptr = scriptptr;
+                check_script_space(1);
                 scriptptr++; //Leave a spot for the fail location
                 parsecommand();
                 *tempscrptr = SCRIPT_OFF(scriptptr);
@@ -1237,6 +1263,7 @@ if (game_profile->gamever < GAMEVER_14) {
                     j |= *scriptptr;
                 }
                 while(keyword() == -1);
+                check_script_space(1);
                 *scriptptr = j;
                 scriptptr++;
             }
@@ -1244,6 +1271,7 @@ if (game_profile->gamever < GAMEVER_14) {
             /* Reserve the false-branch target before compiling the conditional body.
              * Backpatch it with the byte offset immediately after that body. */
             tempscrptr = scriptptr;
+            check_script_space(1);
             scriptptr++; //Leave a spot for the fail location
 
             do
@@ -1652,6 +1680,7 @@ if (game_profile->gamever < GAMEVER_13D) {
                 }
                 j++;
             }
+            check_script_space(1);
             scriptptr++;
             return 0;
     }
