@@ -868,6 +868,8 @@ void flushperms(void);
  * @arg if ((dastat&128) != 0) - automatically draw to all video pages
  * @arg if ((dastat&256) != 0) - with dastat&2, the tile has square pixels: no aspect
  *  correction, but drawn 1.2 times as wide at 320x200 and 640x400 (JFBuild)
+ * @arg if ((dastat&1024) != 0) - with dastat&2, preserve the 4:3 weapon scale
+ *      in a widescreen view shortened by HUD bars.
  * @arg if ((dastat&512) != 0) - with dastat&2, stretch across the full width
  *  rather than keeping the tile in the central 4:3 area
  * @remark Note: As a special case, if both ((dastat&2) != 0) and ((dastat&8) != 0)

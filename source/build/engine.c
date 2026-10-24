@@ -2959,8 +2959,15 @@ static void dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short pi
 		if ((dastat&8) == 0)
 		{
 			if (widescreen && !(dastat&512)) {
-				x = ydimenscale;
-				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),ydimen<<16,200*pixelaspect);
+				if (dastat&1024) {
+					/* Keep weapons at the 4:3 scale above HUD bars. */
+					x = scale(xdimen,ydim<<16,xdim*240);
+					sx = ((cx1+cx2+2)<<15)+mulscale16(sx-(320<<15),x);
+					x = mulscale16(x,yxaspect);
+				} else {
+					x = ydimenscale;
+					sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),ydimen<<16,200*pixelaspect);
+				}
 			} else {
 				x = scale(xdimen,rsyxaspect,320);   /* = scale(xdimen,yxaspect,320); */
 				if (stereomode) x = scale(windowx2-windowx1+1,rsyxaspect,320);

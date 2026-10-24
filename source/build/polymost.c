@@ -2123,8 +2123,15 @@ void polymost_dorotatesprite (int32_t sx, int32_t sy, int32_t z, short a, short 
 		if (!(dastat&8))
 		{
 			if (widescreen && !(dastat&512)) {
-				x = ydimenscale;   //= scale(ydimen,yxaspect,mulscale16(200,pixelaspect));
-				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),oydimen<<16,200*pixelaspect);
+				if (dastat&1024) {
+					/* Keep weapons at the 4:3 scale above HUD bars. */
+					x = scale(oxdimen,ydim<<16,xdim*240);
+					sx = ((cx1+cx2+2)<<15)+mulscale16(sx-(320<<15),x);
+					x = mulscale16(x,yxaspect);
+				} else {
+					x = ydimenscale;
+					sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),oydimen<<16,200*pixelaspect);
+				}
 			} else {
 				x = scale(oxdimen,rsyxaspect,320);   //= scale(xdimen,yxaspect,320);
 				sx = ((cx1+cx2+2)<<15)+scale(sx-(320<<15),oxdimen,320);

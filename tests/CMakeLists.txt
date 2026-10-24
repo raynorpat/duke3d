@@ -182,8 +182,8 @@ target_link_libraries(render_classic2d PRIVATE buildengine duke3d::SDL2main)
 add_executable(render_maskorder render_maskorder.c)
 target_link_libraries(render_maskorder PRIVATE buildengine duke3d::SDL2main)
 
-add_executable(render_horplus render_horplus.c)
-target_link_libraries(render_horplus PRIVATE buildengine duke3d::SDL2main)
+add_executable(render_horplus render_horplus.c "${PROJECT_SOURCE_DIR}/source/game.c")
+target_link_libraries(render_horplus PRIVATE duke3d_game)
 
 set(DUKE3D_GRP "" CACHE FILEPATH "DUKE3D.GRP for tests that need game data")
 set(DUKE3D_E1L1_CHECKSUM "e0517697" CACHE STRING

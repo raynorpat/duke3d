@@ -3,11 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "platform.h"
-#include "build.h"
-#include "display.h"
-#include "engine.h"
-#include "cache1d.h"
+#define SDL_MAIN_HANDLED
+#include "duke3d.h"
 #include "SDL.h"
 #ifdef USE_OPENGL
 #include "SDL_opengl.h"
@@ -15,9 +12,6 @@
 #endif
 
 extern SDL_Surface *surface;
-void timerhandler(void) { }
-void keyhandler(void) { }
-void faketimerhandler(void) { }
 
 static int32_t posx, posy, posz;
 static short ang, sect;
@@ -61,6 +55,60 @@ static void draw(int horiz, int fractional)
     drawrooms(posx, posy, posz, ang, horiz, sect);
     drawmasks();
     nextpage();
+}
+
+/* Weapons use view-clipped autoscaling. A status bar shortens the view,
+ * but must not change their size or position relative to the centre. */
+static int weapon_picture(int renderer)
+{
+    unsigned char *ref, *pic;
+    static const int widths[] = { 640, 840, 1280 };
+    int bar, w, x, bad, visible, status, fail = 0;
+    int samples = REFW*REFH*(renderer == 3 ? 3 : 1);
+
+    screenpeek = 0;
+    ud.camerasprite = -1;
+    ps[0].newowner = ps[0].last_weapon = -1;
+    ps[0].curr_weapon = RPG_WEAPON;
+    sprite[0].extra = 100;
+    sprite[0].xrepeat = 42;
+    ref = malloc(samples); pic = malloc(samples);
+    if (!ref || !pic) return 1;
+    for (bar = 0; bar < 2; bar++)
+        for (w = -1; w < 3; w++)
+        {
+            if ((status = mode(w < 0 ? REFW : widths[w],renderer)) != 0) return status;
+            setview(0,0,xdim-1,bar ? ydim*166/200-1 : ydim-1);
+            /* As in-game, populate renderer 2's depth buffer before HUD draws. */
+            if (renderer == 2)
+            {
+                drawrooms(posx,posy,posz,ang,100,sect);
+                drawmasks();
+            }
+            clearallviews(0);
+            displayweapon(0);
+            nextpage();
+            picture(w < 0 ? ref : pic,renderer,REFW,REFH);
+            if (w < 0)
+            {
+                visible = 0;
+                for (x = 0; x < samples; x++) visible += ref[x] != 0;
+                if (visible < samples/100)
+                {
+                    fprintf(stderr,"FAIL: reference weapon was not drawn\n");
+                    fail = 1;
+                }
+                continue;
+            }
+            bad = 0;
+            for (x = 0; x < samples; x++) bad += ref[x] != pic[x];
+            printf("renderer %d, %dx%d, weapon%s: %.2f%% central pixels differ\n",
+                   renderer,(int)xdim,(int)ydim,bar ? " above status bar" : "",bad*100.0/samples);
+            if (bad > samples/200) fail = 1;
+        }
+    free(ref); free(pic);
+    if (fail) fprintf(stderr,"FAIL: widening the view changed the weapon sprite\n");
+    return fail;
 }
 
 /* A split-colour HUD tile must stretch from edge to edge, keeping its
@@ -165,6 +213,7 @@ int main(int argc, char **argv)
         if ((status = mode(widths[w],r)) != 0) return status;
         fail |= hud_width(r);
     }
+    fail |= weapon_picture(r);
     uninitengine();
     if (fail) fprintf(stderr, "FAIL: widening the view changed the central 4:3 picture\n");
     return fail;

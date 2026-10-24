@@ -1349,7 +1349,7 @@ void myos(int32_t x, int32_t y, short tilenum, signed char shade, char orientati
     else a = 0;
 
     p = sector[ps[screenpeek].cursectnum].floorpal;
-    rotatesprite(x<<16,y<<16,65536L,a,tilenum,shade,p,2|orientation,windowx1,windowy1,windowx2,windowy2);
+    rotatesprite(x<<16,y<<16,65536L,a,tilenum,shade,p,2|1024|orientation,windowx1,windowy1,windowx2,windowy2);
 }
 
 void myospal(int32_t x, int32_t y, short tilenum, signed char shade, char orientation, char p)
@@ -1363,7 +1363,7 @@ void myospal(int32_t x, int32_t y, short tilenum, signed char shade, char orient
 
     fp = sector[ps[screenpeek].cursectnum].floorpal;
 
-    rotatesprite(x<<16,y<<16,65536L,a,tilenum,shade,p,2|orientation,windowx1,windowy1,windowx2,windowy2);
+    rotatesprite(x<<16,y<<16,65536L,a,tilenum,shade,p,2|1024|orientation,windowx1,windowy1,windowx2,windowy2);
 
 }
 

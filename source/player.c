@@ -2077,7 +2077,7 @@ char animatefist(short gs,short snum)
     rotatesprite(
         (-fisti+222+(sync[snum].avel>>4))<<16,
         (looking_arc+fistz)<<16,
-        fistzoom,0,FIST,gs,fistpal,2,0,0,xdim-1,ydim-1);
+        fistzoom,0,FIST,gs,fistpal,2|1024,0,0,xdim-1,ydim-1);
 
     return 1;
 }
