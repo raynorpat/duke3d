@@ -2,6 +2,7 @@
 #define DUKE_PROFILE_TEST_SUPPORT_H
 #include "gameprofile.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 static int test_select_profile(int *argc, char **argv, const char *fallback_token)
 {
@@ -26,7 +27,7 @@ static int test_select_profile(int *argc, char **argv, const char *fallback_toke
         grp=game_grp_find(size,crc);
         if (!grp || !grp->profile) {
             fprintf(stderr,"Unrecognized test GRP; use -test-gameversion TOKEN.\n");
-            return 0;
+            exit(77);
         }
         profile=grp->profile;
     }

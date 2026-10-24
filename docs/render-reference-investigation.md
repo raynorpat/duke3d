@@ -73,3 +73,23 @@ Reproduction uses fresh `/tmp/duke-runtime-baseline-*` CMake directories,
 `cmake --build ... --parallel 4` and `ctest --test-dir ... --output-on-failure`.
 Render controls use `SDL_VIDEODRIVER=dummy BUILD_WINDOWED=1` and existing
 `render_e1l1` / `render_classic2d` executables. Captures/logs stay outside git.
+
+## Reference selection and old caches
+
+The runtime wrapper asks the built `game_profile --identify` helper for the
+size/CRC identity before choosing checksums. Both fixture families register in
+one build. Renaming a GRP does not change its references; changing its bytes
+removes stock golden coverage. Modified rendering data also needs an explicit
+`DUKE3D_RENDER_GAMEVERSION` test profile; without one those probes are skipped.
+
+`DUKE3D_RENDER_13D_*` and `DUKE3D_RENDER_ATOMIC_*` override one reference family.
+`DUKE3D_RENDER_GENERIC_*` applies only to the `DUKE3D_GRP` tests. Values are
+`stock` (the fingerprint table), a hex checksum, or empty (print only).
+For example, `DUKE3D_RENDER_ATOMIC_E1L1` and
+`DUKE3D_RENDER_13D_CLASSIC2D_640x400_MAP` affect distinct named cases.
+
+Legacy nondefault `DUKE3D_E1L1_CHECKSUM`, `DUKE3D_E1L1_TILT_CHECKSUM` and
+`DUKE3D_CLASSIC2D_<size>_<HUD|MAP>` overrides migrate to generic keys once.
+Cached old 1.3D default values are ignored. An explicit old override equal to
+its default cannot be distinguished from an implicit default: set a new key to
+preserve that intent. Floating-point Polymost checksums remain opt-in.

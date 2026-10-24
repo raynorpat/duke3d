@@ -152,107 +152,93 @@ add_executable(render_horplus render_horplus.c)
 target_link_libraries(render_horplus PRIVATE buildengine duke3d::SDL2main)
 
 set(DUKE3D_GRP "" CACHE FILEPATH "DUKE3D.GRP for tests that need game data")
-set(DUKE3D_E1L1_CHECKSUM "e0517697" CACHE STRING
-    "Expected render_e1l1 frame checksum (hex); empty just prints it")
-set(DUKE3D_E1L1_TILT_CHECKSUM "64e7f538" CACHE STRING
-    "Expected render_e1l1_tilt (screen tilt and low detail at 1600x900) checksum (hex); empty just prints it")
-# arm64 macOS gives 0d60cca6 in 1.3D builds and d64ef539 in 1.4/1.5 ones
-# (Polymost takes slope heights from getzsofslope, whose maths changed
-# between engine revisions). Not the default: Polymost is floating point, so
-# other platforms and compilers may round differently.
-set(DUKE3D_E1L1_POLYMOST_CHECKSUM "" CACHE STRING
-    "Expected render_e1l1_polymost (renderer 2) frame checksum (hex); empty just prints it")
-# render_classic2d's HUD and map view checksums (hex) for the 1.3D GRP;
-# empty just prints them. They are the same in 1.3D and 1.5 builds. The
-# wide modes are pinned with the widescreen port; tall modes must stay as
-# they were.
-foreach(_pin "320x200;9f03fd16;763b8c56" "640x400;c6b6b632;7282abe5"
-             "640x480;92082500;dfe0efbe" "1280x1024;43229c16;441cd127"
-             "480x640;6a4e30ce;28839020" "1280x720;7507d7cd;cc44ab59"
-             "1600x900;872652c4;cc8d7da2")
-  list(GET _pin 0 _size)
-  list(GET _pin 1 _hud)
-  list(GET _pin 2 _map)
-  set(DUKE3D_CLASSIC2D_${_size}_HUD "${_hud}" CACHE STRING
-      "Expected render_classic2d_${_size} HUD checksum (hex); empty just prints it")
-  set(DUKE3D_CLASSIC2D_${_size}_MAP "${_map}" CACHE STRING
-      "Expected render_classic2d_${_size} map view checksum (hex); empty just prints it")
-endforeach()
+include("${CMAKE_CURRENT_SOURCE_DIR}/render_references.cmake")
+duke_render_configure("${CMAKE_CURRENT_BINARY_DIR}/render_reference_settings.cmake")
+set(DUKE3D_RENDER_GAMEVERSION "" CACHE STRING "Explicit test profile for modified rendering GRPs")
+set(_render_profile_args "")
+if(DUKE3D_RENDER_GAMEVERSION)
+  set(_render_profile_args -test-gameversion "${DUKE3D_RENDER_GAMEVERSION}")
+endif()
+# Polymost uses floating-point arithmetic; assertions remain opt-in.
+set(DUKE3D_E1L1_POLYMOST_CHECKSUM "" CACHE STRING "Optional platform-specific renderer 2 checksum")
+
+function(add_release_render_tests suffix grp generic)
+  foreach(_kind normal tilt classic)
+    if(_kind STREQUAL "classic")
+      set(_sizes 320x200 640x400 640x480 1280x1024 480x640 1280x720 1600x900)
+      set(_exe render_classic2d)
+    else()
+      set(_sizes view)
+      set(_exe render_e1l1)
+    endif()
+    foreach(_size IN LISTS _sizes)
+      if(_kind STREQUAL "normal")
+        set(_name render_e1l1${suffix})
+      elseif(_kind STREQUAL "tilt")
+        set(_name render_e1l1_tilt${suffix})
+      else()
+        set(_name render_classic2d${suffix}_${_size})
+      endif()
+      add_test(NAME ${_name} COMMAND "${CMAKE_COMMAND}"
+        "-DIDENTIFY=$<TARGET_FILE:game_profile>" "-DEXE=$<TARGET_FILE:${_exe}>"
+        "-DGRP=${grp}" "-DKIND=${_kind}" "-DSIZE=${_size}"
+        "-DOUT=${CMAKE_CURRENT_BINARY_DIR}/${_name}.bmp" "-DGENERIC=${generic}"
+        "-DSETTINGS=${CMAKE_CURRENT_BINARY_DIR}/render_reference_settings.cmake"
+        "-DGAMEVERSION=${DUKE3D_RENDER_GAMEVERSION}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/render_reference_run.cmake")
+      set_tests_properties(${_name} PROPERTIES
+        ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1" TIMEOUT 30
+        SKIP_REGULAR_EXPRESSION "No rendering profile:")
+    endforeach()
+  endforeach()
+endfunction()
 if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
   foreach(_renderer 0 2)
     if(_renderer EQUAL 0 OR DUKE3D_POLYMOST)
       add_test(NAME render_horplus_${_renderer}
-        COMMAND render_horplus "${DUKE3D_GRP}" ${_renderer})
+        COMMAND render_horplus ${_render_profile_args} "${DUKE3D_GRP}" ${_renderer})
       set_tests_properties(render_horplus_${_renderer} PROPERTIES
         ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
         TIMEOUT 30)
     endif()
   endforeach()
-  add_test(NAME render_e1l1
-    COMMAND render_e1l1 "${DUKE3D_GRP}"
-            "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1.bmp"
-            ${DUKE3D_E1L1_CHECKSUM})
-  set_tests_properties(render_e1l1 PROPERTIES
-    ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
-    TIMEOUT 30)
-  # game.c's screen tilt and low detail in a widescreen mode whose tile is a
-  # power of two wide.
-  add_test(NAME render_e1l1_tilt
-    COMMAND render_e1l1 "${DUKE3D_GRP}"
-            "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_tilt.bmp"
-            "${DUKE3D_E1L1_TILT_CHECKSUM}" 0 tilt)
-  set_tests_properties(render_e1l1_tilt PROPERTIES
-    ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
-    TIMEOUT 30)
+  add_release_render_tests("" "${DUKE3D_GRP}" TRUE)
 
   # Views narrower than a Polymost one before them (which leaves every
   # column's bounds open) draw nothing right of their edge.
   add_test(NAME render_e1l1_narrow
-    COMMAND render_e1l1 "${DUKE3D_GRP}"
+    COMMAND render_e1l1 ${_render_profile_args} "${DUKE3D_GRP}"
             "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_narrow.bmp" "" 0 narrow)
   set_tests_properties(render_e1l1_narrow PROPERTIES
     ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
     TIMEOUT 30)
-
-  # Classic renderer HUD rotatesprites and textured map view at several
-  # 8-bit modes.
-  foreach(_size 320x200 640x400 640x480 1280x1024 480x640 1280x720 1600x900)
-    string(REPLACE "x" ";" _wh "${_size}")
-    add_test(NAME render_classic2d_${_size}
-      COMMAND render_classic2d "${DUKE3D_GRP}"
-              "${CMAKE_CURRENT_BINARY_DIR}/render_classic2d_${_size}" ${_wh}
-              "${DUKE3D_CLASSIC2D_${_size}_HUD}" "${DUKE3D_CLASSIC2D_${_size}_MAP}")
-    set_tests_properties(render_classic2d_${_size} PROPERTIES
-      ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
-      TIMEOUT 30)
-  endforeach()
 
   # The same view through Polymost: renderer 2 (software) and 1 (solid
   # colour). Polymost is floating point, so the checksum may differ by
   # platform; renderer 1 only prints its checksum.
   if(DUKE3D_POLYMOST)
     add_test(NAME render_e1l1_polymost
-      COMMAND render_e1l1 "${DUKE3D_GRP}"
+      COMMAND render_e1l1 ${_render_profile_args} "${DUKE3D_GRP}"
               "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost.bmp"
               "${DUKE3D_E1L1_POLYMOST_CHECKSUM}" 2)
     add_test(NAME render_e1l1_polymost_solid
-      COMMAND render_e1l1 "${DUKE3D_GRP}"
+      COMMAND render_e1l1 ${_render_profile_args} "${DUKE3D_GRP}"
               "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost_solid.bmp"
               "" 1)
     # Renderer 2 drawing a render-to-tile view with a power-of-two height.
     add_test(NAME render_e1l1_polymost_tile
-      COMMAND render_e1l1 "${DUKE3D_GRP}"
+      COMMAND render_e1l1 ${_render_profile_args} "${DUKE3D_GRP}"
               "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost_tile.bmp"
               "" 2 tile)
     # The same tilt and low detail in renderer 2, against renderer 0's.
     add_test(NAME render_e1l1_polymost_tilt
-      COMMAND render_e1l1 "${DUKE3D_GRP}"
+      COMMAND render_e1l1 ${_render_profile_args} "${DUKE3D_GRP}"
               "${CMAKE_CURRENT_BINARY_DIR}/render_e1l1_polymost_tilt.bmp"
               "" 2 tilt)
     # A sprite behind a masked wall (JFBuild 61483f0). Renderer 1 first, so
     # renderer 0's xb1/xb2 aren't left to stand in for dxb1/dxb2.
     add_test(NAME render_maskorder
-      COMMAND render_maskorder "${DUKE3D_GRP}" 1 2 0)
+      COMMAND render_maskorder ${_render_profile_args} "${DUKE3D_GRP}" 1 2 0)
     set_tests_properties(render_e1l1_polymost render_e1l1_polymost_solid
                          render_e1l1_polymost_tile render_e1l1_polymost_tilt
                          render_maskorder
@@ -268,7 +254,7 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
   if(DUKE3D_POLYMOST AND DUKE3D_GL_TESTS)
     foreach(_path immediate vbo shader)
       add_test(NAME render_horplus_gl_${_path}
-        COMMAND render_horplus "${DUKE3D_GRP}" 3 ${_path})
+        COMMAND render_horplus ${_render_profile_args} "${DUKE3D_GRP}" 3 ${_path})
       set_tests_properties(render_horplus_gl_${_path} PROPERTIES
         ENVIRONMENT "BUILD_WINDOWED=1"
         SKIP_RETURN_CODE 77 TIMEOUT 30)
@@ -280,7 +266,7 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
     target_link_libraries(render_gl PRIVATE duke3d_game duke3d::SDL2main)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/render_gl")
     add_test(NAME render_gl
-      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl")
+      COMMAND render_gl ${_render_profile_args} "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl")
     set_tests_properties(render_gl PROPERTIES
       ENVIRONMENT "BUILD_WINDOWED=1"
       SKIP_RETURN_CODE 77
@@ -288,7 +274,7 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
     # The VIDEO page's live renderer switch, from a run with no GL context
     # yet, its modes, and the fade around them.
     add_test(NAME render_gl_video
-      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" video)
+      COMMAND render_gl ${_render_profile_args} "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" video)
     set_tests_properties(render_gl_video PROPERTIES
       ENVIRONMENT "BUILD_WINDOWED=1"
       SKIP_RETURN_CODE 77
@@ -296,7 +282,7 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
     # Supersampling on the shader path: the frame shown is the large one
     # box-filtered down, its sizes, clamp and the settings that turn it off.
     add_test(NAME render_gl_supersample
-      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" supersample)
+      COMMAND render_gl ${_render_profile_args} "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" supersample)
     set_tests_properties(render_gl_supersample PROPERTIES
       ENVIRONMENT "BUILD_WINDOWED=1"
       SKIP_RETURN_CODE 77
@@ -304,7 +290,7 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
     # Texture filtering on every draw path: close to nearest, translucency
     # and fades kept, nearest again byte for byte, with supersampling too.
     add_test(NAME render_gl_filter
-      COMMAND render_gl "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" filter)
+      COMMAND render_gl ${_render_profile_args} "${DUKE3D_GRP}" "${CMAKE_CURRENT_BINARY_DIR}/render_gl" filter)
     set_tests_properties(render_gl_filter PROPERTIES
       ENVIRONMENT "BUILD_WINDOWED=1"
       SKIP_RETURN_CODE 77
@@ -312,7 +298,7 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
   endif()
 
   # Boots the real game to its title loop and into E1L1, headless. It uses
-  # the in-repo 1.5 CONs, so not in 1.3D builds.
+  # matching CON files extracted from the base archive.
   if(Python3_Interpreter_FOUND)
     if(WIN32)
       set(_cfg_dir "Duke Nukem 3D")
@@ -396,10 +382,14 @@ if(DUKE3D_GRP AND EXISTS "${DUKE3D_GRP}")
     list(GET _pin 3 _bars)
     string(REPLACE "x" ";" _wh "${_size}")
     add_test(NAME minihud_${_size}
-      COMMAND minihud "${DUKE3D_GRP}"
-              "${CMAKE_CURRENT_BINARY_DIR}/minihud_${_size}" ${_wh}
-              "${_plain}" "${_inv}" "${_bars}")
+      COMMAND "${CMAKE_COMMAND}" "-DIDENTIFY=$<TARGET_FILE:game_profile>"
+        "-DEXE=$<TARGET_FILE:minihud>" "-DGRP=${DUKE3D_GRP}"
+        "-DOUT=${CMAKE_CURRENT_BINARY_DIR}/minihud_${_size}" -DKIND=minihud "-DSIZE=${_size}"
+        "-DMINIREF1=${_plain}" "-DMINIREF2=${_inv}" "-DMINIREF3=${_bars}"
+        "-DGAMEVERSION=${DUKE3D_RENDER_GAMEVERSION}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/render_reference_run.cmake")
     set_tests_properties(minihud_${_size} PROPERTIES
+      SKIP_REGULAR_EXPRESSION "No rendering profile:"
       ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1"
       TIMEOUT 30)
   endforeach()
@@ -1200,3 +1190,26 @@ endfunction()
 add_cross_release_test(v10_v11 "${DUKE3D_V10_SW_DATA_DIR}" "${DUKE3D_V11_SW_DATA_DIR}" 28200)
 add_cross_release_test(13d_sw_full "${DUKE3D_V13D_SW_DATA_DIR}" "${DUKE3D_V13D_DATA_DIR}" 28208)
 add_cross_release_test(13d_atomic "${DUKE3D_V13D_DATA_DIR}" "${_atomic_data}" 28216)
+
+add_test(NAME render_reference_config COMMAND "${CMAKE_COMMAND}"
+  "-DSRC=${PROJECT_SOURCE_DIR}" "-DWORK=${CMAKE_BINARY_DIR}/rrc"
+  "-DIDENTIFY=$<TARGET_FILE:game_profile>" "-DRENDER=$<TARGET_FILE:render_e1l1>" "-DMINIHUD=$<TARGET_FILE:minihud>"
+  "-DGRP_13d=${DUKE3D_V13D_DATA_DIR}/DUKE3D.GRP" "-DGRP_atomic=${DUKE3D_ATOMIC_GRP}"
+  "-DTEST_ARGS=${_configure_test_args}" -P "${CMAKE_CURRENT_SOURCE_DIR}/render_reference_config.cmake")
+set_tests_properties(render_reference_config PROPERTIES TIMEOUT 120
+  ENVIRONMENT "SDL_VIDEODRIVER=dummy;BUILD_WINDOWED=1")
+
+if(EXISTS "${DUKE3D_V13D_DATA_DIR}/DUKE3D.GRP")
+  add_release_render_tests(_13d "${DUKE3D_V13D_DATA_DIR}/DUKE3D.GRP" FALSE)
+endif()
+if(EXISTS "${DUKE3D_ATOMIC_GRP}")
+  add_release_render_tests(_atomic "${DUKE3D_ATOMIC_GRP}" FALSE)
+endif()
+
+# Data without a selectable profile needs an explicit test-only override.
+get_property(_render_tests DIRECTORY PROPERTY TESTS)
+foreach(_test IN LISTS _render_tests)
+  if(_test MATCHES "^(render_|minihud_)")
+    set_tests_properties(${_test} PROPERTIES SKIP_RETURN_CODE 77)
+  endif()
+endforeach()

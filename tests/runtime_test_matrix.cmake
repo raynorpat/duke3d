@@ -24,6 +24,8 @@ foreach(_name game_boot_v099_sw game_boot_v10_sw game_boot_v11_sw
               game_boot_v13d_sw game_boot_v13d_full game_boot_v14 game_boot_atomic
               con_compile_1.4 con_compile_1.5 savegame_codec_1.4
               net_cross_v10_v11 net_cross_13d_sw_full net_cross_13d_atomic
+              render_e1l1_13d render_e1l1_atomic
+              render_classic2d_13d_1600x900 render_classic2d_atomic_1600x900
               con_compile_v099_sw con_compile_v10_sw con_compile_v11_sw
               con_compile_v13d_sw con_compile_v13d_full dos_save_load_fixture_SAV)
   if(NOT _tests MATCHES "add_test\\([^\n]*${_name}[^a-zA-Z0-9_]")
