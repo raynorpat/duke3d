@@ -117,18 +117,18 @@ those implementations before the split.
   slots instead of both taking the last one
 - `pragmas.h`: `klabs` negates as unsigned, so `klabs(INT32_MIN)` gives
   `INT32_MIN` as x86 `neg` does instead of undefined behaviour (ledger E-009)
-- `engine.c`: version-guarded 1.4 engine logic, on `BUILD_ENGINEREV` (see
+- `engine.c`: runtime-selected 1.4 engine logic, on `game_profile->enginerev` (see
   ledger E-005)
-- `engine.c`, `cache1d.c`: version-guarded 1.3D engine logic, on
-  `BUILD_ENGINEREV`: the 1996 logic square root, slope maths, `inside` and the
+- `engine.c`, `cache1d.c`: runtime-selected 1.3D engine logic, on
+  `game_profile->enginerev`: the 1996 logic square root, slope maths, `inside` and the
   1996 LZW format (see ledger E-001 to E-004, E-012)
-- `engine.c`: version-guarded 1.1 and 1.0 engine logic, on `BUILD_ENGINEREV`:
+- `engine.c`: runtime-selected 1.1 and 1.0 engine logic, on `game_profile->enginerev`:
   the early `inside`, which compares the two products and keeps a one-byte
   count (see ledger E11-001)
 - `engine.c`: `inside` computes coordinate differences, products and determinants
   as unsigned 32-bit arithmetic, preserving each revision's DOS wraparound
   without C signed overflow (E11-001, E-004).
-- `engine.c`: version-guarded 1.0 engine logic, on `BUILD_ENGINEREV <
+- `engine.c`: runtime-selected 1.0 engine logic, on `game_profile->enginerev <
   19960220L`: `cansee`'s side test and `lintersect`; `hitscan` without a
   cliptype (always `CLIPMASK1`) that resets only `*hitsect`; `clipmove`
   accepting a bad sector and gathering every listed sector's walls before
@@ -683,8 +683,18 @@ fails or a write fails, it removes the file and returns -1.
 
 ## 0.99 beta hitscan
 
-`BUILD_ENGINEREV < 19960129L` retains the beta's slope-plane intersections behind
+`game_profile->enginerev < 19960129L` retains the beta's slope-plane intersections behind
 ray origins and halves signed height differences before taking their absolute value
 in all four plane range tests. E099-001/002, measured from the Jan4 DOS EXE; guarded
 branches in `engine.c:hitscan`, cases in `tests/engine_trace.c`. All later revisions
 retain their existing sign/range checks.
+
+## Runtime release selection
+
+The game selects one immutable `GameProfile` from the base GRP size and CRC32
+before engine initialization. All historical engine math/traversal branches and
+both LZW formats remain available in one build and read that same profile.
+The editor selects 1.5 explicitly; it does not infer a historical editor from
+the data. Release-specific DOS record sizes remain explicit in the game codec,
+independent of shared native storage. See
+[the runtime verification report](../../docs/runtime-release-verification.md).
