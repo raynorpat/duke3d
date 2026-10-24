@@ -1219,3 +1219,10 @@ target_link_libraries(con_script_limits PRIVATE duke3d_game)
 add_test(NAME con_script_limits COMMAND "${CMAKE_COMMAND}"
   "-DEXE=$<TARGET_FILE:con_script_limits>" "-DWORK=${CMAKE_CURRENT_BINARY_DIR}"
   -P "${CMAKE_CURRENT_SOURCE_DIR}/con_script_limits.cmake")
+
+if(Python3_Interpreter_FOUND)
+  add_test(NAME grp_extent_limits COMMAND "${Python3_EXECUTABLE}" -I
+    "${CMAKE_CURRENT_SOURCE_DIR}/grp_extent_limits.py" "$<TARGET_FILE:game_profile>"
+    "$<TARGET_FILE:duke3d>" "${CMAKE_BINARY_DIR}/extent_limits")
+  set_tests_properties(grp_extent_limits PROPERTIES TIMEOUT 120)
+endif()

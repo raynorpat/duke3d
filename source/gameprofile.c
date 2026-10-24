@@ -112,11 +112,19 @@ int game_grp_inspect(const char *path, uint64_t *size, uint32_t *crc,
     count = le32(buf+12);
     /* Bound all directory entries and member extents before the legacy mounter. */
     required = 16 + (uint64_t)count*16;
+    /* Build's signed member offsets and seeks also include this directory prefix. */
+    if (required > INT32_MAX) {
+        reason = "GRP exceeds legacy 32-bit limits";
+        goto invalid;
+    }
     for (i = 0; i < count; i++) {
         if (fread(buf, 1, 16, fp) != 16) goto invalid;
         *crc = grpcrc32(*crc, buf, 16); *size += 16;
-        if (UINT64_MAX-required < le32(buf+12)) goto invalid;
         required += le32(buf+12);
+        if (required > INT32_MAX) {
+            reason = "GRP exceeds legacy 32-bit limits";
+            goto invalid;
+        }
     }
     while ((n = fread(buf, 1, sizeof(buf), fp)) > 0) {
         *crc = grpcrc32(*crc, buf, n); *size += n;
