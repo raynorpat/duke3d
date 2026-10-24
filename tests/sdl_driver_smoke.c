@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Smoke test for the SDL2 port of sdl_driver.c: brings up the video mode,
  *  sets a palette, pushes frames, pumps events and shuts down. It needs no
@@ -671,6 +672,7 @@ static int video_fade(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     char pal[256 * 4];
     char readback[256 * 4];
     unsigned long start;

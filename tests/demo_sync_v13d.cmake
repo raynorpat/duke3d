@@ -18,6 +18,7 @@
 # is no real one).
 include("${CMAKE_CURRENT_LIST_DIR}/v13d_data.cmake")
 v13d_check_edition("${DATA}" "${EDITION}")
+v13d_game_profile("${EDITION}" _profile)
 
 set(_run "${WORK}/run")
 set(_home "${WORK}/home")
@@ -65,8 +66,12 @@ if(DEMOGOD)
   set(_demo_options -demogod)
 endif()
 
+if(NOT FLAGS MATCHES "-demodump")
+  list(APPEND _demo_options -demodump demo-state.bin)
+endif()
+
 macro(_demo_run)
-  execute_process(COMMAND "${DUKE3D}" -demoverify ${DEMO} ${_flags} ${_demo_options}
+  execute_process(COMMAND "${DUKE3D}" -gameversion "${_profile}" -demoverify ${DEMO} ${_flags} ${_demo_options}
     WORKING_DIRECTORY "${_run}"
     TIMEOUT 300
     RESULT_VARIABLE _result
@@ -119,6 +124,21 @@ string(REGEX MATCH "DEMOSTATE [-0-9 ]+" _line "${_out}")
 if(NOT _line)
   message(FATAL_ERROR "no DEMOSTATE line:\n${_out}")
 endif()
+if(NOT FLAGS MATCHES "-demodump")
+  if(EDITION STREQUAL "sw099")
+    set(_player_size 831)
+  elseif(EDITION STREQUAL "sw10" OR EDITION STREQUAL "sw11")
+    set(_player_size 846)
+  else()
+    set(_player_size 1362)
+  endif()
+  math(EXPR _dump_size "8 + 44*4096 + ${_player_size}")
+  file(SIZE "${_run}/demo-state.bin" _actual_dump_size)
+  if(NOT _actual_dump_size EQUAL _dump_size)
+    message(FATAL_ERROR "diagnostic dump uses native player layout: ${_actual_dump_size}, expected ${_dump_size}")
+  endif()
+endif()
+
 string(REPLACE " " ";" _got "${_line}")
 list(REMOVE_AT _got 0)
 

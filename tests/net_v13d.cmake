@@ -80,12 +80,15 @@ set(_seconds 20)
 set(_b_args "${ARGS}")
 if(B_VERSION)
   set(_b_args "${B_VERSION}")
+  if(MODE STREQUAL "maprefuse")
+    set(_b_args "-test-custom-map ${B_VERSION}")
+  endif()
 endif()
 execute_process(
   COMMAND "${CMAKE_COMMAND}" -DROLE=peer "-DEXE=${A}" "-DRUN=${WORK}/A"
           -DSECONDS=${_seconds} "-DARGS=${ARGS} ${A_ARGS}" -P "${CMAKE_CURRENT_LIST_FILE}"
   COMMAND "${CMAKE_COMMAND}" -DROLE=peer "-DEXE=${B}" "-DRUN=${WORK}/B"
-          -DSECONDS=${_seconds} "-DWAIT_FOR=${WORK}/A" "-DARGS=${_b_args}" -P "${CMAKE_CURRENT_LIST_FILE}"
+          -DSECONDS=${_seconds} "-DWAIT_FOR=${WORK}/A" "-DARGS=${_b_args} ${B_ARGS}" -P "${CMAKE_CURRENT_LIST_FILE}"
   RESULT_VARIABLE _ignored)
 
 set(_fail "")
@@ -96,7 +99,13 @@ foreach(_peer A B)
   string(FIND "${_out}" "Multiplayer initialized" _joined)
   string(FIND "${_out}" "Multiplayer sync checked." _checked)
   string(FIND "${_out}" "Out Of Sync" _oos)
-  if(MODE STREQUAL "refuse")
+  if(MODE STREQUAL "maprefuse")
+    if(_peer STREQUAL "A" AND NOT _out MATCHES "Shareware profiles cannot load custom network maps")
+      string(APPEND _fail "shareware peer did not refuse the custom map request.\n")
+    elseif(_peer STREQUAL "B" AND NOT _out MATCHES "Custom map request sent")
+      string(APPEND _fail "map request peer never sent its request.\n")
+    endif()
+  elseif(MODE STREQUAL "refuse")
     if(_refused EQUAL -1)
       string(APPEND _fail "peer ${_peer} (${${_peer}}) didn't refuse; it ended with \"${_result}\".\n")
     endif()

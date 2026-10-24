@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Renders E1L1's start view in renderer 3 (OpenGL) in a real window, with
  *  a HUD tile, printext256 text, a drawline256 line and a plotpixel, and
@@ -2876,6 +2877,7 @@ static int fl_check(const char *dir)
 
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
     int32_t posx, posy, posz;
     short ang, sectnum;
     char path[1024];

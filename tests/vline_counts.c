@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Checks how many pixels the engine's C column drawers (build/draw.c) write.
  *  The original A.ASM loops end with "sub ecx,1 / jnc", so a count of n
@@ -83,8 +84,9 @@ static void check_drawslab(void)
 #undef RND
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     static unsigned char pal[256], tile[16], dest[16];
     int i;
 

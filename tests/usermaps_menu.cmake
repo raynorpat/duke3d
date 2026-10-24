@@ -28,6 +28,9 @@ foreach(_mode IN LISTS _modes)
     endforeach()
     list(APPEND _args "${GRP}")
   endif()
+  if(PROFILE)
+    list(PREPEND _args -test-gameversion "${PROFILE}")
+  endif()
   execute_process(COMMAND "${CMAKE_COMMAND}" -E env
     "HOME=${_root}/home" "USERPROFILE=${_root}/home" "DUKE3D_SAVE_DIR=${_root}/home"
     SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy BUILD_WINDOWED=1

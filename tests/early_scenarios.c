@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Literal DOS cases: docs/v10-v11/notes/1.1-player.md (0x4517a,
  * 0x45bdc, 0x449a5, 0x4625c), 1.1-actors.md (0x25634), and ledger
  * G10-L14 (0x43c52) / G11-A35 (SE24 0x2c92f). No native goldens. */
@@ -46,18 +47,20 @@ static struct player_struct *setup(void)
     memset(sintable,0,sizeof(sintable)); sintable[512]=16384; sintable[1536]=-16384;
     return &ps[0];
 }
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,"1.1")) return 1;
+    game_init_release_defaults();
     struct player_struct *p;
     int i,j,k;
     initengine();
     p=setup(); sync[0].avel=-64; doincrements(p);
-#if DUKE3D_GAMEVER < GAMEVER_11
+if (game_profile->gamever < GAMEVER_11) {
     check("G10-L14 negative turn",p->weapon_ang,12);
     sync[0].avel=64; doincrements(p); check("G10-L14 positive turn",p->weapon_ang,-12);
-#else
+} else {
     check("1.1 weapon angle stays zero",p->weapon_ang,0);
-#endif
+}
     p=setup(); p->burn_time=2; processinput(0);
     check("burn countdown",p->burn_time,1); check("burn damage fraction",p->extra_extra8,48);
     check("burn draws one random",randomseed,468938558);

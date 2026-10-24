@@ -393,8 +393,8 @@ int xyzsound(short num,short i,int32_t x,int32_t y,int32_t z)
     if(cx)
     {
         if( pitchs < pitche )
-             pitch = pitchs + ( rand()%cx );
-        else pitch = pitche + ( rand()%cx );
+             pitch = pitchs + ( game_rand()%cx );
+        else pitch = pitche + ( game_rand()%cx );
     }
     else pitch = pitchs;
 
@@ -513,8 +513,8 @@ void sound(short num)
     if(cx)
     {
         if( pitchs < pitche )
-             pitch = pitchs + ( rand()%cx );
-        else pitch = pitche + ( rand()%cx );
+             pitch = pitchs + ( game_rand()%cx );
+        else pitch = pitche + ( game_rand()%cx );
     }
     else pitch = pitchs;
 

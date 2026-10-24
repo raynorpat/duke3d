@@ -14,6 +14,7 @@
 #         [-DNAME=<ref name>] [-DOTHER=<other releases' saves, ;-separated>] -P dos_save_v13d.cmake
 include("${CMAKE_CURRENT_LIST_DIR}/v13d_data.cmake")
 v13d_check_edition("${DATA}" "${EDITION}")
+v13d_game_profile("${EDITION}" _profile)
 
 # Keep WORK short: the game's config and save paths live in small buffers.
 set(_run "${WORK}/run")
@@ -35,7 +36,7 @@ set(ENV{DUKE3D_SAVE_DIR} "${_home}")
 
 # Save names are relative: the game treats an argument starting with / as a switch.
 function(run_duke3d result output)
-  execute_process(COMMAND "${DUKE3D}" ${ARGN}
+  execute_process(COMMAND "${DUKE3D}" -gameversion "${_profile}" ${ARGN}
     WORKING_DIRECTORY "${_run}"
     TIMEOUT 60
     RESULT_VARIABLE _result

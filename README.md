@@ -4,8 +4,8 @@ A portable C port of 3D Realms' Duke Nukem 3D, built on Ken Silverman's Build en
 started as the icculus.org port (the first Linux/Mac/Windows one) and now builds
 with CMake for 64-bit Windows, macOS and Linux. Video, input and audio go
 through SDL2; music is played by an emulated OPL3, so no MIDI device or
-SDL_mixer is needed. The same source builds the 1.5 (Atomic Edition) game, 1.4,
-1.3D, and the 1.3D, 1.1, 1.0 and 0.99 pre-release beta shareware variants.
+SDL_mixer is needed. One binary runs 1.5 (Atomic Edition), 1.4, 1.3D full and shareware, and the
+1.1, 1.0 and 0.99 pre-release beta shareware releases.
 
 No game data is included. You need your own copy of the game (see
 [Game data](#game-data)).
@@ -50,71 +50,75 @@ The game reads its data from the working directory:
 - optionally `DUKE.RTS` and demo files (`*.DMO`)
 
 Lookups fall back to a case-insensitive match, so the filename case doesn't
-matter. The data must match the version you built:
-
-| Build | Data needed |
-|---|---|
-| default (1.5) | 1.5 / Atomic Edition |
-| `DUKE3D_VERSION=1.4` | 1.4 |
-| `DUKE3D_VERSION=1.3D` | 1.3D full release |
-| `DUKE3D_VERSION=1.3D` with `DUKE3D_SHAREWARE=ON` | 1.3D shareware |
-| `DUKE3D_VERSION=1.1` with `DUKE3D_SHAREWARE=ON` | 1.1 shareware |
-| `DUKE3D_VERSION=1.0` with `DUKE3D_SHAREWARE=ON` | 1.0 shareware |
-| `DUKE3D_VERSION=0.99` with `DUKE3D_SHAREWARE=ON` | 0.99 pre-release beta |
-
-At startup the game checks `DUKE3D.GRP` against the release GRPs (0.99 through
-1.5, including shareware, by size and CRC-32) and prints a
-warning if it's one of those but not the one the build expects. Other GRPs,
-such as modified ones, aren't checked.
+matter. Keep the GRP and loose CON files from the same release together.
 
 ## Choosing a game version
 
-`DUKE3D_VERSION` selects which release's game logic and file formats are built.
-It affects saves, demos and multiplayer. The multiplayer variants require peers of
-the same version and edition; the 0.99 work targets single player. Details of 1.3D
-and 1.4 are in [docs/v13d/reference.md](docs/v13d/reference.md), of 1.0 and 1.1 in
-[docs/v10-v11/reference.md](docs/v10-v11/reference.md), and of the beta in
-[docs/v099/reference.md](docs/v099/reference.md).
+The game computes the base `DUKE3D.GRP` size and CRC32 before loading game
+logic, and prints the detected identity and selected profile. The same binary
+selects the matching engine behavior, scripts, input defaults, saves, demos and
+network protocol. Add-on `/g` archives do not change the selection.
 
-Use a separate build directory for each variant:
+| Detected release | Override token |
+|---|---|
+| 0.99 pre-release beta shareware | `0.99` |
+| 1.0 shareware | `1.0` |
+| 1.1 shareware | `1.1` |
+| 1.3D shareware | `1.3d-shareware` |
+| 1.3D full | `1.3d` |
+| 1.4 Plutonium Pak | `1.4` |
+| 1.5 Atomic Edition | `1.5` |
+
+An unknown or modified GRP requires an explicit override; there is no fallback:
 
 ```
-cmake -S . -B build-v13d -DDUKE3D_VERSION=1.3D
-cmake --build build-v13d
-
-cmake -S . -B build-v13dsw -DDUKE3D_VERSION=1.3D -DDUKE3D_SHAREWARE=ON
-cmake --build build-v13dsw
-
-cmake -S . -B build-v11sw -DDUKE3D_VERSION=1.1 -DDUKE3D_SHAREWARE=ON
-cmake --build build-v11sw
-
-cmake -S . -B build-v10sw -DDUKE3D_VERSION=1.0 -DDUKE3D_SHAREWARE=ON
-cmake --build build-v10sw
-
-cmake -S . -B build-v099sw -DDUKE3D_VERSION=0.99 -DDUKE3D_SHAREWARE=ON
-cmake --build build-v099sw
+/path/to/repo/build/bin/duke3d -gameversion 1.5
 ```
 
-`DUKE3D_SHAREWARE=ON` with 1.4 or 1.5 is rejected at configure time. The 0.99,
-1.0 and 1.1 variants require it; 1.3D supports both full and shareware builds.
+Choose the release the mod targets. An override cannot turn a recognized
+shareware GRP into a full release. Mac 1.5 shareware is recognized but has no
+supported native profile; an explicit shareware override is required to try it.
+Malformed archives still fail inspection with an override. `--help` needs no GRP.
+
+Shareware profiles load only their six packaged E1 campaign maps from the base
+archive. Custom-map switches, the user-map menu, extra episodes, custom-map
+save/demo/network markers, loose map replacements, later GRP map overrides and
+CON redirects are rejected. Other resource overrides remain available. A modified
+base GRP forced to shareware may contain modified campaign maps in that archive;
+this policy controls map selection, not content provenance. Full profiles keep
+custom-map support. The editor explicitly uses the 1.5 engine and remains able
+to author maps independently of the game's shareware policy.
+
+Peers must use matching release and edition protocols. Beta support targets
+single player. Keep data, saves and demos separated by release: early formats
+lack reliable version markers, and opening one does not switch profiles.
+Historical reconstruction notes are in [1.3D/1.4](docs/v13d/reference.md),
+[1.0/1.1](docs/v10-v11/reference.md) and [0.99](docs/v099/reference.md).
+
+The old `DUKE3D_VERSION` and `DUKE3D_SHAREWARE` build options are obsolete,
+including cached default values. Remove them when reusing an old build directory:
+
+```
+cmake -S . -B build -U DUKE3D_VERSION -U DUKE3D_SHAREWARE
+cmake --build build
+```
 
 ### Playing 1.3D
 
-A 1.3D build needs the files from the original 1.3D release in its working
-directory: the full release for a full build, the shareware release for a
-shareware build. None of them ship with this repository. Besides `DUKE3D.GRP` and
+Use the files from the original 1.3D full or shareware release in the working
+directory; their fingerprint selects the corresponding profile. None of them ship with this repository. Besides `DUKE3D.GRP` and
 the three CON files, copy `DUKE.RTS` and the demos: 1.3D keeps `DEMO1.DMO` and
 the other demos next to the GRP rather than inside it, and the title screen
 only plays the ones it finds.
 
-A 1.3D build plays the original 1.3D demos, compiles 1.3D CON scripts, and
+The 1.3D profile plays the original 1.3D demos, compiles 1.3D CON scripts, and
 loads saves made by the DOS 1.3D executable of the same
 edition (copy them into the save folder as `game0.sav` to `game9.sav`). Its
 own saves use the same DOS 1.3D layout.
 
 ### Playing 1.1 and 1.0
 
-Both were only released as shareware. A 1.1 or 1.0 build needs `DUKE3D.GRP`, the three
+Both were only released as shareware. The 1.1 or 1.0 profile needs `DUKE3D.GRP`, the three
 CON files, `DUKE.RTS` and the demos from the matching shareware release in its working
 directory. The release comes as a zip holding `DUKE3DS._1` to `DUKE3DS._4` and an
 `INSTALL.EXE`, which won't run here. Instead, join the four parts and extract them
@@ -127,11 +131,10 @@ cat DUKE3DS._1 DUKE3DS._2 DUKE3DS._3 DUKE3DS._4 > all.bin
 
 Details are in [docs/v10-v11/reference.md](docs/v10-v11/reference.md).
 
-Each build plays its own release's CON scripts and its three demos, and loads saves made
+Each profile plays its own release's CON scripts and its three demos, and loads saves made
 by the DOS executable of the same release (copy them into the save folder as `game0.sav`
-to `game9.sav`). 1.0 saves carry no version field, so the 1.0 build recognises them by
-their layout. Its own saves use the DOS layout of its release. Multiplayer works between
-our builds of the same release only.
+to `game9.sav`). 1.0 saves carry no version field, so the 1.0 profile recognises them by
+their layout. Its own saves use the DOS layout of its release. Multiplayer requires the same selected release.
 
 ### Playing the 0.99 beta
 
@@ -141,12 +144,12 @@ Use the matching beta `DUKE3D.GRP`, `GAME.CON`, `DEFS.CON` and `USER.CON`, with
 ```
 7zz x d3d_beta.7z -o/path/to/d3d_beta
 cd /path/to/d3d_beta
-/path/to/repo/build-v099sw/bin/duke3d
+/path/to/repo/build/bin/duke3d
 ```
 
 The archive contains the data files directly. The original beta has six E1 maps and
 no bundled demos. Its normal skill is `/s3`; for example, `/v1 /l1 /s3` starts E1L1.
-The beta build loads DOS beta saves and writes its own reloadable saves in the beta
+The beta profile loads DOS beta saves and writes its own reloadable saves in the beta
 layout. Beta and 1.0 saves are distinguished by layout; their unversioned demo headers
 cannot distinguish the two releases. Keep each version's data, demos and saves separate.
 Beta multiplayer is outside the verified single-player scope.
@@ -161,8 +164,6 @@ Pass these with `-D` when configuring.
 
 | Option | Default | Effect |
 |---|---|---|
-| `DUKE3D_VERSION` | `1.5` | Game version: `0.99`, `1.0`, `1.1`, `1.3D`, `1.4` or `1.5` |
-| `DUKE3D_SHAREWARE` | `OFF` | Build a shareware version (`VOLUMEONE`); supported with `0.99`, `1.0`, `1.1` and `1.3D`, and required for the first three |
 | `DUKE3D_ROUTEBOT` | `OFF` | Build the optional `-routebot` demo author; normal builds do not include it |
 | `DUKE3D_V099_SW_DATA_DIR` | empty | Beta data directory for optional beta tests, including references in `refdemos/` and `refsaves/`; needs Python 3 |
 | `DUKE3D_POLYMOST` | `ON` | Build the Polymost renderers (see [Renderers](#renderers)); needs OpenGL. `OFF` builds the classic renderer only |
@@ -446,17 +447,17 @@ the folder has none. On Windows, an existing `duke3d.cfg` and `game0.sav` to
 folder can be moved with the `DUKE3D_SAVE_DIR` environment variable (a
 `Duke Nukem 3D` folder is created inside it).
 
-Original DOS 1.5 (Atomic Edition) saves load on any OS and CPU, and the default build
-writes saves in the same layout. The original DOS game can't load them back,
-though. A 1.3D build loads DOS 1.3D saves instead (see
-[Playing 1.3D](#playing-13d)). A 1.4 or 1.5 build reading 1.3D CON
-files needs `UseOldVersion = 1` under `[Misc]` in `duke3d.cfg`; a 1.3D build
-doesn't.
+Original DOS saves load through explicit codecs for the selected profile,
+independently of the native CPU layout. Native saves retain that profile's DOS
+field layout; they are not guaranteed to load back in the original DOS game.
+A 1.4 or 1.5 profile intentionally reading 1.3D CON files still needs
+`UseOldVersion = 1` under `[Misc]` in `duke3d.cfg`.
 
 64-bit status: the game runs as a native 64-bit binary. That's verified on
 macOS arm64; Linux and Windows are built and tested in CI. Demo recording and
-playback and the editor's map saving are verified on 64-bit. Network play
-builds but hasn't been verified on 64-bit.
+playback and the editor's map saving are verified on 64-bit. Matching 1.3D
+and Atomic peers and cross-release refusal have been tested locally; the known
+1.0/1.1 sync failures are recorded in the verification report below.
 
 ### Gamepads
 
@@ -488,11 +489,12 @@ available for devices SDL does not recognize as game controllers.
 
 Original game switches start with `/`. Native port switches also use `-`, including
 `-renderer`, `-net`, `-demoverify`, `-loadverify` and the optional `-routebot`.
-The table below describes the default 1.5 build; older versions keep their own switch
-sets. Unknown `/` switches print help. Run with `/?` for your build's list.
+The table below describes the 1.5 profile; older releases keep their own switch
+sets. Unknown `/` switches print their legacy help. `--help` prints common startup options.
 
 | Switch | Effect |
 |---|---|
+| `-gameversion TOKEN` | Explicit release override, required for modified or unknown base GRPs |
 | `/v#` `/l##` `/s#` | Warp to volume, level and skill |
 | `/#` | Load a saved game from slot 0-9 |
 | `/m` | No monsters |
@@ -500,7 +502,7 @@ sets. Unknown `/` switches print help. Run with `/?` for your build's list.
 | `/r` | Record a demo |
 | `/dFILE` | Play demo FILE (`.dmo` is added if there's no extension) |
 | `/t#` | Respawn: 1 monsters, 2 items, 3 inventory, other value for all |
-| `/c#` | Multiplayer mode: 1 DukeMatch (spawn), 2 co-op, 3 DukeMatch (no spawn); in 1.3D builds 0, 1 and 2 |
+| `/c#` | Multiplayer mode: 1 DukeMatch (spawn), 2 co-op, 3 DukeMatch (no spawn); in 1.3D, 0, 1 and 2 |
 | `/q#` | Fake multiplayer with 2-8 players; `/a` adds player AI |
 | `/xFILE` | Compile FILE instead of `GAME.CON` |
 | `/gFILE` | Add a group file; must be last on the command line |
@@ -551,81 +553,82 @@ allow 127.0.0.1:23600
 ctest --preset default
 ```
 
-Most tests need no game data: the SDL driver smoke test, version macros,
-fixed-point and drawing helpers, LZW, the OPL3 music path, audio shutdown,
-the CON compiler, game helpers, the save codec, and version-option rejection.
-They run headless with SDL's dummy video and audio drivers. On Windows a
-`save_dir` test checks the Saved Games folder logic.
+Most tests need no game data. They exercise all seven runtime profiles in
+separate processes: engine math, both LZW formats, compiler dialects and limits,
+input, defaults, gameplay, DOS save codecs, demo framing and map policy. They
+also check obsolete-option diagnostics, combined test registration and rendering
+cache migration. SDL probes run headless; Windows adds a save-folder test.
 
-Tests that need game data are only registered when you point CMake at it:
+Supply any combination of optional fixtures in one build:
 
 | Cache variable | Enables |
 |---|---|
-| `DUKE3D_GRP` | `render_e1l1` (frame checksum, compared with `DUKE3D_E1L1_CHECKSUM`) and `game_boot` (not in 1.3D builds) |
-| `DUKE3D_ATOMIC_GRP` and `DUKE3D_DOS_SAVES_DIR` | `dos_save_*`: loads original DOS 1.5 saves and compares with an independent decoder (`tests/dos_save_decode.py`). 1.5 builds only; needs Python 3 |
-| `DUKE3D_DOS_SAVES_DIR` alone | `save_hardening_codec` in 1.4/1.5 builds: checks compressed save structure and malformed offsets without booting the game or requiring a GRP. The 1.4 check uses the shared layout, not an original 1.4 capture; needs Python 3 |
-| `DUKE3D_V13D_DATA_DIR` | In 1.3D builds: CON compile, game boot, demo playback, multiplayer and edition checks against the 1.3D full release. With DOS reference saves in its `refsaves/` folder (listed in `tests/data/v13d_save_refs.cmake`), also `dos_save_v13d_*` and `save_refuse_v13d_*`; needs Python 3 |
-| `DUKE3D_V13D_SW_DATA_DIR` | The same for a 1.3D shareware build |
-| `DUKE3D_V11_SW_DATA_DIR`, `DUKE3D_V10_SW_DATA_DIR` | The same for a 1.1 or 1.0 shareware build, using that release's folder. DOS reference saves go in its `refsaves/` folder |
-| `DUKE3D_V099_SW_DATA_DIR` | Beta CON compile, boot, real-renderer camera, demo-format and DOS-save tests. Installed `refdemos/E1L<n>.DMO` files enable per-map sync checks; E1L5 also enables the 60-second episode-ending check; `refsaves/` holds the listed DOS save references. No beta network tests; needs Python 3 |
-| `DUKE3D_NET_PEERS` | 1.3D, 1.1 and 1.0 builds: other builds, as `<exe>=<data folder>` entries, to check that multiplayer refuses mismatched versions |
+| `DUKE3D_GRP` | Generic rendering and campaign boot with matching CONs extracted for the test |
+| `DUKE3D_ATOMIC_GRP` | Atomic rendering, boot and multiplayer checks; matching loose CONs must be alongside it |
+| `DUKE3D_DOS_SAVES_DIR` | Independent Atomic DOS save decoding/hardening; with Atomic data, full-game round trips |
+| `DUKE3D_V13D_DATA_DIR`, `DUKE3D_V13D_SW_DATA_DIR` | Corresponding CON, boot, original-demo, DOS-save, multiplayer and edition checks; full data also enables named 1.3D rendering |
+| `DUKE3D_V11_SW_DATA_DIR`, `DUKE3D_V10_SW_DATA_DIR` | Corresponding original CON, boot, demo, DOS-save and multiplayer checks |
+| `DUKE3D_V099_SW_DATA_DIR` | Beta CON, boot, camera, demo and DOS-save checks; optional `refdemos/` enables six-map sync and episode ending |
+| `DUKE3D_V14_DATA_DIR` | Optional original 1.4 boot and network fixture |
+| `DUKE3D_NET_PEERS` | Optional external peers as `<exe>=<data folder>` entries |
+| `DUKE3D_GL_TESTS` | Optional real-window OpenGL checks; requires a usable GL context |
 
-Data-enabled 1.0, 1.1 and 1.3D builds automatically test refusals using small
-protocol peers for mismatched BYTEVERSIONs. Names ending in `_protocol_117`
-exercise the 1.5 full-version handshake; `_protocol_27` exercises the 1.5
-shareware handshake, which has no build configuration. These peers test the
-game's rejection path and require no other game's data. Optional
-`DUKE3D_NET_PEERS` entries additionally exercise complete external game builds;
-each entry needs the matching executable and data folder, using absolute paths.
+Release folders hold their GRP and matching loose CONs, with original saves in
+`refsaves/` and demo references as documented by that release. Python 3 enables
+external decoders and several fixture drivers. Protocol refusal tests use small
+peers without extra proprietary data. Available 1.0/1.1, 1.3D shareware/full and
+1.3D/Atomic pairs also test different data in two instances of the same binary.
 
 For example:
 
 ```
-cmake --preset default -DDUKE3D_GRP=/path/to/DUKE3D.GRP
+cmake --preset default \
+    -DDUKE3D_V13D_DATA_DIR=/path/to/13d \
+    -DDUKE3D_ATOMIC_GRP=/path/to/atomic/DUKE3D.GRP \
+    -DDUKE3D_V099_SW_DATA_DIR=/path/to/d3d_beta
 cmake --build --preset default
 ctest --preset default
 ```
 
-The DOS save tests need the Atomic Edition files. `tools/extract_iso_files.py`
-copies them off an Atomic CD image (the image is only read):
+Rendering assertions follow the inspected GRP fingerprint. Both
+`render_e1l1_13d` and `render_e1l1_atomic`, tilt cases and seven classic 2D
+resolutions run together. Issue #1 came from different E1L1 map data;
+[the controlled investigation](docs/render-reference-investigation.md) records
+why the retained 1.3D and separate Atomic checksums are correct.
+
+Override examples: `DUKE3D_RENDER_ATOMIC_E1L1=99d777cd` or
+`DUKE3D_RENDER_13D_CLASSIC2D_640x400_MAP=7282abe5`. Values are `stock`, a hex
+checksum, or empty to print only. `DUKE3D_RENDER_GENERIC_*` affects only
+`DUKE3D_GRP` tests. Old nondefault checksum overrides migrate there; cached old
+1.3D defaults are ignored. If an old explicit override equaled its default,
+set a new key to preserve that intent. Modified data has no stock goldens;
+supply `DUKE3D_RENDER_GAMEVERSION` to render it and explicit generic checksums
+to assert a reference. Polymost's floating-point checksum remains opt-in via
+`DUKE3D_E1L1_POLYMOST_CHECKSUM` because compiler/platform rounding differs.
+
+`tools/extract_iso_files.py` reads Atomic CD images without modifying them:
 
 ```
 python3 tools/extract_iso_files.py "<Track 1>.bin" ~/duke3d-data/atomic15 \
     ATOMINST/DUKE3D.GRP ATOMINST/GAME.CON ATOMINST/DEFS.CON ATOMINST/USER.CON
-cmake --preset default \
-    -DDUKE3D_ATOMIC_GRP=$HOME/duke3d-data/atomic15/DUKE3D.GRP \
-    -DDUKE3D_DOS_SAVES_DIR=<folder of .sav files>
 ```
 
-To enable the beta data tests in a separate build:
-
-```
-cmake -S . -B build-v099sw -DDUKE3D_VERSION=0.99 -DDUKE3D_SHAREWARE=ON \
-    -DDUKE3D_V099_SW_DATA_DIR=/path/to/d3d_beta
-cmake --build build-v099sw
-ctest --test-dir build-v099sw --output-on-failure
-```
-
-To regenerate a reference, use a separate build with `DUKE3D_ROUTEBOT=ON`, Python 3
+To regenerate beta references, build the optional route bot and use Python 3
 and DOSBox-X:
 
 ```
-cmake -S . -B build-v099-routebot -DDUKE3D_VERSION=0.99 \
-    -DDUKE3D_SHAREWARE=ON -DDUKE3D_ROUTEBOT=ON
-cmake --build build-v099-routebot
-sh tools/v099/mkrefdemos.sh /path/to/d3d_beta build-v099-routebot 1
+cmake -S . -B build-routebot -DDUKE3D_ROUTEBOT=ON
+cmake --build build-routebot
+sh tools/v099/mkrefdemos.sh /path/to/d3d_beta build-routebot 1
 ```
 
-The final argument selects E1L1; pass other level numbers 1–6, or omit them to process
-all six. Add `--dosbox /path/to/dosbox-x` if it is not on PATH. The tool writes a
-reference demo and its `tests/data/v13d_demo_refs.cmake` values only after native
-recording, native replay and the DOS capture agree. It stops on a mismatch. See the
-[beta reference](docs/v099/reference.md#regenerating-reference-demos) for the god-mode
-flags and files it updates.
+The final argument selects E1L1; choose 1–6 or omit it for all six. References
+are installed only after native recording, native replay and DOS capture agree.
+See the [beta reference workflow](docs/v099/reference.md#regenerating-reference-demos).
 
-CI (`.github/workflows/build.yml`) builds and tests 1.5 on Ubuntu, macOS and Windows,
-and 1.4, 1.3D full/shareware, 1.1, 1.0 and 0.99 on Ubuntu. It has no game data, so
-only the data-free tests run there.
+CI builds one binary per Ubuntu, macOS and Windows job and runs the data-free
+profile matrix. Local supplied-data results and limitations are recorded in
+[the runtime verification report](docs/runtime-release-verification.md).
 
 ## Project layout
 
@@ -634,7 +637,7 @@ only the data-free tests run there.
 | `source/` | Game code, the map editor (`astub.c`) and the CMake target for both |
 | `source/build/` | The Build engine (icculus port, SDL2 video), JFBuild's Polymost and stb_image_write (public domain or MIT); see `VENDORED.md` there |
 | `source/audiolib/` | Jim Dose's audio library over SDL audio, with a DOS-style MIDI driver and emulated OPL3 (DBOPL) |
-| `cmake/` | SDL2 lookup and fetch, compiler flags and version definitions |
+| `cmake/` | SDL2 lookup and fetch, compiler and renderer flags |
 | `tests/` | CTest tests and their helpers |
 | `testdata/` | The 1.5 CON scripts used by tests |
 | `tools/` | Save extraction and 1.3D reference scripts |

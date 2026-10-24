@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Fresh controls work without a config; saved player choices take precedence. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
@@ -15,6 +16,8 @@ static void check(const char *what, int got, int want)
 
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
+    game_init_release_defaults();
     static const struct { int key, function; } bindings[] = {
         { sc_W, gamefunc_Move_Forward }, { sc_S, gamefunc_Move_Backward },
         { sc_A, gamefunc_Strafe_Left }, { sc_D, gamefunc_Strafe_Right },

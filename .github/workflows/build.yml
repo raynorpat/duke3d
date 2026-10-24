@@ -6,21 +6,12 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.os }} ${{ matrix.version }}
+    name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        version: ['1.5']
-        # The older game versions only change game logic, so one OS covers them.
-        include:
-          - { os: ubuntu-latest, version: '1.4' }
-          - { os: ubuntu-latest, version: '1.3D' }
-          - { os: ubuntu-latest, version: '1.3D-sw' }
-          - { os: ubuntu-latest, version: '1.1-sw' }
-          - { os: ubuntu-latest, version: '1.0-sw' }
-          - { os: ubuntu-latest, version: '0.99-sw' }
 
     steps:
       - uses: actions/checkout@v4
@@ -37,12 +28,7 @@ jobs:
 
       # Windows has no SDL2 installed, so this also tests the FetchContent path.
       - name: Configure
-        shell: bash
-        run: |
-          v='${{ matrix.version }}'
-          flags="-DDUKE3D_VERSION=${v%-sw}"
-          if [[ $v == *-sw ]]; then flags="$flags -DDUKE3D_SHAREWARE=ON"; fi
-          cmake --preset default $flags
+        run: cmake --preset default
 
       - name: Build
         run: cmake --build --preset default --parallel
@@ -53,5 +39,5 @@ jobs:
       - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
-          name: duke3d-${{ runner.os }}${{ matrix.version != '1.5' && format('-{0}', matrix.version) || '' }}
+          name: duke3d-${{ runner.os }}
           path: build/bin/

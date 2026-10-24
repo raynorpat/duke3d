@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Writes buffers with the engine's dfwrite() and reads them back with
  *  kdfread(), so the LZW compressor and decompressor have to agree. Needs
@@ -42,6 +43,17 @@ static void roundtrip(const char *what, unsigned char *data, size_t dasizeof, si
 
     dfwrite(data, dasizeof, count, f);
     fclose(f);
+    if (!strcmp(what,"text")) {
+        unsigned char bytes[2048]; size_t got, total=0; uint32_t crc=0;
+        uint32_t want=game_profile->enginerev<19960820L ? 0x70926b3b : 0x3812ea16;
+        f=fopen(TMPNAME,"rb");
+        while((got=fread(bytes,1,sizeof(bytes),f))>0) { crc=grpcrc32(crc,bytes,got); total+=got; }
+        fclose(f);
+        if(crc!=want || total!=(game_profile->enginerev<19960820L ? 1551u : 1546u)) {
+            printf("FAIL DOS LZW golden: %08x, %lu bytes\n",crc,(unsigned long)total); failures++;
+        }
+    }
+
     memset(back, 0xcc, n);
     fil = kopen4load(TMPNAME, 0);
     if (fil == -1) {
@@ -145,6 +157,7 @@ static void check_dos_save(const char *path)
 
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     static unsigned char buf[100000];
     size_t i;
 

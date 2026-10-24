@@ -15,7 +15,7 @@
 #include <sys/stat.h>
 
 #include "platform.h"
-#include "build.h"  /* BUILD_ENGINEREV, which picks the LZW variant */
+#include "build.h"  /* Shared engine profile selects the LZW variant. */
 
 #include "pragmas.h"
 #include "cache1d.h"
@@ -581,7 +581,7 @@ void dfwrite32(int32_t *_buffer, size_t count, FILE *fil)
 }
 
 
-#if (BUILD_ENGINEREV < 19960820L)
+
 /* The LZW format before revision 19960820: codes start at 9 bits, and every
  * code takes its full width (no dropped bit). Duke Nukem 3D 1.3D wrote its
  * demos and saves this way. */
@@ -593,7 +593,7 @@ Encode one block with the revision's variable-width LZW code format.
 A zero dictionary-count header selects a literal block when compression is not smaller.
 ================
 */
-int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf)
+static int32_t compress1996(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf)
 {
 	int32_t i, addr, newaddr, addrcnt, zx, *longptr;
 	int32_t bytecnt1, bytecnt2, bitcnt, numbits, oneupnumbits;
@@ -665,7 +665,7 @@ Expand one revision-specific LZW block into the bounded output buffer.
 The header supplies the requested output size and distinguishes literal blocks.
 ================
 */
-int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
+static int32_t uncompress1996(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 {
 	int32_t strtot, currstr, numbits, oneupnumbits;
 	int32_t i, dat, leng, inbytecnt, bitcnt, outbytecnt, *longptr;
@@ -707,7 +707,6 @@ int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 	} while (currstr < strtot);
 	return(lzwgoal(BUILDSWAP_INTEL16(shortptr[0]))); /* uncompleng */
 }
-#else
 /*
 ================
 compress
@@ -716,7 +715,7 @@ Encode one block with the revision's variable-width LZW code format.
 A zero dictionary-count header selects a literal block when compression is not smaller.
 ================
 */
-int32_t compress(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf)
+static int32_t compressmodern(char *lzwinbuf, int32_t uncompleng, char *lzwoutbuf)
 {
 	int32_t i, addr, newaddr, addrcnt, zx, *longptr;
 	int32_t bytecnt1, bitcnt, numbits, oneupnumbits;
@@ -792,7 +791,7 @@ Expand one revision-specific LZW block into the bounded output buffer.
 The header supplies the requested output size and distinguishes literal blocks.
 ================
 */
-int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
+static int32_t uncompressmodern(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 {
 	int32_t strtot, currstr, numbits, oneupnumbits;
 	int32_t i, dat, leng, bitcnt, outbytecnt, *longptr;
@@ -836,4 +835,14 @@ int32_t uncompress(char *lzwinbuf, int32_t compleng, char *lzwoutbuf)
 	} while (currstr < strtot);
 	return(lzwgoal(BUILDSWAP_INTEL16(shortptr[0]))); /* uncompleng */
 }
-#endif
+int32_t compress(char *input, int32_t length, char *output)
+{
+    if (game_profile->enginerev < 19960820L) return compress1996(input,length,output);
+    return compressmodern(input,length,output);
+}
+
+int32_t uncompress(char *input, int32_t length, char *output)
+{
+    if (game_profile->enginerev < 19960820L) return uncompress1996(input,length,output);
+    return uncompressmodern(input,length,output);
+}

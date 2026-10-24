@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Beta CON runtime cases from docs/v099/notes/0.99-con-interpreter.md.
  * No game data: run the real interpreter on a square sector. */
 #define SDL_MAIN_HANDLED
@@ -34,8 +35,10 @@ static void setup(const int32_t *code, int words)
     actorscrptr[BOX]=16; memcpy(&script[8],code,words*sizeof(*code));
     totalclock=100; numcyclers=0; gc=176;
 }
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,"0.99")) return 1;
+    game_init_release_defaults();
     static const int32_t pal[]={14,12,34,56,4,4};
     static const int32_t alive[]={51,16384,56,11,77,4,11,88,4};
     static const int32_t respawn[]={71,52,11,77,4,11,88,4};

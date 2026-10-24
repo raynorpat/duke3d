@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Literal actor expectations from docs/v099/notes/0.99-actors.md.
  * Calls the real actor/engine functions; no game data is needed. */
 #define SDL_MAIN_HANDLED
@@ -93,14 +94,16 @@ static void movingsectorflags(void)
     check("stationary SE30 does not carry",ps[0].on_sector_effector,0);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,"0.99")) return 1;
+    game_init_release_defaults();
     int i, j, k;
     movingsectorflags();
     setup(); ps[0].curr_weapon=RPG_WEAPON;
     ps[0].gotweapon[DEVISTATOR_WEAPON]=1; ps[0].ammo_amount[DEVISTATOR_WEAPON]=10;
     checkavailweapon(&ps[0]); check("registered shoot scan",ps[0].curr_weapon,DEVISTATOR_WEAPON);
-    setup(); ps[0].curr_weapon=HANDREMOTE_WEAPON;
+    setup(); ps[0].curr_weapon=game_remote_weapon();
     ps[0].gotweapon[TRIPBOMB_WEAPON]=1; ps[0].ammo_amount[TRIPBOMB_WEAPON]=10;
     checkavailweapon(&ps[0]); check("downward bomb scan",ps[0].curr_weapon,TRIPBOMB_WEAPON);
     setup(); hittype[player].extra=150; hittype[player].picnum=RPG;

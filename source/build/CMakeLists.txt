@@ -30,7 +30,7 @@ if(NOT MSVC)
   target_compile_options(buildengine PRIVATE -fno-omit-frame-pointer)
 endif()
 
-target_link_libraries(buildengine PUBLIC duke3d_compile_options duke3d::SDL2)
+target_link_libraries(buildengine PUBLIC duke3d_compile_options duke3d_profile duke3d::SDL2)
 
 # engine.c includes polymost.c, which includes its two backend implementations.
 # These source files are listed for IDEs, not compiled as separate objects.

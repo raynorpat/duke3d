@@ -77,24 +77,8 @@ char betaname[80];
 
 char level_names[44][33],level_file_names[44][128];
 int32_t partime[44],designertime[44];
-#if DUKE3D_GAMEVER < GAMEVER_14
-// 1.3D CONs can't name episodes or skills; the 1.3D executable has these built in.
-#if DUKE3D_GAMEVER < GAMEVER_10
-char volume_names[4][33] = { "L.A. MELTDOWN", "COSMIC WASTELAND", "SHUTDOWN AT GROUND ZERO" };
-#elif DUKE3D_GAMEVER < GAMEVER_13D
-char volume_names[4][33] = { "L.A. MELTDOWN", "LUNAR APOCALYPSE", "SCHRAPNEL CITY" }; // 1.1's spelling
-#else
-char volume_names[4][33] = { "L.A. MELTDOWN", "LUNAR APOCALYPSE", "SHRAPNEL CITY" };
-#endif
-#if DUKE3D_GAMEVER < GAMEVER_10
-char skill_names[5][33] = { "EASY", "MEDIUM", "NORMAL", "HARD", "HEADACHE" };
-#else
-char skill_names[5][33] = { "PIECE OF CAKE", "LET'S ROCK", "COME GET SOME", "DAMN I'M GOOD" };
-#endif
-#else
 char volume_names[4][33];
 char skill_names[5][33];
-#endif
 
 volatile int32_t checksume;
 int32_t soundsiz[NUM_SOUNDS];
@@ -142,7 +126,7 @@ char playerreadyflag[MAXPLAYERS],ready2send;
 char playerquitflag[MAXPLAYERS];
 int32_t vel, svel, angvel, horiz, ototalclock, respawnactortime=768, respawnitemtime=768, groupfile;
 
-int32_t script[MAXSCRIPTSIZE],*scriptptr,*insptr,*labelcode,labelcnt;
+int32_t script[GAME_SCRIPT_CAPACITY],*scriptptr,*insptr,*labelcode,labelcnt;
 int32_t actorscrptr[MAXTILES],*parsing_actor;
 char *label,*textptr,error,warning,killit_flag;
 char *music_pointer;
@@ -186,12 +170,7 @@ signed char multiwho, multipos, multiwhat, multiflag;
 
 int32_t fakemovefifoplc,movefifoplc;
 int32_t myxbak[MOVEFIFOSIZ], myybak[MOVEFIFOSIZ], myzbak[MOVEFIFOSIZ];
-#if DUKE3D_GAMEVER < GAMEVER_11
-// 1.0 has no CON friction: its movement uses 0xcb00 (G10-L03).
-int32_t myhorizbak[MOVEFIFOSIZ],dukefriction = 0xcb00, show_shareware;
-#else
-int32_t myhorizbak[MOVEFIFOSIZ],dukefriction = 0xcc00, show_shareware;
-#endif
+int32_t myhorizbak[MOVEFIFOSIZ],dukefriction,show_shareware;
 
 short myangbak[MOVEFIFOSIZ];
 char myname[32],camerashitable,freezerhurtowner=0,lasermode;
@@ -1045,3 +1024,53 @@ void Shutdown(void)
  */
 char cachedebug = 0;
 
+
+int game_freeze_weapon(void) { return game_profile->gamever<GAMEVER_13D ? 10 : 9; }
+int game_remote_weapon(void) { return game_profile->gamever<GAMEVER_13D ? 9 : 10; }
+int game_script_limit(void) { return game_profile->gamever<GAMEVER_14 ? 20000 : 20460; }
+int game_sound_limit(void) { return game_profile->gamever<GAMEVER_13D ? 255 : game_profile->gamever<GAMEVER_14 ? 348 : 450; }
+int game_weaprecs_limit(void) { return game_profile->gamever<GAMEVER_14 ? 256 : 16; }
+
+void game_init_release_defaults(void)
+{
+    static const char *early_skills[]={"PIECE OF CAKE","LET'S ROCK","COME GET SOME","DAMN I'M GOOD"};
+    static const char *beta_skills[]={"EASY","MEDIUM","NORMAL","HARD","HEADACHE"};
+    int i;
+    memset(volume_names,0,sizeof(volume_names));
+    memset(skill_names,0,sizeof(skill_names));
+    if(game_profile->gamever<GAMEVER_14) {
+        strcpy(volume_names[0],"L.A. MELTDOWN");
+        strcpy(volume_names[1],game_profile->id==GAME_099SW ? "COSMIC WASTELAND" : "LUNAR APOCALYPSE");
+        strcpy(volume_names[2],game_profile->id==GAME_099SW ? "SHUTDOWN AT GROUND ZERO" :
+               game_profile->gamever<GAMEVER_13D ? "SCHRAPNEL CITY" : "SHRAPNEL CITY");
+        for(i=0;i<(game_profile->id==GAME_099SW ? 5 : 4);i++)
+            strcpy(skill_names[i],game_profile->id==GAME_099SW ? beta_skills[i] : early_skills[i]);
+    }
+    dukefriction=game_profile->gamever<GAMEVER_11 ? 0xcb00 : 0xcc00;
+    game_init_keywords();
+}
+
+int game_weapon_case(int weapon)
+{
+    if(game_profile->gamever<GAMEVER_13D) {
+        if(weapon==9) return HANDREMOTE_WEAPON;
+        if(weapon==10) return FREEZE_WEAPON;
+    }
+    return weapon;
+}
+int game_forcesphere_tile(void) { return game_profile->id==GAME_099SW ? 1220 : 2590; }
+int game_scubamask_tile(void) { return game_profile->id==GAME_099SW ? 2580 : 2581; }
+int game_tile_case(int tile)
+{
+    if(game_profile->gamever<GAMEVER_14) {
+        if(tile==3999) return FRAMEEFFECT1;
+        if(tile==FRAMEEFFECT1) return -1;
+    }
+    if(game_profile->id==GAME_099SW) {
+        if(tile==1220) return FORCESPHERE;
+        if(tile==FORCESPHERE) return -1;
+    }
+    return tile;
+}
+
+int game_frameeffect_tile(void) { return game_profile->gamever<GAMEVER_14 ? 3999 : 4095; }

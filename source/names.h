@@ -24,7 +24,6 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
-#include "gamever.h"
 
 #define SECTOREFFECTOR 1
 #define ACTIVATOR 2
@@ -580,17 +579,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define HANDTHROW 2573
 #define TIP 2576
 #define GLAIR 2578
-#if DUKE3D_GAMEVER < GAMEVER_10
-#define SCUBAMASK 2580
-#else
 #define SCUBAMASK 2581
-#endif
 #define SPACEMASK 2584
-#if DUKE3D_GAMEVER < GAMEVER_10
-#define FORCESPHERE 1220
-#else
 #define FORCESPHERE 2590
-#endif
 #define SHOTSPARK1 2595
 #define RPG 2605
 #define LASERSITE 2612
@@ -634,12 +625,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define FEM9 3450
 #define FOOTPRINT 3701
 #define POOP 4094
-#include "gamever.h"
-#if DUKE3D_GAMEVER < GAMEVER_14
-#define FRAMEEFFECT1 3999 // its tile in 1.3D's art
-#else
 #define FRAMEEFFECT1 4095
-#endif
 #define PANNEL3 4099
 #define SCREENBREAK14 4120
 #define SCREENBREAK15 4123

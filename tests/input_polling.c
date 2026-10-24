@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Device sampling must not consume gameplay input. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
@@ -25,6 +26,8 @@ static void event(int type, int x, int y)
 }
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
+    game_init_release_defaults();
     ControlInfo a, b;
     int fire = gamefunc_Fire;
     _platform_init(argc, argv, "input_polling", "input_polling");
@@ -96,13 +99,7 @@ int main(int argc, char **argv)
         check("submitted input stays visible before simulation", yaw, before);
         CONTROL_AcknowledgeInput(movefifoend[0]); CONTROL_GetView(&yaw, &pitch);
         check("acknowledgment removes simulated turn once", yaw, before - loc.avel *
-#if DUKE3D_GAMEVER < GAMEVER_11
-            TICSPERFRAME
-#elif DUKE3D_GAMEVER < GAMEVER_13D
-            1
-#else
-            2
-#endif
+(game_profile->gamever < GAMEVER_11 ? (TICSPERFRAME) : ((game_profile->gamever < GAMEVER_13D ? (1) : (2))))
             * 65536);
         before = yaw; CONTROL_AcknowledgeInput(movefifoend[0]); CONTROL_GetView(&yaw, &pitch);
         check("prediction replay cannot acknowledge twice", yaw, before);
@@ -161,13 +158,7 @@ int main(int argc, char **argv)
                 totalclock = ototalclock + TICSPERFRAME;
                 faketimerhandler();
                 applied += inputfifo[tick][0].avel *
-#if DUKE3D_GAMEVER < GAMEVER_11
-                    TICSPERFRAME
-#elif DUKE3D_GAMEVER < GAMEVER_13D
-                    1
-#else
-                    2
-#endif
+(game_profile->gamever < GAMEVER_11 ? (TICSPERFRAME) : ((game_profile->gamever < GAMEVER_13D ? (1) : (2))))
                     * 65536;
                 applied_pitch += (inputfifo[tick][0].horz >> 1) * 65536;
                 CONTROL_AcknowledgeInput(tick);

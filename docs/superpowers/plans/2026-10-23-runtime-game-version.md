@@ -256,5 +256,9 @@ has been performed as part of writing this plan.
 
 ## Execution record
 
-Pending execution-method selection after plan review. Preserve baseline commit,
-actual commands/results, fixture coverage and review findings here during work.
+Executed natively in `feature/runtime-game-version`, separate managed worktree.
+Baseline `58bdcc3`; all twelve tasks committed and verified in sequence.
+Final fresh review found one archive-boundary issue, fixed with RED→GREEN
+regressions and the full acceptance matrix.
+The [runtime verification report](../../runtime-release-verification.md) records
+fixture coverage, baseline exceptions and final review results.

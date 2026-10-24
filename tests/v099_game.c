@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Beta spawn differences, measured in docs/v099/notes/0.99-game.md. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
@@ -15,8 +16,10 @@ static int item(int pic)
     ud.multimode=1; ud.player_skill=2; randomseed=17;
     return i;
 }
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,"0.99")) return 1;
+    game_init_release_defaults();
     int i;
     initengine(); numsectors=1; numwalls=4; sector[0].wallptr=0; sector[0].wallnum=4;
     sector[0].ceilingz=-8192; sector[0].floorz=8192;

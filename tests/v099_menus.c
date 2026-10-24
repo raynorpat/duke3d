@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Exercise beta menu transitions through the real input handler. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
@@ -21,6 +22,8 @@ static void menu(int number,int row,int key)
 }
 int main(int argc,char **argv)
 {
+    if (!test_select_profile(&argc,argv,"0.99")) return 1;
+    game_init_release_defaults();
     setvbuf(stdout,NULL,_IONBF,0);
     initengine(); _platform_init(argc,argv,"v099_menus","test");
     if(setgamemode(1,320,200)) return 1;

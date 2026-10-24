@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Checks the engine's C fixed-point helpers (pragmas.h) against what the
  *  original x86 code computes. The reference functions below follow the
@@ -44,8 +45,9 @@ static const int32_t vals[] = {
 };
 #define NVALS ((int)(sizeof(vals) / sizeof(vals[0])))
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     char what[96];
     int i, j, k;
 

@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Exercise the real input handler; wrong-source loading fails these fixtures. */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
@@ -27,17 +28,15 @@ static void writefile(const char *path)
 static void openmaps(void)
 {
     cmenu(100);
-#ifdef PLUTOPAK
-    probey = 4;
-#else
-    probey = 3;
-#endif
+    probey = game_profile->plutopak ? 4 : 3;
     press(sc_Enter);
     check("permanent entry opens picker", current_menu == 120);
 }
 
 int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,"1.5")) return 2;
+    game_init_release_defaults();
     int i, source, launch = argc == 3;
     char paths[4][MAX_PATH];
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -54,13 +53,18 @@ int main(int argc, char **argv)
     if (setgamemode(1, 320, 200)) return 2;
     numplayers = ud.multimode = 1; myconnectindex = screenpeek = connecthead = 0;
     connectpoint2[0] = -1; SoundToggle = MusicToggle = 0; ps[0].gm = MODE_MENU;
-#ifdef VOLUMEONE
+    if(game_profile->shareware)
+    {
     cmenu(100); probey = 1; press(sc_Enter);
     check("shareware still shows episode restriction", current_menu == 20000);
     boardfilename[0] = 0;
     cmenu(100); probey = 3; press(sc_Enter);
     check("shareware has no selectable user maps entry", current_menu != 120);
-#else
+    cmenu(120);
+    check("shareware refuses direct picker entry", current_menu != 120);
+    current_menu = 120; press(0);
+    check("shareware refuses forced picker state", current_menu != 120);
+    } else {
     strcpy(paths[0], "duplicate.map"); strcpy(paths[1], "maps/duplicate.map");
     GetPathFromEnvironment(paths[2], sizeof(paths[2]), "duplicate.map");
     GetPathFromEnvironment(paths[3], sizeof(paths[3]), "maps/duplicate.map");
@@ -129,11 +133,7 @@ int main(int argc, char **argv)
         check("wrapped choice is first file", current_menu == 120);
     } else {
         press(sc_Escape); check("back restores user maps episode row",
-#ifdef PLUTOPAK
-            current_menu == 100 && probey == 4);
-#else
-            current_menu == 100 && probey == 3);
-#endif
+            current_menu == 100 && probey == (game_profile->plutopak ? 4 : 3));
         for (source = 0; source < 4; source++) {
             strcpy(boardfilename, "previous.map"); openmaps();
             for (i = 0; i < source; i++) press(sc_DownArrow);
@@ -157,7 +157,7 @@ int main(int argc, char **argv)
         check("stock episode clears custom map", !boardfilename[0]);
         press(sc_Escape); check("stock skill back returns to episodes", current_menu == 100);
     }
-#endif
+    }
     uninitengine();
     if (failures) return 1;
     puts("user maps menu: PASS"); return 0;

@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /*
  * Checks inside() against the point-in-sector test of each engine revision.
  *  The sector is a diamond at the edge of the map, where the cross product
@@ -38,8 +39,9 @@ static void diamond(int s, int w, int32_t r)
     sector[s].wallptr = w; sector[s].wallnum = 4;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     diamond(0, 0, 1000);
     diamond(1, 4, 131072);
     numsectors = 2;
@@ -54,13 +56,13 @@ int main(void)
     check("bad sector", inside(0, 0, 2), -1);
 
     /* Outside the diamond, with x1*y2 near 2^34. */
-#if BUILD_ENGINEREV < 19960320L
+if (game_profile->enginerev < 19960320L) {
     check("outside, products overflow", inside(-130000, 50210, 1), 1);
     check("outside, products overflow 2", inside(-122081, -57916, 1), 1);
-#else
+} else {
     check("outside, products overflow", inside(-130000, 50210, 1), 0);
     check("outside, products overflow 2", inside(-122081, -57916, 1), 0);
-#endif
+}
 
     if (failures) return 1;
     printf("inside: ok\n");

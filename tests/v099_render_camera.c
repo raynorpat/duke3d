@@ -1,3 +1,4 @@
+#include "profile_test_support.h"
 /* Beta camera inputs reaching the real classic renderer (EXE 0x21950). */
 #define SDL_MAIN_HANDLED
 #include "duke3d.h"
@@ -154,6 +155,8 @@ static void movingsector(void)
 
 int main(int argc,char **argv)
 {
+    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    game_init_release_defaults();
     struct player_struct *p;
     short tile;
     uint32_t actual,reference;

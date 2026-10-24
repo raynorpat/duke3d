@@ -72,6 +72,7 @@ Duke Lookup Table
 #include <stdlib.h>
 #include "build/engine.h"
 #include "build/platform.h"
+#include "gameprofile.h"
 #include "build/build.h"
 #include "build/pragmas.h"
 #include "build/bstub.h"
@@ -1945,6 +1946,7 @@ Initialize the Duke editor resources, saved settings, input and engine state.
 */
 void ExtInit(void)
 {
+    game_profile_select(game_profile_get(GAME_15));
     printf("------------------------------------------------------------------------------\n");
     printf("BUILD.EXE Copyright (c) 1993 - 1996 Ken Silverman, 3D Realms Entertainment.\n");
     printf("This version of BUILD was created for Duke Nukem 3D and parts were modified\n");
