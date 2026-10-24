@@ -38,7 +38,7 @@ int main(int argc,char **argv)
 {
     unsigned char b[194]; char name[]="E1L1.MAP",text=0; int i,fil,sw;
     FILE *f;
-    if(!test_select_profile(&argc,argv,NULL)) return 1;
+    if(!test_select_profile(&argc,argv,"1.5")) return 1;
     game_init_release_defaults(); sw=game_profile->shareware;
     for(i=0;i<6;i++) {
         char campaign[]="E1L1.MAP"; campaign[3]+=(char)i;

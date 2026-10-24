@@ -7,30 +7,6 @@ add_library(duke3d_compile_options INTERFACE)
 
 target_compile_definitions(duke3d_compile_options INTERFACE USE_SDL=1)
 
-# Game and engine revisions for DUKE3D_VERSION, as dates in the form the
-# gamesrc-ver-recreation project uses. The engine sees BUILD_ENGINEREV too.
-if(DUKE3D_VERSION STREQUAL "0.99")
-  set(_gamever 199601040L)
-  set(_enginerev 19960104L)
-elseif(DUKE3D_VERSION STREQUAL "1.0")
-  set(_gamever 199601290L)
-  set(_enginerev 19960129L)
-elseif(DUKE3D_VERSION STREQUAL "1.1")
-  set(_gamever 199602200L)
-  set(_enginerev 19960220L)
-elseif(DUKE3D_VERSION STREQUAL "1.3D")
-  set(_gamever 199604190L)
-  set(_enginerev 19960419L)
-elseif(DUKE3D_VERSION STREQUAL "1.4")
-  set(_gamever 199610210L)
-  set(_enginerev 19960820L)
-else()
-  set(_gamever 199610320L)
-  set(_enginerev 20000614L)
-endif()
-target_compile_definitions(duke3d_compile_options INTERFACE
-  DUKE3D_GAMEVER=${_gamever} BUILD_ENGINEREV=${_enginerev})
-
 if(WIN32)
   target_compile_definitions(duke3d_compile_options INTERFACE
     PLATFORM_WIN32=1)
@@ -92,11 +68,6 @@ target_compile_features(duke3d_compile_options INTERFACE c_std_99)
 
 # Game-specific definitions, for duke3d and the build editor only.
 add_library(duke3d_game_options INTERFACE)
-if(DUKE3D_SHAREWARE)
-  target_compile_definitions(duke3d_game_options INTERFACE VOLUMEONE)
-else()
-  target_compile_definitions(duke3d_game_options INTERFACE VOLUMEALL)
-endif()
 if(DUKE3D_CONTROLS_MENU)
   target_compile_definitions(duke3d_game_options INTERFACE
     CONTROLS_CONFIG_MENU=1)

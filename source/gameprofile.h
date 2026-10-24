@@ -33,6 +33,5 @@ typedef enum { GAME_RESOLVE_OK, GAME_RESOLVE_NEEDS_OVERRIDE,
     GameResolveResult;
 GameResolveResult game_profile_resolve(const GameGrp *detected,
     const GameProfile *forced, const GameProfile **selected);
-void game_profile_select_build_default(void); /* removed after migration */
 int game_profile_select(const GameProfile *profile);
 #endif

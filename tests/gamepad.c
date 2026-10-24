@@ -25,7 +25,7 @@ static void pollpad(void)
 
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     game_init_release_defaults();
     SDL_Joystick *pad;
     int device, action = gamefunc_Jump;
@@ -245,6 +245,6 @@ if (game_profile->gamever >= GAMEVER_13D) {
 }
 #else
 int main(int argc, char **argv) {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     game_init_release_defaults(); return 77; }
 #endif

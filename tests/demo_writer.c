@@ -7,7 +7,7 @@ static int failures;
 extern int32_t recfilep;
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     game_init_release_defaults();
     int sizes[]={1,RECSYNCBUFSIZ,RECSYNCBUFSIZ+1},n,i;
     static const int protocol[]={9,10,12,14,103,116,117};
@@ -15,7 +15,7 @@ int main(int argc, char **argv)
     int early=game_profile->gamever<GAMEVER_13D;
     int atomic=game_profile->gamever>=GAMEVER_14;
     int header_size=atomic?675:early?9:24;
-    if(BYTEVERSION!=protocol[game_profile->id]) { puts("FAIL protocol byte"); failures++; }
+    if(game_profile->byteversion!=protocol[game_profile->id]) { puts("FAIL protocol byte"); failures++; }
     static unsigned char cache[1024*1024];
     initengine(); initcache((intptr_t)cache,sizeof(cache)); connecthead=0; connectpoint2[0]=-1; ud.multimode=1;
     for(n=0;n<3;n++) {

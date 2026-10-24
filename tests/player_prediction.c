@@ -34,7 +34,7 @@ static void setup(int water, int shrunk)
 
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.1")) return 1;
     game_init_release_defaults();
     int water,shrunk;
     initengine();

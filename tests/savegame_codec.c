@@ -402,7 +402,7 @@ off = (game_profile->gamever < GAMEVER_14 ? (-0x4b300) : (-0x4b800));
 
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     game_init_release_defaults();
     if (argc > 1)
     {

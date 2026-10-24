@@ -24,7 +24,6 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 */
 //-------------------------------------------------------------------------
 
-#include "gamever.h"
 
 #define SECTOREFFECTOR 1
 #define ACTIVATOR 2

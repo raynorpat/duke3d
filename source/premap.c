@@ -314,7 +314,7 @@ char getsound(unsigned short num)
     short fp;
     int32_t   l;
 
-if ((game_profile->gamever < GAMEVER_13D ? (num >= GAME_NUM_SOUNDS || SoundToggle == 0) : (num >= NUM_SOUNDS || SoundToggle == 0))) {
+if ((game_profile->gamever < GAMEVER_13D ? (num >= game_sound_limit() || SoundToggle == 0) : (num >= NUM_SOUNDS || SoundToggle == 0))) {
 if (game_profile->gamever < GAMEVER_13D) {
 return 0;
 }
@@ -360,7 +360,7 @@ if (game_profile->gamever >= GAMEVER_13D) {
 }
     j = 0;
 
-    for(i=0;i<GAME_NUM_SOUNDS;i++)
+    for(i=0;i<game_sound_limit();i++)
         if(Sound[i].ptr == 0)
         {
 if (game_profile->gamever >= GAMEVER_15) {

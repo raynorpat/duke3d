@@ -157,7 +157,7 @@ static void check_dos_save(const char *path)
 
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     static unsigned char buf[100000];
     size_t i;
 

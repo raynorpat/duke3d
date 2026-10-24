@@ -2,11 +2,10 @@
 # straight into E1L1. Each run must still be alive when the 15 s timeout
 # kills it. Afterwards duke3d.cfg must exist in the scratch config dir.
 #
-#   cmake -DDUKE3D=<exe> -DGRP=<DUKE3D.GRP> -DCON_DIR=<dir with game.con,
-#         defs.con, user.con> -DWORK=<scratch dir> -DCFG_DIR=<config dir,
+#   cmake -DDUKE3D=<exe> -DGRP=<DUKE3D.GRP> -DPYTHON=<python3> -DWORK=<scratch dir> -DCFG_DIR=<config dir,
 #         relative to the scratch HOME; "." means the run dir> -P game_boot.cmake
 
-foreach(_var DUKE3D GRP CON_DIR WORK CFG_DIR)
+foreach(_var DUKE3D GRP PYTHON WORK CFG_DIR)
   if(NOT DEFINED ${_var})
     message(FATAL_ERROR "game_boot: ${_var} is not set")
   endif()
@@ -21,10 +20,11 @@ file(MAKE_DIRECTORY "${_run}" "${_home}")
 # The game opens duke3d.grp and GAME.CON from its working directory. The
 # CON files are needed there: without them it stops at a keyboard prompt.
 file(CREATE_LINK "${GRP}" "${_run}/duke3d.grp" SYMBOLIC COPY_ON_ERROR)
-foreach(_con GAME.CON DEFS.CON USER.CON)
-  string(TOLOWER "${_con}" _src)
-  file(COPY_FILE "${CON_DIR}/${_src}" "${_run}/${_con}")
-endforeach()
+execute_process(COMMAND "${PYTHON}" -I "${CMAKE_CURRENT_LIST_DIR}/extract_grp_cons.py" "${GRP}" "${_run}"
+  RESULT_VARIABLE _extract)
+if(NOT _extract EQUAL 0)
+  message(FATAL_ERROR "could not extract matching CON files")
+endif()
 
 set(ENV{SDL_VIDEODRIVER} dummy)
 # No sound: killing the game at the timeout would pop the speakers.

@@ -7,7 +7,7 @@ extern char *keyw[];
 int main(int argc,char **argv)
 {
     int bad=0, old;
-    if(!test_select_profile(&argc,argv,NULL)) return 1;
+    if(!test_select_profile(&argc,argv,"1.5")) return 1;
     game_init_release_defaults();
     old=game_profile->gamever<GAMEVER_13D;
     CHECK(game_freeze_weapon()==(old?10:9));
@@ -23,11 +23,9 @@ int main(int argc,char **argv)
     checkavailweapon(&ps[0]);
     CHECK(ps[0].curr_weapon==(!game_profile->shareware || game_profile->id==GAME_099SW ? DEVISTATOR_WEAPON : KNEE_WEAPON));
     CHECK(game_tile_case(game_profile->gamever<GAMEVER_14?3999:4095)==FRAMEEFFECT1);
-    CHECK(GAME_NUM_SOUNDS==(old?255:game_profile->gamever<GAMEVER_14?348:450));
-    CHECK(MAX_WEAPRECS==(game_profile->gamever<GAMEVER_14?256:16));
-    CHECK(game_script_limit()==(game_profile->gamever<GAMEVER_14?20000:20460));
     CHECK(game_sound_limit()==(old?255:game_profile->gamever<GAMEVER_14?348:450));
     CHECK(game_weaprecs_limit()==(game_profile->gamever<GAMEVER_14?256:16));
+    CHECK(game_script_limit()==(game_profile->gamever<GAMEVER_14?20000:20460));
     CHECK(!strcmp(keyw[65],old?"shadeto":"ifmultiplayer"));
     CHECK(!strcmp(keyw[68],old?"ifplayersl":"debug"));
     CHECK(!strcmp(keyw[69],old?(game_profile->id==GAME_099SW?"activate":"endoflevel"):"endofgame"));

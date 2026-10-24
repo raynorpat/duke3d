@@ -6,7 +6,7 @@ static int failures;
 #define CHECK(c) do { if(!(c)) { printf("FAIL line %d: %s\n",__LINE__,#c); failures++; } } while(0)
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"0.99")) return 1;
     game_init_release_defaults();
     FILE *f=fopen("routebot-test.route","w"); input in; int i;
     fputs("# test\n0 0 wait 2\n1024 0 use\n1024 1024 fire\n2048 1024 jump\n",f); fclose(f);

@@ -672,7 +672,7 @@ static int video_fade(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     char pal[256 * 4];
     char readback[256 * 4];
     unsigned long start;

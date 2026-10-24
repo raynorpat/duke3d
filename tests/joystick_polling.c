@@ -11,7 +11,7 @@ static void check(const char *name, int ok)
 }
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     game_init_release_defaults();
     SDL_Joystick *stick;
     int device;
@@ -82,6 +82,6 @@ int main(int argc, char **argv)
 }
 #else
 int main(int argc, char **argv) {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     game_init_release_defaults(); return 77; }
 #endif

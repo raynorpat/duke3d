@@ -37,7 +37,7 @@ static void setup(const int32_t *code, int words)
 }
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"0.99")) return 1;
     game_init_release_defaults();
     static const int32_t pal[]={14,12,34,56,4,4};
     static const int32_t alive[]={51,16384,56,11,77,4,11,88,4};

@@ -1,20 +1,28 @@
-# Configures scratch builds with bad version settings and expects each to
-# stop with a message naming the valid values.
-# -DSRC=<source dir> -DWORK=<scratch dir>
-foreach(_args "-DDUKE3D_VERSION=1.3" "-DDUKE3D_VERSION=13d"
-              "-DDUKE3D_VERSION=1.4;-DDUKE3D_SHAREWARE=ON"
-              "-DDUKE3D_SHAREWARE=ON"
-              "-DDUKE3D_VERSION=1.1" "-DDUKE3D_VERSION=1.0" "-DDUKE3D_VERSION=1.2"
-              "-DDUKE3D_VERSION=0.99" "-DDUKE3D_VERSION=0.9")
-  file(REMOVE_RECURSE "${WORK}")
-  execute_process(COMMAND "${CMAKE_COMMAND}" -S "${SRC}" -B "${WORK}" ${_args}
-                  RESULT_VARIABLE _r OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
-  if(_r EQUAL 0)
-    message(FATAL_ERROR "configure with ${_args} succeeded")
+# Obsolete selectors must fail even when false, default-valued, or cached.
+function(expect_obsolete name)
+  execute_process(COMMAND "${CMAKE_COMMAND}" -S "${SRC}" -B "${WORK}/${name}"
+    ${TEST_ARGS} ${ARGN} RESULT_VARIABLE _result OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
+  if(_result EQUAL 0 OR NOT "${_out}${_err}" MATCHES "obsolete.*Remove|obsolete.*remove")
+    message(FATAL_ERROR "${name} did not reject obsolete selectors with migration guidance:\n${_out}${_err}")
   endif()
-  string(REGEX REPLACE "[ \r\n]+" " " _diagnostic "${_out}${_err}")
-  if(NOT _diagnostic MATCHES "0\\.99, 1\\.0, 1\\.1, 1\\.3D|0\\.99.*shareware")
-    message(FATAL_ERROR "configure with ${_args} failed without naming the valid values:\n${_err}")
+  if(NOT "${_out}${_err}" MATCHES "-gameversion")
+    message(FATAL_ERROR "${name} omitted the runtime replacement")
   endif()
-endforeach()
+endfunction()
 file(REMOVE_RECURSE "${WORK}")
+file(MAKE_DIRECTORY "${WORK}")
+expect_obsolete(version_default -DDUKE3D_VERSION=1.5)
+expect_obsolete(shareware_off -DDUKE3D_SHAREWARE=OFF)
+expect_obsolete(shareware_on -DDUKE3D_SHAREWARE=ON)
+expect_obsolete(old_version -DDUKE3D_VERSION=0.99 -DDUKE3D_SHAREWARE=ON)
+expect_obsolete(bad_version -DDUKE3D_VERSION=not-a-version)
+file(WRITE "${WORK}/old-cache.cmake" "set(DUKE3D_VERSION 1.5 CACHE STRING \"old selector\")\nset(DUKE3D_SHAREWARE OFF CACHE BOOL \"old selector\")\n")
+expect_obsolete(initial_cache -C "${WORK}/old-cache.cmake")
+execute_process(COMMAND "${CMAKE_COMMAND}" -S "${SRC}" -B "${WORK}/clean"
+  ${TEST_ARGS} RESULT_VARIABLE _result OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
+if(NOT _result EQUAL 0)
+  message(FATAL_ERROR "clean runtime configure failed:\n${_out}${_err}")
+endif()
+# Simulate an existing pre-migration cache, then configure without any -D selector.
+file(APPEND "${WORK}/clean/CMakeCache.txt" "\nDUKE3D_VERSION:STRING=1.5\nDUKE3D_SHAREWARE:BOOL=OFF\n")
+expect_obsolete(clean)

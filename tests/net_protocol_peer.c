@@ -17,7 +17,7 @@ void keyhandler(void) { }
 void faketimerhandler(void) { }
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     char packet[2048], version[3];
     short other;
     int i, custom_map=0, byteversion=atoi(argv[argc-1]);

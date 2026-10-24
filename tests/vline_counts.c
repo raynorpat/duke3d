@@ -86,7 +86,7 @@ static void check_drawslab(void)
 
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     static unsigned char pal[256], tile[16], dest[16];
     int i;
 

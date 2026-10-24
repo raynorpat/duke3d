@@ -8,6 +8,7 @@
 #         -P con_compile_v13d.cmake
 include("${CMAKE_CURRENT_LIST_DIR}/v13d_data.cmake")
 v13d_check_edition("${DATA}" "${EDITION}")
+v13d_game_profile("${EDITION}" _profile)
 
 set(_save "${DATA}/refsaves/e1l1start.SAV")
 if(NOT EXISTS "${_save}")
@@ -36,7 +37,7 @@ execute_process(COMMAND "${PYTHON}" -I "${DECODER}" script "${_save}" "${WORK}/r
 if(NOT _r EQUAL 0)
   message(FATAL_ERROR "couldn't decode ${_save}")
 endif()
-execute_process(COMMAND "${CON_COMPILE}" "${WORK}" "${WORK}/ref.txt"
+execute_process(COMMAND "${CON_COMPILE}" -test-gameversion "${_profile}" "${WORK}" "${WORK}/ref.txt"
                 RESULT_VARIABLE _r)
 if(NOT _r EQUAL 0)
   message(FATAL_ERROR "the compiled script doesn't match the DOS executable's")
@@ -48,7 +49,7 @@ foreach(_con game.con DEFS.CON USER.CON)
   string(REPLACE "\r\n" "\n" _text "${_text}")
   file(WRITE "${WORK}/lf/${_con}" "${_text}")
 endforeach()
-execute_process(COMMAND "${CON_COMPILE}" "${WORK}/lf" "${WORK}/ref.txt"
+execute_process(COMMAND "${CON_COMPILE}" -test-gameversion "${_profile}" "${WORK}/lf" "${WORK}/ref.txt"
                 RESULT_VARIABLE _r)
 if(NOT _r EQUAL 0)
   message(FATAL_ERROR "with LF line endings, the compiled script doesn't match the DOS executable's")

@@ -47,7 +47,7 @@ static const int32_t vals[] = {
 
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     char what[96];
     int i, j, k;
 

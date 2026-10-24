@@ -20,7 +20,7 @@ void faketimerhandler(void) { }
 
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     editormode_t m = { 3, 640, 480, 2, GLPATH_VBO, 320, 200, 2 /* SS_4K */, 2 /* TEXFILTER_TRILINEAR */ };
 #ifdef POLYMOST
     int polymost = 1;

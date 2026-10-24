@@ -31,8 +31,8 @@
 #define PREFIX_SLOTS 5  /* one action: five values, its keyword dropped */
 #define SHIFT (PREFIX_SLOTS * 4)
 
-static int32_t a_script[MAXSCRIPTSIZE];
-static int32_t a_labelcode[MAXSCRIPTSIZE];
+static int32_t a_script[GAME_SCRIPT_CAPACITY];
+static int32_t a_labelcode[GAME_SCRIPT_CAPACITY];
 static int32_t a_actorscrptr[MAXTILES];
 static int32_t a_size, a_labelcnt;
 
@@ -88,7 +88,7 @@ static void check_level_names(void)
 /* Compares the compiled script with a DOS reference dump. */
 static int compare_reference(const char *reffile)
 {
-    static int32_t want_script[MAXSCRIPTSIZE], want_actor[MAXTILES];
+    static int32_t want_script[GAME_SCRIPT_CAPACITY], want_actor[MAXTILES];
     char name[16];
     int32_t i, v, words = 0, actors = 0;
     FILE *f = fopen(reffile, "r");
@@ -100,7 +100,7 @@ static int compare_reference(const char *reffile)
     }
     while (fscanf(f, "%15s %d %d", name, &i, &v) == 3)
     {
-        if (strcmp(name, "script") == 0 && i >= 0 && i < MAXSCRIPTSIZE)
+        if (strcmp(name, "script") == 0 && i >= 0 && i < game_script_limit())
             { want_script[i] = v; if (i >= words) words = i + 1; }
         else if (strcmp(name, "actor") == 0 && i >= 0 && i < MAXTILES)
             { want_actor[i] = v; actors++; }
@@ -115,7 +115,7 @@ static int compare_reference(const char *reffile)
         return 1;
     }
     check_level_names();
-    for (i = 0; i < MAXSCRIPTSIZE; i++)
+    for (i = 0; i < game_script_limit(); i++)
         if (script[i] != (i < words ? want_script[i] : 0))
             fail("script differs from the reference, ours", i, script[i]);
     for (i = 0; i < MAXTILES; i++)
@@ -140,7 +140,7 @@ static int compare_reference(const char *reffile)
 
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     game_init_release_defaults();
     int32_t i, a, b, addrslots = 0, addrlabels = 0, actors = 0;
 

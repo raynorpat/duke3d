@@ -5,7 +5,7 @@
 #include <stdio.h>
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     int bad=0;
     if(sizeof(input)!=10 || sizeof(sectortype)!=40 || sizeof(walltype)!=32 || sizeof(spritetype)!=44) bad=1;
     if(sizeof(((struct player_struct *)0)->weaprecs)/sizeof(short)<256) {

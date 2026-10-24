@@ -5,7 +5,7 @@
 
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     game_init_release_defaults();
     static const int seeds[]={1,17,1047}, angles[]={82,1070,58};
     static const uint32_t ends[]={2052237015u,86936935u,2419763165u};

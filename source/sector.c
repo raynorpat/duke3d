@@ -221,7 +221,7 @@ if ((game_profile->gamever >= GAMEVER_10 ? ( (soundm[SLT]&16) == 0) : (1)))
                     if(SLT)
                     {
                         spritesound(SLT,whatsprite);
-                        if(SHT && SLT != SHT && SHT < GAME_NUM_SOUNDS)
+                        if(SHT && SLT != SHT && SHT < game_sound_limit())
                             stopsound(SHT);
                     }
 
@@ -229,7 +229,7 @@ if ((game_profile->gamever >= GAMEVER_10 ? ( (sector[SECT].lotag&0xff) != 22) : 
                         T1 = 1;
                 }
             }
-            else if(SHT < GAME_NUM_SOUNDS)
+            else if(SHT < game_sound_limit())
             {
                 if(SHT) spritesound(SHT,whatsprite);
 if ((game_profile->gamever < GAMEVER_10 ? ( (soundm[SLT]&1) || SHT ) : ( (soundm[SLT]&1) || ( SHT && SHT != SLT ) )))

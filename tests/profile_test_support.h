@@ -14,8 +14,22 @@ static int test_select_profile(int *argc, char **argv, const char *fallback_toke
     }
     argv[out]=NULL; *argc=out;
     if (!profile && fallback_token) profile=game_profile_find(fallback_token);
-    if (profile) return game_profile_select(profile);
-    game_profile_select_build_default();
-    return game_profile!=NULL;
+    if (!profile && !fallback_token && *argc>1) {
+        uint64_t size;
+        uint32_t crc;
+        char error[256];
+        const GameGrp *grp;
+        if (!game_grp_inspect(argv[1],&size,&crc,error,sizeof(error))) {
+            fprintf(stderr,"%s\n",error);
+            return 0;
+        }
+        grp=game_grp_find(size,crc);
+        if (!grp || !grp->profile) {
+            fprintf(stderr,"Unrecognized test GRP; use -test-gameversion TOKEN.\n");
+            return 0;
+        }
+        profile=grp->profile;
+    }
+    return profile && game_profile_select(profile);
 }
 #endif

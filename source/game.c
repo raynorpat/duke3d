@@ -809,12 +809,12 @@ void getpackets(void)
 
                 break;
             case 6:
-                if (packbuf[1] != BYTEVERSION)
+                if (packbuf[1] != game_profile->byteversion)
                 {
                     // Fix: a peer that refused before sending its own name packet left the other one waiting forever; send our version first.
                     char ver[3];
 
-                    ver[0] = 6; ver[1] = BYTEVERSION; ver[2] = 0;
+                    ver[0] = 6; ver[1] = game_profile->byteversion; ver[2] = 0;
                     sendpacket(other,ver,3);
                     gameexit("\nYou cannot play Duke with different versions.");
                 }
@@ -9180,7 +9180,7 @@ void getnames(void)
     if(numplayers > 1)
     {
         buf[0] = 6;
-        buf[1] = BYTEVERSION;
+        buf[1] = game_profile->byteversion;
 
         buf[l+2] = 0;
         l += 3;
@@ -9995,10 +9995,10 @@ if (((game_profile->shareware) ? ( vol != 0 || lev > 10 || skill > 4 || mm < 1 |
      return(1);
 } else {
      kread8(recfilep,&ver);
-     if( (ver != BYTEVERSION) ) // || (ud.reccnt < 512) )
+     if( (ver != game_profile->byteversion) ) // || (ud.reccnt < 512) )
      {
         printf("%s is a version %d demo, but we want version %d.\n",
-                fname, (int) ver, (int) BYTEVERSION);
+                fname, (int) ver, (int) game_profile->byteversion);
         kclose(recfilep);
         return 0;
      }
@@ -10094,7 +10094,7 @@ void opendemowrite(void)
 
     if(ud.recstat == 2) kclose(recfilep);
 
-    ver = BYTEVERSION;
+    ver = game_profile->byteversion;
 
 // CTW - MODIFICATION
 //  if ((frecfilep = fopen(d,"wb")) == -1) return;

@@ -73,26 +73,12 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "build/build.h"
 #include "function.h"
 
-//#define VOLUMEALL
-//#define PLUTOPAK
-// #define VOLUMEONE
 // #define ONELEVELDEMO
-
-// Make sure something is defined here (although this is usually
-//  handled in the makefile now). --ryan.
-#if ((!defined VOLUMEALL) && (!defined VOLUMEONE))
-#define VOLUMEALL
-#endif
 
 #include "gamever.h"
 #include "gameprofile.h"
 #define GAME_SCRIPT_CAPACITY 20460
 #define GAME_WEAPRECS_CAPACITY 256
-
-// Define plutopak if volumeall. --ryan. The Plutonium Pak came with 1.4.
-#if (defined VOLUMEALL) && DUKE3D_GAMEVER >= GAMEVER_14
-#define PLUTOPAK
-#endif
 
 // #define TEN
 // #define BETA
@@ -102,7 +88,6 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #define MAXSLEEPDIST (game_profile->gamever < GAMEVER_10 ? 8192 : 16384)
 #define SLEEPTIME (game_profile->gamever < GAMEVER_10 ? 6*64 : 24*64)
 
-#define BYTEVERSION (game_profile->byteversion)
 
 #define NUMPAGES 1
 
@@ -156,7 +141,6 @@ struct player_struct;
 #define NUM_SOUNDS 450
 
 // Sounds the game logic may name: 1.1's sound table held 255, 1.3D's 348.
-#define GAME_NUM_SOUNDS (game_sound_limit())
 
 #define    ALT_IS_PRESSED ( KB_KeyPressed( sc_RightAlt ) || KB_KeyPressed( sc_LeftAlt ) )
 #define    SHIFTS_IS_PRESSED ( KB_KeyPressed( sc_RightShift ) || KB_KeyPressed( sc_LeftShift ) )
@@ -202,11 +186,7 @@ struct player_struct;
 #define NUMOFFIRSTTIMEACTIVE 192
 
 #define MAXCYCLERS 256
-#if DUKE3D_GAMEVER < GAMEVER_14
-#define MAXSCRIPTSIZE 20000  // 1.3D's script[], as its saves hold it
-#else
-#define MAXSCRIPTSIZE 20460
-#endif
+
 #define MAXANIMATES 64
 
 #define SP  sprite[i].yvel
@@ -397,7 +377,6 @@ void add_ammo( short, short, short, short );
 extern int32_t fricxv,fricyv;
 
 // Weapons a co-op player has picked up and can't take again.
-#define MAX_WEAPRECS (game_weaprecs_limit())
 
 struct player_struct
 {

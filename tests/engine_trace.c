@@ -102,7 +102,7 @@ static void sprite_contracts(void)
 
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"1.5")) return 1;
     short hitsect, hitwall, hitsprite, sect;
     int32_t hitx, hity, hitz, x, y, z;
     int i, r;

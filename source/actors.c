@@ -6339,7 +6339,7 @@ if (game_profile->gamever < GAMEVER_14) {
                                 goto BOLT;
 
                         // Fix: the bound was 255, overflowing weaprecs[16].
-                        if(ps[p].weapreccnt < MAX_WEAPRECS)
+                        if(ps[p].weapreccnt < game_weaprecs_limit())
                             ps[p].weaprecs[ps[p].weapreccnt++] = s->picnum;
                     }
 }

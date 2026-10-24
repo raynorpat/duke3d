@@ -30,7 +30,7 @@ static int carry(int tile,int stat,int cstat)
 int main(int argc,char **argv)
 {
     int i,bad=0,early,atomic;
-    if(!test_select_profile(&argc,argv,NULL)) return 1;
+    if(!test_select_profile(&argc,argv,"1.5")) return 1;
     game_init_release_defaults();
     early=game_profile->gamever<GAMEVER_13D;
     atomic=game_profile->gamever>=GAMEVER_14;

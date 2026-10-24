@@ -96,7 +96,7 @@ static void movingsectorflags(void)
 
 int main(int argc, char **argv)
 {
-    if (!test_select_profile(&argc,argv,NULL)) return 1;
+    if (!test_select_profile(&argc,argv,"0.99")) return 1;
     game_init_release_defaults();
     int i, j, k;
     movingsectorflags();

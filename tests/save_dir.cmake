@@ -1,6 +1,6 @@
 # Windows: on first run the game copies duke3d.cfg and game*.sav from its
 # working directory into the save folder. An empty GRP gets startup far
-# enough; whatever the game does after that doesn't matter.
+# enough with an explicit test profile; later initialization does not matter.
 #
 #   cmake -DDUKE3D=<exe> -DEMPTY_GRP=<empty.grp> -DWORK=<scratch dir>
 #         -P save_dir.cmake
@@ -24,7 +24,7 @@ set(ENV{SDL_VIDEODRIVER} dummy)
 set(ENV{SDL_AUDIODRIVER} dummy)
 set(ENV{BUILD_WINDOWED} 1)
 set(ENV{DUKE3D_SAVE_DIR} "${_saves}")
-execute_process(COMMAND "${DUKE3D}"
+execute_process(COMMAND "${DUKE3D}" -gameversion 1.5
   WORKING_DIRECTORY "${_run}"
   TIMEOUT 15
   RESULT_VARIABLE _result
